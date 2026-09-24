@@ -6,6 +6,8 @@ with rule-based preemption) on the left and COOP-FULL on the right. Record the s
     python scripts/demo_side_by_side.py [--left ev_rule] [--right coop_full]
         [--checkpoint results/checkpoints/coop_full/real_district/seed1.zip]
         [--net real_district] [--demand peak] [--scenarios emergency] [--seed 3]
+
+``--headless`` runs both controllers without windows (checks the setup).
 """
 
 from __future__ import annotations
@@ -13,6 +15,8 @@ from __future__ import annotations
 import argparse
 import multiprocessing as mp
 from pathlib import Path
+
+BASELINES = ("ft", "act", "mp", "ev_rule")
 
 
 def run(
@@ -24,6 +28,8 @@ def run(
     seed: int,
     x: int,
     delay: int,
+    gui: bool = True,
+    quick: bool = False,
 ) -> None:
     from cotraffic.controllers.registry import make_controller
     from cotraffic.envs.episodes import evaluation_episode, split_scenarios
@@ -36,25 +42,28 @@ def run(
         scenarios,
         seed,
         ssm=False,
+        quick=quick,
         additional=controller.additional_files(network, demand),
     )
     _, runtime = split_scenarios(scenarios)
+    window = ["--window-pos", f"{x},30", "--window-size", "940,900", "--delay", str(delay)]
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
         controller.agent_cfg,
         controlled=controller.controlled,
-        gui=True,
+        gui=gui,
         runtime_scenarios=runtime,
         step_hooks=controller.step_hooks(),
         compute_observations=controller.needs_observations,
-        sumo_options=["--window-pos", f"{x},30", "--window-size", "940,900", "--delay", str(delay)],
+        sumo_options=window if gui else [],
     )
     obs, _ = env.reset(seed=seed)
     controller.reset(env)
     while env.agents:
         obs, *_ = env.step(controller.act(env, obs))
     env.close()
+    print(f"{method}: finished at t={env.now:.0f} s, {env.teleports} teleports")
 
 
 def main() -> None:
@@ -69,13 +78,26 @@ def main() -> None:
     parser.add_argument("--scenarios", nargs="*", default=["emergency"])
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--delay", type=int, default=40, help="ms per simulation step")
+    parser.add_argument("--headless", action="store_true", help="no window (checks the setup)")
+    parser.add_argument("--quick", action="store_true", help="short episode")
     args = parser.parse_args()
     jobs = []
     for method, x in ((args.left, 0), (args.right, 960)):
-        ckpt = args.checkpoint if method not in ("ft", "act", "mp", "ev_rule") else None
+        ckpt = None if method in BASELINES else args.checkpoint
         p = mp.Process(
             target=run,
-            args=(method, ckpt, args.net, args.demand, args.scenarios, args.seed, x, args.delay),
+            args=(
+                method,
+                ckpt,
+                args.net,
+                args.demand,
+                args.scenarios,
+                args.seed,
+                x,
+                args.delay,
+                not args.headless,
+                args.quick,
+            ),
         )
         p.start()
         jobs.append(p)
