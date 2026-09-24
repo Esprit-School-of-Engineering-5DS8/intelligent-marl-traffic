@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from cotraffic.forecasting.models import HORIZON, LAGS, make_features, predict_all
 
@@ -66,3 +67,39 @@ def test_sentence_describes_the_decision():
     assert "12 halting on north-south" in text and "emergency vehicle 180 m from the south" in text
     assert "3 pedestrians waiting" in text
     assert sentence(state, 0, "min_green").endswith("shield: min green")
+
+
+def test_online_forecaster_counts_arrivals_per_approach(tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    from cotraffic.forecasting.models import FEATURES
+    from cotraffic.forecasting.online import OnlineForecaster
+
+    # model predicting 5 x lag0: easy to check by hand
+    model = {
+        "features": FEATURES,
+        "mean": [0.0] * len(FEATURES),
+        "scale": [1.0] * len(FEATURES),
+        "coef": [5.0] + [0.0] * (len(FEATURES) - 1),
+        "intercept": 0.0,
+    }
+    path = tmp_path / "ridge.json"
+    path.write_text(json.dumps(model))
+    lanes = {"w_1": [], "w_2": []}
+    conn = SimpleNamespace(lane=SimpleNamespace(getLastStepVehicleIDs=lambda ln: lanes[ln]))
+    inter = SimpleNamespace(side_lanes={"west": ["w_1", "w_2"], "north": []})
+    env = SimpleNamespace(
+        conn=conn, intersections={"J": inter}, now=0.0, episode=SimpleNamespace(measure_from=0.0)
+    )
+    f = OnlineForecaster(path)
+    f.predict(env)
+    lanes["w_1"] = ["a", "b"]
+    env.now = 30.0
+    f.predict(env)
+    lanes["w_1"], lanes["w_2"] = ["b"], ["a", "c"]  # a changed lane, c is new
+    env.now = 55.0
+    f.predict(env)
+    env.now = 65.0  # minute 0 is complete: 3 arrivals (a, b, c)
+    out = f.predict(env)
+    assert out["J"]["west"] == pytest.approx(15.0)

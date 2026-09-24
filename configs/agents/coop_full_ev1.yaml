@@ -1,0 +1,5 @@
+name: coop_full_ev1
+extends: coop_full
+description: Sensitivity check - COOP-FULL with a lower emergency-vehicle weight (lambda_ev = 1).
+reward:
+  ev: 1.0
