@@ -85,11 +85,12 @@ def evaluation_episode(
     protocol: Mapping[str, Any] | None = None,
     quick: bool = False,
     scale: float = 1.0,
+    mode: str = "evaluation",
 ) -> Episode:
     """Warm-up + measured window + cool-down, as defined in configs/protocol.yaml
-    (the ``quick`` section for smoke runs)."""
+    (section ``mode``: ``evaluation``, ``validation``; ``quick`` overrides it)."""
     protocol = protocol or config.load_protocol()
-    ev = protocol["quick"] if quick else protocol["evaluation"]
+    ev = protocol["quick" if quick else mode]
     warmup, measure, cooldown = (float(ev[k]) for k in ("warmup_s", "measure_s", "cooldown_s"))
     route_scenarios, _ = split_scenarios(scenarios)
     bundle = generate(DemandRequest(network, demand, route_scenarios, seed, warmup, measure, scale))

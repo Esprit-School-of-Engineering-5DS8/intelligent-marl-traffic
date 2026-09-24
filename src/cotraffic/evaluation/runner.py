@@ -49,6 +49,7 @@ def run_episode(
     record_decisions: bool = False,
     keep_outputs: bool = False,
     scale: float = 1.0,
+    mode: str = "evaluation",
 ) -> dict[str, Any]:
     """Simulate one episode with ``method`` and return (and store) its result row."""
     protocol = config.load_protocol()
@@ -69,6 +70,7 @@ def run_episode(
         protocol=protocol,
         quick=quick,
         scale=scale,
+        mode=mode,
     )
     _, runtime = split_scenarios(scenarios)
     env = CoTrafficEnv(

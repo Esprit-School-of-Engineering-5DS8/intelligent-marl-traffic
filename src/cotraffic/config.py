@@ -45,6 +45,17 @@ def load(kind: str, name: str) -> dict[str, Any]:
     return data
 
 
+def load_agent(name: str) -> dict[str, Any]:
+    """Agent config with its ``extends`` chain resolved (child values override the parent)."""
+    cfg = load("agents", name)
+    parent = cfg.pop("extends", None)
+    if parent is None:
+        return cfg
+    merged = deep_merge(load_agent(parent), cfg)
+    merged["description"] = cfg.get("description", "")
+    return merged
+
+
 def available(kind: str) -> list[str]:
     return sorted(p.stem for p in (CONFIG_DIR / kind).glob("*.yaml"))
 

@@ -84,6 +84,7 @@ class CoTrafficEnv(ParallelEnv):
         )
         self.controlled = controlled
         self.gui = gui
+        self.render_mode = "human" if gui else None
         self.record_decisions = record_decisions
         self.compute_observations = compute_observations
         self.step_hooks = list(step_hooks)
@@ -115,6 +116,10 @@ class CoTrafficEnv(ParallelEnv):
 
     def action_space(self, agent: str) -> spaces.Space:
         return self.action_spaces[agent]
+
+    def seed_episodes(self, seed: int) -> None:
+        """Seed the generator that draws the demand of every following episode."""
+        self._rng = np.random.default_rng(seed)
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
         if seed is not None:
@@ -237,6 +242,8 @@ class CoTrafficEnv(ParallelEnv):
             summary = self.episode_summary()
             for aid in self.agents:
                 infos[aid]["episode_summary"] = summary
+                # episodes end on a time limit: learners must bootstrap, not treat it as terminal
+                infos[aid]["TimeLimit.truncated"] = True
             self.agents = []
         return obs, rewards, terminations, truncations, infos
 

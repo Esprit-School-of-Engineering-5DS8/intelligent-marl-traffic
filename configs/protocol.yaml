@@ -37,14 +37,21 @@ quick:
   cooldown_s: 300
   episode_s: 600
 
+# Checkpoint selection episodes (validation seeds only): shorter than an evaluation
+# episode so that several checkpoints can be compared at reasonable cost.
+validation:
+  warmup_s: 600
+  measure_s: 1800
+  cooldown_s: 300
+
 sumo:
   step_length: 1.0
   time_to_teleport: 300
   waiting_time_memory: 10000
   max_depart_delay: -1          # never drop vehicles that cannot be inserted
   ssm:
-    measures: "TTC DRAC"
-    thresholds: "1.5 3.4"       # TTC < 1.5 s, DRAC > 3.4 m/s2 are logged as conflicts
+    measures: "TTC"
+    thresholds: "1.5"           # encounters with TTC < 1.5 s are logged as conflicts
     range: 50.0
   # A hard-braking event is a deceleration above this fraction of the vehicle's emergency
   # deceleration (0.5 x 9 m/s2 = 4.5 m/s2 for cars); counted by SUMO's statistic output.

@@ -1,0 +1,179 @@
+"""``results/summary/REPORT_TABLES.md``: the report's tables, generated from result files."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+
+from cotraffic.analysis.style import DEMAND_ORDER, METRIC_LABELS, label, method_sort_key
+from cotraffic.paths import RAW_DIR, SUMMARY_DIR
+
+PEAK_METRICS = [
+    "mean_travel_time",
+    "mean_waiting_time",
+    "mean_queue",
+    "throughput_per_h",
+    "p95_waiting_time",
+    "gini_waiting_time",
+    "co2_g_per_km",
+    "stops_per_vehicle",
+    "ssm_conflicts_per_1000_veh",
+    "shield_interventions",
+    "unfinished",
+    "teleports_total",
+]
+SCENARIO_METRICS = {
+    "emergency": ["ev_travel_time", "ev_delay", "mean_travel_time", "mean_waiting_time"],
+    "incident": ["mean_travel_time", "mean_waiting_time", "mean_queue", "p95_waiting_time"],
+    "pedestrians": ["ped_mean_waiting_time", "ped_max_waiting_time", "mean_travel_time"],
+    "buses": ["person_weighted_delay", "bus_delay", "mean_travel_time"],
+}
+DEFAULT_SCENARIO_METRICS = ["mean_travel_time", "mean_waiting_time", "mean_queue"]
+
+
+def _fmt(mean: float, lo: float, hi: float) -> str:
+    digits = 0 if abs(mean) >= 100 else (1 if abs(mean) >= 1 else 3)
+    return f"{mean:.{digits}f} [{lo:.{digits}f}, {hi:.{digits}f}]"
+
+
+def _cell(summary: pd.DataFrame, metric: str, **where) -> pd.DataFrame:
+    sel = summary["metric"] == metric
+    for key, value in where.items():
+        sel &= summary[key] == value
+    return summary[sel]
+
+
+def _table(header: list[str], rows: list[list[str]]) -> list[str]:
+    out = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    out += ["| " + " | ".join(r) + " |" for r in rows]
+    return out + [""]
+
+
+def demand_table(summary: pd.DataFrame, network: str, scenario: str, metric: str) -> list[str]:
+    sub = _cell(summary, metric, network=network, scenario=scenario)
+    if sub.empty:
+        return []
+    demands = [d for d in DEMAND_ORDER if d in set(sub["demand"])]
+    methods = sorted(sub["method"].unique(), key=method_sort_key)
+    rows = []
+    for m in methods:
+        row = [label(m)]
+        for d in demands:
+            r = sub[(sub["method"] == m) & (sub["demand"] == d)]
+            row.append(
+                _fmt(r["mean"].iloc[0], r["ci_lo"].iloc[0], r["ci_hi"].iloc[0]) if len(r) else "-"
+            )
+        rows.append(row)
+    name = METRIC_LABELS.get(metric, metric)
+    title = f"**{name}** - {network}, scenario `{scenario}` (mean [95% CI])"
+    return [title, ""] + _table(["Method"] + demands, rows)
+
+
+def metrics_table(
+    summary: pd.DataFrame, network: str, scenario: str, demand: str, metrics: list[str]
+) -> list[str]:
+    sub = summary[
+        (summary["network"] == network)
+        & (summary["scenario"] == scenario)
+        & (summary["demand"] == demand)
+    ]
+    metrics = [m for m in metrics if m in set(sub["metric"])]
+    if sub.empty or not metrics:
+        return []
+    methods = sorted(sub["method"].unique(), key=method_sort_key)
+    rows = []
+    for m in methods:
+        row = [label(m)]
+        for metric in metrics:
+            r = sub[(sub["method"] == m) & (sub["metric"] == metric)]
+            row.append(
+                _fmt(r["mean"].iloc[0], r["ci_lo"].iloc[0], r["ci_hi"].iloc[0]) if len(r) else "-"
+            )
+        rows.append(row)
+    title = f"**{network}, scenario `{scenario}`, demand `{demand}`** (mean [95% CI])"
+    return [title, ""] + _table(["Method"] + [METRIC_LABELS.get(m, m) for m in metrics], rows)
+
+
+def comparison_table(comp: pd.DataFrame, kind: str) -> list[str]:
+    """Rows of the comparisons made against ``kind`` (``ft`` or ``best_baseline``)."""
+    sub = comp[comp["kind"] == kind]
+    if sub.empty:
+        return []
+    rows = []
+    for _, r in sub.sort_values(["network", "scenario", "demand"]).iterrows():
+        rows.append(
+            [
+                r["network"],
+                r["scenario"],
+                r["demand"],
+                label(r["method"]),
+                label(r["reference"]),
+                f"{r['mean']:.1f}",
+                f"{r['reference_mean']:.1f}",
+                f"{r['improvement_pct']:+.1f}%",
+                f"{r['p_holm']:.3g}",
+                f"{r['cliffs_delta']:+.2f} ({r['effect']})",
+            ]
+        )
+    header = [
+        "Network",
+        "Scenario",
+        "Demand",
+        "Method",
+        "Reference",
+        "Mean",
+        "Ref. mean",
+        "Improvement",
+        "p (Holm)",
+        "Cliff's delta",
+    ]
+    return _table(header, rows)
+
+
+def build_report_tables(raw_dir: Path = RAW_DIR, summary_dir: Path = SUMMARY_DIR) -> Path:
+    summary = pd.read_csv(summary_dir / "summary.csv")
+    raw = pd.concat(
+        [pd.read_csv(f) for f in sorted(Path(raw_dir).glob("*.csv"))], ignore_index=True
+    )
+    commits = sorted(raw["git_commit"].astype(str).unique())
+    lines = [
+        "# Report tables",
+        "",
+        f"Generated by `python -m cotraffic tables` from {len(raw)} runs in `results/raw` "
+        f"(code versions: {', '.join(commits)}). Do not edit by hand.",
+        "Each cell: mean over runs [95% bootstrap CI]. Lower is better except throughput.",
+        "",
+    ]
+    for network in sorted(summary["network"].unique()):
+        lines += [f"## {network}", ""]
+        for metric in ("mean_travel_time", "mean_waiting_time"):
+            lines += demand_table(summary, network, "normal", metric)
+        if "peak" in set(summary[summary["network"] == network]["demand"]):
+            lines += metrics_table(summary, network, "normal", "peak", PEAK_METRICS)
+        for scenario in sorted(
+            set(summary[summary["network"] == network]["scenario"]) - {"normal"}
+        ):
+            metrics = SCENARIO_METRICS.get(scenario, DEFAULT_SCENARIO_METRICS)
+            for demand in [d for d in DEMAND_ORDER if d in set(summary["demand"])]:
+                lines += metrics_table(summary, network, scenario, demand, metrics)
+    comp_file = summary_dir / "comparisons_mean_travel_time.csv"
+    if comp_file.is_file():
+        comp = pd.read_csv(comp_file)
+        lines += [
+            "## Comparisons - mean travel time",
+            "",
+            "Mann-Whitney U, Holm-corrected within each table; Cliff's delta < 0 means the "
+            "method has lower travel times than the reference.",
+            "",
+        ]
+        for reference, title in (
+            ("ft", "Against fixed-time (FT)"),
+            ("best_baseline", "Against the best baseline of each cell"),
+        ):
+            table = comparison_table(comp, reference)
+            if table:
+                lines += [f"### {title}", ""] + table
+    out = summary_dir / "REPORT_TABLES.md"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out

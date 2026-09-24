@@ -138,6 +138,27 @@ def _baselines() -> str:
     return ", ".join(parts)
 
 
+@check("training")
+def _training() -> str:
+    """Quick PPO run, resume from its checkpoint, then evaluate the policy."""
+    import shutil
+
+    from cotraffic.training.train import list_checkpoints, run_dir, train
+
+    folder = run_dir("coop", "grid2x2", 0) / "quick"
+    shutil.rmtree(folder, ignore_errors=True)
+    train("coop", "grid2x2", 0, quick=True, total_timesteps=1024)
+    train("coop", "grid2x2", 0, quick=True, total_timesteps=2048)
+    steps = [s for s, _ in list_checkpoints(folder / "checkpoints")]
+    assert steps and steps[-1] >= 2048, steps
+    from cotraffic.controllers.rl_policy import LearnedPolicy
+
+    ctrl = LearnedPolicy("coop", list_checkpoints(folder / "checkpoints")[-1][1])
+    row = _quick("coop", "grid2x2", ["emergency"], controller=ctrl)
+    shutil.rmtree(folder, ignore_errors=True)
+    return f"trained to {steps[-1]} steps with resume, evaluated: {row['mean_travel_time']:.0f}s"
+
+
 def run_smoke(only: list[str] | None = None) -> int:
     failures = 0
     for name, fn in CHECKS.items():

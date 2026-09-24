@@ -1,0 +1,17 @@
+name: coop_full
+extends: coop
+description: >
+  All observation blocks (neighbours, emergency vehicles, pedestrians, buses) and a
+  person-weighted reward with CO2, emergency-vehicle and pedestrian penalties. Trained with
+  emergency vehicles, pedestrians and buses in every episode.
+observation:
+  emergency: true
+  pedestrians: true
+  buses: true
+reward:
+  person_weighted: true
+  co2: 0.5
+  ev: 2.0
+  ped: 0.5
+training:
+  scenarios: [emergency, pedestrians, buses]
