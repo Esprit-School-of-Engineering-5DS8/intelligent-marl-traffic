@@ -131,6 +131,9 @@ def cmd_forecast(args: argparse.Namespace) -> int:
     if args.rebuild or not (DATA_DIR / f"inflow_{args.net}.csv").is_file():
         print(f"dataset: {build_dataset(args.net, args.seeds, args.jobs)}")
     out = evaluate(args.net)
+    from cotraffic.forecasting.online import export_ridge
+
+    print(f"model for the agents: {export_ridge(args.net)}")
     table = pd.read_csv(out)
     print(table[table["demand"] == "all"].round(2).to_string(index=False))
     print(f"saved {out}")

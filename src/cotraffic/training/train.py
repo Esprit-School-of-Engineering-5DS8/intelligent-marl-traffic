@@ -23,6 +23,7 @@ from typing import Any
 from cotraffic import config
 from cotraffic.envs.episodes import TrainingEpisodes
 from cotraffic.envs.traffic_env import CoTrafficEnv
+from cotraffic.forecasting.online import attach_forecaster
 from cotraffic.paths import TRAINING_DIR
 
 CHECKPOINT_RE = re.compile(r"model_(\d+)_steps\.zip$")
@@ -52,6 +53,7 @@ def make_vec_env(network: str, agent_cfg: dict[str, Any], quick: bool = False):
         network, training["demand_levels"], training["scenarios"], episode_s=float(episode_s)
     )
     env = CoTrafficEnv(network, episodes, agent_cfg, protocol=protocol)
+    attach_forecaster(env, network)
     vec = ss.pettingzoo_env_to_vec_env_v1(env)
     vec = ss.concat_vec_envs_v1(vec, 1, num_cpus=0, base_class="stable_baselines3")
     return vec, env

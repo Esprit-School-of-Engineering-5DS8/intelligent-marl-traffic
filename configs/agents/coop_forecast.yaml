@@ -1,0 +1,5 @@
+name: coop_forecast
+extends: coop
+description: Tier 3 - COOP plus the predicted inflow of the next 5 minutes per approach (Ridge model).
+observation:
+  forecast: true

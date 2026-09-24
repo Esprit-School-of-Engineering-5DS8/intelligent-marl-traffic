@@ -92,3 +92,15 @@ entries at the bottom. Negative results that belong in the report are marked **[
 - **Lesson:** the lever is information (neighbour messages, COOP) and richer decisions, not
   the reward. This motivates the IND vs COOP ablation (RQ1) and is itself a result: a simple
   classical controller is a strong baseline that learning does not beat easily.
+
+## F-008 - Forecast evaluated on the simulation's cool-down (2026-09-24)
+
+- **Tried:** chronological split at minute 60 of the 90-minute evaluation runs.
+- **Evidence:** persistence beat Ridge and gradient boosting by a wide margin (MAE 11.0 vs
+  14.9 / 16.6) in that split, while gradient boosting was best on held-out seeds (5.6).
+- **Diagnosis:** the test window included the 15-minute cool-down, during which the protocol
+  stops all new demand - an artefact that never occurs on a street and that the time-of-hour
+  feature had never seen.
+- **Fix / lesson:** forecasting targets are restricted to the demand period. Check what the
+  test set contains before comparing models; an unexpected winner is a signal to look at the
+  data, not a result.

@@ -5,9 +5,11 @@ position of t in the demand hour. Target: vehicles arriving during minutes t+1..
 
 Two splits, both free of leakage:
 
-* chronological (main): models are fitted on the first two thirds of every run (minutes
-  0-59 of the 90-minute evaluation protocol) and tested on the last third - forecasting
-  the future of a known day;
+* chronological (main): models are fitted on the first two thirds of the demand period of
+  every run and tested on the last third - forecasting the future of a known day;
+
+Only minutes whose 5-minute target lies inside the demand period are used: after it, the
+simulation's cool-down stops all new demand, which never happens on a real street.
 * held-out realisations: fitted on some seeds, tested on other seeds - forecasting a
   day never seen.
 """
@@ -94,9 +96,14 @@ def evaluate(
     network: str = "grid4x4", data_dir: Path = DATA_DIR, out_dir: Path = SUMMARY_DIR
 ) -> Path:
     data = pd.read_csv(data_dir / f"inflow_{network}.csv")
-    feats = make_features(data)
+    if "demand_end_minute" not in data:  # datasets recorded with the evaluation protocol
+        ev = config.load_protocol()["evaluation"]
+        data["demand_end_minute"] = (float(ev["warmup_s"]) + float(ev["measure_s"])) / 60.0
+    demand_end = float(data["demand_end_minute"].min())
+    feats = make_features(data.drop(columns="demand_end_minute"))
+    feats = feats[feats["minute"] + HORIZON < demand_end].reset_index(drop=True)
     rows = []
-    split = round(2 * (data["minute"].max() + 1) / 3)
+    split = round(2 * demand_end / 3)
     train = feats[feats["minute"] + HORIZON < split]
     test = feats[feats["minute"] >= split]
     rows += _scores(test, predict_all(train, test), "chronological")

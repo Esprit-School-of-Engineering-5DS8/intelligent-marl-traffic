@@ -89,6 +89,7 @@ def _record(args: tuple[str, str, int] | tuple[str, str, int, str]) -> pd.DataFr
             "side": s,
             "minute": m,
             "vehicles": v,
+            "demand_end_minute": episode.measure_to / 60.0,
         }
         for (t, s, m), v in sorted(counts.items())
     ]

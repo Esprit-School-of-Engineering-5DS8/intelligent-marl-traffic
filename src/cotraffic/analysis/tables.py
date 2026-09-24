@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from cotraffic.analysis.style import DEMAND_ORDER, METRIC_LABELS, label, method_sort_key
-from cotraffic.paths import RAW_DIR, SUMMARY_DIR
+from cotraffic.paths import CHECKPOINTS_DIR, RAW_DIR, SUMMARY_DIR
 
 PEAK_METRICS = [
     "mean_travel_time",
@@ -176,6 +176,103 @@ def build_report_tables(raw_dir: Path = RAW_DIR, summary_dir: Path = SUMMARY_DIR
             table = comparison_table(comp, reference)
             if table:
                 lines += [f"### {title}", ""] + table
+    lines += training_table()
+    lines += forecast_tables(summary_dir)
+    lines += importance_tables(summary_dir)
     out = summary_dir / "REPORT_TABLES.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out
+
+
+def training_table() -> list[str]:
+    """Training cost and selected checkpoint of every learned policy."""
+    import json
+
+    rows = []
+    for path in sorted(CHECKPOINTS_DIR.glob("*/*/seed*.json")):
+        d = json.loads(path.read_text(encoding="utf-8"))
+        best = d["scores"][str(d["selected_steps"])]["mean_travel_time"]
+        wall = d.get("train_wall_time_s")
+        rows.append(
+            [
+                label(d["agent"]),
+                d["network"],
+                str(d["training_seed"]),
+                f"{d.get('total_timesteps') or 0:,}",
+                f"{wall / 60:.0f}" if wall else "-",
+                f"{d['selected_steps']:,}",
+                f"{best:.1f}",
+            ]
+        )
+    if not rows:
+        return []
+    header = [
+        "Variant",
+        "Network",
+        "Training seed",
+        "Agent steps",
+        "Training time (min)",
+        "Selected checkpoint (steps)",
+        "Validation travel time (s)",
+    ]
+    intro = "Checkpoints chosen on validation seeds 1000+ (`python -m cotraffic select`)."
+    return ["## Training runs", "", intro, ""] + _table(header, rows)
+
+
+def forecast_tables(summary_dir: Path) -> list[str]:
+    lines: list[str] = []
+    for path in sorted(summary_dir.glob("forecast_*.csv")):
+        df = pd.read_csv(path)
+        network = path.stem.removeprefix("forecast_")
+        lines += [
+            f"## Inflow forecasting - {network}",
+            "",
+            "Next-5-minute arrivals per approach (vehicles); MAE and RMSE on the test part.",
+            "",
+        ]
+        for split in df["split"].unique():
+            sub = df[(df["split"] == split) & (df["demand"] == "all")].sort_values("mae")
+            rows = [
+                [
+                    r["model"],
+                    f"{r['mae']:.2f}",
+                    f"{r['rmse']:.2f}",
+                    f"{r['mean_target']:.1f}",
+                    str(r["n"]),
+                ]
+                for _, r in sub.iterrows()
+            ]
+            header = ["Model", "MAE", "RMSE", "Mean target", "Test rows"]
+            lines += [f"**Split: {split}**", ""] + _table(header, rows)
+    return lines
+
+
+def importance_tables(summary_dir: Path) -> list[str]:
+    lines: list[str] = []
+    for path in sorted(summary_dir.glob("importance_*.csv")):
+        df = pd.read_csv(path).sort_values("action_change_rate", ascending=False)
+        first = df.iloc[0]
+        lines += [
+            f"## Feature-group importance - {label(first['method'])}, {first['network']}",
+            "",
+            f"Demand `{first['demand']}`, scenario `{first['scenario']}`, seeds {first['seeds']}; "
+            f"travel time without shuffling {first['travel_time_base']:.1f} s.",
+            "",
+        ]
+        rows = [
+            [
+                r["group"],
+                f"{100 * r['action_change_rate']:.1f}%",
+                f"{r['travel_time']:.1f}",
+                f"{r['travel_time_increase_pct']:+.1f}%",
+            ]
+            for _, r in df.iterrows()
+        ]
+        header = [
+            "Observation block",
+            "Decisions changed when shuffled",
+            "Travel time when shuffled (s)",
+            "Change",
+        ]
+        lines += _table(header, rows)
+    return lines

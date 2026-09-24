@@ -170,3 +170,30 @@ budget (300k steps), mean travel time on validation episodes (`results/explorati
 
 No variant differs by more than 1.6%: the reward definition is not the bottleneck. We keep
 the specified reward and SB3's defaults (FAILURES F-007).
+
+## 2026-09-24 - Inflow forecasting (Tier 2)
+
+Dataset: induction loops at the start of every approach of grid4x4, 1-minute counts, 16
+episodes under Max-Pressure (4 demand levels x seeds 6000-6003), 4 sides x 16 junctions.
+Task: arrivals of the next 5 minutes per approach from the last 10 minutes and the time in
+the demand hour. `python -m cotraffic forecast`; `results/summary/forecast_grid4x4.csv`.
+
+First evaluation was wrong: the chronological test window contained the cool-down, where
+the simulation stops all new demand. Persistence "won" (MAE 11.0 vs 14.9 for Ridge) because
+the time feature had never seen the end of demand. Targets are now restricted to the demand
+period (FAILURES F-008). MAE in vehicles per 5 min (mean target about 40):
+
+| Model | chronological (last third of the demand period) | held-out seeds |
+|---|---|---|
+| persistence (last 5 min) | 7.53 | 7.19 |
+| moving average (last 10 min) | 6.87 | 6.62 |
+| ridge regression | 7.52 | 6.46 |
+| gradient boosting | 6.91 | 6.40 |
+
+- Learned models improve on persistence by about 10%, but a moving average does almost as
+  well. Arrivals are close to Poisson: with the true rate known, the expected absolute error
+  of a count with mean 41 is sqrt(2 x 41 / pi) = 5.1 vehicles, so the best models are within
+  about 25% of the noise floor. Short-term arrival counts carry little predictable signal
+  beyond their recent average.
+- The Ridge coefficients are exported (`results/forecasting/ridge_grid4x4.json`) for the
+  Tier 3 test (forecast as an observation block, `configs/agents/coop_forecast.yaml`).

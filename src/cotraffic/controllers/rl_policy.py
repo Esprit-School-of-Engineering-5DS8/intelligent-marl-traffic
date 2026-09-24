@@ -37,6 +37,9 @@ class LearnedPolicy(Controller):
         self.model = PPO.load(self.checkpoint, device="cpu")
 
     def reset(self, env) -> None:
+        from cotraffic.forecasting.online import attach_forecaster
+
+        attach_forecaster(env, env.network)
         expected = self.model.observation_space.shape
         if env.observation_space(env.possible_agents[0]).shape != expected:
             raise ValueError(
