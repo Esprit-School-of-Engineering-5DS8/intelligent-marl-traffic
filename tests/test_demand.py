@@ -55,3 +55,23 @@ def test_pedestrians_and_buses_are_written():
     names = [p.name for p in b.route_files]
     assert "persons.rou.xml" in names and "buses.rou.xml" in names
     assert b.meta["pedestrians"] > 0 and len(b.meta["bus_lines"]) == 2
+
+
+def test_district_trips_only_use_connected_origin_destination_pairs():
+    from cotraffic.demand.generator import reachable_exits
+    from cotraffic.networks.build import ensure_network
+    from cotraffic.networks.topology import fringe_edges, load_net, walkable_component
+
+    net = load_net(str(ensure_network("real_district")))
+    entries, exits = fringe_edges(net)
+    reach = reachable_exits(net, entries, exits)
+    assert any(len(v) < len(exits) for v in reach.values())  # one-way streets matter here
+    b = generate(DemandRequest("real_district", "low", ("pedestrians",), seed=9, duration=600))
+    root = ET.parse(b.route_files[0]).getroot()
+    for veh in root.iter("vehicle"):
+        edges = veh.find("route").get("edges").split()
+        assert edges[-1] in reach[edges[0]]
+    walkable = set(walkable_component(net))
+    persons = ET.parse(b.directory / "persons.rou.xml").getroot()
+    for walk in persons.iter("walk"):
+        assert walk.get("from") in walkable and walk.get("to") in walkable

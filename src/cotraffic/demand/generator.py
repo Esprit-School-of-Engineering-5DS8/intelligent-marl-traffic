@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -25,12 +26,23 @@ import numpy as np
 from cotraffic import config
 from cotraffic.demand.profiles import poisson_arrivals
 from cotraffic.networks.build import ensure_network
-from cotraffic.networks.topology import OPPOSITE, SIDES, FringeEdge, fringe_edges, is_road, load_net
+from cotraffic.networks.topology import (
+    OPPOSITE,
+    SIDES,
+    FringeEdge,
+    fringe_edges,
+    load_net,
+    walkable_component,
+)
 from cotraffic.paths import CONFIG_DIR, ROUTES_DIR
 from cotraffic.utils.proc import run
 from cotraffic.utils.sumo import binary
 
 STREAMS = ("cars", "emergency", "pedestrians", "buses")
+# Bump when a code change alters the generated files, so cached bundles are rebuilt.
+GENERATOR_VERSION = 3
+# Scenario times in the configs refer to a 60-min demand hour; shorter hours scale them.
+REFERENCE_HOUR_S = 3600.0
 
 
 @dataclass(frozen=True)
@@ -41,6 +53,7 @@ class DemandRequest:
     seed: int = 0
     offset: float = 0.0  # start of the demand hour (the warm-up length in evaluation)
     duration: float = 3600.0  # length of the demand hour; vehicles depart in [0, offset + duration)
+    scale: float = 1.0  # multiplies the car rate (demand calibration sweeps only)
 
 
 @dataclass
@@ -75,6 +88,34 @@ def write_vtypes(path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def reachable_exits(
+    net, entries: list[FringeEdge], exits: list[FringeEdge], vclass: str = "passenger"
+) -> dict[str, set[str]]:
+    """Exits reachable from every entry, excluding the reverse direction of the entry itself.
+
+    Real networks are connected but not strongly connected (one-way streets), so an
+    origin-destination pair has to be checked before a trip is generated.
+    """
+    exit_ids = {x.edge_id for x in exits}
+    out: dict[str, set[str]] = {}
+    for entry in entries:
+        start = net.getEdge(entry.edge_id)
+        seen = {start.getID()}
+        stack = [start]
+        while stack:
+            for nxt in stack.pop().getOutgoing():
+                if nxt.getID() not in seen and nxt.allows(vclass):
+                    seen.add(nxt.getID())
+                    stack.append(nxt)
+        reverse = {
+            e.getID()
+            for e in start.getToNode().getOutgoing()
+            if e.getToNode() == start.getFromNode()
+        }
+        out[entry.edge_id] = (seen & exit_ids) - reverse
+    return out
+
+
 def _pick_od(
     rng: np.random.Generator,
     n: int,
@@ -82,9 +123,12 @@ def _pick_od(
     exits: list[FringeEdge],
     side_weights: dict[str, float],
     opposite_prob: float,
+    reach: dict[str, set[str]],
 ) -> list[tuple[str, str]]:
+    """Draw origin-destination pairs: origin side by weight x lanes, then the opposite
+    side with probability ``opposite_prob``, otherwise one of the two lateral sides."""
+    entries = [e for e in entries if reach.get(e.edge_id)]
     by_side_in = {s: [e for e in entries if e.side == s] for s in SIDES}
-    by_side_out = {s: [e for e in exits if e.side == s] for s in SIDES}
     sides = [s for s in SIDES if by_side_in[s]]
     w = np.array([side_weights.get(s, 1.0) * sum(e.lanes for e in by_side_in[s]) for s in sides])
     origin_sides = rng.choice(len(sides), size=n, p=w / w.sum())
@@ -92,13 +136,17 @@ def _pick_od(
     for k in origin_sides:
         side = sides[k]
         o = by_side_in[side][rng.integers(len(by_side_in[side]))]
+        feasible = reach[o.edge_id]
+        out = {s: [x for x in exits if x.side == s and x.edge_id in feasible] for s in SIDES}
         opposite = OPPOSITE[side]
-        others = [s for s in SIDES if s not in (side, opposite) and by_side_out[s]]
-        if by_side_out[opposite] and (rng.uniform() < opposite_prob or not others):
+        others = [s for s in SIDES if s not in (side, opposite) and out[s]]
+        if out[opposite] and (rng.uniform() < opposite_prob or not others):
             dest_side = opposite
+        elif others:
+            dest_side = others[rng.integers(len(others))]
         else:
-            dest_side = others[rng.integers(len(others))] if others else opposite
-        d = by_side_out[dest_side][rng.integers(len(by_side_out[dest_side]))]
+            dest_side = side
+        d = out[dest_side][rng.integers(len(out[dest_side]))]
         pairs.append((o.edge_id, d.edge_id))
     return pairs
 
@@ -137,13 +185,18 @@ def _route_trips(
 
 
 def _line_route(net, entries, exits, line: dict[str, Any], reverse: bool) -> list[str]:
+    """Edges of a bus line, given either by fringe sides/indices (grids) or by edge ids."""
+
     def fringe(items, side, index):
         on_side = [e for e in items if e.side == side]
         if not on_side:
             raise ValueError(f"bus line {line['id']}: no fringe edge on side {side}")
         return on_side[min(index, len(on_side) - 1)].edge_id
 
-    if reverse:
+    if "from_edge" in line:
+        key = "reverse_" if reverse else ""
+        start, end = line[f"{key}from_edge"], line[f"{key}to_edge"]
+    elif reverse:
         start = fringe(entries, line["to_side"], line["to_index"])
         end = fringe(exits, line["from_side"], line["from_index"])
     else:
@@ -163,6 +216,7 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
     vtypes_cfg = config.load_yaml(CONFIG_DIR / "vehicles.yaml")
     key = _digest(
         [
+            GENERATOR_VERSION,
             asdict(request),
             net_cfg.get("demand"),
             net_cfg.get("bus_lines"),
@@ -174,22 +228,30 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
         ]
     )
     tag = "+".join(request.scenarios) or "normal"
-    directory = ROUTES_DIR / request.network / f"{request.demand}_{tag}_s{request.seed}_{key}"
+    level = request.demand if request.scale == 1.0 else f"{request.demand}_x{request.scale:g}"
+    directory = ROUTES_DIR / request.network / f"{level}_{tag}_s{request.seed}_{key}"
     meta_file = directory / "meta.json"
     if meta_file.is_file() and not force:
         return _load_bundle(directory)
     if directory.exists():
         shutil.rmtree(directory)
+    final_dir = directory
+    # Build in a private directory and rename at the end: parallel runs may request the
+    # same bundle, and a half-written bundle must never be visible.
+    directory = final_dir.with_name(f"{final_dir.name}.tmp{os.getpid()}")
+    shutil.rmtree(directory, ignore_errors=True)
     directory.mkdir(parents=True)
 
     net_file = ensure_network(request.network)
     net = load_net(str(net_file))
     entries, exits = fringe_edges(net)
+    reach = reachable_exits(net, entries, exits)
     streams = dict(
         zip(STREAMS, np.random.SeedSequence(request.seed).spawn(len(STREAMS)), strict=True)
     )
     rng = {name: np.random.default_rng(seq) for name, seq in streams.items()}
     end = request.offset + request.duration
+    time_scale = request.duration / REFERENCE_HOUR_S
     dem = net_cfg["demand"]
     meta: dict[str, Any] = {"request": asdict(request), "network_file": str(net_file)}
 
@@ -197,7 +259,9 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
     write_vtypes(vtypes)
 
     # passenger cars
-    rate = float(dem["peak_vehicles_per_hour"]) * float(demand_cfg.get("level", 1.0))
+    rate = (
+        float(dem["peak_vehicles_per_hour"]) * float(demand_cfg.get("level", 1.0)) * request.scale
+    )
     times = poisson_arrivals(rate, 0.0, end, rng["cars"], demand_cfg.get("profile"), request.offset)
     ods = _pick_od(
         rng["cars"],
@@ -206,6 +270,7 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
         exits,
         dem.get("origin_side_weights", {}),
         float(dem.get("opposite_side_prob", 0.5)),
+        reach,
     )
     trips = [
         (t, f"car_{i}", "car", o, d) for i, (t, (o, d)) in enumerate(zip(times, ods, strict=True))
@@ -218,9 +283,11 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
         ev_cfg = scen_cfg["emergency"]
         lo, hi = ev_cfg["count"]
         n_ev = int(rng["emergency"].integers(lo, hi + 1))
-        w0, w1 = ev_cfg["window_s"]
+        w0, w1 = (float(w) * time_scale for w in ev_cfg["window_s"])
         departs = np.sort(rng["emergency"].uniform(request.offset + w0, request.offset + w1, n_ev))
-        ev_ods = _pick_od(rng["emergency"], n_ev, entries, exits, {s: 1.0 for s in SIDES}, 1.0)
+        ev_ods = _pick_od(
+            rng["emergency"], n_ev, entries, exits, dict.fromkeys(SIDES, 1.0), 1.0, reach
+        )
         for k, (t, (o, d)) in enumerate(zip(departs, ev_ods, strict=True)):
             trips.append((float(t), f"ev_{k}", "emergency", o, d))
             evs.append({"id": f"ev_{k}", "depart": round(float(t), 2), "from": o, "to": d})
@@ -280,7 +347,8 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
         site = net_cfg["incident"]
         edge = net.getEdge(site["edge"])
         pos = float(site.get("position_frac", 0.5)) * edge.getLength()
-        start = request.offset + float(inc["start_s"])
+        start = request.offset + float(inc["start_s"]) * time_scale
+        inc_duration = float(inc["duration_s"]) * time_scale
         inc_file = directory / "incident.rou.xml"
         inc_file.write_text(
             "<routes>\n"
@@ -298,13 +366,13 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
             "lane": site["lane"],
             "position": round(pos, 1),
             "start": start,
-            "end": start + float(inc["duration_s"]),
+            "end": start + inc_duration,
         }
 
     # pedestrians walking between random points of the street network
     if "pedestrians" in scen_cfg:
         rate = float(scen_cfg["pedestrians"]["persons_per_hour"])
-        walkable = [e for e in net.getEdges(withInternal=False) if is_road(e, "pedestrian")]
+        walkable = [net.getEdge(e) for e in walkable_component(net)]
         ped_times = poisson_arrivals(rate, 0.0, end, rng["pedestrians"])
         ped_file = directory / "persons.rou.xml"
         with ped_file.open("w", encoding="utf-8") as fh:
@@ -325,8 +393,14 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
 
     meta["route_files"] = [p.name for p in route_files]
     meta["additional_files"] = [vtypes.name]
-    meta_file.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    return _load_bundle(directory)
+    (directory / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    try:
+        directory.rename(final_dir)
+    except OSError:
+        shutil.rmtree(directory, ignore_errors=True)  # another process finished first
+        if not meta_file.is_file():
+            raise
+    return _load_bundle(final_dir)
 
 
 def _load_bundle(directory: Path) -> RouteBundle:

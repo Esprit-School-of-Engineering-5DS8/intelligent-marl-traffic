@@ -129,6 +129,38 @@ class TLSGeometry:
     crossing_side: dict[str, str] = field(default_factory=dict)
 
 
+def walkable_component(net) -> list[str]:
+    """Road edges of the largest connected pedestrian network.
+
+    Pedestrians may walk a sidewalk in both directions, so connectivity is computed on
+    the undirected graph of walkable edges, crossings and walking areas. Imported
+    networks can have separate pieces; a walk between two of them cannot be routed.
+    """
+    walkable = [e for e in net.getEdges(withInternal=True) if e.allows("pedestrian")]
+    adjacency: dict[str, set[str]] = {e.getID(): set() for e in walkable}
+    for edge in walkable:
+        for nxt in edge.getOutgoing():
+            if nxt.getID() in adjacency:
+                adjacency[edge.getID()].add(nxt.getID())
+                adjacency[nxt.getID()].add(edge.getID())
+    best: set[str] = set()
+    seen: set[str] = set()
+    for start in adjacency:
+        if start in seen:
+            continue
+        component, stack = {start}, [start]
+        seen.add(start)
+        while stack:
+            for nxt in adjacency[stack.pop()]:
+                if nxt not in seen:
+                    seen.add(nxt)
+                    component.add(nxt)
+                    stack.append(nxt)
+        if len(component) > len(best):
+            best = component
+    return sorted(e for e in best if not e.startswith(":"))
+
+
 def pedestrian_edges(net) -> tuple[set[str], set[str]]:
     """Ids of all crossing and walking-area edges (internal pedestrian infrastructure)."""
     crossings, walkingareas = set(), set()

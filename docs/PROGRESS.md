@@ -3,8 +3,8 @@
 | # | Milestone | Status |
 |---|---|---|
 | M0 | Repo skeleton, environment, SUMO running, tests | done (2026-09-24) |
-| M1 | Networks, demand levels, rush profile, vehicle types, scenarios | in progress |
-| M2 | Evaluation pipeline, metrics, baselines FT / ACT / MP / EV-RULE | planned |
+| M1 | Networks, demand levels, rush profile, vehicle types, scenarios | done (2026-09-24) |
+| M2 | Evaluation pipeline, metrics, baselines FT / ACT / MP / EV-RULE | in progress |
 | M3 | PPO training with parameter sharing, checkpoint/resume, IND | planned |
 | M4 | COOP (neighbour communication), reward normalisation | planned |
 | M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | planned |
@@ -25,3 +25,18 @@
   for Python 3.10 compatibility (F-002).
 - Next: M1 - OpenStreetMap district, demand calibration against fixed-time control,
   all scenarios end-to-end in quick mode.
+
+## M1 - summary (2026-09-24)
+
+- Works: grid2x2/4x4/8x8 and the OSM district (7 signals, placeholder in central Tunis,
+  ADR-006); demand levels and rush-hour profile; buses, emergency vehicles, pedestrians,
+  incidents; sensor noise and communication dropout; Webster FT, actuated, Max-Pressure
+  and EV-RULE baselines; metrics and episode runner (built early to calibrate demand).
+- Measured: peak rates calibrated against fixed-time control - grid4x4 8 800 veh/h,
+  district 5 200 veh/h, grid8x8 14 000 veh/h (journal M1); Webster plan checked against
+  longer-cycle plans (it is the best of them).
+- Tests: 79 passing; smoke covers every scenario and baseline in quick mode.
+- Problems: sparse OSM signal tags (F-003), tlsCycleAdaptation unusable with pedestrian
+  clearance phases (F-004), unreachable OD pairs on the real network (F-005).
+- Next: M2 - experiment runner over a matrix of cells, baseline results on grid4x4 with
+  5 seeds, statistics and the first comparison table.

@@ -38,6 +38,19 @@ def cmd_episode(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_calibrate_demand(args: argparse.Namespace) -> int:
+    _libsumo_default()
+    import pandas as pd
+
+    from cotraffic.evaluation.calibrate import demand_sweep
+
+    out = demand_sweep(args.net, args.scales, args.methods, args.seeds, args.demand, args.jobs)
+    with pd.option_context("display.width", 200, "display.max_columns", 30):
+        print(pd.read_csv(out).round(1).to_string(index=False))
+    print(f"saved {out}")
+    return 0
+
+
 def cmd_smoke(args: argparse.Namespace) -> int:
     _libsumo_default()
     from cotraffic.evaluation.smoke import run_smoke
@@ -62,6 +75,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--scenarios", nargs="*", default=[])
     p.set_defaults(func=cmd_episode)
+
+    p = sub.add_parser("calibrate-demand", help="sweep the peak demand rate (tuning seeds)")
+    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--scales", type=float, nargs="+", default=[1.0, 1.5, 2.0])
+    p.add_argument("--methods", nargs="+", default=["ft"])
+    p.add_argument("--seeds", type=int, nargs="+", default=[5001])
+    p.add_argument("--demand", default="peak")
+    p.add_argument("--jobs", type=int, default=2)
+    p.set_defaults(func=cmd_calibrate_demand)
 
     p = sub.add_parser("smoke", help="quick end-to-end check of every feature")
     p.add_argument("--only", nargs="*", default=None, help="run only these checks")

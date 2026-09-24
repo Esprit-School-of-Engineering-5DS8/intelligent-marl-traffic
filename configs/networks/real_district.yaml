@@ -1,0 +1,53 @@
+name: real_district
+kind: osm
+description: >
+  PLACEHOLDER until the team confirms the city and area - central Tunis, arterial
+  network around Avenue Mohamed V, Avenue Habib Bourguiba and Rue Jean Jaures
+  (about 1.4 km x 1.3 km). To change it: edit osm.bbox (and tls_set), delete
+  sumo_files/real_district/ and run `python -m cotraffic networks real_district --force`.
+
+osm:
+  bbox: [10.176, 36.800, 10.192, 36.812]    # [west, south, east, north], WGS84
+  # Arterial network only: residential streets are unsignalised and would triple the
+  # size of the network without adding decisions.
+  road_types: [motorway, motorway_link, trunk, trunk_link, primary, primary_link,
+               secondary, secondary_link, tertiary, tertiary_link]
+  join_dist_m: 15        # junction clusters closer than this become one junction
+  signal_dist_m: 25      # OSM signal nodes this close to a junction make it signalised
+  tls_join_dist_m: 30    # signals this close are controlled together
+  guess_tls: false
+  # OpenStreetMap tags very few signals in Tunis (72 nodes in the whole city in
+  # September 2026; 3 usable junctions here). We also signalise the junctions where
+  # two main avenues meet (OSM node ids below, e.g. Place du 14 Janvier 2011 at
+  # Bourguiba / Mohamed V). The team should check these on site (Empathize stage).
+  tls_set: [287863988, 387151797, 5294059357, cluster_1089663256_4940244077, 1089666873]
+  tls_unset: []
+
+pedestrians: true
+
+padding:
+  lanes_per_side: 3
+  max_phases: 3
+  max_crossings: 4
+
+neighbours:
+  max_distance_m: 500
+
+demand:
+  peak_vehicles_per_hour: 5200   # calibrated against fixed-time control, see docs/EXPERIMENT_JOURNAL.md
+  origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
+  opposite_side_prob: 0.5
+  route_random_factor: 1.3
+
+# Along Avenue Mohamed V and Avenue Habib Bourguiba, through 3 signalised junctions.
+bus_lines:
+  - id: L1
+    from_edge: "247165438#0"
+    to_edge: "10641416#0"
+    reverse_from_edge: "577010716#1"
+    reverse_to_edge: "94346392#5"
+
+incident:
+  edge: "94346392#0"     # northbound Avenue Mohamed V, 560 m, 2 vehicle lanes
+  lane: 1                # rightmost vehicle lane (lane 0 is the sidewalk)
+  position_frac: 0.4

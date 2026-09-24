@@ -9,6 +9,16 @@ timing:
   max_green: 60        # s, longer greens are cut if another phase has demand
   max_red: 90          # s, anti-starvation: a movement with demand waiting longer is served
 
+baselines:
+  saturation_flow_veh_h: 1800   # per lane, used by Webster's method
+  startup_lost_s: 2.0           # lost time per phase in addition to the yellow
+  min_cycle_s: 40
+  max_cycle_s: 120
+  webster_tuning_seed: 5000     # demand realisation used to compute fixed-time plans
+  actuated_max_gap_s: 3.0       # an actuated green ends after this gap between vehicles
+  actuated_detector_gap_s: 2.0  # detector distance from the stop line, in seconds of travel
+  ev_preemption_range_m: 200    # EV-RULE: distance at which the rule claims the green
+
 evaluation:
   warmup_s: 900        # excluded from all metrics
   measure_s: 3600      # measured window
@@ -18,6 +28,14 @@ evaluation:
 training:
   episode_s: 3600
   demand_levels: [low, medium, peak, rush_profile]
+
+# --quick mode: the same pipeline on short episodes, for smoke tests only.
+# Scenario times are given for a 60-min hour and scaled to the shorter hour.
+quick:
+  warmup_s: 300
+  measure_s: 600
+  cooldown_s: 300
+  episode_s: 600
 
 sumo:
   step_length: 1.0

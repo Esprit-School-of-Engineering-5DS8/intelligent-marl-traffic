@@ -83,24 +83,25 @@ def evaluation_episode(
     ssm: bool = True,
     additional: Sequence[Path] = (),
     protocol: Mapping[str, Any] | None = None,
-    measure_s: float | None = None,
+    quick: bool = False,
+    scale: float = 1.0,
 ) -> Episode:
-    """Warm-up + measured window + cool-down, as defined in configs/protocol.yaml."""
+    """Warm-up + measured window + cool-down, as defined in configs/protocol.yaml
+    (the ``quick`` section for smoke runs)."""
     protocol = protocol or config.load_protocol()
-    ev = protocol["evaluation"]
-    warmup = float(ev["warmup_s"])
-    measure = float(measure_s if measure_s is not None else ev["measure_s"])
+    ev = protocol["quick"] if quick else protocol["evaluation"]
+    warmup, measure, cooldown = (float(ev[k]) for k in ("warmup_s", "measure_s", "cooldown_s"))
     route_scenarios, _ = split_scenarios(scenarios)
-    bundle = generate(DemandRequest(network, demand, route_scenarios, seed, warmup, measure))
+    bundle = generate(DemandRequest(network, demand, route_scenarios, seed, warmup, measure, scale))
     return Episode(
         ensure_network(network),
         bundle,
-        end_time=warmup + measure + float(ev["cooldown_s"]),
+        end_time=warmup + measure + cooldown,
         sumo_seed=seed,
         measure_from=warmup,
         measure_to=warmup + measure,
         output_dir=output_dir,
         ssm=ssm,
         additional=tuple(additional),
-        info={"demand": demand, "seed": seed, "scenarios": list(scenarios)},
+        info={"demand": demand, "seed": seed, "scenarios": list(scenarios), "quick": quick},
     )

@@ -25,7 +25,7 @@ neighbours:
   max_distance_m: 400
 
 demand:
-  peak_vehicles_per_hour: 2600   # calibrated, see docs/EXPERIMENT_JOURNAL.md (M1)
+  peak_vehicles_per_hour: 8800   # calibrated against fixed-time control, see docs/EXPERIMENT_JOURNAL.md
   # Dominant west->east commuter flow so that adaptivity matters.
   origin_side_weights: {west: 1.6, east: 0.8, north: 1.0, south: 0.6}
   opposite_side_prob: 0.6        # probability that a trip ends on the side facing its origin

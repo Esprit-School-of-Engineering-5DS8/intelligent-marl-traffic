@@ -25,7 +25,7 @@ def check(name: str):
 def _networks() -> str:
     from cotraffic.networks.build import ensure_network
 
-    return ", ".join(ensure_network(n).name for n in ("grid2x2", "grid4x4"))
+    return ", ".join(ensure_network(n).name for n in ("grid2x2", "grid4x4", "grid8x8"))
 
 
 @check("random_episode")
@@ -55,6 +55,87 @@ def _pettingzoo_api() -> str:
     finally:
         env.close()
     return "parallel_api_test passed"
+
+
+CORE_METRICS = (
+    "mean_travel_time",
+    "mean_waiting_time",
+    "mean_queue",
+    "throughput_per_h",
+    "co2_g_per_km",
+    "person_weighted_delay",
+    "gini_waiting_time",
+)
+
+
+def _quick(
+    method: str, network: str, scenarios: list[str], demand: str = "medium", controller=None
+) -> dict:
+    """One quick-mode evaluation run whose row must be complete and plausible."""
+    import math
+
+    from cotraffic.evaluation.runner import run_episode
+    from cotraffic.paths import RESULTS_DIR
+
+    row = run_episode(
+        method,
+        network,
+        demand,
+        scenarios,
+        seed=7,
+        quick=True,
+        raw_dir=RESULTS_DIR / "tmp" / "smoke_raw",
+        logs_dir=RESULTS_DIR / "tmp" / "smoke_logs",
+        controller=controller,
+    )
+    for key in CORE_METRICS:
+        value = float(row[key])
+        assert not math.isnan(value), f"{method} {scenarios}: {key} is NaN"
+    assert row["mean_travel_time"] > 0 and row["throughput_per_h"] > 0, row
+    return row
+
+
+@check("real_district")
+def _real_district() -> str:
+    from cotraffic.networks.build import ensure_network
+
+    ensure_network("real_district")
+    row = _quick("mp", "real_district", ["incident", "emergency", "buses", "pedestrians"])
+    assert row["ev_count"] > 0 and row["bus_count"] > 0 and row["incident_start"] != ""
+    return f"7 signals, all route scenarios: travel time {row['mean_travel_time']:.0f}s"
+
+
+@check("scenarios_grid4x4")
+def _scenarios() -> str:
+    from cotraffic.controllers.random_policy import RandomPolicy
+    from cotraffic.evaluation.quick import FULL_OBSERVATION
+
+    checks = {
+        "normal": lambda r: True,
+        "incident": lambda r: r["incident_start"] != "",
+        "emergency": lambda r: r["ev_count"] >= 3,
+        "pedestrians": lambda r: r["ped_count"] > 0,
+        "buses": lambda r: r["bus_count"] > 0,
+    }
+    for scenario, ok in checks.items():
+        row = _quick("mp", "grid4x4", [scenario])
+        assert ok(row), f"scenario {scenario} had no effect: {row}"
+    for scenario in ("sensor_noise", "comm_dropout_30"):
+        ctrl = RandomPolicy()
+        ctrl.agent_cfg = FULL_OBSERVATION
+        ctrl.needs_observations = True
+        row = _quick("random", "grid4x4", [scenario], controller=ctrl)
+    assert row["messages_lost"] > 0, "comm dropout lost no message"
+    return f"{len(checks) + 2} scenarios"
+
+
+@check("baselines")
+def _baselines() -> str:
+    parts = []
+    for method in ("ft", "act", "mp", "ev_rule"):
+        row = _quick(method, "grid4x4", ["emergency"], demand="peak")
+        parts.append(f"{method} {row['mean_travel_time']:.0f}s")
+    return ", ".join(parts)
 
 
 def run_smoke(only: list[str] | None = None) -> int:
