@@ -1,6 +1,6 @@
 # ADR-010: Reward design and weights
 
-- Status: accepted (weights to be confirmed by the sensitivity check, journal M5)
+- Status: accepted (base term confirmed by a validation study; penalty weights checked in M5)
 - Date: 2026-09-24
 
 ## Context
@@ -45,3 +45,7 @@ the delay objective. COOP-ECO at two values of λ gives the Pareto front (RQ3).
   we want. We checked that rewards are not dominated by clipping (first episodes: mean
   reward about -0.003 per decision).
 - A sensitivity check on λ_ev and λ_co2 is part of M5.
+- **Validation study of the base term (journal M3, FAILURES F-007).** At the same budget,
+  IND with the specified waiting-difference reward, a queue-length reward, the PressLight
+  pressure reward and an entropy bonus all land within 1.6% of each other on validation
+  seeds (e.g. peak 211.5 / 212.6 / 214.9 / 211.9 s). The specified reward is kept.

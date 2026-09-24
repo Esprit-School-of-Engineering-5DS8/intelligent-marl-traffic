@@ -52,5 +52,10 @@ seed, checkpoint and git commit (with `-dirty` when uncommitted changes were pre
 - An evaluation episode is 90 simulated minutes. Measured during calibration (without
   the SSM device): 15-60 s on grid4x4 depending on demand, 2.5-4 min on grid8x8. Every
   result row stores its wall time (`sim_wall_time_s`).
-- Five seeds give limited statistical power; we report effect sizes and do not claim a
-  difference that the test does not support.
+- Five seeds give limited statistical power: with 5 runs against 5 the smallest two-sided
+  Mann-Whitney p-value is 0.008, so after Holm correction over more than 6 tests no
+  baseline-vs-baseline difference can be declared significant, however large (journal, M2).
+  The confirmatory family is therefore learned variants (3 training seeds x 5 evaluation
+  seeds = 15 runs) against the best baseline of each cell (5 runs), where the smallest
+  p-value is about 1.3e-4. For every comparison we report the effect size (Cliff's delta)
+  and the confidence intervals, and we do not claim a difference the test does not support.

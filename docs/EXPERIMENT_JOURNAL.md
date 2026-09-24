@@ -99,3 +99,74 @@ junction), so the Webster plan we use is the best of these fixed-time plans, not
 emergency, pedestrians, buses, sensor noise, communication dropout on grid4x4; incident +
 emergency + buses + pedestrians together on the district; FT, ACT, MP and EV-RULE on the
 emergency scenario. All runs produce complete result rows without NaN.
+
+## 2026-09-24 - M2: baselines on grid4x4 (5 evaluation seeds)
+
+Command: `python -m cotraffic evaluate --experiment baselines_grid4x4`. Tables:
+`results/summary/REPORT_TABLES.md`. Mean travel time (s), mean [95% CI]:
+
+| Method | low | medium | peak | rush profile |
+|---|---|---|---|---|
+| FT | 171 [171, 172] | 180 [179, 181] | 261 [247, 276] | 209 |
+| ACT | 145 [145, 146] | 157 [157, 158] | 275 [257, 290] | 195 |
+| MP | 148 [148, 149] | 158 [157, 159] | 210 [203, 217] | 180 |
+
+- Actuated control is best at low and medium demand and collapses at peak (worse than FT).
+  Max-Pressure is the best baseline at peak and on the rush profile.
+- Emergency scenario at peak: EV delay FT 155 s, ACT 150 s, MP 106 s, EV-RULE 58 s. EV-RULE
+  cuts the EV delay by 61% against ACT at a cost of +3.6% travel time for the other vehicles
+  (288 vs 278 s).
+- SSM: 3 200 to 3 600 encounters with TTC < 1.5 s per 1 000 vehicles at peak, mostly vehicles
+  closing on standing queues. We keep TTC only (DRAC was not reported and cost about 20% more
+  simulation time in a quick test; conflict counts are identical).
+- **Statistical power.** With 5 runs against 5, the smallest two-sided Mann-Whitney p-value is
+  2/252 = 0.008. After Holm correction over the 11 baseline-vs-FT tests, even a complete
+  separation (MP vs FT at peak, Cliff's delta = -1) gives p = 0.087. Learned variants are
+  evaluated with 3 training seeds x 5 evaluation seeds = 15 runs against 5 (smallest p about
+  1.3e-4), so their comparisons are the confirmatory family; baseline-vs-baseline differences
+  are reported with effect sizes and confidence intervals.
+- Engineering (wall time per evaluation episode, 2-5 processes sharing the laptop): peak with
+  SSM 3-7 min, peak without SSM 1-2 min, low and medium 0.5-2 min.
+
+## 2026-09-24 - M3: PPO training, IND
+
+- Training speed (grid4x4, 16 agents, single torch thread): 500 000 agent steps in 1 082 s
+  (18 min) with two evaluation processes running in parallel; about 500 steps/s. Resume from
+  checkpoints tested (quick run interrupted and continued, both sessions logged).
+- Reward scales from Max-Pressure runs on training demand (`configs/reward_norm/`):
+  waiting std 151 veh-s per decision; first episodes then have a mean reward of about -0.003
+  per decision (no clipping).
+- Learning curves (`figures/fig01_training_curves.png`): halting vehicles fall at every demand
+  level during the first 150-300k steps (peak 141 -> about 105-115, low 22 -> 17), then plateau.
+- Checkpoint selection on validation seeds: the last four checkpoints are within 2 s of each
+  other (184.5-186.7 s); 400k steps selected.
+- Test seeds (5 runs per cell), IND vs baselines, mean travel time:
+
+| Demand | IND | best baseline | IND vs best baseline | IND vs FT |
+|---|---|---|---|---|
+| low | 151.6 | ACT 145.0 | -4.6% (p Holm 0.032) | +11.5% |
+| medium | 160.8 | ACT 157.3 | -2.2% (p 0.032) | +10.6% |
+| peak | 214.5 | MP 210.2 | -2.1% (p 0.69) | +17.9% |
+| rush profile | 184.0 | MP 179.9 | -2.2% (p 0.44) | +12.1% |
+
+  IND matches Max-Pressure on mean waiting time at peak (55.5 vs 55.3 s) and has a slightly
+  lower P95 wait and Gini (135 vs 137 s; 0.385 vs 0.393), but not a lower travel time.
+- Behaviour: IND switches phase about as often as Max-Pressure (4 250-4 700 vs 3 900-4 400
+  switches per 90-min episode on 16 junctions). With 250 m links, frequent switching is right
+  here - consistent with Webster's short optimal cycle (M1).
+
+### Reward and exploration study (validation seeds 1000-1001 only)
+
+Could a different reward or more exploration close the gap with Max-Pressure? Same seed and
+budget (300k steps), mean travel time on validation episodes (`results/exploration/`):
+
+| Variant | medium | peak |
+|---|---|---|
+| IND, waiting-difference reward (specification) | 162.7 | 211.5 |
+| IND, queue-length reward | 161.9 | 212.6 |
+| IND, pressure reward (PressLight) | 162.0 | 214.9 |
+| IND, entropy bonus 0.01 | 161.8 | 211.9 |
+| Max-Pressure | 159.3 | 207.7 |
+
+No variant differs by more than 1.6%: the reward definition is not the bottleneck. We keep
+the specified reward and SB3's defaults (FAILURES F-007).

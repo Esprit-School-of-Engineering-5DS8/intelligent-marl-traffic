@@ -4,9 +4,9 @@
 |---|---|---|
 | M0 | Repo skeleton, environment, SUMO running, tests | done (2026-09-24) |
 | M1 | Networks, demand levels, rush profile, vehicle types, scenarios | done (2026-09-24) |
-| M2 | Evaluation pipeline, metrics, baselines FT / ACT / MP / EV-RULE | in progress |
-| M3 | PPO training with parameter sharing, checkpoint/resume, IND | planned |
-| M4 | COOP (neighbour communication), reward normalisation | planned |
+| M2 | Evaluation pipeline, metrics, baselines FT / ACT / MP / EV-RULE | done (2026-09-24) |
+| M3 | PPO training with parameter sharing, checkpoint/resume, IND | done (2026-09-24) |
+| M4 | COOP (neighbour communication), reward normalisation | in progress (training) |
 | M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | planned |
 | M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | planned |
 | M7 | Full experiment matrix, statistics, figures, tables | planned |
@@ -40,3 +40,25 @@
   clearance phases (F-004), unreachable OD pairs on the real network (F-005).
 - Next: M2 - experiment runner over a matrix of cells, baseline results on grid4x4 with
   5 seeds, statistics and the first comparison table.
+
+## M2 - summary (2026-09-24)
+
+- Works: experiment matrix runner (resumable, parallel, per-cell SSM switch), bootstrap CIs,
+  Mann-Whitney U with Holm correction, Cliff's delta, report tables, figures, dashboard.
+- Measured (grid4x4, 5 seeds): ACT best at low/medium demand, MP best at peak and on the rush
+  profile; FT 12-20% behind MP; EV-RULE cuts emergency-vehicle delay by 61% vs ACT for +3.6%
+  travel time of the others (journal M2).
+- Problems: 5-vs-5 comparisons cannot reach significance after Holm (documented, ADR-005);
+  a route cache corrupted by a killed process (now rebuilt automatically).
+- Next: M3 training.
+
+## M3 - summary (2026-09-24)
+
+- Works: PPO with parameter sharing through SuperSuit, reward normalisation from baseline
+  runs, checkpoints every 50k steps with resume, checkpoint selection on validation seeds,
+  Kaggle and Colab notebooks, training smoke check.
+- Measured: 500k agent steps in 18 min on the laptop. IND beats FT by 11-18% at every demand
+  level and matches MP's waiting time, but is 2-5% slower than the best baseline in travel
+  time (journal M3). Reward and entropy variants do not change this (F-007).
+- Problems: SuperSuit / SB3 API mismatches (F-006).
+- Next: M4 - COOP (3 seeds), then all variants and the district (training batch running).

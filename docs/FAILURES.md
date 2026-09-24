@@ -76,3 +76,19 @@ entries at the bottom. Negative results that belong in the report are marked **[
   `render_mode`, and mark time-limit ends in the environment's `infos`. Read the glue code
   between libraries: none of these problems raises an error at the right place, and the
   last one silently biases the value estimates.
+
+## F-007 - Changing the reward did not close the gap with Max-Pressure (2026-09-24) [report]
+
+- **Tried:** after IND reached Max-Pressure's waiting time but not its travel time, three
+  alternatives at the same budget: queue-length reward, pressure reward (PressLight),
+  entropy bonus 0.01.
+- **Evidence:** on validation seeds all four IND variants are within 1.6% of each other
+  (medium 161.8-162.7 s, peak 211.5-214.9 s) and about 2% behind Max-Pressure (159.3 / 207.7 s).
+  Every variant converges to the same behaviour: a switch at almost every opportunity the
+  shield allows, which Max-Pressure also does on this network.
+- **Diagnosis:** with 2-phase junctions and 250 m links the room for improvement over a
+  well-behaved pressure rule is small; what a local agent can learn is close to what
+  Max-Pressure already does. Better rewards do not add information the agent lacks.
+- **Lesson:** the lever is information (neighbour messages, COOP) and richer decisions, not
+  the reward. This motivates the IND vs COOP ablation (RQ1) and is itself a result: a simple
+  classical controller is a strong baseline that learning does not beat easily.
