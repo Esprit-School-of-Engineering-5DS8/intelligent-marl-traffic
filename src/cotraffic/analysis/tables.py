@@ -33,6 +33,8 @@ DEFAULT_SCENARIO_METRICS = ["mean_travel_time", "mean_waiting_time", "mean_queue
 
 
 def _fmt(mean: float, lo: float, hi: float) -> str:
+    if mean == lo == hi == 0:
+        return "0"
     digits = 0 if abs(mean) >= 100 else (1 if abs(mean) >= 1 else 3)
     return f"{mean:.{digits}f} [{lo:.{digits}f}, {hi:.{digits}f}]"
 

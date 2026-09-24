@@ -1,0 +1,7 @@
+name: ind_pressure
+extends: ind
+description: Reward exploration - IND with the pressure base reward of PressLight (validation study).
+reward:
+  base: pressure
+training:
+  total_timesteps: 300000

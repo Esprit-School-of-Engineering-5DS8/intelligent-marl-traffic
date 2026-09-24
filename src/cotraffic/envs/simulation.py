@@ -7,6 +7,7 @@ per process); with TraCI it runs as a separate process (needed for sumo-gui).
 from __future__ import annotations
 
 import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,9 @@ class Episode:
     info: dict[str, Any] = field(default_factory=dict)
 
 
-def sumo_command(ep: Episode, protocol: dict[str, Any], gui: bool = False) -> list[str]:
+def sumo_command(
+    ep: Episode, protocol: dict[str, Any], gui: bool = False, extra: Sequence[str] = ()
+) -> list[str]:
     s = protocol["sumo"]
     additional = [*ep.bundle.additional_files, *ep.additional]
     cmd = [
@@ -99,7 +102,7 @@ def sumo_command(ep: Episode, protocol: dict[str, Any], gui: bool = False) -> li
             ]
     if gui:
         cmd += ["--start", "true", "--quit-on-end", "true"]
-    return cmd
+    return cmd + list(extra)
 
 
 class Simulation:

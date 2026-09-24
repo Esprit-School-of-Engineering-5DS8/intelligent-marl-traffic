@@ -75,3 +75,11 @@ def test_district_trips_only_use_connected_origin_destination_pairs():
     persons = ET.parse(b.directory / "persons.rou.xml").getroot()
     for walk in persons.iter("walk"):
         assert walk.get("from") in walkable and walk.get("to") in walkable
+
+
+def test_a_corrupted_cache_entry_is_rebuilt():
+    request = DemandRequest("grid2x2", "low", (), seed=21, duration=600)
+    bundle = generate(request)
+    (bundle.directory / "meta.json").write_text("", encoding="utf-8")
+    rebuilt = generate(request)
+    assert rebuilt.meta["cars"] == bundle.meta["cars"]

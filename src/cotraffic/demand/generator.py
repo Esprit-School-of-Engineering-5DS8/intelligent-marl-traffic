@@ -232,7 +232,10 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
     directory = ROUTES_DIR / request.network / f"{level}_{tag}_s{request.seed}_{key}"
     meta_file = directory / "meta.json"
     if meta_file.is_file() and not force:
-        return _load_bundle(directory)
+        try:
+            return _load_bundle(directory)
+        except (ValueError, FileNotFoundError):
+            pass  # interrupted or corrupted cache entry (e.g. a killed process): rebuild it
     if directory.exists():
         shutil.rmtree(directory)
     final_dir = directory

@@ -92,6 +92,19 @@ def cmd_select(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_validate(args: argparse.Namespace) -> int:
+    _libsumo_default()
+    import pandas as pd
+
+    from cotraffic.training.select import validation_table
+
+    out = validation_table(args.agents, args.baselines, args.net, args.seed, jobs=args.jobs)
+    df = pd.read_csv(out)
+    print(df.pivot_table(index="method", columns="demand", values="mean_travel_time").round(1))
+    print(f"saved {out}")
+    return 0
+
+
 def cmd_evaluate(args: argparse.Namespace) -> int:
     _libsumo_default()
     from cotraffic.evaluation.matrix import run_matrix
@@ -105,6 +118,58 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
 
     for path in run_aggregate():
         print(f"wrote {path}")
+    return 0
+
+
+def cmd_forecast(args: argparse.Namespace) -> int:
+    _libsumo_default()
+    import pandas as pd
+
+    from cotraffic.forecasting.dataset import DATA_DIR, build_dataset
+    from cotraffic.forecasting.models import evaluate
+
+    if args.rebuild or not (DATA_DIR / f"inflow_{args.net}.csv").is_file():
+        print(f"dataset: {build_dataset(args.net, args.seeds, args.jobs)}")
+    out = evaluate(args.net)
+    table = pd.read_csv(out)
+    print(table[table["demand"] == "all"].round(2).to_string(index=False))
+    print(f"saved {out}")
+    return 0
+
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    _libsumo_default()
+    from pathlib import Path
+
+    from cotraffic.explainability.explain import explain_episode, permutation_importance
+    from cotraffic.paths import CHECKPOINTS_DIR
+
+    ckpt = (
+        Path(args.checkpoint)
+        if args.checkpoint
+        else CHECKPOINTS_DIR / args.agent / args.net / "seed1.zip"
+    )
+    log = explain_episode(args.agent, ckpt, args.net, args.demand, args.scenarios, args.seed)
+    print(f"decision log: {log}")
+    if not args.no_importance:
+        out = permutation_importance(
+            args.agent,
+            ckpt,
+            args.net,
+            args.demand,
+            args.scenarios,
+            args.importance_seeds,
+            online=not args.offline,
+        )
+        print(f"importance: {out}")
+    return 0
+
+
+def cmd_figures(args: argparse.Namespace) -> int:
+    from cotraffic.analysis.figures import build_figures
+
+    for line in build_figures():
+        print(line)
     return 0
 
 
@@ -170,6 +235,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jobs", type=int, default=2)
     p.set_defaults(func=cmd_select)
 
+    p = sub.add_parser("validate", help="compare variants on validation seeds (design choices)")
+    p.add_argument("--agents", nargs="+", required=True)
+    p.add_argument("--baselines", nargs="*", default=["mp"])
+    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--seed", type=int, default=1, help="training seed of the runs")
+    p.add_argument("--jobs", type=int, default=2)
+    p.set_defaults(func=cmd_validate)
+
     p = sub.add_parser("evaluate", help="run an experiment matrix (configs/experiments)")
     p.add_argument("--experiment", default="full_matrix")
     p.add_argument("--jobs", type=int, default=2)
@@ -184,6 +257,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("aggregate", help="statistics and summary tables from results/raw")
     p.set_defaults(func=cmd_aggregate)
+
+    p = sub.add_parser("forecast", help="inflow forecasting: dataset, models, scores")
+    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--seeds", type=int, default=4, help="runs per demand level")
+    p.add_argument("--jobs", type=int, default=2)
+    p.add_argument("--rebuild", action="store_true")
+    p.set_defaults(func=cmd_forecast)
+
+    p = sub.add_parser("explain", help="decision log and feature-group importance of a policy")
+    p.add_argument("--agent", default="coop_full")
+    p.add_argument("--net", default="grid4x4")
+    p.add_argument(
+        "--checkpoint", default=None, help="default: results/checkpoints/<agent>/<net>/seed1.zip"
+    )
+    p.add_argument("--demand", default="peak")
+    p.add_argument("--scenarios", nargs="*", default=["emergency"])
+    p.add_argument("--seed", type=int, default=3)
+    p.add_argument("--importance-seeds", type=int, nargs="+", default=[0, 1])
+    p.add_argument("--no-importance", action="store_true")
+    p.add_argument("--offline", action="store_true", help="skip the online replays (faster)")
+    p.set_defaults(func=cmd_explain)
+
+    p = sub.add_parser("figures", help="report figures into figures/ (PNG + SVG)")
+    p.set_defaults(func=cmd_figures)
 
     p = sub.add_parser("tables", help="write results/summary/REPORT_TABLES.md")
     p.set_defaults(func=cmd_tables)

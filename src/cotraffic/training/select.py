@@ -104,3 +104,70 @@ def trained_runs(
             continue
         found.append((a, n, int(seed_dir.name.removeprefix("seed"))))
     return found
+
+
+def validation_table(
+    agents: list[str],
+    baselines: list[str],
+    network: str,
+    seed: int = 1,
+    val_seeds: tuple[int, ...] = (1000, 1001),
+    jobs: int = 2,
+) -> Path:
+    """Final checkpoints of several variants and some baselines on validation episodes
+    (used for design choices such as the reward definition, never for reporting)."""
+    import pandas as pd
+
+    from cotraffic.paths import RESULTS_DIR
+
+    demands = config.load_agent("base")["validation"]["demands"]
+    tasks = []
+    for agent in agents:
+        steps, path = list_checkpoints(run_dir(agent, network, seed) / "checkpoints")[-1]
+        tasks += [(agent, network, d, s, str(path), steps) for d in demands for s in val_seeds]
+    with ProcessPoolExecutor(max_workers=max(1, jobs)) as pool:
+        learned = list(pool.map(_validate, tasks))
+        base = list(
+            pool.map(
+                _validate_baseline,
+                [(m, network, d, s) for m in baselines for d in demands for s in val_seeds],
+            )
+        )
+    rows = [
+        {"method": t[0], "steps": r[0], "demand": r[1], "seed": r[2], "mean_travel_time": r[3]}
+        for t, r in zip(tasks, learned, strict=True)
+    ]
+    rows += [
+        {"method": m, "steps": 0, "demand": d, "seed": s, "mean_travel_time": v}
+        for m, d, s, v in base
+    ]
+    out = RESULTS_DIR / "exploration" / f"{network}_validation.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows)
+    if out.is_file():
+        old = pd.read_csv(out)
+        df = pd.concat([old[~old["method"].isin(df["method"])], df], ignore_index=True)
+    df.to_csv(out, index=False)
+    return out
+
+
+def _validate_baseline(args: tuple[str, str, str, int]) -> tuple[str, str, int, float]:
+    os.environ.setdefault("LIBSUMO_AS_TRACI", "1")
+    from cotraffic.evaluation.runner import run_episode
+    from cotraffic.paths import RESULTS_DIR
+
+    method, network, demand, seed = args
+    work = RESULTS_DIR / "exploration" / "runs"
+    row = run_episode(
+        method,
+        network,
+        demand,
+        [],
+        seed,
+        ssm=False,
+        mode="validation",
+        tag="val",
+        raw_dir=work,
+        logs_dir=work / "logs",
+    )
+    return method, demand, seed, float(row["mean_travel_time"])

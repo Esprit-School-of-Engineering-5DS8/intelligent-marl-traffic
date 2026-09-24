@@ -34,18 +34,31 @@ python -m pytest -q
 ## Commands
 
 The `Makefile` targets are aliases of the Python CLI, so everything also works on
-Windows without `make`.
+Windows without `make`. `python -m cotraffic <command> --help` lists the options.
 
 | make | python -m cotraffic ... | What it does |
 |---|---|---|
-| `make test` | `python -m pytest -q` | unit and integration tests |
-| `make lint` | `python -m ruff check src tests scripts dashboard` | style |
-| `make smoke` | `smoke` | quick end-to-end run of every feature |
+| `make test` | (`python -m pytest -q`) | unit and integration tests |
+| `make lint` | (`python -m ruff check src tests scripts dashboard`) | style |
+| `make smoke` | `smoke` | quick end-to-end run of every feature (a few minutes) |
 | `make networks` | `networks --all` | build the SUMO networks from `configs/networks` |
-| | `episode --net grid4x4 --demand peak --seconds 3600` | one random-policy episode (sanity check) |
+| | `calibrate-demand --net grid4x4 --scales ...` | demand calibration sweep (tuning seeds) |
+| `make calibrate` | `calibrate --net grid4x4` | reward normalisation constants from baseline runs |
+| `make train` | `train --agent coop --net grid4x4 --seed 1` | train one variant (resumes from its last checkpoint) |
+| `make select` | `select` | choose the checkpoint of each run on validation seeds |
+| | `validate --agents ind coop --baselines mp` | compare variants on validation seeds (design choices) |
+| `make evaluate` | `evaluate --experiment full_matrix --jobs 2` | run an experiment matrix (skips runs already done) |
+| `make aggregate` | `aggregate` | means, bootstrap CIs, Mann-Whitney U + Holm, Cliff's delta |
+| `make figures` | `figures` | the report figures, PNG + SVG, in `figures/` |
+| `make tables` | `tables` | `results/summary/REPORT_TABLES.md` |
+| `make forecast` | `forecast --net grid4x4` | inflow forecasting dataset, models and scores |
+| `make explain` | `explain --agent coop_full --net grid4x4` | decision log and feature-group importance |
+| `make dashboard` | (`streamlit run dashboard/app.py`) | interactive results (no SUMO needed) |
+| `make demo` | (`python scripts/demo_side_by_side.py`) | two sumo-gui windows: baseline vs COOP-FULL |
+| `make reproduce` | (`bash scripts/reproduce_all.sh`) | everything, from networks to tables |
 
-More commands are added with each milestone (training, evaluation, figures); see
-`docs/PROGRESS.md`.
+`docs/RUN_PLAN.md` explains how to split training and evaluation between machines,
+Kaggle (`notebooks/kaggle_train.ipynb`) and Colab (`notebooks/colab_train.ipynb`).
 
 ## Repository layout
 

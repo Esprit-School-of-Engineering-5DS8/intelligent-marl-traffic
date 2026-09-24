@@ -27,3 +27,4 @@ results/training/**/tensorboard/
 results/training/**/checkpoints/
 results/tmp/
 sumo_files/*/tls/
+results/forecasting/tmp/

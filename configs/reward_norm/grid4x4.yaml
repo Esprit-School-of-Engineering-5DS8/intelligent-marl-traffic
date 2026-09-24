@@ -1,6 +1,8 @@
 # Written by `python -m cotraffic calibrate`; do not edit by hand.
 norm:
   wait: 151.1636
+  queue: 12.7759
+  pressure: 21.8637
   co2: 247124.6984
   ev: 4.4286
   ped: 8.122

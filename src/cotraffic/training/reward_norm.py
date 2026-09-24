@@ -6,7 +6,7 @@ training demand, record every raw term of every agent decision, and choose scale
 bring each term to order 1:
 
 * waiting change: standard deviation (the term is centred, its sign carries the signal);
-* CO2: mean per decision (always positive);
+* queue, pressure and CO2: mean per decision (they are never negative);
 * emergency-vehicle and pedestrian waiting: mean of the non-zero values - these terms
   are zero most of the time, and their scale should reflect a typical event, not the
   long quiet periods between events.
@@ -30,7 +30,7 @@ from cotraffic.envs.simulation import Episode
 from cotraffic.envs.traffic_env import CoTrafficEnv
 from cotraffic.paths import CONFIG_DIR
 
-TERMS = ("wait", "co2", "ev", "ped")
+TERMS = ("wait", "queue", "pressure", "co2", "ev", "ped")
 
 
 def calibrate_rewards(
@@ -64,6 +64,8 @@ def calibrate_rewards(
     nonzero = {t: arrays[t][arrays[t] > 0] for t in ("ev", "ped")}
     norm = {
         "wait": float(arrays["wait"].std()),
+        "queue": float(arrays["queue"].mean()),
+        "pressure": float(arrays["pressure"].mean()),
         "co2": float(arrays["co2"].mean()),
         "ev": float(nonzero["ev"].mean()) if nonzero["ev"].size else 1.0,
         "ped": float(nonzero["ped"].mean()) if nonzero["ped"].size else 1.0,

@@ -44,7 +44,7 @@ def reward_norm(network: str) -> dict[str, float]:
     path = CONFIG_DIR / "reward_norm" / f"{network}.yaml"
     if path.is_file():
         return {k: float(v) for k, v in config.load_yaml(path)["norm"].items()}
-    return {"wait": 1.0, "co2": 1.0, "ev": 1.0, "ped": 1.0}
+    return dict.fromkeys(("wait", "queue", "pressure", "co2", "ev", "ped"), 1.0)
 
 
 class CoTrafficEnv(ParallelEnv):
@@ -62,6 +62,7 @@ class CoTrafficEnv(ParallelEnv):
         protocol: Mapping[str, Any] | None = None,
         step_hooks: Sequence[StepHook] = (),
         compute_observations: bool = True,
+        sumo_options: Sequence[str] = (),
     ):
         self.network = network
         self.episodes = episodes
@@ -88,6 +89,7 @@ class CoTrafficEnv(ParallelEnv):
         self.record_decisions = record_decisions
         self.compute_observations = compute_observations
         self.step_hooks = list(step_hooks)
+        self.sumo_options = list(sumo_options)
         self.runtime = runtime_perturbations(runtime_scenarios)
         self.forecaster = None
 
@@ -126,7 +128,9 @@ class CoTrafficEnv(ParallelEnv):
             self._rng = np.random.default_rng(seed)
         options = options or {}
         self.episode = options.get("episode") or self.episodes(self._rng)
-        self.conn = self.sim.start(sumo_command(self.episode, self.protocol, self.gui))
+        self.conn = self.sim.start(
+            sumo_command(self.episode, self.protocol, self.gui, self.sumo_options)
+        )
         conn = self.conn
         self.now = float(conn.simulation.getTime())
         lanes_per_side = self.pad.lanes_per_side
@@ -229,7 +233,7 @@ class CoTrafficEnv(ParallelEnv):
         for aid, inter in self.intersections.items():
             if self.compute_observations:
                 ped_s = sum(self.ped_waiting.get(c, 0.0) for c in inter.crossings) * self.delta
-                raw = self.rewards.raw_terms(conn, inter, co2[aid], ped_s)
+                raw = self.rewards.raw_terms(conn, inter, co2[aid], ped_s, self.meas.count)
                 rewards[aid] = self.rewards.combine(raw)
                 infos[aid] = {"raw": raw}
             else:
