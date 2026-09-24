@@ -19,7 +19,7 @@ from cotraffic.analysis.style import (
     label,
     method_sort_key,
 )
-from cotraffic.paths import LOGS_DIR, RAW_DIR, TRAINING_DIR
+from cotraffic.paths import LOGS_DIR, RAW_DIR, SUMMARY_DIR, TRAINING_DIR
 
 st.set_page_config(page_title="CoTraffic results", layout="wide")
 
@@ -68,8 +68,15 @@ cell = summary[
 ].copy()
 cell["Method"] = cell["method"].map(label)
 
-tab_overview, tab_time, tab_tradeoff, tab_training, tab_decisions = st.tabs(
-    ["Overview", "Over time", "Travel time vs CO2", "Training", "Decisions"]
+tab_overview, tab_time, tab_tradeoff, tab_training, tab_decisions, tab_models = st.tabs(
+    [
+        "Overview",
+        "Over time",
+        "Travel time vs CO2",
+        "Training",
+        "Decisions",
+        "Forecast & importance",
+    ]
 )
 
 with tab_overview:
@@ -201,3 +208,31 @@ with tab_decisions:
             width="stretch",
             hide_index=True,
         )
+
+with tab_models:
+    for path in sorted(SUMMARY_DIR.glob("forecast_*.csv")):
+        st.subheader(f"Inflow forecasting - {path.stem.removeprefix('forecast_')}")
+        fc = pd.read_csv(path)
+        st.caption("Arrivals of the next 5 minutes per approach; mean absolute error (vehicles).")
+        st.dataframe(
+            fc.pivot_table(index="model", columns=["split", "demand"], values="mae").round(2),
+            width="stretch",
+        )
+    for path in sorted(SUMMARY_DIR.glob("importance_*.csv")):
+        imp = pd.read_csv(path).sort_values("action_change_rate", ascending=False)
+        st.subheader(f"What {label(imp['method'].iloc[0])} relies on ({imp['network'].iloc[0]})")
+        imp["Decisions changed (%)"] = 100 * imp["action_change_rate"]
+        chart = (
+            alt.Chart(imp)
+            .mark_bar(size=18, cornerRadiusEnd=4, color=METHOD_COLORS.get(imp["method"].iloc[0]))
+            .encode(
+                x=alt.X("Decisions changed (%):Q"),
+                y=alt.Y("group:N", sort="-x", title=None),
+                tooltip=[
+                    "group",
+                    alt.Tooltip("Decisions changed (%):Q", format=".1f"),
+                    alt.Tooltip("travel_time_increase_pct:Q", format="+.1f"),
+                ],
+            )
+        )
+        st.altair_chart(chart, width="stretch")
