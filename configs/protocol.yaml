@@ -1,0 +1,45 @@
+# Global simulation and evaluation protocol shared by every experiment.
+# Every number used by the environment, controllers and metrics is defined here
+# or in the network/demand/scenario/agent configs, never in code.
+
+timing:
+  delta_time: 5        # s between two decisions of an agent
+  yellow_time: 3       # s of yellow when switching phase
+  min_green: 10        # s, a green phase cannot be cut earlier
+  max_green: 60        # s, longer greens are cut if another phase has demand
+  max_red: 90          # s, anti-starvation: a movement with demand waiting longer is served
+
+evaluation:
+  warmup_s: 900        # excluded from all metrics
+  measure_s: 3600      # measured window
+  cooldown_s: 900      # no new demand; lets vehicles of the window finish their trip
+  teleport_penalty_s: 300   # added to the travel time of a vehicle that teleported
+
+training:
+  episode_s: 3600
+  demand_levels: [low, medium, peak, rush_profile]
+
+sumo:
+  step_length: 1.0
+  time_to_teleport: 300
+  waiting_time_memory: 10000
+  max_depart_delay: -1          # never drop vehicles that cannot be inserted
+  ssm:
+    measures: "TTC DRAC"
+    thresholds: "1.5 3.4"       # TTC < 1.5 s, DRAC > 3.4 m/s2 are logged as conflicts
+    range: 50.0
+  # A hard-braking event is a deceleration above this fraction of the vehicle's emergency
+  # deceleration (0.5 x 9 m/s2 = 4.5 m/s2 for cars); counted by SUMO's statistic output.
+  hard_braking_fraction: 0.5
+
+observation:
+  lane_capacity_gap_m: 7.5      # vehicle length + minimum gap used to convert length to capacity
+  ev_detection_range_m: 250     # emergency vehicles farther than this are not observed
+  ped_norm: 10                  # waiting pedestrians per crossing mapped to 1.0
+  bus_norm: 60                  # occupancy-weighted buses per approach mapped to 1.0
+  forecast_norm: 150            # vehicles per 5 min per approach mapped to 1.0
+
+occupancy:                      # persons per vehicle, used for person-based delay
+  passenger: 1.2
+  bus: 30
+  emergency: 2

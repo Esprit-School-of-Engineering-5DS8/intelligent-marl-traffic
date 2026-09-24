@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Simulation working files (regenerated from configs)
+sumo_files/routes/
+sumo_files/tmp/
+runs/
+*.log
+
+# Training artefacts: only the selected checkpoints under results/checkpoints are versioned
+results/training/**/tensorboard/
+results/training/**/checkpoints/
+results/tmp/

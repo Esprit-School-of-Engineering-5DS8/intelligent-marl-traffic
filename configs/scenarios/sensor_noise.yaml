@@ -1,0 +1,5 @@
+name: sensor_noise
+description: Gaussian noise on observed lane counts and 20% of lane detectors returning 0 (evaluation only).
+sensor_noise:
+  count_std_veh: 2.0      # std of the noise added to vehicle counts, in vehicles
+  failed_fraction: 0.2    # share of lane detectors that report 0 for the whole episode

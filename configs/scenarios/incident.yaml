@@ -1,0 +1,5 @@
+name: incident
+description: One lane of a key approach is blocked by a stopped vehicle 20 min into the measured hour, for 15 min.
+incident:
+  start_s: 1200      # relative to the start of the measured hour
+  duration_s: 900

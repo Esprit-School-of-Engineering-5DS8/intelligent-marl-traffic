@@ -1,0 +1,4 @@
+name: peak
+description: Rush-hour traffic at the calibrated peak rate (clear congestion under fixed-time control, no permanent gridlock).
+level: 1.0
+profile: constant

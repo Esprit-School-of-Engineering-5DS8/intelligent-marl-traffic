@@ -1,0 +1,5 @@
+name: emergency
+description: 3 to 5 emergency vehicles cross the network on long routes during the measured hour.
+emergency:
+  count: [3, 5]          # inclusive range, drawn per seed
+  window_s: [300, 3300]  # departure window relative to the start of the measured hour

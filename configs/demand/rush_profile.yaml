@@ -1,0 +1,12 @@
+name: rush_profile
+description: Time-varying hour - ramp up, 20 min at peak, ramp down - to test adaptivity.
+level: 1.0
+# [time since the start of the demand hour (s), fraction of the peak rate]; linear in between.
+# The warm-up before the hour uses the first value.
+profile:
+  - [0, 0.4]
+  - [900, 0.6]
+  - [1500, 1.0]
+  - [2700, 1.0]
+  - [3300, 0.6]
+  - [3600, 0.4]

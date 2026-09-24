@@ -1,0 +1,45 @@
+name: grid8x8
+kind: grid
+description: 8x8 grid (64 intersections), evaluation only - zero-shot scalability test.
+
+grid:
+  x: 8
+  y: 8
+  length: 250
+  attach_length: 250
+  lanes: 2
+  speed: 13.89
+
+pedestrians: true
+
+# Must match grid4x4 so that the grid4x4 policies can be applied directly.
+padding:
+  lanes_per_side: 2
+  max_phases: 2
+  max_crossings: 4
+
+neighbours:
+  max_distance_m: 400
+
+demand:
+  # Twice the entry points of grid4x4 and trips twice as long: doubling the total rate
+  # keeps the load per intersection comparable.
+  peak_vehicles_per_hour: 5200
+  origin_side_weights: {west: 1.6, east: 0.8, north: 1.0, south: 0.6}
+  opposite_side_prob: 0.6
+  route_random_factor: 1.5
+
+bus_lines:
+  - {id: L1, from_side: west, from_index: 3, to_side: east, to_index: 3}
+  - {id: L2, from_side: south, from_index: 4, to_side: north, to_index: 4}
+
+incident:
+  edge: D3E3
+  lane: 1
+  position_frac: 0.4
+
+reward_norm:
+  wait: 1.0
+  co2: 1.0
+  ev: 1.0
+  ped: 1.0

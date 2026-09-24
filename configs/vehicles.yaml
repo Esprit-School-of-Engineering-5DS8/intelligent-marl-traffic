@@ -1,0 +1,40 @@
+# Vehicle types written to every route bundle. Emission classes are left to SUMO's
+# defaults per vehicle class (HBEFA4: petrol Euro-4 car, urban bus, light
+# commercial vehicle for emergency vehicles).
+vtypes:
+  car:
+    vClass: passenger
+    length: 5.0
+    minGap: 2.5
+    accel: 2.6
+    decel: 4.5
+    sigma: 0.5
+    speedDev: 0.1
+    color: "1,1,0"
+  bus:
+    vClass: bus
+    length: 12.0
+    minGap: 3.0
+    accel: 1.2
+    decel: 4.0
+    sigma: 0.5
+    speedDev: 0.05
+    color: "0,0.4,1"
+  emergency:
+    # Emergency vehicles obey signals in our model (no blue-light device, no
+    # rescue lane), so their delay reflects how well the signals clear their way.
+    vClass: emergency
+    length: 6.5
+    minGap: 2.5
+    accel: 2.8
+    decel: 4.5
+    sigma: 0.2
+    speedFactor: 1.2
+    speedDev: 0.0
+    guiShape: emergency
+    color: "1,0,0"
+  incident:
+    vClass: passenger
+    length: 5.0
+    minGap: 2.5
+    color: "1,0,1"
