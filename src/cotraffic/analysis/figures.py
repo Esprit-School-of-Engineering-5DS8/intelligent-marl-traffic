@@ -67,11 +67,15 @@ def _style() -> None:
     )
 
 
+_OUT = {"dir": FIGURES_DIR}
+
+
 def _save(fig, name: str) -> Path:
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    png = FIGURES_DIR / f"{name}.png"
+    out_dir = _OUT["dir"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    png = out_dir / f"{name}.png"
     fig.savefig(png, dpi=200, bbox_inches="tight")
-    fig.savefig(FIGURES_DIR / f"{name}.svg", bbox_inches="tight")
+    fig.savefig(out_dir / f"{name}.svg", bbox_inches="tight")
     plt.close(fig)
     return png
 
@@ -119,11 +123,26 @@ def _bars(
     ax.grid(axis="x", visible=False)
 
 
+NETWORK_ORDER = ("grid4x4", "real_district", "grid8x8")
+
+
+def _networks(df: pd.DataFrame, exclude: tuple[str, ...] = ("grid8x8",)) -> list[str]:
+    """Networks present in ``df``, in the report's order."""
+    if df.empty:
+        return []
+    present = [n for n in df["network"].unique() if n not in exclude]
+    return sorted(present, key=lambda n: (NETWORK_ORDER.index(n) if n in NETWORK_ORDER else 9, n))
+
+
 class Data:
     """Lazy access to result files."""
 
-    def __init__(self, raw_dir: Path = RAW_DIR, logs_dir: Path = LOGS_DIR):
-        self.raw = load_raw(raw_dir) if any(Path(raw_dir).glob("*.csv")) else pd.DataFrame()
+    def __init__(
+        self, raw_dir: Path = RAW_DIR, logs_dir: Path = LOGS_DIR, allow_quick: bool = False
+    ):
+        self.raw = (
+            load_raw(raw_dir, allow_quick) if any(Path(raw_dir).glob("*.csv")) else pd.DataFrame()
+        )
         self.summary = summarise(self.raw) if not self.raw.empty else pd.DataFrame()
         self.logs_dir = logs_dir
 
@@ -229,9 +248,7 @@ def fig01_training_curves(d: Data) -> Path | None:
 
 
 def fig02_travel_time(d: Data) -> Path | None:
-    nets = [
-        n for n in ("grid4x4", "real_district") if not d.cell(network=n, scenario="normal").empty
-    ]
+    nets = _networks(d.cell(scenario="normal"))
     if not nets:
         return None
     fig, axes = plt.subplots(len(nets), 1, figsize=(8.5, 3.3 * len(nets)), squeeze=False)
@@ -376,7 +393,9 @@ def fig05_emergency(d: Data) -> Path | None:
     cell = d.cell(scenario="emergency")
     if cell.empty or "ev_delay" not in cell:
         return None
-    nets = [n for n in ("grid4x4", "real_district") if not cell[cell["network"] == n].empty]
+    nets = _networks(cell)
+    if not nets:
+        return None
     fig, axes = plt.subplots(len(nets), 2, figsize=(10, 3.2 * len(nets)), squeeze=False)
     for row, net in enumerate(nets):
         sub = cell[cell["network"] == net]
@@ -699,9 +718,15 @@ FIGURES = [
 ]
 
 
-def build_figures() -> list[str]:
+def build_figures(
+    raw_dir: Path = RAW_DIR,
+    logs_dir: Path = LOGS_DIR,
+    out_dir: Path = FIGURES_DIR,
+    allow_quick: bool = False,
+) -> list[str]:
     _style()
-    d = Data()
+    _OUT["dir"] = out_dir
+    d = Data(raw_dir, logs_dir, allow_quick)
     report = []
     for fn in FIGURES:
         out = fn(d)

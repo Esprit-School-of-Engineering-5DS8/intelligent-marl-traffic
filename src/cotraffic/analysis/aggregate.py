@@ -21,12 +21,12 @@ from cotraffic.paths import RAW_DIR, SUMMARY_DIR
 CELL = ["network", "scenario", "demand"]
 
 
-def load_raw(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
+def load_raw(raw_dir: Path = RAW_DIR, allow_quick: bool = False) -> pd.DataFrame:
     files = sorted(Path(raw_dir).glob("*.csv"))
     if not files:
         raise FileNotFoundError(f"no result file in {raw_dir}")
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
-    if "quick" in df:
+    if "quick" in df and not allow_quick:
         quick = df["quick"].astype(str).str.lower() == "true"
         if quick.any():
             raise ValueError(f"{quick.sum()} quick-mode rows in {raw_dir}; they are not results")
@@ -111,8 +111,10 @@ def compare(
     return out
 
 
-def run_aggregate(raw_dir: Path = RAW_DIR, out_dir: Path = SUMMARY_DIR) -> list[Path]:
-    df = load_raw(raw_dir)
+def run_aggregate(
+    raw_dir: Path = RAW_DIR, out_dir: Path = SUMMARY_DIR, allow_quick: bool = False
+) -> list[Path]:
+    df = load_raw(raw_dir, allow_quick)
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     summary = summarise(df)

@@ -5,8 +5,9 @@ position of t in the demand hour. Target: vehicles arriving during minutes t+1..
 
 Two splits, both free of leakage:
 
-* chronological (main): models are fitted on the first 60 minutes of every run and
-  tested on the later minutes - forecasting the future of a known day;
+* chronological (main): models are fitted on the first two thirds of every run (minutes
+  0-59 of the 90-minute evaluation protocol) and tested on the last third - forecasting
+  the future of a known day;
 * held-out realisations: fitted on some seeds, tested on other seeds - forecasting a
   day never seen.
 """
@@ -28,7 +29,6 @@ from cotraffic.paths import SUMMARY_DIR
 
 LAGS = 10
 HORIZON = 5
-SPLIT_MINUTE = 60
 
 
 SERIES = ["network", "demand", "seed", "tls", "side"]
@@ -90,19 +90,23 @@ def _scores(test: pd.DataFrame, preds: dict[str, np.ndarray], split: str) -> lis
     return rows
 
 
-def evaluate(network: str = "grid4x4") -> Path:
-    data = pd.read_csv(DATA_DIR / f"inflow_{network}.csv")
+def evaluate(
+    network: str = "grid4x4", data_dir: Path = DATA_DIR, out_dir: Path = SUMMARY_DIR
+) -> Path:
+    data = pd.read_csv(data_dir / f"inflow_{network}.csv")
     feats = make_features(data)
     rows = []
-    train = feats[feats["minute"] + HORIZON < SPLIT_MINUTE]
-    test = feats[feats["minute"] >= SPLIT_MINUTE]
+    split = round(2 * (data["minute"].max() + 1) / 3)
+    train = feats[feats["minute"] + HORIZON < split]
+    test = feats[feats["minute"] >= split]
     rows += _scores(test, predict_all(train, test), "chronological")
     seeds = sorted(feats["seed"].unique())
-    held = seeds[len(seeds) // 2 :]
-    train = feats[~feats["seed"].isin(held)]
-    test = feats[feats["seed"].isin(held)]
-    rows += _scores(test, predict_all(train, test), "held-out seeds")
-    out = SUMMARY_DIR / f"forecast_{network}.csv"
+    if len(seeds) >= 2:
+        held = seeds[len(seeds) // 2 :]
+        train = feats[~feats["seed"].isin(held)]
+        test = feats[feats["seed"].isin(held)]
+        rows += _scores(test, predict_all(train, test), "held-out seeds")
+    out = out_dir / f"forecast_{network}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(out, index=False)
     return out

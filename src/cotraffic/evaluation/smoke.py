@@ -155,8 +155,73 @@ def _training() -> str:
 
     ctrl = LearnedPolicy("coop", list_checkpoints(folder / "checkpoints")[-1][1])
     row = _quick("coop", "grid2x2", ["emergency"], controller=ctrl)
+    from cotraffic.explainability.explain import explain_episode
+
+    log = explain_episode(
+        "coop", ctrl.checkpoint, "grid2x2", "medium", ["emergency"], 7, max_rows=200
+    )
+    assert log.is_file()
+    log.unlink()
     shutil.rmtree(folder, ignore_errors=True)
     return f"trained to {steps[-1]} steps with resume, evaluated: {row['mean_travel_time']:.0f}s"
+
+
+@check("analysis")
+def _analysis() -> str:
+    """Quick matrix -> statistics -> report tables -> figures, in a temporary folder."""
+    import shutil
+
+    from cotraffic.analysis.aggregate import run_aggregate
+    from cotraffic.analysis.figures import build_figures
+    from cotraffic.analysis.tables import build_report_tables
+    from cotraffic.evaluation.matrix import run_matrix
+    from cotraffic.paths import RESULTS_DIR
+
+    assert run_matrix("quick", jobs=2) == 0
+    raw, logs = RESULTS_DIR / "tmp" / "quick_raw", RESULTS_DIR / "tmp" / "quick_logs"
+    out = RESULTS_DIR / "tmp" / "smoke_summary"
+    shutil.rmtree(out, ignore_errors=True)
+    run_aggregate(raw, out, allow_quick=True)
+    tables = build_report_tables(raw, out)
+    report = build_figures(raw, logs, out / "figures", allow_quick=True)
+    drawn = [line for line in report if "skipped" not in line]
+    assert tables.is_file() and any("fig02" in line for line in drawn), report
+    return f"tables + {len(drawn)} figures from the quick matrix"
+
+
+@check("forecast")
+def _forecast() -> str:
+    import pandas as pd
+
+    from cotraffic.forecasting.dataset import build_dataset
+    from cotraffic.forecasting.models import evaluate
+    from cotraffic.paths import RESULTS_DIR
+
+    work = RESULTS_DIR / "tmp" / "smoke_forecast"
+    build_dataset("grid2x2", seeds_per_level=1, jobs=2, mode="validation", out_dir=work)
+    scores = pd.read_csv(evaluate("grid2x2", work, work))
+    assert scores["mae"].notna().all() and len(scores["model"].unique()) == 4
+    return f"{len(scores)} scores for 4 models"
+
+
+@check("dashboard")
+def _dashboard() -> str:
+    """In a separate process: streamlit loads pyarrow, whose DLLs clash with the Arrow
+    library bundled in libsumo once libsumo is loaded (the dashboard never loads SUMO)."""
+    import subprocess
+    import sys
+
+    from cotraffic.paths import REPO_ROOT
+
+    app_file = REPO_ROOT / "dashboard" / "app.py"
+    code = (
+        "from streamlit.testing.v1 import AppTest; "
+        f"app = AppTest.from_file(r'{app_file}', default_timeout=180).run(); "
+        "print([e.message for e in app.exception])"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert out.stdout.strip().endswith("[]"), out.stdout + out.stderr
+    return "app runs without exception"
 
 
 def run_smoke(only: list[str] | None = None) -> int:

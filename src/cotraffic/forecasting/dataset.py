@@ -50,19 +50,19 @@ def detector_file(env_net: str, out_file: Path, xml_out: Path) -> list[tuple[str
     return loops
 
 
-def _record(args: tuple[str, str, int]) -> pd.DataFrame:
+def _record(args: tuple[str, str, int] | tuple[str, str, int, str]) -> pd.DataFrame:
     os.environ.setdefault("LIBSUMO_AS_TRACI", "1")
     from cotraffic.controllers.classical import MaxPressure
     from cotraffic.envs.episodes import evaluation_episode
     from cotraffic.envs.traffic_env import CoTrafficEnv
 
-    network, demand, seed = args
+    network, demand, seed, mode = (*args, "evaluation")[:4]
     work = DATA_DIR / "tmp" / f"{network}_{demand}_s{seed}"
     work.mkdir(parents=True, exist_ok=True)
     loops_xml = work / "loops.xml"
     loops = detector_file(network, work / "loops.add.xml", loops_xml)
     episode = evaluation_episode(
-        network, demand, [], seed, ssm=False, additional=[work / "loops.add.xml"]
+        network, demand, [], seed, ssm=False, additional=[work / "loops.add.xml"], mode=mode
     )
     env = CoTrafficEnv(network, lambda rng: episode, controlled=True, compute_observations=False)
     controller = MaxPressure()
@@ -95,15 +95,23 @@ def _record(args: tuple[str, str, int]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_dataset(network: str = "grid4x4", seeds_per_level: int = 4, jobs: int = 2) -> Path:
+def build_dataset(
+    network: str = "grid4x4",
+    seeds_per_level: int = 4,
+    jobs: int = 2,
+    mode: str = "evaluation",
+    out_dir: Path = DATA_DIR,
+) -> Path:
     levels = config.load_protocol()["training"]["demand_levels"]
     tasks = [
-        (network, level, FORECAST_SEED_BASE + k) for level in levels for k in range(seeds_per_level)
+        (network, level, FORECAST_SEED_BASE + k, mode)
+        for level in levels
+        for k in range(seeds_per_level)
     ]
     with ProcessPoolExecutor(max_workers=max(1, jobs)) as pool:
         frames = list(pool.map(_record, tasks))
     df = pd.concat(frames, ignore_index=True)
-    out = DATA_DIR / f"inflow_{network}.csv"
+    out = out_dir / f"inflow_{network}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
     return out

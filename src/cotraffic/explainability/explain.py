@@ -127,6 +127,7 @@ def explain_episode(
     scenarios: list[str],
     seed: int,
     max_rows: int = 5000,
+    quick: bool = False,
 ) -> Path:
     """Decision log with the blocks each decision depends on and a readable sentence."""
     os.environ.setdefault("LIBSUMO_AS_TRACI", "1")
@@ -134,7 +135,7 @@ def explain_episode(
     from cotraffic.envs.traffic_env import CoTrafficEnv
 
     policy = LearnedPolicy(method, checkpoint)
-    episode = evaluation_episode(network, demand, scenarios, seed, ssm=False)
+    episode = evaluation_episode(network, demand, scenarios, seed, ssm=False, quick=quick)
     _, runtime = split_scenarios(scenarios)
     env = CoTrafficEnv(
         network,
