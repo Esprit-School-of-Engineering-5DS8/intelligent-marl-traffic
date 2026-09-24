@@ -39,6 +39,7 @@ import pandas as pd
 
 from cotraffic.envs.rewards import vehicle_kind
 
+WAIT_BIN_S = 15.0
 VEHICLE_COLUMNS = [
     "id",
     "kind",
@@ -185,8 +186,9 @@ def compute_metrics(
     protocol: Mapping[str, Any],
     teleported: set[str] | frozenset[str] = frozenset(),
     ssm: bool = True,
-) -> tuple[dict[str, float], pd.DataFrame]:
-    """All metrics of one episode, and the per-minute time series of the network."""
+) -> tuple[dict[str, float], pd.DataFrame, pd.DataFrame]:
+    """All metrics of one episode, the per-minute time series of the network and the
+    histogram of the vehicles' waiting times (for the equity figure)."""
     begin, finish = window
     penalty = float(protocol["evaluation"]["teleport_penalty_s"])
     occupancy = {k: float(v) for k, v in protocol["occupancy"].items()}
@@ -240,6 +242,10 @@ def compute_metrics(
         "mean_waiting_time": float(np.mean(waiting)),
         "mean_time_loss": float(np.mean(time_loss)),
         "mean_depart_delay": float(pop["depart_delay"].mean()),
+        "p25_waiting_time": float(np.percentile(waiting, 25)),
+        "median_waiting_time": float(np.percentile(waiting, 50)),
+        "p75_waiting_time": float(np.percentile(waiting, 75)),
+        "p90_waiting_time": float(np.percentile(waiting, 90)),
         "p95_waiting_time": float(np.percentile(waiting, 95)),
         "max_waiting_time": float(np.max(waiting)),
         "gini_waiting_time": gini(waiting),
@@ -302,4 +308,9 @@ def compute_metrics(
         )
         .reset_index()
     )
-    return m, series
+    edges = np.append(np.arange(0.0, 900.0 + 1e-9, WAIT_BIN_S), np.inf)
+    counts, _ = np.histogram(waiting, bins=edges)
+    distribution = pd.DataFrame(
+        {"wait_from_s": edges[:-1], "wait_to_s": edges[1:], "vehicles": counts}
+    )
+    return m, series, distribution

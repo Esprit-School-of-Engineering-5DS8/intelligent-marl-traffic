@@ -18,19 +18,28 @@ METHOD_ORDER = list(METHOD_LABELS)
 BASELINE_METHODS = ("ft", "act", "mp", "ev_rule")
 DEMAND_ORDER = ["low", "medium", "peak", "rush_profile"]
 
-# Okabe-Ito palette: distinguishable with the common forms of colour blindness.
+# Categorical hues checked for colour-vision deficiency and normal-vision separation in
+# the orders the figures use (adjacent CVD delta E >= 9.2 in OKLab x100). FT is the
+# status-quo reference and is drawn in neutral grey on purpose; it is always labelled.
 METHOD_COLORS = {
-    "ft": "#999999",
-    "act": "#E69F00",
-    "mp": "#56B4E9",
-    "ev_rule": "#F0E442",
-    "ind": "#CC79A7",
-    "coop": "#009E73",
-    "coop_eco05": "#0072B2",
-    "coop_eco": "#004B75",
-    "coop_full": "#D55E00",
-    "random": "#000000",
+    "ft": "#8f8d88",
+    "act": "#4a3aa7",
+    "mp": "#eb6834",
+    "ev_rule": "#e34948",
+    "ind": "#1baf7a",
+    "coop": "#2a78d6",
+    "coop_eco05": "#e87ba4",
+    "coop_eco": "#008300",
+    "coop_full": "#eda100",
+    "random": "#52514e",
 }
+SURFACE = "#fcfcfb"
+TEXT_PRIMARY = "#0b0b0b"
+TEXT_SECONDARY = "#52514e"
+GRID = "#e4e3df"
+SEQUENTIAL_CMAP = "Blues"
+DIVERGING_CMAP = "RdBu"
+
 
 METRIC_LABELS = {
     "mean_travel_time": "Mean travel time (s)",

@@ -79,7 +79,7 @@ def outputs(tmp_path):
 def test_population_and_travel_time_definitions(outputs):
     out, routes = outputs
     protocol = config.load_protocol()
-    m, series = compute_metrics(
+    m, series, dist = compute_metrics(
         out, [routes], (900.0, 1600.0), 2000.0, protocol, teleported={"car_1"}, ssm=False
     )
     # population: car_1..car_4, ev_0 and the two buses of the flow (car_0 is in the warm-up)
@@ -109,12 +109,14 @@ def test_population_and_travel_time_definitions(outputs):
     # queue over the window: halting = t // 100 for t in 900..1500
     assert m["mean_queue"] == pytest.approx(np.mean(range(9, 16)))
     assert list(series.columns[:2]) == ["minute", "halting"]
+    assert dist["vehicles"].sum() == 7
+    assert m["median_waiting_time"] == pytest.approx(np.median(waits))
 
 
 def test_person_weighted_delay_counts_bus_passengers(outputs):
     out, routes = outputs
     protocol = config.load_protocol()
-    m, _ = compute_metrics(out, [routes], (900.0, 1600.0), 2000.0, protocol, ssm=False)
+    m, _, _ = compute_metrics(out, [routes], (900.0, 1600.0), 2000.0, protocol, ssm=False)
     occ = protocol["occupancy"]
     losses = {
         "car_1": 30,

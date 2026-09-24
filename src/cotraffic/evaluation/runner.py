@@ -102,7 +102,7 @@ def run_episode(
         env.close()
     wall = time.perf_counter() - wall
 
-    metrics, series = compute_metrics(
+    metrics, series, distribution = compute_metrics(
         out_dir,
         episode.bundle.route_files,
         (episode.measure_from, episode.measure_to),
@@ -146,6 +146,10 @@ def run_episode(
     ts_dir.mkdir(parents=True, exist_ok=True)
     series.insert(0, "run_id", rid)
     series.to_csv(ts_dir / f"{rid}.csv", index=False)
+    dist_dir = logs_dir / "waiting_distributions"
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    distribution.insert(0, "run_id", rid)
+    distribution.to_csv(dist_dir / f"{rid}.csv", index=False)
     if decisions:
         import pandas as pd
 

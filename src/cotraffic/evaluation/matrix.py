@@ -34,6 +34,7 @@ class RunSpec:
     checkpoint: str = ""
     tag: str = ""
     quick: bool = False
+    ssm: bool = True
 
 
 def find_checkpoints(method: str, network: str) -> list[tuple[int, Path]]:
@@ -71,7 +72,17 @@ def expand(exp: dict[str, Any]) -> tuple[list[RunSpec], list[str]]:
                     for seed in seeds:
                         for ckpt, tag in variants:
                             specs.append(
-                                RunSpec(method, network, demand, scen, seed, ckpt, tag, quick)
+                                RunSpec(
+                                    method,
+                                    network,
+                                    demand,
+                                    scen,
+                                    seed,
+                                    ckpt,
+                                    tag,
+                                    quick,
+                                    bool(cell.get("ssm", True)),
+                                )
                             )
     return specs, warnings
 
@@ -97,6 +108,7 @@ def _execute(spec_dict: dict[str, Any]) -> tuple[str, str]:
             spec.seed,
             checkpoint=Path(spec.checkpoint) if spec.checkpoint else None,
             quick=spec.quick,
+            ssm=spec.ssm,
             tag=spec.tag,
             raw_dir=raw_dir,
             logs_dir=logs_dir,

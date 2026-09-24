@@ -63,3 +63,16 @@ entries at the bottom. Negative results that belong in the report are marked **[
   walks inside the largest connected sidewalk component (`reachable_exits`,
   `walkable_component`). Route caches now carry a generator version so that stale files
   are never reused after such a fix.
+
+## F-006 - SuperSuit and Stable-Baselines3 versions disagree on the vector-env API (2026-09-24)
+
+- **Tried:** the documented pipeline `pettingzoo_env_to_vec_env_v1` + `concat_vec_envs_v1(...,
+  base_class="stable_baselines3")` with `PPO(..., seed=s)`.
+- **Evidence:** `AttributeError: 'ConcatVecEnv' object has no attribute 'seed'` (SB3 2.9 seeds
+  environments through `VecEnv.seed`); SuperSuit also needs a `render_mode` attribute on the
+  environment, and never sets `TimeLimit.truncated`, so SB3 would treat the end of every
+  episode as a real termination.
+- **Fix / lesson:** we seed Python/NumPy/PyTorch and our episode generator explicitly, add
+  `render_mode`, and mark time-limit ends in the environment's `infos`. Read the glue code
+  between libraries: none of these problems raises an error at the right place, and the
+  last one silently biases the value estimates.
