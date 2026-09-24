@@ -45,9 +45,14 @@ with the validation scores). Copy those folders between machines.
 ## 3. Evaluation
 
 ```bash
-python -m cotraffic evaluate --experiment baselines_grid4x4 --jobs 2   # classical controllers
-python -m cotraffic evaluate --experiment full_matrix --jobs 2         # everything
+python -m cotraffic evaluate --experiment core --jobs 2        # RQ1-RQ5, run on the team laptop
+python -m cotraffic evaluate --experiment extended --jobs 2    # rest of the design (other machines)
+python -m cotraffic evaluate --experiment full_matrix --jobs 2 # both at once
 ```
+
+`core` is 790 runs, `extended` 420 (learned variants: 3 training seeds x 5 evaluation seeds
+per cell). Measured cost on the laptop with 2-5 processes sharing it: 0.5-2 min per run,
+except peak demand with the SSM device (about 5 min) and grid8x8 (about 4 min).
 
 Runs with a result file are skipped, so the same command completes an interrupted matrix.
 To split the matrix: run subsets with `--methods ...` on different machines, then merge:

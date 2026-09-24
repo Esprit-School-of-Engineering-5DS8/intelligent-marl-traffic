@@ -1,0 +1,35 @@
+name: extended
+description: >
+  Remaining cells of the full design (run on team machines or Kaggle, then merge with
+  scripts/merge_results.py). Together with core.yaml this is full_matrix.yaml.
+seeds: [0, 1, 2, 3, 4]
+cells:
+  - network: grid4x4
+    methods: [ft, act, mp, ind, coop, coop_full]
+    demands: [medium]
+    scenarios: [incident]
+    ssm: false
+  - network: grid4x4
+    methods: [ft, act, mp, ev_rule, coop, coop_full]
+    demands: [medium]
+    scenarios: [emergency]
+    ssm: false
+  - network: grid4x4
+    methods: [ft, act, mp, coop, coop_full]
+    demands: [peak]
+    scenarios: [pedestrians, buses]
+    ssm: false
+  - network: grid8x8
+    checkpoint_network: grid4x4
+    methods: [ft, mp, ind, coop]
+    demands: [medium]
+    scenarios: [normal]
+    ssm: false
+  - network: real_district
+    methods: [ft, act, mp, ind, coop, coop_full]
+    demands: [low, rush_profile]
+    scenarios: [normal]
+  - network: real_district
+    methods: [ft, act, mp, ind, coop, coop_full]
+    demands: [peak]
+    scenarios: [incident]
