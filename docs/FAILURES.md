@@ -120,3 +120,15 @@ entries at the bottom. Negative results that belong in the report are marked **[
 - **Lesson:** communication is only worth its cost when neighbours know something the
   local detectors cannot see soon enough - longer links, several phases, or events outside
   the detection range. The comm-dropout and district results test the same question.
+
+## F-010 - An incident that did not disturb anything (2026-09-25)
+
+- **Tried:** a vehicle stopped for 15 min at 40% of a main approach's right lane.
+- **Evidence:** +2-4% halting vehicles during the incident, travel times unchanged, for every
+  controller (journal, 2026-09-25).
+- **Diagnosis:** mid-link, vehicles merge past the obstacle and still use both lanes at the
+  stop line; a single lane of free flow carries more than the approach's green-time share.
+- **Fix / lesson:** crash next to the stop line (85% of the link) and local metrics
+  (vehicles crossing the blocked approach, queue on that approach). Check that a scenario
+  actually stresses the system before comparing controllers on it; a scenario without
+  effect cannot discriminate anything.

@@ -231,3 +231,27 @@ Tests (Mann-Whitney U, Holm; Cliff's delta):
 agents, and neither outperforms the best classical controller of each demand level. They are
 consistently better than fixed-time control and never collapse the way actuated control does
 at peak. See FAILURES F-009 for the diagnosis.
+
+## 2026-09-25 - Incident scenario redesign and district emergency vehicles
+
+**Incident.** With the stopped vehicle at 40% of the link, the incident barely changed the
+network: halting vehicles during the incident window (minutes 35-55) rose by 6.8 (ACT),
+5.1 (MP) and -0.5 (FT) vehicles on the 5 test seeds, i.e. 2-4%, and travel times did not
+move (MP 212 vs 210 s). Vehicles merge past the obstacle and use both lanes again at the stop
+line; the one-lane section (about 1 800 veh/h) never limits the signal. We moved the stopped
+vehicle next to the stop line (85% of the link, 31 m before it on grid4x4), where a crash
+removes the lane's queue storage and discharge. Checked on validation seed 1000 before
+changing the configs: MP +8 halting (+6%), FT +5 (+3%) - still small network-wide, because
+the blocked approach carries only part of the traffic and is not at capacity. We therefore
+also measure the incident locally: travel time and time loss of the vehicles whose route
+crosses the blocked approach (from 10 min before the incident to its end), and the queue
+on that approach over time (`incident_affected_*` columns, figure 6). The 30 incident runs
+made with the first design were deleted and are re-run (FAILURES F-010).
+
+**Emergency vehicles on the district.** EV-RULE did not reduce the EV delay on the district
+test runs (99 s vs 95 s for ACT) while it cut it by 61% on the grid. Diagnosis on validation
+seed 1000: the rule works (5 preemptions; delays 9.8 / 16.1 / 53.7 s vs 27.3 / 60.3 / 42.2 s
+with ACT), but the district's emergency routes (1.7-3.5 km) cross only 1-2 of the 7 signals,
+so most of their delay comes from congestion and unsignalised junctions that signal
+preemption cannot remove; with 3-5 EVs per run the difference is within noise. Result rows
+now include the number of preemptions.
