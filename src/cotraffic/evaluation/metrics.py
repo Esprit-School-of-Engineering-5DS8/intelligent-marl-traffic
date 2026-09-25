@@ -25,6 +25,8 @@ Definitions (also in the report, section 7):
 * People: person-weighted delay = sum(occupancy x time loss) / sum(occupancy), with the
   occupancies of ``configs/protocol.yaml``; pedestrians' waiting times from personinfo.
 * Priority: emergency vehicles' travel time, delay (time loss) and free-flow time.
+* Incident: travel time and time loss of the vehicles whose route crosses the blocked
+  approach and that depart from 10 min before the incident to its end.
 """
 
 from __future__ import annotations
@@ -101,20 +103,40 @@ def parse_tripinfo(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     return pd.DataFrame(vehicles, columns=VEHICLE_COLUMNS), pd.DataFrame(persons)
 
 
-def planned_vehicles(route_files: list[Path]) -> pd.DataFrame:
-    """Every vehicle SUMO was asked to insert, with its intended departure time."""
+def planned_vehicles(route_files: list[Path], edge: str | None = None) -> pd.DataFrame:
+    """Every vehicle SUMO was asked to insert, with its intended departure time and, when
+    ``edge`` is given, whether its route uses that edge."""
     rows = []
+    routes: dict[str, list[str]] = {}
     for path in route_files:
         for _, el in ET.iterparse(path):
-            if el.tag == "vehicle":
-                rows.append({"id": el.get("id"), "planned_depart": _f(el, "depart")})
+            if el.tag == "route" and el.get("id"):
+                routes[el.get("id")] = el.get("edges", "").split()
+            elif el.tag == "vehicle":
+                route = el.find("route")
+                edges = route.get("edges", "").split() if route is not None else []
+                rows.append(
+                    {
+                        "id": el.get("id"),
+                        "planned_depart": _f(el, "depart"),
+                        "uses_edge": edge in edges,
+                    }
+                )
             elif el.tag == "flow":
                 begin, end, period = _f(el, "begin"), _f(el, "end"), _f(el, "period")
+                uses = edge in routes.get(el.get("route", ""), [])
                 if period > 0:
                     for k, t in enumerate(np.arange(begin, end, period)):
-                        rows.append({"id": f"{el.get('id')}.{k}", "planned_depart": float(t)})
-            el.clear()
-    return pd.DataFrame(rows, columns=["id", "planned_depart"])
+                        rows.append(
+                            {
+                                "id": f"{el.get('id')}.{k}",
+                                "planned_depart": float(t),
+                                "uses_edge": uses,
+                            }
+                        )
+            if el.tag in ("vehicle", "flow", "person"):
+                el.clear()
+    return pd.DataFrame(rows, columns=["id", "planned_depart", "uses_edge"])
 
 
 def parse_statistics(path: Path) -> dict[str, float]:
@@ -186,6 +208,7 @@ def compute_metrics(
     protocol: Mapping[str, Any],
     teleported: set[str] | frozenset[str] = frozenset(),
     ssm: bool = True,
+    incident: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, float], pd.DataFrame, pd.DataFrame]:
     """All metrics of one episode, the per-minute time series of the network and the
     histogram of the vehicles' waiting times (for the equity figure)."""
@@ -193,7 +216,7 @@ def compute_metrics(
     penalty = float(protocol["evaluation"]["teleport_penalty_s"])
     occupancy = {k: float(v) for k, v in protocol["occupancy"].items()}
     vehicles, persons = parse_tripinfo(output_dir / "tripinfo.xml")
-    planned = planned_vehicles(route_files)
+    planned = planned_vehicles(route_files, incident["edge"] if incident else None)
     planned = planned[~planned["id"].str.startswith("incident_")]
     pop = planned[(planned["planned_depart"] >= begin) & (planned["planned_depart"] < finish)]
     pop = pop.merge(vehicles, on="id", how="left")
@@ -257,6 +280,19 @@ def compute_metrics(
         "person_weighted_delay": float(np.sum(occ * time_loss) / np.sum(occ)),
         "distance_km": float(distance_km),
     }
+    if incident:
+        # vehicles whose route crosses the blocked approach, from 10 min before the incident
+        # to its end: the network-wide mean dilutes a local event
+        start, stop = float(incident["start"]), float(incident["end"])
+        hit = (
+            pop["uses_edge"]
+            & (pop["planned_depart"] >= start - 600)
+            & (pop["planned_depart"] < stop)
+        ).to_numpy()
+        m["incident_affected_vehicles"] = float(hit.sum())
+        if hit.any():
+            m["incident_affected_travel_time"] = float(np.mean(travel[hit]))
+            m["incident_affected_time_loss"] = float(np.mean(time_loss[hit]))
     arrivals = vehicles[(vehicles["arrival"] >= begin) & (vehicles["arrival"] < finish)]
     arrivals = arrivals[~arrivals["id"].str.startswith("incident_")]
     m["throughput_per_h"] = float(len(arrivals) * 3600.0 / (finish - begin))

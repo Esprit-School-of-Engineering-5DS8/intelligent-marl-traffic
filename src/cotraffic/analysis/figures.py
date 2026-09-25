@@ -431,30 +431,33 @@ def fig06_incident(d: Data) -> Path | None:
     cell = d.cell(network="grid4x4", scenario="incident", demand="peak")
     if cell.empty:
         return None
-    fig, ax = plt.subplots(figsize=(8, 3.4))
+    fig, (local, network) = plt.subplots(2, 1, figsize=(8, 5.4), sharex=True)
     for method in _methods(cell["method"]):
-        s = _mean_series(d, cell[cell["method"] == method], "halting")
-        if s is not None:
-            ax.plot(s.index, s.to_numpy(), color=METHOD_COLORS[method], label=label(method))
+        runs = cell[cell["method"] == method]
+        ts = d.series(runs["run_id"].tolist())
+        if ts.empty:
+            continue
+        mean = ts.groupby("minute").mean(numeric_only=True)
+        color = METHOD_COLORS[method]
+        if "incident_edge_halting" in mean:
+            local.plot(mean.index, mean["incident_edge_halting"], color=color, label=label(method))
+        network.plot(mean.index, mean["halting"], color=color, label=label(method))
     start = pd.to_numeric(cell["incident_start"], errors="coerce").dropna()
     if not start.empty:
         scen = config.load("scenarios", "incident")["incident"]
         begin = float(start.median()) / 60
-        ax.axvspan(
-            begin, begin + float(scen["duration_s"]) / 60, color=GRID, alpha=0.8, linewidth=0
-        )
-        ax.text(
-            begin + 0.5,
-            ax.get_ylim()[1] * 0.95,
-            "lane blocked",
-            fontsize=8,
-            color=TEXT_SECONDARY,
-            va="top",
-        )
-    ax.set_xlabel("Simulation time (min)")
-    ax.set_ylabel("Halting vehicles in the network")
-    ax.set_title("Incident on grid4x4 at peak demand - mean over runs")
-    ax.legend()
+        for ax in (local, network):
+            ax.axvspan(begin, begin + float(scen["duration_s"]) / 60, color=GRID, alpha=0.8,
+                       linewidth=0)
+        local.text(begin + 0.5, 0.92, "lane blocked", fontsize=8, color=TEXT_SECONDARY,
+                   va="top", transform=local.get_xaxis_transform())
+    local.set_ylabel("Halting on the
+blocked approach")
+    local.set_title("Incident on grid4x4 at peak demand - mean over runs")
+    local.legend(ncol=3)
+    network.set_xlabel("Simulation time (min)")
+    network.set_ylabel("Halting vehicles
+in the network")
     fig.tight_layout()
     return _save(fig, "fig06_incident_queues")
 

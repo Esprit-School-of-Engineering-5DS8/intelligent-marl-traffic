@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from cotraffic import config
 from cotraffic.controllers.base import Controller
@@ -73,13 +74,21 @@ def run_episode(
         mode=mode,
     )
     _, runtime = split_scenarios(scenarios)
+    incident = episode.bundle.meta.get("incident")
+    incident_queue: list[tuple[float, float]] = []
+
+    def record_incident(env, now: float) -> None:
+        if int(now) % 10 == 0:
+            incident_queue.append((now, env.conn.edge.getLastStepHaltingNumber(incident["edge"])))
+
+    hooks = controller.step_hooks() + ([record_incident] if incident else [])
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
         controller.agent_cfg,
         controlled=controller.controlled,
         runtime_scenarios=runtime,
-        step_hooks=controller.step_hooks(),
+        step_hooks=hooks,
         compute_observations=controller.needs_observations,
         record_decisions=record_decisions,
         protocol=protocol,
@@ -110,7 +119,16 @@ def run_episode(
         protocol,
         teleported,
         ssm,
+        incident,
     )
+    if incident_queue:
+        q = pd.DataFrame(incident_queue, columns=["time", "incident_edge_halting"])
+        q["minute"] = (q["time"] // 60).astype(int)
+        series = series.merge(
+            q.groupby("minute")["incident_edge_halting"].mean().reset_index(),
+            on="minute",
+            how="left",
+        )
     row: dict[str, Any] = {
         "run_id": rid,
         "method": method,
@@ -139,6 +157,7 @@ def run_episode(
             else 0.0,
             "inference_ms_per_step": 1000 * float(np.mean(latencies)) if latencies else 0.0,
             "incident_start": episode.bundle.meta.get("incident", {}).get("start", ""),
+            "preemptions": getattr(controller, "preemptions", ""),
         }
     )
     write_row(raw_dir / f"{rid}.csv", row)
@@ -151,8 +170,6 @@ def run_episode(
     distribution.insert(0, "run_id", rid)
     distribution.to_csv(dist_dir / f"{rid}.csv", index=False)
     if decisions:
-        import pandas as pd
-
         dec_dir = logs_dir / "decisions"
         dec_dir.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(decisions).to_csv(dec_dir / f"{rid}.csv", index=False)

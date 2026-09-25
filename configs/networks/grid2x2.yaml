@@ -32,7 +32,7 @@ bus_lines:
 incident:
   edge: A1B1
   lane: 1
-  position_frac: 0.4
+  position_frac: 0.85     # stopped vehicle just before the stop line (see journal, incident)
 
 reward_norm:
   wait: 1.0

@@ -50,4 +50,4 @@ bus_lines:
 incident:
   edge: "94346392#0"     # northbound Avenue Mohamed V, 560 m, 2 vehicle lanes
   lane: 1                # rightmost vehicle lane (lane 0 is the sidewalk)
-  position_frac: 0.4
+  position_frac: 0.85     # stopped vehicle just before the stop line (see journal, incident)

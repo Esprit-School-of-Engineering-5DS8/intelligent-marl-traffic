@@ -163,3 +163,16 @@ def test_ssm_conflicts_are_counted_once_per_pair(tmp_path):
     ]
     ssm.write_text("<SSMLog>" + "".join(events) + "</SSMLog>")
     assert count_conflicts(ssm, 1.5, 900, 1600) == 1
+
+
+def test_incident_metrics_cover_vehicles_crossing_the_blocked_edge(outputs):
+    out, routes = outputs
+    protocol = config.load_protocol()
+    incident = {"edge": "b", "start": 1100.0, "end": 1400.0}
+    m, _, _ = compute_metrics(
+        out, [routes], (900.0, 1600.0), 2000.0, protocol, ssm=False, incident=incident
+    )
+    # cars 1-4 use edge b and depart in [start - 600, end); ev_0 departs at the end;
+    # the bus route is not listed in this file, so buses do not count
+    assert m["incident_affected_vehicles"] == 4
+    assert m["incident_affected_travel_time"] == pytest.approx(np.mean([100, 200, 800, 700]))

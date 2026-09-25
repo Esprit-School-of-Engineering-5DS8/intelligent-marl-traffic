@@ -38,7 +38,7 @@ bus_lines:
 incident:
   edge: B1C1          # eastbound approach of the central junction C1 (dominant direction)
   lane: 1             # rightmost vehicle lane (lane 0 is the sidewalk)
-  position_frac: 0.4  # stopped vehicle at 40% of the link, leaves room to merge back
+  position_frac: 0.85     # stopped vehicle ~31 m before the stop line (see journal, incident)
 
 reward_norm:          # set by `cotraffic calibrate` from baseline runs
   wait: 1.0
