@@ -447,17 +447,23 @@ def fig06_incident(d: Data) -> Path | None:
         scen = config.load("scenarios", "incident")["incident"]
         begin = float(start.median()) / 60
         for ax in (local, network):
-            ax.axvspan(begin, begin + float(scen["duration_s"]) / 60, color=GRID, alpha=0.8,
-                       linewidth=0)
-        local.text(begin + 0.5, 0.92, "lane blocked", fontsize=8, color=TEXT_SECONDARY,
-                   va="top", transform=local.get_xaxis_transform())
-    local.set_ylabel("Halting on the
-blocked approach")
+            ax.axvspan(
+                begin, begin + float(scen["duration_s"]) / 60, color=GRID, alpha=0.8, linewidth=0
+            )
+        local.text(
+            begin + 0.5,
+            0.92,
+            "lane blocked",
+            fontsize=8,
+            color=TEXT_SECONDARY,
+            va="top",
+            transform=local.get_xaxis_transform(),
+        )
+    local.set_ylabel("Halting on the blocked approach")
     local.set_title("Incident on grid4x4 at peak demand - mean over runs")
     local.legend(ncol=3)
     network.set_xlabel("Simulation time (min)")
-    network.set_ylabel("Halting vehicles
-in the network")
+    network.set_ylabel("Halting in the network")
     fig.tight_layout()
     return _save(fig, "fig06_incident_queues")
 
