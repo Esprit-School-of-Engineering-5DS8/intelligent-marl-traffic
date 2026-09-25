@@ -25,6 +25,13 @@ osm:
 
 pedestrians: true
 
+# Only 4 of the 112 edges of the imported arterial network have a sidewalk; on the other
+# 92 pedestrians walk on the carriageway, and a pedestrian flow collapses the network
+# (validation seed 1000, Max-Pressure at peak: 1 026 s mean travel time instead of 134 s,
+# 108 teleports). Pedestrian scenarios are therefore not run on this network: training
+# leaves them out and evaluation refuses them (journal, FAILURES F-011).
+unsupported_scenarios: [pedestrians]
+
 padding:
   lanes_per_side: 3
   max_phases: 3

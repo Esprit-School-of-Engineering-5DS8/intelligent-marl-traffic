@@ -83,3 +83,12 @@ def test_a_corrupted_cache_entry_is_rebuilt():
     (bundle.directory / "meta.json").write_text("", encoding="utf-8")
     rebuilt = generate(request)
     assert rebuilt.meta["cars"] == bundle.meta["cars"]
+
+
+def test_unsupported_scenarios_are_left_out_of_training_and_refused_in_evaluation():
+    from cotraffic.envs.episodes import TrainingEpisodes, evaluation_episode
+
+    episodes = TrainingEpisodes("real_district", ["low"], ["emergency", "pedestrians"])
+    assert episodes.scenarios == ("emergency",)
+    with pytest.raises(ValueError):
+        evaluation_episode("real_district", "low", ["pedestrians"], 0)

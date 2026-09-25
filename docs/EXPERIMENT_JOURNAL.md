@@ -255,3 +255,23 @@ with ACT), but the district's emergency routes (1.7-3.5 km) cross only 1-2 of th
 so most of their delay comes from congestion and unsignalised junctions that signal
 preemption cannot remove; with 3-5 EVs per run the difference is within noise. Result rows
 now include the number of preemptions.
+
+## 2026-09-25 - Pedestrians on the district: scenario excluded, district runs retrained
+
+While checking the first district training runs we saw COOP-FULL (trained with pedestrians,
+buses and emergency vehicles in every episode) stay at about 52 halting vehicles at peak,
+against about 7 for IND and COOP. Measured on validation seed 1000 with Max-Pressure at peak:
+without pedestrians 134 s mean travel time and 1 teleport; with the pedestrian flow 1 026 s
+and 108 teleports. Only 4 of the district's 112 edges have a sidewalk (netconvert guesses
+sidewalks on roads up to 50 km/h only), so pedestrians walk on the carriageway of 92 edges.
+
+Consequences and decisions:
+
+- Pedestrian scenarios are not run on the district (`unsupported_scenarios` in its config;
+  training leaves them out, evaluation refuses them). The project plan asked for pedestrians
+  on the district only "if performance allows"; this is a data limitation of the OSM import.
+- The district reward scales had been estimated from runs that included the collapse
+  (waiting-term scale 247 veh-s); re-estimated without pedestrians: 31 veh-s.
+- The 7 district training runs made so far were discarded and all 9 are retrained with the
+  corrected scales, so IND, COOP and COOP-FULL are comparable. The grids are unaffected
+  (sidewalks and crossings on every edge).

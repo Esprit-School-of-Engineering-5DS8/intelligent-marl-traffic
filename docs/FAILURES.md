@@ -132,3 +132,16 @@ entries at the bottom. Negative results that belong in the report are marked **[
   (vehicles crossing the blocked approach, queue on that approach). Check that a scenario
   actually stresses the system before comparing controllers on it; a scenario without
   effect cannot discriminate anything.
+
+## F-011 - Pedestrians on a network without sidewalks (2026-09-25)
+
+- **Tried:** the same pedestrian flows on the OSM district as on the grid, including in the
+  training episodes of COOP-FULL and in the runs that estimate the reward scales.
+- **Evidence:** Max-Pressure at peak, validation seed 1000: 1 026 s mean travel time and 108
+  teleports with pedestrians vs 134 s and 1 without; 92 of 112 edges carry pedestrians on
+  the carriageway; COOP-FULL's district training did not improve at peak.
+- **Diagnosis:** an import artefact (sidewalks guessed only on slow roads), not traffic.
+- **Fix / lesson:** scenario excluded on the district, reward scales re-estimated, district
+  runs retrained (about 1.5 h of compute lost). Look at what a scenario does to the
+  simulation before training on it - the symptom (a flat training curve) appeared far from
+  the cause.

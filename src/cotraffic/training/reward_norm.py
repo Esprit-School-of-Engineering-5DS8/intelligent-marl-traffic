@@ -25,7 +25,7 @@ import yaml
 
 from cotraffic import config
 from cotraffic.controllers.classical import MaxPressure
-from cotraffic.envs.episodes import TRAINING_SEED_BASE
+from cotraffic.envs.episodes import TRAINING_SEED_BASE, unsupported
 from cotraffic.envs.simulation import Episode
 from cotraffic.envs.traffic_env import CoTrafficEnv
 from cotraffic.paths import CONFIG_DIR
@@ -40,7 +40,8 @@ def calibrate_rewards(
     from cotraffic.networks.build import ensure_network
 
     agent = config.load_agent("coop_full")
-    scenarios = tuple(agent["training"]["scenarios"])
+    excluded = unsupported(network)
+    scenarios = tuple(sc for sc in agent["training"]["scenarios"] if sc not in excluded)
     samples: dict[str, list[float]] = {t: [] for t in TERMS}
     runs = []
     for i, demand in enumerate(demands):

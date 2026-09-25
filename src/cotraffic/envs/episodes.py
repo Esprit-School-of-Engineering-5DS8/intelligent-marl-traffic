@@ -39,6 +39,11 @@ def split_scenarios(names: Iterable[str]) -> tuple[tuple[str, ...], tuple[str, .
     return tuple(route), tuple(runtime)
 
 
+def unsupported(network: str) -> set[str]:
+    """Scenarios a network cannot represent faithfully (``unsupported_scenarios``)."""
+    return set(config.load("networks", network).get("unsupported_scenarios", []))
+
+
 class TrainingEpisodes:
     """Domain randomisation: a demand level and a demand seed drawn at every reset."""
 
@@ -52,7 +57,8 @@ class TrainingEpisodes:
     ):
         self.network = network
         self.levels = list(demand_levels)
-        self.scenarios, _ = split_scenarios(scenarios)
+        excluded = unsupported(network)
+        self.scenarios, _ = split_scenarios([s for s in scenarios if s not in excluded])
         self.episode_s = float(episode_s)
         self.pool = [TRAINING_SEED_BASE + i for i in range(pool_size)]
         self.net_file = ensure_network(network)
@@ -92,6 +98,11 @@ def evaluation_episode(
     protocol = protocol or config.load_protocol()
     ev = protocol["quick" if quick else mode]
     warmup, measure, cooldown = (float(ev[k]) for k in ("warmup_s", "measure_s", "cooldown_s"))
+    refused = unsupported(network) & set(scenarios)
+    if refused:
+        raise ValueError(
+            f"{network} does not support scenario(s) {sorted(refused)} (network config)"
+        )
     route_scenarios, _ = split_scenarios(scenarios)
     bundle = generate(DemandRequest(network, demand, route_scenarios, seed, warmup, measure, scale))
     return Episode(
