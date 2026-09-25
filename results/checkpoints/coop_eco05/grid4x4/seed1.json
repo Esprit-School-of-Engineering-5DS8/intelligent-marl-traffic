@@ -1,0 +1,106 @@
+{
+  "agent": "coop_eco05",
+  "network": "grid4x4",
+  "training_seed": 1,
+  "selected_checkpoint": "model_400000_steps.zip",
+  "selected_steps": 400000,
+  "validation": {
+    "seeds": [
+      1000
+    ],
+    "demands": [
+      "medium",
+      "peak"
+    ],
+    "metric": "mean_travel_time",
+    "episode": "protocol.validation"
+  },
+  "scores": {
+    "400000": {
+      "mean_travel_time": 184.3713787105147,
+      "runs": [
+        160.63684346701163,
+        208.10591395401775
+      ]
+    },
+    "450000": {
+      "mean_travel_time": 186.67515807519254,
+      "runs": [
+        160.63069857697283,
+        212.71961757341225
+      ]
+    },
+    "500000": {
+      "mean_travel_time": 184.9499621781565,
+      "runs": [
+        161.15139715394565,
+        208.7485272023674
+      ]
+    },
+    "503808": {
+      "mean_travel_time": 186.36296866206942,
+      "runs": [
+        161.63231565329883,
+        211.09362167083998
+      ]
+    }
+  },
+  "train_wall_time_s": 3353.5,
+  "total_timesteps": 500000,
+  "config": {
+    "name": "coop_eco05",
+    "observation": {
+      "neighbours": true,
+      "emergency": false,
+      "pedestrians": false,
+      "buses": false,
+      "forecast": false
+    },
+    "reward": {
+      "person_weighted": false,
+      "co2": 0.5,
+      "ev": 0.0,
+      "ped": 0.0,
+      "clip": 5.0
+    },
+    "ppo": {
+      "learning_rate": 0.0003,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.0,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "training": {
+      "total_timesteps": 500000,
+      "checkpoint_every": 50000,
+      "demand_levels": [
+        "low",
+        "medium",
+        "peak",
+        "rush_profile"
+      ],
+      "scenarios": [],
+      "quick_timesteps": 3000
+    },
+    "validation": {
+      "seeds": [
+        1000
+      ],
+      "demands": [
+        "medium",
+        "peak"
+      ],
+      "last_checkpoints": 4
+    },
+    "description": "COOP with a CO2 penalty in the reward (lambda_co2 = 0.5)."
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "agent": "coop",
+  "network": "grid4x4",
+  "training_seed": 1,
+  "selected_checkpoint": "model_450000_steps.zip",
+  "selected_steps": 450000,
+  "validation": {
+    "seeds": [
+      1000
+    ],
+    "demands": [
+      "medium",
+      "peak"
+    ],
+    "metric": "mean_travel_time",
+    "episode": "protocol.validation"
+  },
+  "scores": {
+    "400000": {
+      "mean_travel_time": 186.65749115743057,
+      "runs": [
+        161.1724191461837,
+        212.14256316867744
+      ]
+    },
+    "450000": {
+      "mean_travel_time": 185.88024557473977,
+      "runs": [
+        162.15560155239328,
+        209.60488959708627
+      ]
+    },
+    "500000": {
+      "mean_travel_time": 187.72831089181335,
+      "runs": [
+        160.51232858990943,
+        214.94429319371727
+      ]
+    },
+    "503808": {
+      "mean_travel_time": 186.28115343444483,
+      "runs": [
+        162.26426908150066,
+        210.29803778738903
+      ]
+    }
+  },
+  "train_wall_time_s": 1410.4,
+  "total_timesteps": 500000,
+  "config": {
+    "name": "coop",
+    "observation": {
+      "neighbours": true,
+      "emergency": false,
+      "pedestrians": false,
+      "buses": false,
+      "forecast": false
+    },
+    "reward": {
+      "person_weighted": false,
+      "co2": 0.0,
+      "ev": 0.0,
+      "ped": 0.0,
+      "clip": 5.0
+    },
+    "ppo": {
+      "learning_rate": 0.0003,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.0,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "training": {
+      "total_timesteps": 500000,
+      "checkpoint_every": 50000,
+      "demand_levels": [
+        "low",
+        "medium",
+        "peak",
+        "rush_profile"
+      ],
+      "scenarios": [],
+      "quick_timesteps": 3000
+    },
+    "validation": {
+      "seeds": [
+        1000
+      ],
+      "demands": [
+        "medium",
+        "peak"
+      ],
+      "last_checkpoints": 4
+    },
+    "description": "Cooperative agents - local observation plus messages from upstream neighbours."
+  }
+}

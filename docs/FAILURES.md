@@ -104,3 +104,19 @@ entries at the bottom. Negative results that belong in the report are marked **[
 - **Fix / lesson:** forecasting targets are restricted to the demand period. Check what the
   test set contains before comparing models; an unexpected winner is a signal to look at the
   data, not a result.
+
+## F-009 - Neighbour messages did not improve the agents (2026-09-25) [report]
+
+- **Tried:** COOP agents receive, from each upstream neighbour, the queue heading to them,
+  whether the neighbour is releasing traffic toward them and its largest phase pressure.
+- **Evidence:** COOP = IND at low and medium demand (differences below 0.1%), -3.3% at peak
+  and -1.2% on the rush profile, not significant; the spread between COOP training seeds
+  (218-234 s at peak) is larger than the IND-COOP difference.
+- **Diagnosis (hypotheses, to be discussed in the report):** (1) on 250 m links a platoon
+  released upstream reaches the next junction in about 20 s, i.e. four decisions later,
+  and is already visible on the incoming lanes that every agent observes; (2) with two
+  phases and near-maximal switching (F-007) the decision space leaves little room for
+  anticipation; (3) twelve more inputs slightly slow learning at the same budget.
+- **Lesson:** communication is only worth its cost when neighbours know something the
+  local detectors cannot see soon enough - longer links, several phases, or events outside
+  the detection range. The comm-dropout and district results test the same question.

@@ -197,3 +197,37 @@ period (FAILURES F-008). MAE in vehicles per 5 min (mean target about 40):
   beyond their recent average.
 - The Ridge coefficients are exported (`results/forecasting/ridge_grid4x4.json`) for the
   Tier 3 test (forecast as an observation block, `configs/agents/coop_forecast.yaml`).
+
+## 2026-09-25 - M4: COOP vs IND vs baselines (grid4x4, normal scenario)
+
+14 grid4x4 training runs (IND, COOP, COOP-FULL, COOP-ECO x 2, three seeds each; 500k agent
+steps, 25-35 min each with three runs sharing the laptop). Checkpoints selected on
+validation seed 1000. Test: 3 training seeds x 5 evaluation seeds = 15 runs per learned
+variant and cell, 5 runs per baseline.
+
+Mean travel time (s):
+
+| Method | low | medium | peak | rush profile |
+|---|---|---|---|---|
+| FT | 171.4 | 179.8 | 261.2 | 209.2 |
+| ACT | **145.0** | **157.3** | 275.3 | 195.0 |
+| MP | 148.5 | 157.9 | **210.2** | **179.9** |
+| IND | 150.8 | 161.1 | 217.5 | 184.5 |
+| COOP | 150.8 | 161.0 | 224.6 | 186.7 |
+
+Tests (Mann-Whitney U, Holm; Cliff's delta):
+
+- IND vs best baseline: -4.0% (low, vs ACT) and -2.4% (medium, vs ACT), both p = 0.001, large
+  effect; -3.5% (peak, vs MP, p = 0.23) and -2.6% (rush, vs MP, p = 0.16). Mean waiting time at
+  peak and rush is equivalent to MP (negligible effect). At medium demand IND's 95th-percentile
+  wait is lower than ACT's (55 vs 57 s, p = 0.003).
+- COOP vs IND: no difference at low and medium demand (negligible effect); -3.3% at peak
+  (p = 0.50, medium effect), -1.2% on the rush profile. The peak gap comes mostly from one
+  training seed (COOP t2: 234 s; t1 and t3: 222 and 218 s; IND 215-220 s): the difference
+  between IND and COOP is of the order of the spread between training runs.
+- Both learned variants beat FT by 10-18% in every cell (p = 0.001).
+
+**RQ1 answer so far:** on the grid, the cooperative agents do not outperform the independent
+agents, and neither outperforms the best classical controller of each demand level. They are
+consistently better than fixed-time control and never collapse the way actuated control does
+at peak. See FAILURES F-009 for the diagnosis.

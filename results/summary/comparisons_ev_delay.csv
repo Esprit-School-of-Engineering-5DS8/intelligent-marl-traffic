@@ -1,0 +1,9 @@
+network,scenario,demand,method,reference,kind,metric,mean,reference_mean,improvement_pct,p_value,cliffs_delta,n,n_reference,p_holm,effect,significant
+grid4x4,emergency,peak,act,ft,ft,ev_delay,149.7468,154.67260000000002,3.1846623125233617,1.0,0.04,5,5,1.0,negligible,False
+grid4x4,emergency,peak,ev_rule,ft,ft,ev_delay,58.2328,154.67260000000002,62.350927054953495,0.007936507936507936,-1.0,5,5,0.047619047619047616,large,True
+grid4x4,emergency,peak,mp,ft,ft,ev_delay,106.3167,154.67260000000002,31.263391188872504,0.2222222222222222,-0.52,5,5,1.0,large,False
+real_district,emergency,peak,act,ft,ft,ev_delay,95.08970000000002,133.60330000000002,28.826832870146166,1.0,-0.04,5,5,1.0,negligible,False
+real_district,emergency,peak,ev_rule,ft,ft,ev_delay,99.13839999999999,133.60330000000002,25.796443650718228,0.6904761904761905,-0.2,5,5,1.0,small,False
+real_district,emergency,peak,mp,ft,ft,ev_delay,119.44380000000001,133.60330000000002,10.598166362657214,1.0,0.04,5,5,1.0,negligible,False
+grid4x4,emergency,peak,coop,ev_rule,best_baseline,ev_delay,107.825,58.2328,-85.16197057328516,0.3333333333333333,1.0,1,5,0.3333333333333333,large,False
+grid4x4,emergency,peak,coop,ft,ft,ev_delay,107.825,154.67260000000002,30.28823463237833,0.6666666666666666,-0.6,1,5,0.6666666666666666,large,False
