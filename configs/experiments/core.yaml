@@ -15,6 +15,7 @@ cells:
     methods: [coop_eco05, coop_eco]
     demands: [medium, peak]
     scenarios: [normal]
+    ssm: false          # the Pareto front needs travel time and CO2 only
   # RQ2 - emergency vehicles
   - network: grid4x4
     methods: [ft, act, mp, ev_rule, coop, coop_full]

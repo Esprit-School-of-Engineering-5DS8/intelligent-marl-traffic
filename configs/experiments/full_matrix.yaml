@@ -32,6 +32,7 @@ cells:
   - peak
   scenarios:
   - normal
+  ssm: false
 - network: grid4x4
   methods:
   - ft
