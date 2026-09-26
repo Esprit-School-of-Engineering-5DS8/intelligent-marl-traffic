@@ -14,6 +14,9 @@ METHOD_LABELS = {
     "coop_eco05": "COOP-ECO (λ=0.5)",
     "coop_eco": "COOP-ECO (λ=1.0)",
     "coop_full": "COOP-FULL",
+    "coop_forecast": "COOP + forecast",
+    "coop_full_ev1": "COOP-FULL (λ_ev=1)",
+    "coop_full_ev4": "COOP-FULL (λ_ev=4)",
     "random": "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS)
@@ -35,6 +38,9 @@ METHOD_COLORS = {
     "coop_eco05": "#e87ba4",
     "coop_eco": "#008300",
     "coop_full": "#eda100",
+    "coop_forecast": "#5b8fb9",
+    "coop_full_ev1": "#c98a00",
+    "coop_full_ev4": "#f4c455",
     "random": "#52514e",
 }
 SURFACE = "#fcfcfb"

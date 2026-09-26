@@ -95,6 +95,7 @@ def _bars(
     """Grouped bars with 95% CI whiskers; getter(group, method) -> (mean, lo, hi) or None."""
     n = max(1, len(methods))
     width = min(0.8 / n, 0.18)
+    top = 0.0
     for i, method in enumerate(methods):
         xs, means, errs = [], [], [[], []]
         for g, group in enumerate(groups):
@@ -102,6 +103,7 @@ def _bars(
             if value is None:
                 continue
             mean, lo, hi = value
+            top = max(top, hi)
             xs.append(g + (i - (n - 1) / 2) * (width + 0.01))
             means.append(mean)
             errs[0].append(max(0.0, mean - lo))
@@ -122,6 +124,9 @@ def _bars(
     ax.set_xticks(range(len(groups)))
     ax.set_xticklabels([(group_labels or {}).get(g, g) for g in groups])
     ax.grid(axis="x", visible=False)
+    if top > 0:
+        # headroom above the tallest whisker for the legend
+        ax.set_ylim(0, top * (1.12 + 0.07 * ((n + 1) // 2)))
 
 
 NETWORK_ORDER = ("grid4x4", "real_district", "grid8x8")
@@ -144,6 +149,10 @@ class Data:
         self.raw = (
             load_raw(raw_dir, allow_quick) if any(Path(raw_dir).glob("*.csv")) else pd.DataFrame()
         )
+        if not self.raw.empty:
+            # report figures show the baselines and the main variants; sensitivity variants
+            # (forecast, EV weight) are reported in tables and text only
+            self.raw = self.raw[self.raw["method"].isin(BASELINE_METHODS + LEARNED)]
         self.summary = summarise(self.raw) if not self.raw.empty else pd.DataFrame()
         self.logs_dir = logs_dir
 
