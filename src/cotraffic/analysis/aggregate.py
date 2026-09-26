@@ -35,6 +35,42 @@ def load_raw(raw_dir: Path = RAW_DIR, allow_quick: bool = False) -> pd.DataFrame
     return df
 
 
+def core_cells(experiment: str = "core") -> set[tuple[str, str, str, str]]:
+    """(network, scenario, demand, method) of the core experiment.
+
+    The core cells and variants form the confirmatory family of the report: their tests
+    are Holm-corrected together, and results added later (extended matrix, sensitivity
+    variants) form a separate, exploratory family, so that they cannot change the
+    report's corrected p-values.
+    """
+    from cotraffic import config
+
+    exp = config.load("experiments", experiment)
+    return {
+        (cell["network"], scenario, demand, method)
+        for cell in exp["cells"]
+        for method in cell["methods"]
+        for demand in cell["demands"]
+        for scenario in cell["scenarios"]
+    }
+
+
+def assign_families(comp: pd.DataFrame, core: set[tuple[str, str, str, str]]) -> pd.DataFrame:
+    """Holm correction within each (comparison, family) group; see ``core_cells``."""
+    comp = comp.copy()
+    comp["family"] = [
+        "core" if key in core else "exploratory"
+        for key in zip(
+            comp["network"], comp["scenario"], comp["demand"], comp["method"], strict=True
+        )
+    ]
+    comp["p_holm"] = comp.groupby(["comparison", "family"])["p_value"].transform(
+        lambda p: pd.Series(holm(p.tolist()), index=p.index)
+    )
+    comp["significant"] = comp["p_holm"] < 0.05
+    return comp
+
+
 def seed_table(group: pd.DataFrame, metric: str) -> pd.DataFrame:
     """Values of one method in one cell as a (training run x test seed) table.
 
@@ -153,6 +189,7 @@ def run_aggregate(
     df = load_raw(raw_dir, allow_quick)
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
+    core = core_cells()
     summary = summarise(df)
     path = out_dir / "summary.csv"
     summary.to_csv(path, index=False)
@@ -170,19 +207,20 @@ def run_aggregate(
     ):
         if metric not in df.columns:
             continue
-        tables = [compare(df, metric, [m for m in baselines if m != "ft"], "ft")]
+        tables = [
+            compare(df, metric, [m for m in baselines if m != "ft"], "ft").assign(
+                comparison="baselines_vs_ft"
+            )
+        ]
         if learned:
             tables += [
-                compare(df, metric, learned, "best_baseline"),
-                compare(df, metric, learned, "ft"),
+                compare(df, metric, learned, "best_baseline").assign(comparison="learned_vs_best"),
+                compare(df, metric, learned, "ft").assign(comparison="learned_vs_ft"),
             ]
-        comp = (
-            pd.concat([t for t in tables if not t.empty], ignore_index=True)
-            if any(not t.empty for t in tables)
-            else pd.DataFrame()
-        )
-        if comp.empty:
+        tables = [t for t in tables if not t.empty and "p_value" in t]
+        if not tables:
             continue
+        comp = assign_families(pd.concat(tables, ignore_index=True), core)
         path = out_dir / f"comparisons_{metric}.csv"
         comp.to_csv(path, index=False)
         written.append(path)

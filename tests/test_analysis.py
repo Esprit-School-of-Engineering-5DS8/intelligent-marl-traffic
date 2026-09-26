@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cotraffic.analysis.aggregate import compare, summarise
+from cotraffic.analysis.aggregate import assign_families, compare, summarise
 from cotraffic.evaluation.matrix import expand
 
 
@@ -100,3 +100,21 @@ def test_learned_runs_get_two_way_intervals_and_paired_comparisons():
     expected = -100 * 10.0 / df[df.method == "mp"]["mean_travel_time"].mean()
     assert row["paired_improvement_pct"] == pytest.approx(expected, abs=0.01)
     assert row["paired_ci_lo"] <= row["paired_improvement_pct"] <= row["paired_ci_hi"] < 0
+
+
+def test_holm_is_applied_within_the_core_family_only():
+    comp = pd.DataFrame(
+        {
+            "network": ["g", "g", "g"],
+            "scenario": ["normal", "normal", "incident"],
+            "demand": ["peak", "low", "peak"],
+            "method": ["coop", "coop", "coop"],
+            "p_value": [0.01, 0.02, 0.001],
+            "comparison": ["learned_vs_best"] * 3,
+        }
+    )
+    core = {("g", "normal", "peak", "coop"), ("g", "normal", "low", "coop")}
+    out = assign_families(comp, core)
+    assert out["family"].tolist() == ["core", "core", "exploratory"]
+    # the exploratory test does not enlarge the core family
+    assert out["p_holm"].tolist() == pytest.approx([0.02, 0.02, 0.001])

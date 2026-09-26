@@ -68,3 +68,8 @@ seed, checkpoint and git commit (with `-dirty` when uncommitted changes were pre
   Cliff's delta = +-1 (complete separation) are unaffected; for the others we rely on the
   two-way intervals and the paired analysis (decided 2026-09-26, after the first core
   results: the ordinary bootstrap gave learned methods intervals up to twice too narrow).
+- The confirmatory family is fixed in advance: the cells and variants of the core matrix
+  (`configs/experiments/core.yaml`). Comparisons in cells or with variants added later
+  (extended matrix, sensitivity experiment, EV-RULE-MP) are Holm-corrected in a separate,
+  exploratory family, so that adding results cannot change the corrected p-values of the
+  report (`family` column of `results/summary/comparisons_*.csv`).

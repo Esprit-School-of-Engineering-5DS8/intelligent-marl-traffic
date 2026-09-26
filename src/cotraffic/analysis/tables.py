@@ -97,9 +97,12 @@ def metrics_table(
     return [title, ""] + _table(["Method"] + [METRIC_LABELS.get(m, m) for m in metrics], rows)
 
 
-def comparison_table(comp: pd.DataFrame, kind: str) -> list[str]:
-    """Rows of the comparisons made against ``kind`` (``ft`` or ``best_baseline``)."""
+def comparison_table(comp: pd.DataFrame, kind: str, family: str = "core") -> list[str]:
+    """Rows of the comparisons made against ``kind`` (``ft`` or ``best_baseline``) in one
+    Holm family (``core``: the report's confirmatory tests; ``exploratory``: the rest)."""
     sub = comp[comp["kind"] == kind]
+    if "family" in sub:
+        sub = sub[sub["family"] == family]
     if sub.empty:
         return []
     rows = []
@@ -178,11 +181,17 @@ def build_report_tables(raw_dir: Path = RAW_DIR, summary_dir: Path = SUMMARY_DIR
             "same test seed, with a two-way bootstrap CI.",
             "",
         ]
-        for reference, title in (
-            ("ft", "Against fixed-time (FT)"),
-            ("best_baseline", "Against the best baseline of each cell"),
+        for reference, family, title in (
+            ("ft", "core", "Against fixed-time (FT)"),
+            ("best_baseline", "core", "Against the best baseline of each cell"),
+            (
+                "best_baseline",
+                "exploratory",
+                "Exploratory: extended and sensitivity cells against the best baseline "
+                "(separate Holm family)",
+            ),
         ):
-            table = comparison_table(comp, reference)
+            table = comparison_table(comp, reference, family)
             if table:
                 lines += [f"### {title}", ""] + table
     lines += failures_table(raw)
