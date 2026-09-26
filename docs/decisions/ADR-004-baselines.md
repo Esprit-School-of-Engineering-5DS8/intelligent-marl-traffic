@@ -23,6 +23,7 @@ from the agents only in *when* they switch.
 | MP | Max-Pressure (Varaiya 2013): request the phase maximising the sum of (upstream - downstream) vehicles over its movements; ties keep the phase; same safety shield as the agents | `controllers/classical.py::MaxPressure` |
 | EV-RULE | ACT + rule-based preemption: when an emergency vehicle is within 200 m of its next signal, hold or claim its green, respecting min green and yellow | `controllers/ev_preemption.py` |
 | EV-RULE-MP | the same preemption on top of Max-Pressure, requested at each 5-s decision through the shield (added 2026-09-26, FAILURES F-013) | `controllers/ev_preemption.py` |
+| PED-RULE-MP | Max-Pressure; a crossing whose longest-waiting pedestrian has waited more than 30 s (the Highway Capacity Manual's impatience threshold, fixed before any run) requests its green at the next decision, through the shield (added 2026-09-26, the pedestrian-aware reference for COOP-FULL) | `controllers/pedestrian_rule.py` |
 
 Choices that make the baselines fair:
 

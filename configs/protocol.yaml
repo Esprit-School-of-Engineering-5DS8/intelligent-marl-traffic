@@ -18,6 +18,7 @@ baselines:
   actuated_max_gap_s: 3.0       # an actuated green ends after this gap between vehicles
   actuated_detector_gap_s: 2.0  # detector distance from the stop line, in seconds of travel
   ev_preemption_range_m: 200    # EV-RULE: distance at which the rule claims the green
+  ped_rule_wait_s: 30           # PED-RULE-MP: serve a crossing once a pedestrian has waited this long
 
 evaluation:
   warmup_s: 900        # excluded from all metrics

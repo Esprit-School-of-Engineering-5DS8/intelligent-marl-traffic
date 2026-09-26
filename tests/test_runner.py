@@ -56,6 +56,25 @@ def test_incident_and_emergency_scenarios_run(tmp_path):
     assert row["incident_start"] != ""
 
 
+def test_pedestrian_rule_serves_waiting_pedestrians(tmp_path):
+    from cotraffic.controllers.registry import make_controller
+
+    ctrl = make_controller("ped_rule_mp")
+    row = run_episode(
+        "ped_rule_mp",
+        "grid2x2",
+        "peak",
+        ["pedestrians"],
+        seed=3,
+        quick=True,
+        raw_dir=tmp_path,
+        logs_dir=tmp_path,
+        controller=ctrl,
+    )
+    assert ctrl.requests > 0
+    assert row["collisions"] == 0
+
+
 @pytest.mark.parametrize("method", ["ev_rule", "ev_rule_mp"])
 def test_ev_rule_preempts_and_stays_safe(method, tmp_path):
     from cotraffic.controllers.registry import make_controller

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from cotraffic.controllers.base import Controller
 
-BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp")
+BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
 LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full")
 
 
@@ -31,6 +31,10 @@ def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Co
         from cotraffic.controllers.ev_preemption import MaxPressurePreemption
 
         return MaxPressurePreemption()
+    if method == "ped_rule_mp":
+        from cotraffic.controllers.pedestrian_rule import PedestrianRule
+
+        return PedestrianRule()
     if method == "random":
         from cotraffic.controllers.random_policy import RandomPolicy
 

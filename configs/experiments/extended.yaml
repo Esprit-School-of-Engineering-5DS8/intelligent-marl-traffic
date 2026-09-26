@@ -19,6 +19,11 @@ cells:
     demands: [peak]
     scenarios: [pedestrians, buses]
     ssm: false
+  - network: grid4x4
+    methods: [ped_rule_mp]
+    demands: [peak]
+    scenarios: [pedestrians]
+    ssm: false
   - network: grid8x8
     checkpoint_network: grid4x4
     methods: [ft, mp, ind, coop]
