@@ -8,7 +8,11 @@
 * Permutation importance by block: on the observations of evaluation episodes, each block
   is shuffled between decisions and we count how often the chosen phase changes; then an
   episode is replayed with that block shuffled online, which gives the effect on travel
-  time. A block the policy ignores changes nothing.
+  time and emergency-vehicle delay. A block the policy ignores changes nothing.
+  Sparse blocks (an emergency vehicle is in range for few decisions) are also scored on
+  the decisions where they are non-zero; a rate over all decisions would dilute them.
+  Blocks that never vary in the episodes (no bus in the scenario) are left out: shuffling
+  a constant cannot measure anything.
 """
 
 from __future__ import annotations
@@ -67,6 +71,13 @@ class PermutedPolicy(LearnedPolicy):
             o[self.group] = self.pool[self.rng.integers(len(self.pool)), self.group]
             shuffled[agent] = o
         return super().act(env, shuffled)
+
+
+def _mean_of(rows: list[dict[str, Any]], key: str) -> float:
+    """Mean of a result column over runs, NaN when no run has it (e.g. no EV)."""
+    values = [float(r[key]) for r in rows if r.get(key) not in (None, "")]
+    values = [v for v in values if not np.isnan(v)]
+    return float(np.mean(values)) if values else float("nan")
 
 
 def _greedy(model, batch: np.ndarray) -> np.ndarray:
@@ -199,8 +210,9 @@ def permutation_importance(
     scenarios: list[str],
     seeds: list[int],
     online: bool = True,
+    quick: bool = False,
 ) -> Path:
-    """Action-change rate and travel-time effect of shuffling each observation block."""
+    """Action-change rate, travel-time and EV-delay effect of shuffling each block."""
     os.environ.setdefault("LIBSUMO_AS_TRACI", "1")
     from cotraffic.evaluation.runner import run_episode
 
@@ -215,6 +227,7 @@ def permutation_importance(
             s,
             controller=recorder,
             ssm=False,
+            quick=quick,
             tag="imp-base",
             raw_dir=work,
             logs_dir=work,
@@ -223,6 +236,7 @@ def permutation_importance(
     ]
     pool = np.stack(recorder.records)
     base_travel = float(np.mean([r["mean_travel_time"] for r in base_rows]))
+    base_ev = _mean_of(base_rows, "ev_delay")
     rng = np.random.default_rng(0)
     probe = pool[rng.choice(len(pool), size=min(20000, len(pool)), replace=False)]
     base_actions = _greedy(recorder.model, probe)
@@ -233,10 +247,19 @@ def permutation_importance(
     )
     rows = []
     for name, sl in slices.items():
+        if np.ptp(pool[:, sl], axis=0).max() == 0:
+            continue  # constant in these episodes: nothing to measure
         shuffled = probe.copy()
         shuffled[:, sl] = probe[rng.permutation(len(probe)), sl]
         change = float(np.mean(_greedy(recorder.model, shuffled) != base_actions))
-        travel = float("nan")
+        active = np.flatnonzero(np.any(pool[:, sl] != 0, axis=1))
+        sample = pool[rng.choice(active, size=min(20000, len(active)), replace=False)]
+        replaced = sample.copy()
+        replaced[:, sl] = pool[rng.integers(len(pool), size=len(sample)), sl]
+        change_active = float(
+            np.mean(_greedy(recorder.model, replaced) != _greedy(recorder.model, sample))
+        )
+        travel = ev = float("nan")
         if online:
             ctrl = PermutedPolicy(method, checkpoint, sl, pool)
             runs = [
@@ -248,6 +271,7 @@ def permutation_importance(
                     s,
                     controller=ctrl,
                     ssm=False,
+                    quick=quick,
                     tag=f"imp-{name}",
                     raw_dir=work,
                     logs_dir=work,
@@ -255,6 +279,7 @@ def permutation_importance(
                 for s in seeds
             ]
             travel = float(np.mean([r["mean_travel_time"] for r in runs]))
+            ev = _mean_of(runs, "ev_delay")
         rows.append(
             {
                 "method": method,
@@ -262,15 +287,20 @@ def permutation_importance(
                 "demand": demand,
                 "scenario": "+".join(scenarios) or "normal",
                 "group": GROUP_NAMES[name],
+                "active_share": len(active) / len(pool),
                 "action_change_rate": change,
+                "action_change_rate_active": change_active,
                 "travel_time": travel,
                 "travel_time_base": base_travel,
                 "travel_time_increase_pct": 100.0 * (travel - base_travel) / base_travel,
+                "ev_delay": ev,
+                "ev_delay_base": base_ev,
+                "ev_delay_increase_pct": 100.0 * (ev - base_ev) / base_ev,
                 "decisions_probed": len(probe),
                 "seeds": " ".join(map(str, seeds)),
             }
         )
-    out = SUMMARY_DIR / f"importance_{method}_{network}.csv"
+    out = (work if quick else SUMMARY_DIR) / f"importance_{method}_{network}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(out, index=False)
     return out

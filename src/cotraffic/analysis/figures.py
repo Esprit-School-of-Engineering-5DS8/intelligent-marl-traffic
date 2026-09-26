@@ -527,12 +527,15 @@ def fig08_robustness(d: Data) -> Path | None:
         if not pts:
             continue
         pts = np.array(pts)
-        if len(pts) == 1:  # not affected by messages: reference line
+        if len(pts) == 1:  # only evaluated without dropout: reference line
+            uses_messages = (
+                method != "mp" and config.load_agent(method)["observation"]["neighbours"]
+            )
             a.axhline(
                 pts[0, 1],
                 color=METHOD_COLORS[method],
                 linewidth=1.5,
-                label=f"{label(method)} (no messages)",
+                label=f"{label(method)} ({'no dropout' if uses_messages else 'no messages'})",
             )
         else:
             a.plot(
@@ -678,35 +681,42 @@ def fig11_people(d: Data) -> Path | None:
 
 
 def fig12_importance(d: Data) -> Path | None:
+    """Decisions changed when a block is shuffled, counted on the decisions where the block
+    is non-zero (a sparse block such as emergency vehicles would otherwise look unused),
+    with the effect of shuffling it online on travel time and emergency-vehicle delay."""
     files = sorted(SUMMARY_DIR.glob("importance_*.csv"))
     if not files:
         return None
     frames = [pd.read_csv(f) for f in files]
-    fig, axes = plt.subplots(1, len(frames), figsize=(5 * len(frames), 3.2), squeeze=False)
+    fig, axes = plt.subplots(1, len(frames), figsize=(6.2 * len(frames), 3.4), squeeze=False)
     for ax, df in zip(axes[0], frames, strict=True):
-        df = df.sort_values("action_change_rate")
-        method = df["method"].iloc[0]
-        ax.barh(
-            df["group"],
-            df["action_change_rate"] * 100,
-            color=METHOD_COLORS.get(method, TEXT_SECONDARY),
-            height=0.5,
+        rate = (
+            "action_change_rate_active"
+            if "action_change_rate_active" in df
+            else ("action_change_rate")
         )
-        for y, (v, drop) in enumerate(
-            zip(df["action_change_rate"] * 100, df["travel_time_increase_pct"], strict=True)
-        ):
-            ax.text(
-                v + 0.5,
-                y,
-                f"{v:.0f}% of decisions, travel time {drop:+.1f}%",
-                va="center",
-                fontsize=7,
-                color=TEXT_SECONDARY,
-            )
-        ax.set_xlabel("Decisions changed when the block is shuffled (%)")
-        ax.set_title(f"What {label(method)} relies on ({df['network'].iloc[0]})")
+        df = df.sort_values(rate)
+        method = df["method"].iloc[0]
+        values = df[rate].to_numpy() * 100
+        ax.barh(df["group"], values, color=METHOD_COLORS.get(method, TEXT_SECONDARY), height=0.5)
+        for y, (_, r) in enumerate(df.iterrows()):
+            text = f"travel time {r['travel_time_increase_pct']:+.1f}%"
+            if not np.isnan(r.get("ev_delay_increase_pct", np.nan)) and (
+                r["group"] == "emergency vehicles"
+            ):
+                text += f"\nEV delay {r['ev_delay_increase_pct']:+.0f}%"
+            share = 100 * r.get("active_share", 1.0)
+            if share < 95:
+                text += f"\nnon-zero in {share:.1f}% of decisions"
+            ax.text(values[y] + 0.5, y, text, va="center", fontsize=7, color=TEXT_SECONDARY)
+        ax.set_xlabel(
+            "Decisions changed when shuffled (%)\namong decisions where the block is non-zero"
+        )
+        ax.set_title(
+            f"What {label(method)} relies on ({df['network'].iloc[0]}, {df['scenario'].iloc[0]})"
+        )
         ax.grid(axis="y", visible=False)
-        ax.set_xlim(0, max(10.0, float(df["action_change_rate"].max() * 100) * 1.8))
+        ax.set_xlim(0, max(10.0, float(values.max()) * 2.0))
     fig.tight_layout()
     return _save(fig, "fig12_feature_importance")
 

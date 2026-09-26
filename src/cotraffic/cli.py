@@ -277,7 +277,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--demand", default="peak")
     p.add_argument("--scenarios", nargs="*", default=["emergency"])
     p.add_argument("--seed", type=int, default=3)
-    p.add_argument("--importance-seeds", type=int, nargs="+", default=[0, 1])
+    p.add_argument("--importance-seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     p.add_argument("--no-importance", action="store_true")
     p.add_argument("--offline", action="store_true", help="skip the online replays (faster)")
     p.set_defaults(func=cmd_explain)
