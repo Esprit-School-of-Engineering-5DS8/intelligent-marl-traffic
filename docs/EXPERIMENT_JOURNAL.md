@@ -522,6 +522,6 @@ Poisson noise floor.
 
 **EV weight.** COOP-FULL with lambda_ev = 1 and 4 (one training run each, seed 1),
 emergency cell at peak, against COOP-FULL t1 (lambda_ev = 2): EV delay 109.7 s (+70%) and
-63.3 s (-2%, not significant); travel time +4.4% and +1.7%. Below lambda_ev = 2 the EV
-benefit is lost; above, it does not grow. Single runs: the travel-time differences are
-within the spread between training runs.
+63.3 s (-2%, not significant); travel time +4.4% and +1.7%. This suggests that
+lambda_ev >= 2 is needed and that a larger weight adds nothing, but each value rests on a
+single training run and the spread between runs is large (COOP t2): indicative only.

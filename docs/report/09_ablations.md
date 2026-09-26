@@ -75,10 +75,12 @@ seed 1, paired by test seed against lambda_ev = 2):
 | 2 (COOP-FULL) | 64.4 | | 217.0 | |
 | 4 | 63.3 | -1.6% [-11.8, +9.4] | 220.7 | +1.7% [+0.6, +2.8] |
 
-With lambda_ev = 1 the emergency vehicles lose most of the benefit (110 s, close to
-COOP's 116 s); a weight of 2 or 4 gives the same EV delay. The travel-time differences
-come from single training runs and are of the size of the spread between training runs
-(section 9.1), so we do not read them as an effect of the weight.
+These runs suggest that a weight of at least 2 is needed: with lambda_ev = 1 the
+emergency vehicles lose most of the benefit (110 s, close to COOP's 116 s), while 2 and 4
+give the same EV delay. Each weight rests on a single training run, and the spread between
+training runs is large (COOP's run t2 is 6% slower than the others at peak, section 9.1),
+so this is indicative, not a conclusion; the travel-time differences in particular are
+within that spread.
 
 ## 9.4 Reward definition and exploration (validation seeds, M3)
 
