@@ -1,0 +1,110 @@
+{
+  "agent": "coop_full",
+  "network": "real_district",
+  "training_seed": 2,
+  "selected_checkpoint": "model_449946_steps.zip",
+  "selected_steps": 449946,
+  "validation": {
+    "seeds": [
+      1000
+    ],
+    "demands": [
+      "medium",
+      "peak"
+    ],
+    "metric": "mean_travel_time",
+    "episode": "protocol.validation"
+  },
+  "scores": {
+    "399952": {
+      "mean_travel_time": 138.13354745709483,
+      "runs": [
+        112.1785092491839,
+        164.08858566500575
+      ]
+    },
+    "449946": {
+      "mean_travel_time": 130.48302878710214,
+      "runs": [
+        110.66436343852013,
+        150.30169413568416
+      ]
+    },
+    "499940": {
+      "mean_travel_time": 133.05635056477723,
+      "runs": [
+        111.00495103373233,
+        155.10775009582215
+      ]
+    },
+    "500122": {
+      "mean_travel_time": 130.49950978053286,
+      "runs": [
+        112.08329706202395,
+        148.91572249904178
+      ]
+    }
+  },
+  "train_wall_time_s": 237.7,
+  "total_timesteps": 500000,
+  "config": {
+    "name": "coop_full",
+    "observation": {
+      "neighbours": true,
+      "emergency": true,
+      "pedestrians": true,
+      "buses": true,
+      "forecast": false
+    },
+    "reward": {
+      "person_weighted": true,
+      "co2": 0.5,
+      "ev": 2.0,
+      "ped": 0.5,
+      "clip": 5.0
+    },
+    "ppo": {
+      "learning_rate": 0.0003,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.0,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "training": {
+      "total_timesteps": 500000,
+      "checkpoint_every": 50000,
+      "demand_levels": [
+        "low",
+        "medium",
+        "peak",
+        "rush_profile"
+      ],
+      "scenarios": [
+        "emergency",
+        "pedestrians",
+        "buses"
+      ],
+      "quick_timesteps": 3000
+    },
+    "validation": {
+      "seeds": [
+        1000
+      ],
+      "demands": [
+        "medium",
+        "peak"
+      ],
+      "last_checkpoints": 4
+    },
+    "description": "All observation blocks (neighbours, emergency vehicles, pedestrians, buses) and a person-weighted reward with CO2, emergency-vehicle and pedestrian penalties. Trained with emergency vehicles, pedestrians and buses in every episode.\n"
+  }
+}

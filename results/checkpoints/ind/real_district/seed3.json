@@ -1,0 +1,106 @@
+{
+  "agent": "ind",
+  "network": "real_district",
+  "training_seed": 3,
+  "selected_checkpoint": "model_449946_steps.zip",
+  "selected_steps": 449946,
+  "validation": {
+    "seeds": [
+      1000
+    ],
+    "demands": [
+      "medium",
+      "peak"
+    ],
+    "metric": "mean_travel_time",
+    "episode": "protocol.validation"
+  },
+  "scores": {
+    "399952": {
+      "mean_travel_time": 136.05945722536578,
+      "runs": [
+        110.22312295973884,
+        161.8957914909927
+      ]
+    },
+    "449946": {
+      "mean_travel_time": 130.3222011547873,
+      "runs": [
+        110.64205658324266,
+        150.00234572633192
+      ]
+    },
+    "499940": {
+      "mean_travel_time": 137.01499449465751,
+      "runs": [
+        110.47992383025027,
+        163.5500651590648
+      ]
+    },
+    "501578": {
+      "mean_travel_time": 132.60349996517454,
+      "runs": [
+        110.83248095756257,
+        154.37451897278652
+      ]
+    }
+  },
+  "train_wall_time_s": 2053.0,
+  "total_timesteps": 500000,
+  "config": {
+    "name": "ind",
+    "observation": {
+      "neighbours": false,
+      "emergency": false,
+      "pedestrians": false,
+      "buses": false,
+      "forecast": false
+    },
+    "reward": {
+      "person_weighted": false,
+      "co2": 0.0,
+      "ev": 0.0,
+      "ped": 0.0,
+      "clip": 5.0
+    },
+    "ppo": {
+      "learning_rate": 0.0003,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.0,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "training": {
+      "total_timesteps": 500000,
+      "checkpoint_every": 50000,
+      "demand_levels": [
+        "low",
+        "medium",
+        "peak",
+        "rush_profile"
+      ],
+      "scenarios": [],
+      "quick_timesteps": 3000
+    },
+    "validation": {
+      "seeds": [
+        1000
+      ],
+      "demands": [
+        "medium",
+        "peak"
+      ],
+      "last_checkpoints": 4
+    },
+    "description": "Independent agents - local observation only, no communication."
+  }
+}

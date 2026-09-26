@@ -1,0 +1,4 @@
+method,network,demand,scenario,group,active_share,action_change_rate,action_change_rate_active,travel_time,travel_time_base,travel_time_increase_pct,ev_delay,ev_delay_base,ev_delay_increase_pct,decisions_probed,seeds
+coop,grid4x4,peak,normal,local lanes,1.0,0.3962,0.40045,339.2972706031883,221.46583698804798,53.20524159285994,,,,20000,0 1 2 3 4
+coop,grid4x4,peak,normal,phase and timers,1.0,0.1402,0.13935,222.0795013776367,221.46583698804798,0.2770921230717062,,,,20000,0 1 2 3 4
+coop,grid4x4,peak,normal,neighbour messages,1.0,0.0713,0.06885,218.44124624817496,221.46583698804798,-1.3657143607373854,,,,20000,0 1 2 3 4

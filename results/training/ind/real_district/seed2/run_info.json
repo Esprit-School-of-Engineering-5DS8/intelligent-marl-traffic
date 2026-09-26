@@ -63,13 +63,13 @@
   },
   "sessions": [
     {
-      "started": "2026-09-25 00:57:41",
+      "started": "2026-09-25 12:04:14",
       "resumed_from_steps": 0,
       "ended_at_steps": 501760,
-      "wall_time_s": 2560.4
+      "wall_time_s": 2929.0
     }
   ],
-  "train_wall_time_s": 2560.4,
+  "train_wall_time_s": 2929.0,
   "machine": {
     "platform": "Windows-10-10.0.19045-SP0",
     "cpu_count": 8,
