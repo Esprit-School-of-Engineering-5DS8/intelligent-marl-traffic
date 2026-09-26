@@ -42,6 +42,27 @@ def list_checkpoints(directory: Path) -> list[tuple[int, Path]]:
     return sorted(found)
 
 
+def trim_episode_log(path: Path, steps: int) -> int:
+    """Drop the rows logged after ``steps``, the checkpoint a run resumes from.
+
+    Those episodes trained a policy that was never saved; the resumed run logs its own.
+    Returns the number of rows removed.
+    """
+    if not path.is_file():
+        return 0
+    with path.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        fields = reader.fieldnames or []
+        rows = list(reader)
+    kept = [row for row in rows if int(row["timesteps"]) <= steps]
+    if len(kept) < len(rows):
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(kept)
+    return len(rows) - len(kept)
+
+
 def make_vec_env(network: str, agent_cfg: dict[str, Any], quick: bool = False):
     """SB3-compatible vector environment, one slot per intersection."""
     import supersuit as ss
@@ -147,6 +168,9 @@ def train(
             **ppo,
         )
         model.action_space.seed(seed)
+    # episodes logged after the starting point (all of them for a fresh start) belong to
+    # an interrupted session whose policy was never saved
+    trim_episode_log(folder / "episodes.csv", steps_done)
     env.seed_episodes(seed + steps_done)
     remaining = total - model.num_timesteps
     wall = time.perf_counter()
