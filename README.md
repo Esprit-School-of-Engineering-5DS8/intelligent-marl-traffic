@@ -7,8 +7,9 @@ share one policy (PPO with parameter sharing), exchange short messages with thei
 neighbours, go through a safety shield that makes unsafe signal sequences impossible,
 and are trained to reduce person-weighted waiting time while accounting for CO2,
 emergency vehicles and pedestrians. They are compared with fixed-time (Webster),
-actuated and Max-Pressure control on a synthetic grid and on a real district imported
-from OpenStreetMap, under normal, peak, incident and emergency conditions.
+actuated and Max-Pressure control, and with rule-based emergency-vehicle preemption, on a
+synthetic grid and on a real district imported from OpenStreetMap, under normal, peak,
+incident, emergency and failure conditions.
 
 Simulation: [SUMO](https://eclipse.dev/sumo/) 1.27 through libsumo. CPU only.
 
@@ -77,12 +78,44 @@ tests/          pytest suite
 ## Reproducibility
 
 - Every parameter lives in `configs/`; the code has no magic numbers.
-- Demand, SUMO and learning are seeded. Test, validation and training seeds are disjoint
-  (`src/cotraffic/envs/episodes.py`).
+- Demand, SUMO and learning are seeded. Test, validation and training seeds are disjoint,
+  and `evaluate` / `select` refuse a seed outside their range (`src/cotraffic/seeds.py`).
+- Every result row stores the method, network, scenario, demand, seed, checkpoint and git
+  commit; interrupted training runs resume from their last checkpoint.
 - Each traffic component (cars, buses, emergency vehicles, pedestrians) draws from its
   own random stream, so scenarios run with the same seed share the same car demand.
 
 ## Results
 
-Results are produced by the evaluation pipeline and summarised in
-`results/summary/REPORT_TABLES.md` once the experiment matrix has run (milestone M7).
+Core experiment matrix: 790 runs, 5 test seeds per cell, 3 training runs per learned
+variant (checkpoints chosen on validation seeds). Write-up per research question:
+`docs/report/08_results.md` (ablations and limitations in sections 9 and 10); every table,
+with 95% confidence intervals and tests: `results/summary/REPORT_TABLES.md`.
+
+Mean travel time (s), normal traffic (lower is better; best in bold):
+
+| Network, demand | FT | ACT | MP | IND | COOP |
+|---|---|---|---|---|---|
+| grid4x4, low | 171.4 | **145.0** | 148.5 | 150.8 | 150.8 |
+| grid4x4, medium | 179.8 | **157.3** | 157.9 | 161.1 | 161.0 |
+| grid4x4, peak | 261.2 | 275.3 | **210.2** | 217.5 | 224.6 |
+| grid4x4, rush profile | 209.2 | 195.0 | **179.9** | 184.5 | 186.7 |
+| district, medium | 112.7 | 109.9 | **109.4** | 109.7 | 109.9 |
+| district, peak | 196.8 | 158.3 | **153.4** | 158.4 | 159.5 |
+| grid8x8, peak (trained on grid4x4) | 365.5 | - | **300.7** | 312.7 | 313.1 |
+
+- One learned policy stays within 4% (IND) or 7% (COOP) of the best classical controller
+  at every demand level, although that controller changes with the demand; it is
+  consistently a little slower, never faster. It is 10-20% faster than fixed-time control,
+  except at medium demand on the district (3%), where all controllers are close.
+- Emergency vehicles: a preemption rule on top of Max-Pressure cuts their delay by 64% for
+  +0.4% of travel time; the learned COOP-FULL cuts it by 37% compared with COOP, at no
+  cost to the other traffic, but less than the rule.
+- CO2 follows travel time on our networks: there is no trade-off between the two.
+- Under sensor faults the learned IND agent loses 1.4% of travel time, Max-Pressure 21.5%
+  (partly because our safety shield cannot see a movement whose detectors failed).
+- The policy trained on 16 junctions runs unchanged on 64, at 4% from Max-Pressure.
+- What did not work: messages between neighbouring agents brought no gain; the learned
+  agents handle accidents worse than Max-Pressure (`docs/FAILURES.md`).
+
+![Travel time by demand level](figures/fig02_travel_time_by_demand.png)

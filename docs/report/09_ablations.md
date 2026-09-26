@@ -51,14 +51,22 @@ run: per training run at peak, COOP-ECO reaches 214-217 s (lambda = 0.5) and 216
 Doubling the weight does not help further. On our networks the CO2 term is a second
 congestion signal rather than a competing objective.
 
-## 9.3 Emergency vehicles: COOP vs COOP-FULL vs EV-RULE
+## 9.3 Emergency vehicles: learned priority vs rule-based preemption
 
-See section 8.2. Adding the emergency-vehicle block and reward term (COOP-FULL) cuts the
-emergency-vehicle delay by 37% compared with COOP and keeps the cost to the traffic as a
-whole at 3.6% against Max-Pressure, where rule-based preemption costs 36%. The
-sensitivity of this result to the weight of the EV term (lambda_ev = 1 and 4 instead of
-2, one training run each) is trained and will be evaluated in the `sensitivity`
-experiment.
+Each mechanism against its own base (section 8.2, grid4x4 at peak, paired):
+
+| Mechanism | Base | EV delay | Travel time |
+|---|---|---|---|
+| preemption rule (EV-RULE) | ACT | -61.1% [-68.8, -50.2] | +3.6% [+1.4, +5.8] |
+| preemption rule (EV-RULE-MP) | MP | -64.2% [-69.7, -55.3] | +0.4% [-0.5, +1.0] |
+| EV block + reward term (COOP-FULL) | COOP | -36.6% [-49.4, -16.6] | -2.7% [-3.7, -1.4] |
+
+The learned mechanism reaches about 60% of the rule's reduction; the rule on Max-Pressure
+also keeps the lower travel time. A first version of this comparison set COOP-FULL against
+the rule on actuated control only, which attributed the breakdown of actuated control to
+preemption (FAILURES F-013). The sensitivity of COOP-FULL to the weight of its EV term
+(lambda_ev = 1 and 4 instead of 2, one training run each) is evaluated in the
+`sensitivity` experiment.
 
 ## 9.4 Reward definition and exploration (validation seeds, M3)
 

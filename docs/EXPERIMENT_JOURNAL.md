@@ -453,3 +453,33 @@ instead of 2. One replay took 90 min instead of 1: the laptop was in standby fro
 552-561 min measured) and three were resumed. The report tables now give episodes x median
 time per episode (16-47 min per run, three runs sharing the laptop) with a note on those
 runs.
+
+## 2026-09-26 - EV-RULE-MP: preemption judged against its own base controller
+
+Reviewing the RQ2 draft, we noticed that EV-RULE runs on actuated control, which breaks
+down at grid peak on its own (278.0 s vs 211.6 s for MP): the "+36% cost of preemption"
+was mostly the cost of actuated control (FAILURES F-013). We added EV-RULE-MP, the same
+200 m preemption rule on top of Max-Pressure, requested at each 5-s decision through the
+shield (`controllers/ev_preemption.py`), and evaluated it on the two emergency cells of
+the core matrix (5 test seeds each, part of the `sensitivity` experiment; 10 runs, none
+failed).
+
+Grid4x4 at peak, each mechanism against its own base (paired by test seed):
+
+| Mechanism | EV delay (s) | vs base | Travel time (s) | vs base |
+|---|---|---|---|---|
+| EV-RULE on ACT | 58.2 | -61.1% [-68.8, -50.2] | 288.1 | +3.6% [+1.4, +5.8] |
+| EV-RULE-MP on MP | 38.1 | -64.2% [-69.7, -55.3] | 212.4 | +0.4% [-0.5, +1.0] |
+| COOP-FULL vs COOP | 73.5 | -36.6% [-49.4, -16.6] | 219.2 | -2.7% [-3.7, -1.4] |
+
+EV-RULE-MP beats COOP-FULL on both criteria (EV delay: COOP-FULL +93%, paired
+[+58, +138], every COOP-FULL run slower; travel time: +3.2% [+1.6, +5.0]). On the district
+nothing is significant (EV delays 85-134 s for all methods, intervals of +-60 to +-120 s;
+EV-RULE-MP preempts 7 times per run there, 24 on the grid). The RQ2 statements of the
+earlier entries today ("most of the benefit of preemption without its collateral cost")
+are superseded: report sections 8.2 and 9.3 were rewritten.
+
+**Holm family.** EV-RULE-MP is a baseline, and the sensitivity and extended results add
+cells and variants; with a single family, adding results would have changed the corrected
+p-values of the report. The confirmatory family is now fixed to the core matrix and its
+variants; everything else is corrected in a separate, exploratory family (ADR-005).

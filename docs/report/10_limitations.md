@@ -9,6 +9,9 @@ The negative results below are part of the findings; each one is traced in
   4%, COOP within 7%) but systematic: paired on the same traffic, it excludes zero in most
   grid cells (section 8.1).
 - Cooperation through neighbour messages brought no gain (section 9.1, F-009).
+- For emergency vehicles, a preemption rule on top of Max-Pressure beats COOP-FULL on
+  both the emergency-vehicle delay (38 s vs 74 s) and the travel time of the other
+  traffic (section 8.2).
 - They handle an accident worse than Max-Pressure (+3 to +12% for the affected vehicles),
   having never seen one in training (section 8.4).
 - Surrogate safety measures favour Max-Pressure and actuated control: the learned agents
@@ -23,7 +26,9 @@ The negative results below are part of the findings; each one is traced in
 
 - The shield's anti-starvation and maximum-green rules act on detected demand only; a
   movement whose detectors have all failed can be starved (F-012). Field controllers put
-  failed detectors on recall; our shield does not.
+  failed detectors on recall; our shield does not. This penalises Max-Pressure, which
+  relies on the counts alone, in the sensor-fault scenario, so the robustness advantage
+  of the learned agents there is probably overstated (section 8.4).
 - Pedestrians cannot be simulated on the district: the OpenStreetMap import has sidewalks on
   4 of 112 edges (F-011).
 - Collisions occur on the district with every controller (0.2-1.0 per 90-minute run,

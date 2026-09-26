@@ -79,7 +79,8 @@
   with local metrics; core matrix complete (790 runs, 0 failed); two-way bootstrap and
   paired analysis (ADR-005); report sections 8-10 drafted (`docs/report/`).
 - Measured: IND within 4% and COOP within 7% of the best baseline in every cell, 10-20%
-  better than FT; COOP-FULL halves EV delay at +3.6% travel time vs MP (EV-RULE +36%);
+  better than FT; preemption on MP (EV-RULE-MP) cuts EV delay 64% at +0.4% travel time
+  and beats COOP-FULL (-37% vs COOP; F-013);
   CO2 follows travel time (no trade-off); IND robust to sensor faults (+1.4% vs MP +21.5%);
   zero-shot on grid8x8 at +4% from MP.
 - Problems: laptop shutdown and standby interrupted runs (resumed and verified, journal);

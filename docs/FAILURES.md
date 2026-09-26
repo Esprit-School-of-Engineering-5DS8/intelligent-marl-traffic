@@ -171,3 +171,18 @@ entries at the bottom. Negative results that belong in the report are marked **[
   failed detector is placed on recall, i.e. its movement is served every cycle as if it
   had demand. A fault-tolerant shield would do the same (a demand-independent `max_red`
   for movements with a failed detector).
+
+## F-013 - A preemption baseline built on a collapsing controller (2026-09-26) [report]
+
+- **Tried:** RQ2 compared COOP-FULL with EV-RULE, rule-based preemption on top of actuated
+  control, and reported EV-RULE's +36% travel time against Max-Pressure as the cost of
+  preemption.
+- **Evidence:** found when reviewing the draft: actuated control alone is 278.0 s at grid
+  peak against 211.6 s for Max-Pressure; preemption adds 3.6% to actuated control. The
+  same rule on Max-Pressure (EV-RULE-MP) cuts the EV delay by 64% for +0.4% of travel
+  time, and beats COOP-FULL on both criteria (38 s vs 74 s EV delay, 212 s vs 219 s).
+- **Diagnosis:** the comparison mixed the effect of the mechanism with the effect of the
+  controller it runs on, which flattered the learned agent.
+- **Fix / lesson:** EV-RULE-MP added as a baseline; every mechanism is reported against
+  its own base controller. Compare a mechanism with the same mechanism on the strongest
+  base available before crediting the learned agent.

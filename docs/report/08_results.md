@@ -20,14 +20,19 @@ p-values are optimistic, and we rely on the intervals as much as on p. Full tabl
   (the paired intervals exclude zero in most grid cells); the learned agents are never
   faster. They are 10-20% faster than fixed-time control, except at medium demand on the
   district, where every controller is within 3%.
-- With the emergency-vehicle block and reward term, COOP-FULL halves the delay of
-  emergency vehicles and costs the traffic as a whole 3.6% of travel time against
-  Max-Pressure, where the preemption rule costs 36%.
+- Emergency vehicles can be prioritised almost for free, and a simple rule does it best:
+  preemption on top of Max-Pressure cuts their delay by 64% for +0.4% of travel time.
+  COOP-FULL, which learns priority from an observation block and a reward term, halves the
+  delay compared with actuated control (-37% compared with COOP) at no cost to the other
+  traffic, but its emergency vehicles take twice as long as with the rule on Max-Pressure
+  (74 s vs 38 s).
 - CO2 follows travel time (correlation 0.93-0.99 across runs): there is no trade-off to
   trace on our networks.
-- Under sensor faults IND loses 1.4% while Max-Pressure loses 21.5%. COOP is insensitive
-  to losing up to half of its messages. The learned agents handle an accident worse than
-  Max-Pressure.
+- Under sensor faults IND loses 1.4% while Max-Pressure loses 21.5% (7.8% without one
+  collapsed episode). Part of Max-Pressure's loss comes from our shield, which cannot see a
+  movement whose detectors failed, so this advantage is probably overstated. COOP is
+  insensitive to losing up to half of its messages. The learned agents handle an accident
+  worse than Max-Pressure.
 - Policies trained on the 16-junction grid run unchanged on the 64-junction grid, 4% from
   Max-Pressure and 14% faster than fixed-time control.
 - Communication between neighbours brought no gain (section 9, FAILURES F-009).
@@ -59,7 +64,7 @@ Learned variants against the best baseline of each cell:
 - **No classical controller is best everywhere.** Actuated control is best at low and
   medium demand but breaks down at peak (31% slower than Max-Pressure); Max-Pressure is
   2.4% slower than actuated control at low demand. A single learned policy follows the
-  best of them within 4% (IND) at every level, and never breaks down.
+  best of them within 4% (IND) at every level, and never breaks down on the grid.
 - **The gap is small but systematic.** With Holm correction only the low and medium grid
   cells are significant (every learned run slower than every actuated run). Paired by
   test seed, the intervals also exclude zero at peak and on the rush profile: on the same
@@ -92,32 +97,48 @@ takes 16-47 min per run of 500 000 agent steps, with up to three runs sharing th
 
 ## 8.2 RQ2 - Can emergency vehicles be prioritised without degrading overall traffic?
 
-Grid4x4 at peak with emergency vehicles (Figure 5):
+A preemption mechanism has to be judged against its own base controller: EV-RULE runs on
+actuated control, which breaks down at peak on its own. We therefore also evaluate
+EV-RULE-MP, the same 200 m preemption rule on top of Max-Pressure (requests at the 5-s
+decision interval, through the same shield as the learned agents).
 
-| Method | EV delay (s) | Travel time, all vehicles (s) | Travel time vs MP, paired |
-|---|---|---|---|
-| FT | 154.7 | 261.6 | |
-| ACT | 149.8 | 278.0 | |
-| MP | 106.3 | 211.6 | reference |
-| EV-RULE (preemption on top of ACT) | **58.2** [44.9, 69.8] | 288.1 | +36.2% [+30.0, +42.2] |
-| COOP | 115.9 [100.5, 131.3] | 225.3 | |
-| COOP-FULL | 73.5 [58.8, 96.5] | 219.2 | **+3.6% [+2.1, +5.1]** |
+Grid4x4 at peak with emergency vehicles (Figure 5). Paired differences are against the
+controller the mechanism is built on:
 
-- COOP-FULL halves the emergency-vehicle delay compared with actuated control (-50.9%,
-  paired [-67.4, -21.9]) and cuts it by 37% compared with COOP (paired [-49.4, -16.6]).
-- The preemption rule remains faster for the emergency vehicle (COOP-FULL +26%, paired
-  [-3, +70], Holm p = 0.69), but it runs on actuated control and costs the traffic as a
-  whole 36% of travel time against Max-Pressure. COOP-FULL costs 3.6%: most of the benefit
-  of preemption, without its collateral cost.
-- The mechanism is the observation block and the reward term, not an override (Figure
-  12): an emergency vehicle is in detection range for 0.7% of COOP-FULL's decisions, but
-  shuffling that block changes 40% of those decisions and raises the EV delay from 64 to
-  112 s (+75%), back to COOP's level, while travel time moves by 0.7%.
+| Method | Built on | EV delay (s) [CI] | Travel time, all vehicles (s) | EV delay vs base | Travel time vs base |
+|---|---|---|---|---|---|
+| FT | | 154.7 | 261.6 | | |
+| ACT | | 149.8 | 278.0 | | |
+| MP | | 106.3 | **211.6** | | |
+| COOP | | 115.9 | 225.3 | | |
+| EV-RULE | ACT | 58.2 [44.9, 69.8] | 288.1 | -61.1% [-68.8, -50.2] | +3.6% [+1.4, +5.8] |
+| EV-RULE-MP | MP | **38.1** [34.7, 41.2] | 212.4 | -64.2% [-69.7, -55.3] | +0.4% [-0.5, +1.0] |
+| COOP-FULL | COOP | 73.5 [58.8, 96.5] | 219.2 | -36.6% [-49.4, -16.6] | -2.7% [-3.7, -1.4] |
+
+- Rule-based preemption cuts the emergency-vehicle delay by 61-64% compared with its base
+  controller, for +3.6% of travel time on actuated control and +0.4% (not significant)
+  on Max-Pressure. The 36% gap between EV-RULE and Max-Pressure is the breakdown of
+  actuated control at peak, not the cost of preemption (FAILURES F-013).
+- COOP-FULL learns part of this behaviour: -37% EV delay compared with COOP, with no cost
+  to the other traffic. COOP-FULL differs from COOP in more than the emergency-vehicle
+  block (all observation blocks, person-weighted reward), so COOP is only an approximate
+  base.
+- Head-to-head, the rule on Max-Pressure is better on both criteria: EV delay 38.1 s
+  against 73.5 s (COOP-FULL +93%, paired [+58, +138], every COOP-FULL run slower) and
+  travel time 212.4 s against 219.2 s (COOP-FULL +3.2%, paired [+1.6, +5.0]).
+- **Answer to RQ2:** yes - emergency vehicles can be prioritised almost without degrading
+  the other traffic, and the most effective way we found is a simple preemption rule on
+  the best base controller. The learned policy achieves part of it.
+- The learned mechanism is the observation block and the reward term, not an override
+  (Figure 12): an emergency vehicle is in detection range for 0.7% of COOP-FULL's
+  decisions, but shuffling that block changes 40% of those decisions and raises the EV
+  delay from 64 to 112 s (+75%), back to COOP's level, while travel time moves by 0.7%.
 - On the district the question stays open: 3-5 emergency vehicles per run, whose routes
-  cross 1-2 of the 7 signals (journal, 2026-09-25), give intervals of +-60 to +-120 s. The
-  means order as COOP-FULL 85.2, COOP 94.5, ACT 95.1, EV-RULE 99.1, MP 119.4, FT 133.6 s,
-  with no significant difference; costs to the other vehicles vs MP are +4.4% [-3.6,
-  +11.2] for EV-RULE and +0.1% [-9.6, +9.7] for COOP-FULL.
+  cross 1-2 of the 7 signals (EV-RULE-MP preempts 7 times per run, against 24 on the
+  grid), give intervals of +-60 to +-120 s. The mean EV delays are COOP-FULL 85.2, COOP
+  94.5, ACT 95.1, EV-RULE 99.1, EV-RULE-MP 112.6, MP 119.4 and FT 133.6 s, with no
+  significant difference; preemption costs +1.3% (EV-RULE vs ACT) and +1.4% (EV-RULE-MP
+  vs MP) of travel time, both not significant.
 
 ## 8.3 RQ3 - What is the trade-off between travel time and CO2?
 
@@ -172,11 +193,16 @@ time compared with its own runs without faults, paired:
 | COOP | 224.6 | 247.7 | +10.3% [+2.4, +25.4] |
 
 Under faults IND is 13.7% faster than MP (paired [-30.6, -0.4]). Max-Pressure chooses
-phases from the counts alone; on one test seed it collapses (359 s, 18 teleports,
-189 unfinished vehicles), because a movement whose detectors read 0 exerts no pressure and
-the shield's anti-starvation rule only sees detected demand (FAILURES F-012). IND keeps a
-steady switching rhythm and does not depend on any single count. COOP's loss comes from
-one training run (t2: +23%; t1, t3: +2-3%).
+phases from the counts alone. On one test seed it collapses (359 s, 18 teleports,
+189 unfinished vehicles, a maximum wait of 1 762 s); on the other four it loses 4-15%
+(7.8% on average), against 0.7-1.9% for IND on every seed. Part of this loss, and most
+likely the collapse, comes from our shield rather than from Max-Pressure itself: its
+anti-starvation and maximum-green rules only see detected demand, so a movement whose
+detectors all read 0 can wait indefinitely (FAILURES F-012). Field controllers place failed
+detectors on recall and serve their movement every cycle; with such a fallback
+Max-Pressure would lose less, and the robustness advantage of the learned agents is
+probably overstated here. IND keeps a steady switching rhythm and does not depend on any
+single count. COOP's loss comes from one training run (t2: +23%; t1, t3: +2-3%).
 
 **Communication failures.** Losing 10%, 30% or 50% of the neighbour messages (the receiver
 keeps the last message received) changes COOP's travel time by +0.5% each time (paired on
@@ -236,7 +262,10 @@ against 98 s for MP and 143-150 s for FT and ACT.
 
 Each observation block is shuffled between decisions (test seeds 0-4); we count how
 often the chosen phase changes, among the decisions where the block is non-zero, and
-replay episodes with the block shuffled.
+replay episodes with the block shuffled. The replays use one training run of each
+variant (t1, the checkpoint `seed1.zip`): its baseline values differ from the means over
+three training runs in sections 8.1-8.2 (COOP-FULL t1: EV delay 64 s, against 73.5 s for
+the three runs; COOP t1: 221 s at peak, against 224.6 s).
 
 | Block | COOP: decisions changed | COOP: travel time | COOP-FULL: decisions changed | COOP-FULL: travel time | COOP-FULL: EV delay |
 |---|---|---|---|---|---|
