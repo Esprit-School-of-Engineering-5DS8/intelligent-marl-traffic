@@ -483,3 +483,25 @@ are superseded: report sections 8.2 and 9.3 were rewritten.
 cells and variants; with a single family, adding results would have changed the corrected
 p-values of the report. The confirmatory family is now fixed to the core matrix and its
 variants; everything else is corrected in a separate, exploratory family (ADR-005).
+
+## 2026-09-27 - PED-RULE-MP: a pedestrian-aware reference
+
+COOP-FULL's pedestrian result (-29% mean wait against MP) was measured against baselines
+that choose phases from vehicle counts only. We added PED-RULE-MP: Max-Pressure, plus a
+crossing whose longest-waiting pedestrian has waited more than 30 s requests its green at
+the next decision (threshold from the Highway Capacity Manual's impatience delay, set in
+`configs/protocol.yaml` before any run; `controllers/pedestrian_rule.py`). 5 runs on the
+pedestrian cell of the core matrix, none failed.
+
+| Method | mean ped. wait (s) | longest ped. wait (s) | vehicle travel time (s) |
+|---|---|---|---|
+| MP | 17.7 | 176.8 | 164.7 |
+| PED-RULE-MP | 16.4 | 109.0 | 164.8 |
+| COOP-FULL | 12.5 | 114.9 | 169.1 |
+
+Paired: PED-RULE-MP vs MP -7.3% mean wait [-12.4, -1.4], -38.3% longest wait
+[-50.4, -22.4], +0.1% travel time [-0.7, +0.9]; COOP-FULL vs PED-RULE-MP -23.8% mean
+wait [-28.1, -18.2], +2.6% travel time [+1.3, +5.1], +7.2% person-weighted vehicle delay
+[+3.6, +14.0]. The rule caps the long waits for free; COOP-FULL shortens the typical wait
+and pays in vehicle time. With one threshold we cannot say whether a shorter one would
+dominate COOP-FULL. Report section 8.7 rewritten.

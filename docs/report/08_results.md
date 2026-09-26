@@ -30,11 +30,11 @@ p-values are optimistic, and we rely on the intervals as much as on p. Full tabl
   whose detectors failed, so this advantage is probably overstated. They transfer
   unchanged from 16 to 64 junctions, 4% from Max-Pressure and 14% faster than fixed-time
   control.
-- With pedestrian and emergency-vehicle terms, COOP-FULL lowers the pedestrian wait by 29%
-  compared with Max-Pressure (19% compared with COOP) and the EV delay by 37% compared
-  with COOP, without slowing the other traffic compared with COOP - but the pedestrian
-  gain is measured against baselines that ignore pedestrians, and a simple rule does
-  better for emergency vehicles. CO2 follows travel time (correlation 0.93-0.99): there is no
+- With pedestrian and emergency-vehicle terms, COOP-FULL lowers the mean pedestrian wait
+  by 24% compared with a pedestrian rule on Max-Pressure, at +2.6% of vehicle travel
+  time, while the rule caps the longest waits as well at no vehicle cost: two points of
+  the same trade-off, neither dominated. For emergency vehicles the rule on Max-Pressure
+  does better (F-013). CO2 follows travel time (correlation 0.93-0.99): there is no
   trade-off to trace.
 - Neither communication between neighbours (F-009) nor a different reward (F-007) closed
   the gap; the learned agents also handle an accident worse than Max-Pressure.
@@ -244,27 +244,35 @@ of the Poisson noise floor, while a 10-minute moving average does almost as well
 
 ## 8.7 People: pedestrians and buses (grid4x4, medium; Figure 11)
 
-| Method | Pedestrian wait (s) | Vehicle travel time (s) | Bus delay (s) | Person-weighted delay, bus scenario (s) |
-|---|---|---|---|---|
-| FT | 14.1 | 186.9 | 84.4 | 77.1 |
-| ACT | 15.8 | 174.2 | **46.4** | **52.3** |
-| MP | 17.7 | **164.7** | 49.0 | 52.7 |
-| COOP | 15.4 | 168.0 | 51.9 | 56.0 |
-| COOP-FULL | **12.5** | 169.1 | 49.8 | 55.8 |
+| Method | Mean pedestrian wait (s) | Longest pedestrian wait (s) | Vehicle travel time (s) | Bus delay (s) | Person-weighted delay, bus scenario (s) |
+|---|---|---|---|---|---|
+| FT | 14.1 | **85.2** | 186.9 | 84.4 | 77.1 |
+| ACT | 15.8 | 159.2 | 174.2 | **46.4** | **52.3** |
+| MP | 17.7 | 176.8 | **164.7** | 49.0 | 52.7 |
+| PED-RULE-MP | 16.4 | 109.0 | 164.8 | - | - |
+| COOP | 15.4 | 164.1 | 168.0 | 51.9 | 56.0 |
+| COOP-FULL | **12.5** | 114.9 | 169.1 | 49.8 | 55.8 |
 
+The classical baselines choose phases from vehicle counts only (fixed-time serves every
+crossing once per cycle; for Max-Pressure, as for the learned agents, the shield serves a
+crossing that has stayed red for 90 s while pedestrians wait). As for emergency vehicles
+(section 8.2), we therefore compare COOP-FULL with a rule on Max-Pressure: PED-RULE-MP
+serves a crossing once a pedestrian has waited 30 s, the delay above which the Highway
+Capacity Manual expects pedestrians to become impatient (threshold fixed before any run).
+
+- PED-RULE-MP shortens the longest waits by 38% compared with MP (paired [-50.4, -22.4])
+  and the mean wait by 7% ([-12.4, -1.4]), at no cost to vehicles (+0.1% [-0.7, +0.9]).
 - COOP-FULL, which observes waiting pedestrians and includes their wait in its reward,
-  cuts the mean pedestrian wait by 29% compared with MP (paired [-32.1, -26.4]) for 2.7%
-  more vehicle travel time ([+1.3, +5.0]); its longest pedestrian waits are also shorter
-  (115 s vs 177 s).
-- The person-weighted reward (30 persons per bus) lowers COOP-FULL's bus delay by 4% compared
-  with COOP (paired [-9.4, +1.5], not significant), but not below the classical controllers.
-- **Fairness.** None of the baselines uses pedestrian demand to choose phases: fixed-time
-  serves every crossing once per cycle, actuated control and Max-Pressure respond to
-  vehicles only (for Max-Pressure, as for the learned agents, the shield serves a crossing
-  that has stayed red for 90 s while pedestrians wait). COOP-FULL's -29% therefore shows what a
-  pedestrian-aware objective buys, not that learning is needed for it; the fair reference
-  would be a pedestrian rule on Max-Pressure (serve a crossing when its pedestrians have
-  waited more than a threshold), as EV-RULE-MP is for emergency vehicles (section 10).
+  keeps a lower mean pedestrian wait: -29% compared with MP ([-32.1, -26.4]) and -24%
+  compared with PED-RULE-MP ([-28.1, -18.2]), with longest waits similar to the rule's
+  (115 s vs 109 s). It costs 2.6% of vehicle travel time compared with PED-RULE-MP
+  ([+1.3, +5.1]) and 7.2% of person-weighted vehicle delay ([+3.6, +14.0]).
+- The two sit at different points of the pedestrian-vehicle trade-off; neither dominates.
+  With a single threshold, fixed in advance, we cannot say whether a rule with a shorter
+  threshold would match COOP-FULL's mean wait at a smaller vehicle cost.
+- The person-weighted reward (30 persons per bus) lowers COOP-FULL's bus delay by 4%
+  compared with COOP (paired [-9.4, +1.5], not significant), but not below the classical
+  controllers.
 
 ## 8.8 Adaptivity: rush-hour profile (Figure 7)
 

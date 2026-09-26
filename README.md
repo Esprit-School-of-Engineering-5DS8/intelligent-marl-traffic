@@ -118,8 +118,9 @@ Mean travel time (s), normal traffic (lower is better; best in bold):
 - Under sensor faults the learned IND agent loses 1.4% of travel time, Max-Pressure 21.5%
   (partly because our safety shield cannot see a movement whose detectors failed).
 - The policy trained on 16 junctions runs unchanged on 64, at 4% from Max-Pressure.
-- COOP-FULL lowers pedestrian waits by 29% compared with Max-Pressure, but all the
-  baselines ignore pedestrians.
+- Pedestrians: COOP-FULL lowers the mean pedestrian wait by 24% compared with a
+  pedestrian rule on Max-Pressure, at +2.6% of vehicle travel time; the rule caps the
+  longest waits at no vehicle cost.
 - What did not work: messages between neighbouring agents (F-009) and reward redesign
   (F-007) did not close the gap; the learned agents handle accidents worse than
   Max-Pressure (`docs/FAILURES.md`).
