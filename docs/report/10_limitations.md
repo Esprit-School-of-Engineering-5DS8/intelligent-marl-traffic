@@ -12,6 +12,11 @@ The negative results below are part of the findings; each one is traced in
 - For emergency vehicles, a preemption rule on top of Max-Pressure beats COOP-FULL on
   both the emergency-vehicle delay (38 s vs 74 s) and the travel time of the other
   traffic (section 8.2).
+- Max-Pressure, not the learned policy, is the best single controller across demand
+  levels (best in 4 of 6 cells, within 2.4% in all).
+- COOP-FULL's pedestrian gain (-29% wait against Max-Pressure) is measured against
+  baselines that ignore pedestrians; a pedestrian rule on top of Max-Pressure, the fair
+  reference, has not been evaluated (section 8.7).
 - They handle an accident worse than Max-Pressure (+3 to +12% for the affected vehicles),
   having never seen one in training (section 8.4).
 - Surrogate safety measures favour Max-Pressure and actuated control: the learned agents

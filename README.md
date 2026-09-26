@@ -104,10 +104,13 @@ Mean travel time (s), normal traffic (lower is better; best in bold):
 | district, peak | 196.8 | 158.3 | **153.4** | 158.4 | 159.5 |
 | grid8x8, peak (trained on grid4x4) | 365.5 | - | **300.7** | 312.7 | 313.1 |
 
-- One learned policy stays within 4% (IND) or 7% (COOP) of the best classical controller
-  at every demand level, although that controller changes with the demand; it is
-  consistently a little slower, never faster. It is 10-20% faster than fixed-time control,
-  except at medium demand on the district (3%), where all controllers are close.
+- On these networks Max-Pressure plus simple rules remains the best controller:
+  Max-Pressure is best in 4 of 6 cells and within 2.4% of the best in all. The learned
+  agents are 0.2-4% (IND) and 0.4-7% (COOP) slower than the best controller of each cell,
+  never faster, so they are not better generalists than Max-Pressure.
+- The learned agents clearly beat fixed-time control (10-20%, 3% at district medium) and
+  actuated control where it breaks down (-21% at grid peak); actuated control stays 2-4%
+  better at low and medium demand.
 - Emergency vehicles: a preemption rule on top of Max-Pressure cuts their delay by 64% for
   +0.4% of travel time; the learned COOP-FULL cuts it by 37% compared with COOP, at no
   cost to the other traffic, but less than the rule.
@@ -115,7 +118,13 @@ Mean travel time (s), normal traffic (lower is better; best in bold):
 - Under sensor faults the learned IND agent loses 1.4% of travel time, Max-Pressure 21.5%
   (partly because our safety shield cannot see a movement whose detectors failed).
 - The policy trained on 16 junctions runs unchanged on 64, at 4% from Max-Pressure.
-- What did not work: messages between neighbouring agents brought no gain; the learned
-  agents handle accidents worse than Max-Pressure (`docs/FAILURES.md`).
+- COOP-FULL lowers pedestrian waits by 29% compared with Max-Pressure, but all the
+  baselines ignore pedestrians.
+- What did not work: messages between neighbouring agents (F-009) and reward redesign
+  (F-007) did not close the gap; the learned agents handle accidents worse than
+  Max-Pressure (`docs/FAILURES.md`).
+- Contribution: a fair, reproducible benchmark (same shield, seeds, statistics and base
+  controllers for every method) and the diagnosis of why learning does not beat
+  Max-Pressure here (F-007, F-009, F-013).
 
 ![Travel time by demand level](figures/fig02_travel_time_by_demand.png)

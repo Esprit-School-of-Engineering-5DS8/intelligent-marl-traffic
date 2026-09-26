@@ -14,28 +14,34 @@ p-values are optimistic, and we rely on the intervals as much as on p. Full tabl
 
 **In short.**
 
-- One learned policy, trained once, stays close to the best classical controller at
-  every demand level, although that controller changes with the demand: IND is 0.2-4.0%
-  slower than the best baseline of each cell, COOP 0.4-6.9%. The gap is small but real
-  (the paired intervals exclude zero in most grid cells); the learned agents are never
-  faster. They are 10-20% faster than fixed-time control, except at medium demand on the
-  district, where every controller is within 3%.
-- Emergency vehicles can be prioritised almost for free, and a simple rule does it best:
-  preemption on top of Max-Pressure cuts their delay by 64% for +0.4% of travel time.
-  COOP-FULL, which learns priority from an observation block and a reward term, halves the
-  delay compared with actuated control (-37% compared with COOP) at no cost to the other
-  traffic, but its emergency vehicles take twice as long as with the rule on Max-Pressure
-  (74 s vs 38 s).
-- CO2 follows travel time (correlation 0.93-0.99 across runs): there is no trade-off to
-  trace on our networks.
-- Under sensor faults IND loses 1.4% while Max-Pressure loses 21.5% (7.8% without one
-  collapsed episode). Part of Max-Pressure's loss comes from our shield, which cannot see a
-  movement whose detectors failed, so this advantage is probably overstated. COOP is
-  insensitive to losing up to half of its messages. The learned agents handle an accident
-  worse than Max-Pressure.
-- Policies trained on the 16-junction grid run unchanged on the 64-junction grid, 4% from
-  Max-Pressure and 14% faster than fixed-time control.
-- Communication between neighbours brought no gain (section 9, FAILURES F-009).
+- On these networks, Max-Pressure plus simple rules remains the best controller.
+  Max-Pressure is the best baseline in 4 of the 6 main cells and within 2.4% of the best
+  in all of them; the learned agents are 0.2-4.0% (IND) and 0.4-6.9% (COOP) slower than
+  the best baseline of each cell and never faster, so a learned policy is not a better
+  generalist than Max-Pressure. For emergency vehicles, a preemption rule on top of
+  Max-Pressure cuts their delay by 64% for +0.4% of travel time and beats the learned
+  COOP-FULL (74 s vs 38 s; FAILURES F-013).
+- The learned agents clearly beat fixed-time control (10-20% shorter travel times, 3% at
+  medium demand on the district) and actuated control where it breaks down (-21% at grid
+  peak, -5% on the rush profile); actuated control remains 2-4% better at low and medium
+  demand on the grid.
+- They are more robust to sensor faults than Max-Pressure (IND +1.4% against +21.5%;
+  +7.8% without one collapsed episode), partly because our shield cannot see a movement
+  whose detectors failed, so this advantage is probably overstated. They transfer
+  unchanged from 16 to 64 junctions, 4% from Max-Pressure and 14% faster than fixed-time
+  control.
+- With pedestrian and emergency-vehicle terms, COOP-FULL lowers the pedestrian wait by 29%
+  compared with Max-Pressure (19% compared with COOP) and the EV delay by 37% compared
+  with COOP, without slowing the other traffic compared with COOP - but the pedestrian
+  gain is measured against baselines that ignore pedestrians, and a simple rule does
+  better for emergency vehicles. CO2 follows travel time (correlation 0.93-0.99): there is no
+  trade-off to trace.
+- Neither communication between neighbours (F-009) nor a different reward (F-007) closed
+  the gap; the learned agents also handle an accident worse than Max-Pressure.
+- Our contribution is therefore a fair, reproducible benchmark - the same shield, seeds,
+  statistics and base controllers for every method, each mechanism compared with the same
+  mechanism on the strongest base - and the diagnosis of why learning does not beat
+  Max-Pressure here (F-007, F-009, F-013).
 
 ## 8.1 RQ1 - Do cooperative agents outperform independent agents and classical controllers?
 
@@ -61,10 +67,12 @@ Learned variants against the best baseline of each cell:
 | district, medium | MP 109.4 [109.1, 109.8] | 109.7 [109.2, 110.3] | +0.2% [-0.2, +0.8] | 109.9 [109.4, 110.3] | +0.4% [+0.0, +0.8] | 1 / 1 |
 | district, peak | MP 153.4 [143.2, 164.0] | 158.4 [145.9, 170.1] | +3.2% [-4.0, +9.8] | 159.5 [143.8, 176.1] | +3.9% [-4.7, +15.8] | 1 / 1 |
 
-- **No classical controller is best everywhere.** Actuated control is best at low and
-  medium demand but breaks down at peak (31% slower than Max-Pressure); Max-Pressure is
-  2.4% slower than actuated control at low demand. A single learned policy follows the
-  best of them within 4% (IND) at every level, and never breaks down on the grid.
+- **Max-Pressure is the best single controller.** It is the best baseline in 4 of the 6
+  cells and within 2.4% of the best in all of them: actuated control is 2.4% and 0.4%
+  faster at low and medium demand but breaks down at peak (31% slower than Max-Pressure).
+  A single learned policy also covers every demand level and never breaks down on the
+  grid, but at 0.2-4.0% (IND) from the best baseline of each cell it is not a better
+  generalist than Max-Pressure.
 - **The gap is small but systematic.** With Holm correction only the low and medium grid
   cells are significant (every learned run slower than every actuated run). Paired by
   test seed, the intervals also exclude zero at peak and on the rush profile: on the same
@@ -250,6 +258,13 @@ of the Poisson noise floor, while a 10-minute moving average does almost as well
   (115 s vs 177 s).
 - The person-weighted reward (30 persons per bus) lowers COOP-FULL's bus delay by 4% compared
   with COOP (paired [-9.4, +1.5], not significant), but not below the classical controllers.
+- **Fairness.** None of the baselines uses pedestrian demand to choose phases: fixed-time
+  serves every crossing once per cycle, actuated control and Max-Pressure respond to
+  vehicles only (for Max-Pressure, as for the learned agents, the shield serves a crossing
+  that has stayed red for 90 s while pedestrians wait). COOP-FULL's -29% therefore shows what a
+  pedestrian-aware objective buys, not that learning is needed for it; the fair reference
+  would be a pedestrian rule on Max-Pressure (serve a crossing when its pedestrians have
+  waited more than a threshold), as EV-RULE-MP is for emergency vehicles (section 10).
 
 ## 8.8 Adaptivity: rush-hour profile (Figure 7)
 
