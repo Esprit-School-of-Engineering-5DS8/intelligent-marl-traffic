@@ -18,8 +18,8 @@ import pandas as pd
 
 from cotraffic import config
 from cotraffic.paths import RESULTS_DIR
+from cotraffic.seeds import FORECAST_SEED_BASE
 
-FORECAST_SEED_BASE = 6000
 DATA_DIR = RESULTS_DIR / "forecasting"
 
 

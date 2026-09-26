@@ -25,10 +25,11 @@ import yaml
 
 from cotraffic import config
 from cotraffic.controllers.classical import MaxPressure
-from cotraffic.envs.episodes import TRAINING_SEED_BASE, unsupported
+from cotraffic.envs.episodes import unsupported
 from cotraffic.envs.simulation import Episode
 from cotraffic.envs.traffic_env import CoTrafficEnv
 from cotraffic.paths import CONFIG_DIR
+from cotraffic.seeds import TRAINING_SEED_BASE
 
 TERMS = ("wait", "queue", "pressure", "co2", "ev", "ped")
 

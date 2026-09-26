@@ -53,3 +53,24 @@ def test_unknown_options_are_rejected():
 def test_missing_config_fails_loudly():
     with pytest.raises(FileNotFoundError):
         config.load("networks", "does_not_exist")
+
+
+def test_seed_ranges_are_enforced():
+    from cotraffic.evaluation.matrix import expand
+    from cotraffic.seeds import TEST_SEEDS, VALIDATION_SEEDS, check_seeds
+
+    assert not set(TEST_SEEDS) & set(VALIDATION_SEEDS)
+    check_seeds([0, 4, 999], TEST_SEEDS, "evaluation")
+    with pytest.raises(ValueError, match="validation seeds"):
+        check_seeds([1000, 3], VALIDATION_SEEDS, "validation")
+    with pytest.raises(ValueError, match="evaluation seeds"):
+        expand({"seeds": [0, 1000], "cells": []})
+
+
+def test_every_config_uses_its_own_seed_range():
+    from cotraffic.seeds import TEST_SEEDS, VALIDATION_SEEDS, check_seeds
+
+    for name in config.available("agents"):
+        check_seeds(config.load_agent(name)["validation"]["seeds"], VALIDATION_SEEDS, name)
+    for name in config.available("experiments"):
+        check_seeds(config.load("experiments", name)["seeds"], TEST_SEEDS, name)

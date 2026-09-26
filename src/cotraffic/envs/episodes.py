@@ -1,11 +1,8 @@
 """What each environment reset simulates.
 
-Seed ranges are disjoint by construction:
-
-* test (evaluation) seeds: 0-999, chosen in the experiment configs
-* validation seeds (checkpoint selection): 1000-1999
-* training seeds: a fixed pool starting at 100000, shared by every variant so that
-  all variants see the same training demand.
+Seed ranges are disjoint (``cotraffic.seeds``); the training pool starts at
+``TRAINING_SEED_BASE`` and is shared by every variant so that all variants see the same
+training demand.
 """
 
 from __future__ import annotations
@@ -20,11 +17,10 @@ from cotraffic import config
 from cotraffic.demand.generator import DemandRequest, generate
 from cotraffic.envs.simulation import Episode
 from cotraffic.networks.build import ensure_network
+from cotraffic.seeds import TRAINING_SEED_BASE
 
 ROUTE_KEYS = ("incident", "emergency", "pedestrians", "buses")
 RUNTIME_KEYS = ("sensor_noise", "comm_dropout")
-TRAINING_SEED_BASE = 100_000
-VALIDATION_SEED_BASE = 1_000
 
 
 def split_scenarios(names: Iterable[str]) -> tuple[tuple[str, ...], tuple[str, ...]]:

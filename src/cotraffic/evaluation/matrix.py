@@ -22,6 +22,7 @@ from typing import Any
 from cotraffic import config
 from cotraffic.controllers.registry import BASELINES
 from cotraffic.paths import CHECKPOINTS_DIR, LOGS_DIR, RAW_DIR, RESULTS_DIR
+from cotraffic.seeds import TEST_SEEDS, check_seeds
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ def expand(exp: dict[str, Any]) -> tuple[list[RunSpec], list[str]]:
     specs, warnings = [], []
     quick = bool(exp.get("quick", False))
     seeds = [int(s) for s in exp["seeds"]]
+    check_seeds(seeds, TEST_SEEDS, "evaluation")
     for cell in exp["cells"]:
         network = cell["network"]
         trained_on = cell.get("checkpoint_network", network)

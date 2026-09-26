@@ -18,6 +18,7 @@ import numpy as np
 
 from cotraffic import config
 from cotraffic.paths import CHECKPOINTS_DIR, TRAINING_DIR
+from cotraffic.seeds import VALIDATION_SEEDS, check_seeds
 from cotraffic.training.train import list_checkpoints, run_dir
 
 
@@ -46,6 +47,7 @@ def _validate(args: tuple[str, str, str, int, str, int]) -> tuple[int, str, int,
 def select_checkpoint(agent: str, network: str, seed: int, jobs: int = 2) -> Path:
     cfg = config.load_agent(agent)
     val = cfg["validation"]
+    check_seeds(val["seeds"], VALIDATION_SEEDS, "validation")
     folder = run_dir(agent, network, seed)
     ckpts = list_checkpoints(folder / "checkpoints")[-int(val["last_checkpoints"]) :]
     if not ckpts:
@@ -120,6 +122,7 @@ def validation_table(
 
     from cotraffic.paths import RESULTS_DIR
 
+    check_seeds(val_seeds, VALIDATION_SEEDS, "validation")
     demands = config.load_agent("base")["validation"]["demands"]
     tasks = []
     for agent in agents:
