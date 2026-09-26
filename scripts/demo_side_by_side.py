@@ -1,9 +1,11 @@
 """Two sumo-gui windows side by side, same demand and events, two controllers.
 
-Default: the real district at peak with emergency vehicles, EV-RULE (actuated control
-with rule-based preemption) on the left and COOP-FULL on the right. Record the screen.
+Default: the real district at peak with emergency vehicles, fixed-time signals (the
+status quo) on the left and COOP-FULL on the right. Record the screen. For the strongest
+classical controller use ``--left mp``, or ``--left ev_rule_mp`` for Max-Pressure with
+emergency-vehicle preemption (report, section 8.2).
 
-    python scripts/demo_side_by_side.py [--left ev_rule] [--right coop_full]
+    python scripts/demo_side_by_side.py [--left ft] [--right coop_full]
         [--checkpoint results/checkpoints/coop_full/real_district/seed1.zip]
         [--net real_district] [--demand peak] [--scenarios emergency] [--seed 3]
 
@@ -16,7 +18,7 @@ import argparse
 import multiprocessing as mp
 from pathlib import Path
 
-BASELINES = ("ft", "act", "mp", "ev_rule")
+from cotraffic.controllers.registry import BASELINES
 
 
 def run(
@@ -68,7 +70,7 @@ def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--left", default="ev_rule")
+    parser.add_argument("--left", default="ft")
     parser.add_argument("--right", default="coop_full")
     parser.add_argument(
         "--checkpoint", default="results/checkpoints/coop_full/real_district/seed1.zip"
