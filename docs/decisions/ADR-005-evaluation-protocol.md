@@ -39,10 +39,14 @@ same car demand, so differences between scenarios are paired.
 (checkpoint selection), Webster tuning and demand calibration 5000-5999, training from
 100000. No method is ever tuned on an evaluation seed.
 
-**Statistics.** Mean and bootstrap 95% CI over the 5 seeds; each learning method against
-the best baseline of the cell with a Mann-Whitney U test, Holm correction over the
-family of comparisons, and Cliff's delta as effect size; relative improvement against FT
-and MP.
+**Statistics.** Mean and bootstrap 95% CI. A baseline has one run per test seed (5); a
+learned method has a training-run x test-seed table (3 x 5), and its CI resamples both
+factors as clusters (two-way bootstrap), so it includes the variation between training
+runs. Each learning method is compared with the best baseline of the cell by a
+Mann-Whitney U test with Holm correction over the family of comparisons, Cliff's delta as
+effect size, and a paired analysis: method minus baseline on the same test seed, with the
+same two-way bootstrap (it removes the traffic of the seed, which dominates on the real
+district). Relative improvement against FT and MP.
 
 **Traceability.** Every result row stores method, variant, network, scenario, demand,
 seed, checkpoint and git commit (with `-dirty` when uncommitted changes were present).
@@ -59,3 +63,8 @@ seed, checkpoint and git commit (with `-dirty` when uncommitted changes were pre
   seeds = 15 runs) against the best baseline of each cell (5 runs), where the smallest
   p-value is about 1.3e-4. For every comparison we report the effect size (Cliff's delta)
   and the confidence intervals, and we do not claim a difference the test does not support.
+- The Mann-Whitney test treats the 15 runs of a learned method as independent although
+  they come from 3 training runs, so its p-values are optimistic. Conclusions with
+  Cliff's delta = +-1 (complete separation) are unaffected; for the others we rely on the
+  two-way intervals and the paired analysis (decided 2026-09-26, after the first core
+  results: the ordinary bootstrap gave learned methods intervals up to twice too narrow).

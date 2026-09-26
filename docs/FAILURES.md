@@ -120,6 +120,15 @@ entries at the bottom. Negative results that belong in the report are marked **[
 - **Lesson:** communication is only worth its cost when neighbours know something the
   local detectors cannot see soon enough - longer links, several phases, or events outside
   the detection range. The comm-dropout and district results test the same question.
+- **Confirmed (2026-09-26):** losing 10-50% of the messages changes COOP's travel time by
+  +0.5% (paired on training run and test seed, CI within +-2%), and shuffling the message
+  block changes 7% of COOP's decisions with no effect on travel time (fig. 12). In the
+  9 cells where both were run, COOP is between 0.1% faster and 12% slower than IND (the
+  district and grid8x8 included), and never better than the best baseline. We keep the
+  COOP results as they are (no retraining).
+- **Future work:** learned, selective communication - attention over the neighbours'
+  messages (e.g. graph attention, as in CoLight, Wei et al. 2019), so that an agent can
+  weight the neighbours that matter, instead of a fixed concatenation of all messages.
 
 ## F-010 - An incident that did not disturb anything (2026-09-25)
 
@@ -145,3 +154,20 @@ entries at the bottom. Negative results that belong in the report are marked **[
   runs retrained (about 1.5 h of compute lost). Look at what a scenario does to the
   simulation before training on it - the symptom (a flat training curve) appeared far from
   the cause.
+
+## F-012 - The anti-starvation rule only protects movements it can see (2026-09-26) [report]
+
+- **Tried:** sensor-fault scenario (20% of lane detectors report 0) with every controller
+  behind the same safety shield.
+- **Evidence:** Max-Pressure, evaluation seed 3: 359 s mean travel time (199 s without
+  faults), 18 teleports, a maximum wait of 1 762 s, and 0 anti-starvation interventions.
+- **Diagnosis:** the shield serves a movement that has been red longer than `max_red` only if
+  it has *detected* demand, and ends a green at `max_green` only if another phase has
+  detected demand. A movement whose detectors have all failed is invisible to both rules
+  and to Max-Pressure. The learned agents are less affected because they switch at a steady
+  rhythm.
+- **Fix / lesson:** we keep the shield as it is so that every result uses the same rules,
+  and discuss this in the report. Field controllers handle it with detector diagnostics: a
+  failed detector is placed on recall, i.e. its movement is served every cycle as if it
+  had demand. A fault-tolerant shield would do the same (a demand-independent `max_red`
+  for movements with a failed detector).

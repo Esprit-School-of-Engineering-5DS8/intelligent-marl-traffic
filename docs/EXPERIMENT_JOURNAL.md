@@ -275,3 +275,181 @@ Consequences and decisions:
 - The 7 district training runs made so far were discarded and all 9 are retrained with the
   corrected scales, so IND, COOP and COOP-FULL are comparable. The grids are unaffected
   (sidewalks and crossings on every edge).
+
+## 2026-09-26 - Interrupted jobs resumed
+
+The laptop shut down on 2026-09-25 at about 13:00 while two batches were running. Both were
+restarted on 2026-09-26 at 17:09 with the same commands, which resume by design.
+
+- **Core evaluation** (`evaluate --experiment core`) had finished 197 of its 310 runs. A
+  result file is written only when a run completes, so the restart skipped the finished
+  runs and redid the 3 runs that were in progress (their working folders in `results/tmp`
+  were incomplete and unused).
+- **District training**: COOP-FULL seed 2 had reached 483 840 agent steps, IND seed 3
+  85 680, COOP seed 3 75 600; COOP-FULL seed 3 had not started. Each run resumed from its
+  latest checkpoint (449 946 steps for COOP-FULL seed 2, 49 994 for IND and COOP seed 3)
+  with the saved policy and optimiser state; the resumed session draws its training
+  episodes from the same demand pool (seeds 100000-100049).
+
+Checks before evaluating these runs (`results/training/*/real_district/`):
+
+| Run | Resumed from | Final agent steps | PPO rollouts | Log rows |
+|---|---|---|---|---|
+| IND / COOP / COOP-FULL, seeds 1-2 | - | 501 760 | 280 | 99 |
+| COOP-FULL seed 2 | 449 946 | 500 122 | 279 | 98 |
+| IND seed 3, COOP seed 3 | 49 994 | 501 578 | 279 | 98 |
+
+- Every run reached the 500 000-step budget. A run stops at the first complete rollout
+  (256 steps x 7 agents = 1 792 agent steps) beyond the budget. The rollout that was being
+  collected when the laptop stopped was lost (1 610 agent steps for the seed-3 runs, 154 for
+  COOP-FULL seed 2), so each resumed run trained on one rollout less than an uninterrupted
+  one: 499 968 against 501 760 agent steps, 0.4% of the budget.
+- The training logs (`episodes.csv`) of the resumed runs contained the episodes of the
+  interrupted session after the checkpoint (8, 6 and 7 rows), produced by a policy that was
+  never saved. We removed them; `train` now does this itself when it resumes. Every log now
+  has strictly increasing steps, no duplicate, and one row per 5 040-step episode, except
+  one wider gap at the resume point: the episode in progress when the checkpoint was
+  written finished under the lost policy, so neither session has a row for it.
+- Checkpoint selection used validation seed 1000 at medium and peak demand; the test runs
+  use seeds 0-4 and training seeds 100000-100049, so no demand realisation is shared. The
+  ranges were a convention; `select` and `evaluate` now refuse seeds outside their range
+  (`cotraffic/seeds.py`).
+- Selection may pick a checkpoint written before the interruption: COOP-FULL seed 2 kept its
+  449 946-step checkpoint, the one it resumed from.
+
+## 2026-09-26 - Grid4x4: COOP-FULL, CO2 reward, emergency vehicles, incident, sensor noise
+
+These grid4x4 cells of the core matrix are complete (learned variants: 3 training seeds x 5
+evaluation seeds; baselines: 5 runs). p-values below are Mann-Whitney U before the Holm
+correction; the corrected values are in `results/summary/comparisons_*.csv`.
+
+**COOP-FULL on normal traffic.** 151.9 / 161.1 / 219.7 / 184.5 s at low / medium / peak /
+rush, against 150.8 / 161.1 / 217.5 / 184.5 s for IND. Its extra observation blocks and
+reward terms neither cost nor gain anything without emergency vehicles (at low demand it is
+1 s slower, p = 0.01).
+
+**RQ2 - emergency vehicles (peak).** Mean emergency-vehicle delay and mean travel time of
+all vehicles (s):
+
+| Method | EV delay | Travel time |
+|---|---|---|
+| FT | 154.7 | 261.6 |
+| ACT | 149.8 | 278.0 |
+| MP | 106.3 | 211.6 |
+| EV-RULE (preemption on top of ACT) | **58.2** | 288.1 |
+| COOP | 115.9 | 225.3 |
+| COOP-FULL | 73.5 | **219.2** |
+
+- COOP-FULL halves the EV delay compared with ACT (-51%, p = 0.003) and cuts it by 37%
+  compared with COOP (p = 0.0001), on each of its training seeds (64 / 88 / 68 s against
+  111-123 s for COOP).
+- EV-RULE remains the fastest for the emergency vehicle (COOP-FULL +26%, p = 0.23), but it
+  is built on the actuated controller, which breaks down at peak. COOP-FULL gets most of the
+  preemption benefit while the other vehicles travel 24% faster than with EV-RULE. It does
+  so with no override rule: only the EV observation block and the EV term of its reward.
+- The weight of that term (lambda_ev = 2) is checked with lambda_ev = 1 and 4 (training).
+
+**RQ3 - CO2.** COOP with a CO2 penalty in the reward (lambda_co2 = 0.5 and 1.0):
+
+| Method | CO2 medium (kg) | travel medium (s) | CO2 peak (kg) | travel peak (s) |
+|---|---|---|---|---|
+| COOP | 2 270 | 161.0 | 4 190 | 224.6 |
+| COOP-ECO, lambda 0.5 | 2 257 | 160.2 | 4 050 | 215.2 |
+| COOP-ECO, lambda 1.0 | 2 255 | 160.0 | 4 091 | 218.2 |
+| IND | 2 273 | 161.1 | 4 090 | 217.5 |
+| MP | **2 205** | **157.9** | **3 959** | **210.2** |
+
+- The CO2 penalty lowers CO2 and travel time together. Over the 90 runs of each demand
+  level, network CO2 and mean travel time are correlated at 0.93 (medium) and 0.99 (peak):
+  on this network the CO2 difference between controllers is the time vehicles spend
+  stopped and idling. There is no trade-off to trace - the Pareto front of RQ3 reduces to
+  one point, and Max-Pressure is best on both axes.
+- The gain of COOP-ECO (lambda 0.5) over COOP at peak (-4.2% travel time, -3.3% CO2,
+  p = 0.04) comes largely from COOP's weak training seed t2; against IND the difference is
+  1%. The CO2 term acts as one more congestion signal.
+- We report RQ3 as a negative result with this explanation. A real trade-off would need
+  vehicles whose emissions depend more on the speed profile than on time (heavy goods
+  vehicles, gradients), which our demand does not contain.
+
+**RQ4 - incident (vehicle stopped 31 m before the stop line, minutes 35-55, peak).** Mean
+travel time of all vehicles and of the 384 vehicles per run whose route crosses the blocked
+approach (s):
+
+| Method | all vehicles | affected vehicles | affected time loss |
+|---|---|---|---|
+| FT | 261.3 | 332.7 | 218.0 |
+| ACT | 287.9 | 331.0 | 216.3 |
+| MP | **212.5** | **267.0** | **152.4** |
+| IND | 219.2 | 292.8 | 178.1 |
+| COOP | 227.3 | 299.1 | 184.5 |
+| COOP-FULL | 221.8 | 275.7 | 161.1 |
+
+- Network-wide the incident costs 1% of travel time for MP and the learned agents (e.g. MP
+  210.2 -> 212.5 s), 5% for ACT; locally it is large for every controller.
+- Max-Pressure serves the affected vehicles best. IND (+9.6%, p = 0.04) and COOP (+12%,
+  p = 0.08) are behind; COOP-FULL is closest (+3.3%, p = 0.44). None of the learned agents
+  saw an incident during training.
+
+**RQ4 - sensor faults (peak; Gaussian noise of 2 vehicles on every count, 20% of the lane
+detectors reporting 0 for the whole episode).** Mean travel time (s):
+
+| Method | normal | sensor faults | change |
+|---|---|---|---|
+| MP | 210.2 | 255.4 | +21.5% |
+| IND | 217.5 | 220.4 | +1.4% |
+| COOP | 224.6 | 247.7 | +10.3% |
+
+- IND is the most robust controller and is 13.7% faster than MP under sensor faults
+  (p = 0.03). MP loses 5-10% on four evaluation seeds and collapses on seed 3 (359 s,
+  18 teleports, 189 vehicles unfinished, a maximum wait of 1 762 s). MP chooses phases from
+  the detector counts only; a movement whose detectors read 0 exerts no pressure, and the
+  shield's anti-starvation rule, which acts on detected demand, never fired (FAILURES F-012).
+- IND keeps switching as often as without faults (4 938 vs 4 979 switches per episode), so
+  it serves lanes by rhythm as much as by counts - a likely reason for its robustness.
+- COOP's loss comes from one training seed: t2 goes from 234 to 288 s (+23%) while t1 and t3
+  lose 3% and 2%. Messages carry the neighbours' noisy counts, so a faulty detector reaches
+  two agents; with three training seeds we cannot tell whether this makes COOP systematically
+  more fragile or whether t2 is simply a weaker policy (it is also the slowest without
+  faults).
+
+## 2026-09-26 - Core matrix complete; statistics and importance revised
+
+The core matrix is complete: 790 runs, none failed (`evaluate --experiment core`, the
+learned district cells last, after the district checkpoints were selected). The results
+per research question are written up in `docs/report/08_results.md`; the main numbers:
+
+- RQ1: IND is 0.2-4.0% and COOP 0.4-6.9% slower than the best baseline of each cell
+  (actuated control at low and medium demand, Max-Pressure at peak, on the rush profile and
+  on the district); 10-20% faster than FT, except district medium (2.5-2.7%).
+- RQ2: COOP-FULL EV delay 73.5 s vs 149.8 s (ACT) and 58.2 s (EV-RULE); cost to the traffic
+  as a whole vs MP +3.6% [+2.1, +5.1], EV-RULE +36.2% [+30.0, +42.2] (paired).
+- RQ5: on grid8x8 (zero-shot) IND and COOP are 4.0-4.1% slower than MP and 14.3-14.5%
+  faster than FT.
+- District: all controllers but FT within 153-160 s at peak; the test seed dominates (the
+  same policy ranges from 128 to 197 s).
+
+**Statistics revised (ADR-005).** With the ordinary bootstrap, the 15 runs of a learned
+variant were treated as independent although they come from 3 training runs; COOP's
+interval at grid peak was [218.4, 230.9] while its training runs average 218, 222 and
+234 s. Intervals of learned variants now resample training runs and test seeds (two-way
+bootstrap): [213.3, 236.3]. We also compare methods paired on the test seed. Both change
+the reading of the results in one direction: at grid peak and on the rush profile, where
+the Holm-corrected Mann-Whitney test finds no difference, the paired intervals show that
+the learned agents are consistently slower than Max-Pressure (IND +3.5% [+2.0, +5.4]
+and +2.6% [+1.6, +3.5]). The p-values of learned variants remain optimistic; we say so in
+the report.
+
+**Feature importance revised (fig. 12).** The first version reported that shuffling the
+emergency-vehicle block changes 0.4% of COOP-FULL's decisions, which read as "unused",
+while COOP-FULL halves the EV delay. An emergency vehicle is in range for 0.7% of
+decisions, so a rate over all decisions dilutes the block. The block is now scored on the
+decisions where it is non-zero (40% change), the online replays record the EV delay (+75%
+when the block is shuffled, 64 -> 112 s), blocks that are constant in the scenario are
+left out (pedestrians and buses in the emergency scenario), and 5 test seeds are used
+instead of 2. One replay took 90 min instead of 1: the laptop was in standby from 19:35 to
+21:04 (Windows power events).
+
+**Training times.** Six runs include laptop standby (e.g. the seed-1 district runs:
+552-561 min measured) and three were resumed. The report tables now give episodes x median
+time per episode (16-47 min per run, three runs sharing the laptop) with a note on those
+runs.

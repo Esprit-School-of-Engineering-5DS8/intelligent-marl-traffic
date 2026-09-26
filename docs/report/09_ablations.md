@@ -1,0 +1,84 @@
+# 9. Ablations
+
+Same conventions as section 8. Each variant differs from the one above it by one design
+choice; all use the same PPO settings, 500 000 agent steps and 3 training runs, except the
+reward study (one run, validation seeds only).
+
+## 9.1 Neighbour messages: IND vs COOP
+
+COOP receives from each upstream neighbour the queue heading to it, whether the neighbour
+is releasing traffic toward it and its largest phase pressure (ADR-009). Mean travel time
+(s) in every cell where both were evaluated:
+
+| Cell | IND | COOP | COOP vs IND |
+|---|---|---|---|
+| grid4x4, low | 150.8 | 150.8 | 0.0% |
+| grid4x4, medium | 161.1 | 161.0 | -0.1% |
+| grid4x4, peak | 217.5 | 224.6 | +3.3% |
+| grid4x4, rush profile | 184.5 | 186.7 | +1.2% |
+| grid4x4, incident | 219.2 | 227.3 | +3.7% |
+| grid4x4, sensor faults | 220.4 | 247.7 | +12.4% |
+| grid8x8, peak (zero-shot) | 312.7 | 313.1 | +0.2% |
+| district, medium | 109.7 | 109.9 | +0.2% |
+| district, peak | 158.4 | 159.5 | +0.7% |
+
+- The messages bring no gain in any cell. The largest differences come from one COOP
+  training run (t2: 234 s at grid peak, against 218-222 s for t1 and t3 and 214-221 s for
+  the three IND runs), i.e. from the spread between training runs, not from the messages.
+- Two independent checks show that COOP barely uses them: shuffling the message block
+  changes 7% of its decisions and nothing in travel time (section 8.9), and losing up to
+  50% of the messages costs +0.5% (section 8.4).
+- Our explanation (FAILURES F-009): on 250 m links a platoon released upstream reaches the
+  next junction about four decisions later and is already visible on the incoming lanes;
+  with two phases and frequent switching there is little to anticipate. Communication
+  would pay off where neighbours know something local detectors cannot see in time -
+  longer links, more phases, events beyond detection range - and with a mechanism that
+  lets an agent weight the neighbours that matter, such as graph attention over the
+  messages (CoLight). We leave this to future work.
+
+## 9.2 CO2 weight in the reward: lambda_co2 = 0, 0.5, 1.0
+
+| Variant | travel, medium (s) | CO2, medium (kg) | travel, peak (s) | CO2, peak (kg) |
+|---|---|---|---|---|
+| COOP (lambda = 0) | 161.0 | 2 270 | 224.6 | 4 190 |
+| COOP-ECO (lambda = 0.5) | 160.2 | 2 257 | 215.2 | 4 050 |
+| COOP-ECO (lambda = 1.0) | 160.0 | 2 255 | 218.2 | 4 091 |
+
+The penalty reduces travel time and CO2 together (section 8.3). The gain over COOP at peak
+(-4.2% travel time, -3.3% CO2 for lambda = 0.5) comes largely from COOP's weak training
+run: per training run at peak, COOP-ECO reaches 214-217 s (lambda = 0.5) and 216-222 s
+(lambda = 1.0), COOP 218-234 s and IND 214-221 s.
+Doubling the weight does not help further. On our networks the CO2 term is a second
+congestion signal rather than a competing objective.
+
+## 9.3 Emergency vehicles: COOP vs COOP-FULL vs EV-RULE
+
+See section 8.2. Adding the emergency-vehicle block and reward term (COOP-FULL) cuts the
+emergency-vehicle delay by 37% compared with COOP and keeps the cost to the traffic as a
+whole at 3.6% against Max-Pressure, where rule-based preemption costs 36%. The
+sensitivity of this result to the weight of the EV term (lambda_ev = 1 and 4 instead of
+2, one training run each) is trained and will be evaluated in the `sensitivity`
+experiment.
+
+## 9.4 Reward definition and exploration (validation seeds, M3)
+
+Before the main runs we checked whether a different reward or more exploration would close
+the gap to Max-Pressure (one training run of 300 000 steps each, validation seeds only;
+journal, 2026-09-24). Mean travel time (s):
+
+| Variant | medium | peak |
+|---|---|---|
+| IND, waiting-difference reward (used) | 162.7 | 211.5 |
+| IND, queue-length reward | 161.9 | 212.6 |
+| IND, pressure reward (PressLight) | 162.0 | 214.9 |
+| IND, entropy bonus 0.01 | 161.8 | 211.9 |
+| Max-Pressure | 159.3 | 207.7 |
+
+No variant differs by more than 1.6%: the reward definition is not what separates the
+learned agents from Max-Pressure (FAILURES F-007).
+
+## 9.5 Forecast observation (Tier 3)
+
+`coop_forecast` adds the predicted inflow of the next 5 minutes per approach (Ridge model)
+to COOP's observation. It is trained (3 runs); the comparison with COOP at medium, peak and
+rush-profile demand is part of the `sensitivity` experiment and is not reported yet.

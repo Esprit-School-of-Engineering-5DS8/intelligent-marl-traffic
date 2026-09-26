@@ -6,10 +6,10 @@
 | M1 | Networks, demand levels, rush profile, vehicle types, scenarios | done (2026-09-24) |
 | M2 | Evaluation pipeline, metrics, baselines FT / ACT / MP / EV-RULE | done (2026-09-24) |
 | M3 | PPO training with parameter sharing, checkpoint/resume, IND | done (2026-09-24) |
-| M4 | COOP (neighbour communication), reward normalisation | in progress (training) |
-| M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | planned |
-| M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | planned |
-| M7 | Full experiment matrix, statistics, figures, tables | planned |
+| M4 | COOP (neighbour communication), reward normalisation | done (2026-09-26) |
+| M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | done (2026-09-26) |
+| M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | in progress: all evaluated except the forecast agent (trained) |
+| M7 | Full experiment matrix, statistics, figures, tables | in progress: core matrix, statistics, figures, tables done; extended and sensitivity matrices to run |
 | M8 | Dashboard, demo script, docs, README results | planned |
 
 ## M0 - summary (2026-09-24)
@@ -62,3 +62,26 @@
   time (journal M3). Reward and entropy variants do not change this (F-007).
 - Problems: SuperSuit / SB3 API mismatches (F-006).
 - Next: M4 - COOP (3 seeds), then all variants and the district (training batch running).
+
+## M4 - summary (2026-09-26)
+
+- Works: COOP with neighbour messages and communication dropout; COOP, COOP-ECO (lambda 0.5
+  and 1.0) and COOP-FULL trained on grid4x4 (3 runs each); training-log trimming on resume.
+- Measured: COOP no better than IND in any cell (-0.1% to +12%); dropout up to 50% costs
+  +0.5%; the message block changes 7% of decisions and nothing in travel time (journal,
+  2026-09-25 and 2026-09-26).
+- Problems: no cooperation gain (F-009, documented; attention-based communication left
+  as future work).
+
+## M5 - summary (2026-09-26)
+
+- Works: IND, COOP, COOP-FULL trained on the district (3 runs each); incident scenario
+  with local metrics; core matrix complete (790 runs, 0 failed); two-way bootstrap and
+  paired analysis (ADR-005); report sections 8-10 drafted (`docs/report/`).
+- Measured: IND within 4% and COOP within 7% of the best baseline in every cell, 10-20%
+  better than FT; COOP-FULL halves EV delay at +3.6% travel time vs MP (EV-RULE +36%);
+  CO2 follows travel time (no trade-off); IND robust to sensor faults (+1.4% vs MP +21.5%);
+  zero-shot on grid8x8 at +4% from MP.
+- Problems: laptop shutdown and standby interrupted runs (resumed and verified, journal);
+  pedestrians impossible on the district (F-011); shield blind to failed detectors (F-012).
+- Next: sensitivity experiment (forecast agent, lambda_ev), extended matrix, M8.
