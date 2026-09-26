@@ -22,6 +22,7 @@ from the agents only in *when* they switch.
 | ACT | SUMO gap-based actuated control, min green 10 s, max green 60 s, max gap 3 s | `controllers/programs.py::actuated_program` |
 | MP | Max-Pressure (Varaiya 2013): request the phase maximising the sum of (upstream - downstream) vehicles over its movements; ties keep the phase; same safety shield as the agents | `controllers/classical.py::MaxPressure` |
 | EV-RULE | ACT + rule-based preemption: when an emergency vehicle is within 200 m of its next signal, hold or claim its green, respecting min green and yellow | `controllers/ev_preemption.py` |
+| EV-RULE-MP | the same preemption on top of Max-Pressure, requested at each 5-s decision through the shield (added 2026-09-26, FAILURES F-013) | `controllers/ev_preemption.py` |
 
 Choices that make the baselines fair:
 

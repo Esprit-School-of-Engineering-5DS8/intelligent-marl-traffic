@@ -1,4 +1,7 @@
-"""EV-RULE: rule-based emergency-vehicle preemption on top of actuated control.
+"""Rule-based emergency-vehicle preemption: EV-RULE (on actuated control) and EV-RULE-MP
+(on Max-Pressure).
+
+EV-RULE, on top of actuated control:
 
 When an emergency vehicle is within ``ev_preemption_range_m`` of its next signal, the
 rule takes the signal over and gives green to the movement the vehicle will use:
@@ -9,16 +12,42 @@ rule takes the signal over and gives green to the movement the vehicle will use:
 
 When no emergency vehicle approaches any more, the actuated program resumes from the
 phase that was held. Signals without emergency vehicles run actuated control untouched.
+
+EV-RULE-MP applies the same rule on top of Max-Pressure, so that the cost of preemption
+can be measured against the best base controller at peak: at each decision, a signal with
+an emergency vehicle within the same range requests the vehicle's phase; the others follow
+Max-Pressure. Requests go through the shield like every controller of the environment
+(minimum green, then the yellow), at the 5-s decision interval of the learned agents.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cotraffic.controllers.classical import Actuated
+from cotraffic.controllers.classical import Actuated, MaxPressure
 from cotraffic.envs.intersection import yellow_state
 
 IDLE, CLEARING, HOLDING = "idle", "clearing", "holding"
+
+
+def approaching(env, signals, range_m: float) -> dict[str, tuple[float, int]]:
+    """Closest approaching emergency vehicle per signal: (distance, link index)."""
+    out: dict[str, tuple[float, int]] = {}
+    for ev in env.ev_ids:
+        upcoming = env.conn.vehicle.getNextTLS(ev)
+        if not upcoming:
+            continue
+        tls, link, dist, _ = upcoming[0]
+        if tls in signals and dist <= range_m and (tls not in out or dist < out[tls][0]):
+            out[tls] = (dist, link)
+    return out
+
+
+def phase_for(inter, link: int) -> int:
+    """Green phase serving a link, preferring a protected (G) over a permissive (g) green."""
+    states = inter.green_states
+    strict = [p for p, s in enumerate(states) if s[link] == "G"]
+    return (strict or [p for p, s in enumerate(states) if s[link] in "Gg"] or [0])[0]
 
 
 @dataclass
@@ -49,26 +78,11 @@ class EmergencyPreemption(Actuated):
         self.yellow = float(t["yellow_time"])
 
     def _requests(self, env) -> dict[str, tuple[float, int]]:
-        """Closest approaching emergency vehicle per signal: (distance, link index)."""
-        out: dict[str, tuple[float, int]] = {}
-        for ev in env.ev_ids:
-            upcoming = env.conn.vehicle.getNextTLS(ev)
-            if not upcoming:
-                continue
-            tls, link, dist, _ = upcoming[0]
-            if (
-                tls in self.takeovers
-                and dist <= self.range_m
-                and (tls not in out or dist < out[tls][0])
-            ):
-                out[tls] = (dist, link)
-        return out
+        return approaching(env, self.takeovers, self.range_m)
 
     @staticmethod
     def _phase_for(inter, link: int) -> int:
-        states = inter.green_states
-        strict = [p for p, s in enumerate(states) if s[link] == "G"]
-        return (strict or [p for p, s in enumerate(states) if s[link] in "Gg"] or [0])[0]
+        return phase_for(inter, link)
 
     def _on_step(self, env, now: float) -> None:
         tl = env.conn.trafficlight
@@ -109,3 +123,26 @@ class EmergencyPreemption(Actuated):
                 tl.setProgram(tid, "act")
                 tl.setPhase(tid, 2 * take.current if inter.n_phases > 1 else 0)
                 take.mode = IDLE
+
+
+class MaxPressurePreemption(MaxPressure):
+    name = "ev_rule_mp"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.preemptions = 0
+        self.active: set[str] = set()
+
+    def reset(self, env) -> None:
+        self.range_m = float(env.protocol["baselines"]["ev_preemption_range_m"])
+        self.preemptions = 0
+        self.active = set()
+
+    def act(self, env, obs):
+        actions = super().act(env, obs)
+        requests = approaching(env, env.intersections, self.range_m)
+        for tid, (_, link) in requests.items():
+            actions[tid] = phase_for(env.intersections[tid], link)
+        self.preemptions += len(set(requests) - self.active)
+        self.active = set(requests)
+        return actions

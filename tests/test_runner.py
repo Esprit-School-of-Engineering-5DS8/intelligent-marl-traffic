@@ -56,12 +56,13 @@ def test_incident_and_emergency_scenarios_run(tmp_path):
     assert row["incident_start"] != ""
 
 
-def test_ev_rule_preempts_and_stays_safe(tmp_path):
-    from cotraffic.controllers.ev_preemption import EmergencyPreemption
+@pytest.mark.parametrize("method", ["ev_rule", "ev_rule_mp"])
+def test_ev_rule_preempts_and_stays_safe(method, tmp_path):
+    from cotraffic.controllers.registry import make_controller
 
-    ctrl = EmergencyPreemption()
+    ctrl = make_controller(method)
     row = run_episode(
-        "ev_rule",
+        method,
         "grid2x2",
         "peak",
         ["emergency"],

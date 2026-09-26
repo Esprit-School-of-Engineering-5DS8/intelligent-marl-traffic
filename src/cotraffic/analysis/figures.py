@@ -20,6 +20,7 @@ import pandas as pd  # noqa: E402
 from cotraffic import config  # noqa: E402
 from cotraffic.analysis.aggregate import load_raw, summarise  # noqa: E402
 from cotraffic.analysis.style import (  # noqa: E402
+    BASELINE_METHODS,
     DEMAND_ORDER,
     GRID,
     METHOD_COLORS,
@@ -598,7 +599,7 @@ def fig09_scalability(d: Data) -> Path | None:
     a.set_ylabel("Mean travel time (s)")
     a.set_title("grid8x8 (64 signals), policies trained on grid4x4")
     a.legend(ncol=2)
-    learned = [m for m in methods if m not in ("ft", "act", "ev_rule")]
+    learned = [m for m in methods if m not in BASELINE_METHODS]
     nets = ["grid4x4", "grid8x8"]
     _bars(
         b,

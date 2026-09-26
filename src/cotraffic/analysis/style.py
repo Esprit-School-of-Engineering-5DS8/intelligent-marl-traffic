@@ -7,6 +7,7 @@ METHOD_LABELS = {
     "act": "ACT",
     "mp": "MP",
     "ev_rule": "EV-RULE",
+    "ev_rule_mp": "EV-RULE-MP",
     "ind": "IND",
     "coop": "COOP",
     "coop_eco05": "COOP-ECO (λ=0.5)",
@@ -15,7 +16,7 @@ METHOD_LABELS = {
     "random": "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS)
-BASELINE_METHODS = ("ft", "act", "mp", "ev_rule")
+BASELINE_METHODS = ("ft", "act", "mp", "ev_rule", "ev_rule_mp")
 DEMAND_ORDER = ["low", "medium", "peak", "rush_profile"]
 
 # Categorical hues checked for colour-vision deficiency and normal-vision separation in
@@ -26,6 +27,7 @@ METHOD_COLORS = {
     "act": "#4a3aa7",
     "mp": "#eb6834",
     "ev_rule": "#e34948",
+    "ev_rule_mp": "#9c2f1c",
     "ind": "#1baf7a",
     "coop": "#2a78d6",
     "coop_eco05": "#e87ba4",

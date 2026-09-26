@@ -149,6 +149,7 @@ cells:
   - act
   - mp
   - ev_rule
+  - ev_rule_mp
   - coop
   - coop_full
   demands:

@@ -10,7 +10,7 @@ cells:
     scenarios: [incident]
     ssm: false
   - network: grid4x4
-    methods: [ft, act, mp, ev_rule, coop, coop_full]
+    methods: [ft, act, mp, ev_rule, ev_rule_mp, coop, coop_full]
     demands: [medium]
     scenarios: [emergency]
     ssm: false

@@ -254,7 +254,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--methods",
         nargs="*",
         default=None,
-        help="only these methods ('baselines' = ft act mp ev_rule)",
+        help="only these methods ('baselines' = ft act mp ev_rule ev_rule_mp)",
     )
     p.set_defaults(func=cmd_evaluate)
 
