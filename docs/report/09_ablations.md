@@ -64,9 +64,21 @@ Each mechanism against its own base (section 8.2, grid4x4 at peak, paired):
 The learned mechanism reaches about 60% of the rule's reduction; the rule on Max-Pressure
 also keeps the lower travel time. A first version of this comparison set COOP-FULL against
 the rule on actuated control only, which attributed the breakdown of actuated control to
-preemption (FAILURES F-013). The sensitivity of COOP-FULL to the weight of its EV term
-(lambda_ev = 1 and 4 instead of 2, one training run each) is evaluated in the
-`sensitivity` experiment.
+preemption (FAILURES F-013).
+
+Weight of the EV term (grid4x4 at peak; one training run per weight, all with training
+seed 1, paired by test seed against lambda_ev = 2):
+
+| lambda_ev | EV delay (s) | vs lambda_ev = 2 | Travel time (s) | vs lambda_ev = 2 |
+|---|---|---|---|---|
+| 1 | 109.7 | +70.4% [+45.7, +98.7] | 226.6 | +4.4% [+3.5, +5.8] |
+| 2 (COOP-FULL) | 64.4 | | 217.0 | |
+| 4 | 63.3 | -1.6% [-11.8, +9.4] | 220.7 | +1.7% [+0.6, +2.8] |
+
+With lambda_ev = 1 the emergency vehicles lose most of the benefit (110 s, close to
+COOP's 116 s); a weight of 2 or 4 gives the same EV delay. The travel-time differences
+come from single training runs and are of the size of the spread between training runs
+(section 9.1), so we do not read them as an effect of the weight.
 
 ## 9.4 Reward definition and exploration (validation seeds, M3)
 
@@ -88,5 +100,7 @@ learned agents from Max-Pressure (FAILURES F-007).
 ## 9.5 Forecast observation (Tier 3)
 
 `coop_forecast` adds the predicted inflow of the next 5 minutes per approach (Ridge model)
-to COOP's observation. It is trained (3 runs); the comparison with COOP at medium, peak and
-rush-profile demand is part of the `sensitivity` experiment and is not reported yet.
+to COOP's observation. It matches IND at medium, peak and rush-profile demand (all
+differences within +-0.4%, intervals including zero; section 8.6) and does not narrow the
+gap to Max-Pressure. The forecast is accurate only to within 25% of the noise floor of
+Poisson arrivals, which leaves little for the policy to exploit.

@@ -36,8 +36,9 @@ p-values are optimistic, and we rely on the intervals as much as on p. Full tabl
   the same trade-off, neither dominated. For emergency vehicles the rule on Max-Pressure
   does better (F-013). CO2 follows travel time (correlation 0.93-0.99): there is no
   trade-off to trace.
-- Neither communication between neighbours (F-009) nor a different reward (F-007) closed
-  the gap; the learned agents also handle an accident worse than Max-Pressure.
+- Neither communication between neighbours (F-009), a different reward (F-007) nor a
+  forecast of arrivals (RQ6) closed the gap; the learned agents also handle an accident
+  worse than Max-Pressure.
 - Our contribution is therefore a fair, reproducible benchmark - the same shield, seeds,
   statistics and base controllers for every method, each mechanism compared with the same
   mechanism on the strongest base - and the diagnosis of why learning does not beat
@@ -238,9 +239,22 @@ possible: every junction runs the same policy on the same observation layout.
 Forecast accuracy (next-5-minute arrivals per approach) is reported in
 `REPORT_TABLES.md`: learned models improve on persistence by about 10% and come within 25%
 of the Poisson noise floor, while a 10-minute moving average does almost as well
-(journal, 2026-09-24). The agent that receives the forecast as an observation block
-(`coop_forecast`, 3 training runs) is trained; its evaluation is part of the
-`sensitivity` experiment and is not reported yet.
+(journal, 2026-09-24). `coop_forecast` adds the Ridge prediction per approach to COOP's
+observation (3 training runs). Mean travel time, grid4x4, normal traffic; differences
+paired by test seed, with training runs of both variants resampled:
+
+| Demand | COOP + forecast (s) | vs COOP | vs IND | vs MP |
+|---|---|---|---|---|
+| medium | 160.8 | -0.1% [-0.5, +0.3] | -0.2% [-0.6, +0.2] | +1.8% [+1.6, +2.0] |
+| peak | 218.0 | -2.9% [-6.5, +0.2] | +0.3% [-1.4, +1.8] | +3.7% [+2.6, +5.0] |
+| rush profile | 183.7 | -1.6% [-3.1, -0.4] | -0.4% [-1.4, +0.4] | +2.1% [+1.4, +2.8] |
+
+The forecast brings no measurable gain: the agent is indistinguishable from IND at every
+level and remains slower than Max-Pressure. Its small advantage over COOP at peak and on
+the rush profile matches COOP's weak training run (t2), not a forecasting effect: its
+three runs are as close to each other (217-219 s at peak) as IND's. With arrivals close
+to Poisson, a 5-minute forecast carries little information the current queues do not
+already give. **Answer to RQ6:** no, not on these networks.
 
 ## 8.7 People: pedestrians and buses (grid4x4, medium; Figure 11)
 

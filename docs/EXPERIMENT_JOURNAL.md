@@ -505,3 +505,23 @@ wait [-28.1, -18.2], +2.6% travel time [+1.3, +5.1], +7.2% person-weighted vehic
 [+3.6, +14.0]. The rule caps the long waits for free; COOP-FULL shortens the typical wait
 and pays in vehicle time. With one threshold we cannot say whether a shorter one would
 dominate COOP-FULL. Report section 8.7 rewritten.
+
+## 2026-09-27 - Sensitivity experiment: forecast agent and EV weight
+
+`evaluate --experiment sensitivity` (checkpoints of the new variants selected on validation
+seed 1000 first): 55 runs of the learned variants, none failed, plus the EV-RULE-MP and
+PED-RULE-MP runs above.
+
+**Forecast agent (RQ6, Tier 3).** COOP with the Ridge forecast in its observation, 3
+training runs, grid4x4 normal: 160.8 / 218.0 / 183.7 s at medium / peak / rush profile.
+Against IND -0.2% / +0.3% / -0.4% (intervals include zero), against COOP -0.1% / -2.9% /
+-1.6%, against MP +1.8% / +3.7% / +2.1%. Its three runs are as close to each other as
+IND's (217-219 s at peak), so the gap to COOP is COOP's weak run t2, not the forecast.
+No measurable gain from forecasting, consistent with the forecast accuracy near the
+Poisson noise floor.
+
+**EV weight.** COOP-FULL with lambda_ev = 1 and 4 (one training run each, seed 1),
+emergency cell at peak, against COOP-FULL t1 (lambda_ev = 2): EV delay 109.7 s (+70%) and
+63.3 s (-2%, not significant); travel time +4.4% and +1.7%. Below lambda_ev = 2 the EV
+benefit is lost; above, it does not grow. Single runs: the travel-time differences are
+within the spread between training runs.

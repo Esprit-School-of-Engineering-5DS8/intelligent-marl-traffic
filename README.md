@@ -121,8 +121,8 @@ Mean travel time (s), normal traffic (lower is better; best in bold):
 - Pedestrians: COOP-FULL lowers the mean pedestrian wait by 24% compared with a
   pedestrian rule on Max-Pressure, at +2.6% of vehicle travel time; the rule caps the
   longest waits at no vehicle cost.
-- What did not work: messages between neighbouring agents (F-009) and reward redesign
-  (F-007) did not close the gap; the learned agents handle accidents worse than
+- What did not work: messages between neighbouring agents (F-009), reward redesign
+  (F-007) and a forecast of arrivals in the observation did not close the gap; the learned agents handle accidents worse than
   Max-Pressure (`docs/FAILURES.md`).
 - Contribution: a fair, reproducible benchmark (same shield, seeds, statistics and base
   controllers for every method) and the diagnosis of why learning does not beat

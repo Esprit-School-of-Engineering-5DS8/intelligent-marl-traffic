@@ -1,0 +1,106 @@
+{
+  "agent": "coop_forecast",
+  "network": "grid4x4",
+  "training_seed": 3,
+  "selected_checkpoint": "model_503808_steps.zip",
+  "selected_steps": 503808,
+  "validation": {
+    "seeds": [
+      1000
+    ],
+    "demands": [
+      "medium",
+      "peak"
+    ],
+    "metric": "mean_travel_time",
+    "episode": "protocol.validation"
+  },
+  "scores": {
+    "400000": {
+      "mean_travel_time": 187.08028170772684,
+      "runs": [
+        163.45961190168177,
+        210.7009515137719
+      ]
+    },
+    "450000": {
+      "mean_travel_time": 189.58258662125357,
+      "runs": [
+        162.53205692108668,
+        216.63311632142046
+      ]
+    },
+    "500000": {
+      "mean_travel_time": 186.23508273482247,
+      "runs": [
+        161.485808538163,
+        210.9843569314819
+      ]
+    },
+    "503808": {
+      "mean_travel_time": 185.67727930533965,
+      "runs": [
+        162.03626131953428,
+        209.318297291145
+      ]
+    }
+  },
+  "train_wall_time_s": 2021.8,
+  "total_timesteps": 500000,
+  "config": {
+    "name": "coop_forecast",
+    "observation": {
+      "neighbours": true,
+      "emergency": false,
+      "pedestrians": false,
+      "buses": false,
+      "forecast": true
+    },
+    "reward": {
+      "person_weighted": false,
+      "co2": 0.0,
+      "ev": 0.0,
+      "ped": 0.0,
+      "clip": 5.0
+    },
+    "ppo": {
+      "learning_rate": 0.0003,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.0,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "training": {
+      "total_timesteps": 500000,
+      "checkpoint_every": 50000,
+      "demand_levels": [
+        "low",
+        "medium",
+        "peak",
+        "rush_profile"
+      ],
+      "scenarios": [],
+      "quick_timesteps": 3000
+    },
+    "validation": {
+      "seeds": [
+        1000
+      ],
+      "demands": [
+        "medium",
+        "peak"
+      ],
+      "last_checkpoints": 4
+    },
+    "description": "Tier 3 - COOP plus the predicted inflow of the next 5 minutes per approach (Ridge model)."
+  }
+}

@@ -52,8 +52,8 @@ The negative results below are part of the findings; each one is traced in
   trade-off of RQ3 could not appear; heavier vehicles or gradients might change that.
 - Emergency-vehicle results on the district are inconclusive: 3-5 vehicles per run whose
   routes cross 1-2 of the 7 signals.
-- The forecast-augmented agent (Tier 3) and the sensitivity to the emergency-vehicle weight
-  are trained but not yet evaluated.
+- The sensitivity to the emergency-vehicle weight rests on one training run per weight;
+  the forecast-augmented agent (Tier 3) was evaluated on the grid only.
 
 **Statistics.**
 

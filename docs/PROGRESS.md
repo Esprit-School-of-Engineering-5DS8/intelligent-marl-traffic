@@ -8,8 +8,8 @@
 | M3 | PPO training with parameter sharing, checkpoint/resume, IND | done (2026-09-24) |
 | M4 | COOP (neighbour communication), reward normalisation | done (2026-09-26) |
 | M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | done (2026-09-26) |
-| M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | in progress: all evaluated except the forecast agent (trained) |
-| M7 | Full experiment matrix, statistics, figures, tables | in progress: core matrix, statistics, figures, tables done; extended and sensitivity matrices to run |
+| M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | done (2026-09-27) |
+| M7 | Full experiment matrix, statistics, figures, tables | in progress: core and sensitivity done; extended matrix running |
 | M8 | Dashboard, demo script, docs, README results | planned |
 
 ## M0 - summary (2026-09-24)

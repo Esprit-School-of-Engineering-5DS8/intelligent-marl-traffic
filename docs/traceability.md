@@ -21,7 +21,7 @@ Status: **done** = implemented and evidenced, **impl.** = implemented, evidence 
 | Extension: sustainability / pollution | CO2 reward term, emission metrics | Fig. 4; report 8.3 | done |
 | Extension: accident scenarios | incident scenario (blocked lane) | Fig. 6; report 8.4 | done |
 | Extension: communication between agents | neighbour messages, dropout scenario | RQ1, RQ4, Fig. 8; report 8.4, 9.1 | done |
-| Extension: prediction | `src/cotraffic/forecasting` (persistence, moving average, Ridge, gradient boosting) | forecasting table in REPORT_TABLES.md; forecast agent trained, evaluation pending | impl. |
+| Extension: prediction | `src/cotraffic/forecasting` (persistence, moving average, Ridge, gradient boosting) | forecasting table in REPORT_TABLES.md; forecast agent evaluated (report 8.6, 9.5) | done |
 | Extension: large-scale networks | grid8x8 (64 signals), zero-shot cell of `full_matrix` | Fig. 9; report 8.5 | done |
 | Real city district | `configs/networks/real_district.yaml` (OpenStreetMap, placeholder Tunis, ADR-006) | district results, report 8.1-8.2 | done |
 | Real traffic counts (GEH) | only if counts are provided; demand is synthetic (documented) | - | not available |
