@@ -25,6 +25,8 @@ for measured times. Jobs resume from their latest checkpoint if interrupted.
 | coop_eco05 | 1, 2, 3 | - |
 | coop_eco | 1, 2, 3 | - |
 | coop_full | 1, 2, 3 | 1, 2, 3 |
+| coop_forecast | 1, 2, 3 | - |
+| coop_full_ev1, coop_full_ev4 | 1 | - |
 
 ```bash
 python -m cotraffic train --agent coop --net grid4x4 --seed 1      # or: make train AGENT=coop NET=grid4x4 SEED=1
@@ -48,6 +50,7 @@ with the validation scores). Copy those folders between machines.
 python -m cotraffic evaluate --experiment core --jobs 2        # RQ1-RQ5, run on the team laptop
 python -m cotraffic evaluate --experiment extended --jobs 2    # rest of the design (other machines)
 python -m cotraffic evaluate --experiment full_matrix --jobs 2 # both at once
+python -m cotraffic evaluate --experiment sensitivity --jobs 2 # forecast block, EV weight
 ```
 
 `core` is 790 runs, `extended` 420 (learned variants: 3 training seeds x 5 evaluation seeds

@@ -25,6 +25,7 @@ runs/
 # Training artefacts: only the selected checkpoints under results/checkpoints are versioned
 results/training/**/tensorboard/
 results/training/**/checkpoints/
+results/training/**/validation_logs/
 results/tmp/
 sumo_files/*/tls/
 results/forecasting/tmp/
