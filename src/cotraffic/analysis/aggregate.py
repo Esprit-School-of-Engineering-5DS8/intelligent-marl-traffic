@@ -9,16 +9,18 @@ import numpy as np
 import pandas as pd
 
 from cotraffic.analysis.stats import (
-    bootstrap_ci,
     cliffs_delta,
     cliffs_magnitude,
+    crossed_bootstrap_ci,
     holm,
     mann_whitney_p,
+    paired_change_ci,
 )
 from cotraffic.analysis.style import BASELINE_METHODS, HIGHER_IS_BETTER, METRIC_LABELS
 from cotraffic.paths import RAW_DIR, SUMMARY_DIR
 
 CELL = ["network", "scenario", "demand"]
+TRAIN_SEED_RE = r"-t(\d+)__"
 
 
 def load_raw(raw_dir: Path = RAW_DIR, allow_quick: bool = False) -> pd.DataFrame:
@@ -33,8 +35,25 @@ def load_raw(raw_dir: Path = RAW_DIR, allow_quick: bool = False) -> pd.DataFrame
     return df
 
 
+def seed_table(group: pd.DataFrame, metric: str) -> pd.DataFrame:
+    """Values of one method in one cell as a (training run x test seed) table.
+
+    Learned methods have one row per training seed (tag ``-t<k>`` of the run id);
+    baselines have a single row.
+    """
+    train = (
+        group["run_id"].astype(str).str.extract(TRAIN_SEED_RE)[0].fillna("-")
+        if "run_id" in group
+        else pd.Series("-", index=group.index)
+    )
+    values = pd.to_numeric(group[metric], errors="coerce")
+    frame = pd.DataFrame({"train": train, "seed": group["seed"], "value": values})
+    return frame.pivot_table(index="train", columns="seed", values="value", aggfunc="mean")
+
+
 def summarise(df: pd.DataFrame, metrics: Sequence[str] | None = None) -> pd.DataFrame:
-    """Long table: one row per (cell, method, metric) with n, mean and bootstrap CI."""
+    """Long table: one row per (cell, method, metric) with n, mean and bootstrap CI
+    (two-way over training runs and test seeds for learned methods, see ``stats``)."""
     metrics = [m for m in (metrics or METRIC_LABELS) if m in df.columns]
     rows = []
     for key, group in df.groupby(CELL + ["method"], sort=False):
@@ -42,12 +61,14 @@ def summarise(df: pd.DataFrame, metrics: Sequence[str] | None = None) -> pd.Data
             values = pd.to_numeric(group[metric], errors="coerce").dropna()
             if values.empty:
                 continue
-            mean, lo, hi = bootstrap_ci(values.to_numpy())
+            table = seed_table(group, metric)
+            mean, lo, hi = crossed_bootstrap_ci(table.to_numpy())
             rows.append(
                 {
                     **dict(zip(CELL + ["method"], key, strict=True)),
                     "metric": metric,
                     "n": len(values),
+                    "n_train": len(table),
                     "mean": mean,
                     "ci_lo": lo,
                     "ci_hi": hi,
@@ -64,13 +85,16 @@ def compare(
 
     ``reference`` is a method id (e.g. ``ft``) or ``best_baseline``: the baseline with the
     best mean of this metric in the cell. p-values are Holm-corrected over the whole table.
+    ``paired_improvement_*``: the same comparison paired on test seeds (method minus
+    reference on the same seed), with a two-way bootstrap CI; positive = better.
     """
     lower_better = metric not in HIGHER_IS_BETTER
     rows = []
     for key, cell in df.groupby(CELL, sort=False):
+        groups = dict(tuple(cell.groupby("method")))
         values = {
             m: pd.to_numeric(g[metric], errors="coerce").dropna().to_numpy()
-            for m, g in cell.groupby("method")
+            for m, g in groups.items()
         }
         if reference == "best_baseline":
             present = {m: v.mean() for m, v in values.items() if m in BASELINE_METHODS and v.size}
@@ -87,6 +111,14 @@ def compare(
             a, b = values[cand], values[ref]
             ref_mean = float(b.mean())
             gain = (ref_mean - a.mean()) if lower_better else (a.mean() - ref_mean)
+            cand_table = seed_table(groups[cand], metric)
+            ref_table = seed_table(groups[ref], metric)
+            seeds = sorted(set(cand_table.columns) & set(ref_table.columns))
+            change, lo, hi = paired_change_ci(
+                cand_table[seeds].to_numpy(), ref_table[seeds].mean(axis=0).to_numpy()
+            )
+            sign = -1.0 if lower_better else 1.0
+            paired = sorted((sign * lo, sign * hi))
             rows.append(
                 {
                     **dict(zip(CELL, key, strict=True)),
@@ -99,8 +131,12 @@ def compare(
                     "improvement_pct": 100.0 * gain / ref_mean if ref_mean else np.nan,
                     "p_value": mann_whitney_p(a, b),
                     "cliffs_delta": cliffs_delta(a, b),
+                    "paired_improvement_pct": sign * change,
+                    "paired_ci_lo": paired[0],
+                    "paired_ci_hi": paired[1],
                     "n": a.size,
                     "n_reference": b.size,
+                    "n_train": len(cand_table),
                 }
             )
     out = pd.DataFrame(rows)

@@ -5,8 +5,10 @@ from cotraffic.analysis.stats import (
     bootstrap_ci,
     cliffs_delta,
     cliffs_magnitude,
+    crossed_bootstrap_ci,
     holm,
     mann_whitney_p,
+    paired_change_ci,
 )
 
 
@@ -54,3 +56,30 @@ def test_mann_whitney_detects_a_clear_difference():
     assert mann_whitney_p([1, 2, 3, 4, 5], [10, 11, 12, 13, 14]) < 0.05
     assert mann_whitney_p([1, 2, 3], [1, 2, 3]) > 0.5
     assert mann_whitney_p([2, 2], [2, 2]) == 1.0
+
+
+def test_crossed_bootstrap_widens_with_differences_between_training_runs():
+    seeds = np.array([210.0, 205.0, 215.0, 200.0, 205.0])
+    same = np.stack([seeds, seeds + 1, seeds - 1])
+    spread = np.stack([seeds, seeds + 15, seeds - 15])
+    m1, lo1, hi1 = crossed_bootstrap_ci(same)
+    m2, lo2, hi2 = crossed_bootstrap_ci(spread)
+    assert m1 == pytest.approx(m2) == pytest.approx(seeds.mean())
+    assert hi2 - lo2 > hi1 - lo1
+    # one row = ordinary bootstrap over test seeds; missing cells are ignored
+    assert crossed_bootstrap_ci(seeds)[0] == pytest.approx(seeds.mean())
+    with_gap = spread.copy()
+    with_gap[0, 0] = np.nan
+    assert crossed_bootstrap_ci(with_gap)[0] == pytest.approx(np.nanmean(with_gap))
+    assert all(np.isnan(v) for v in crossed_bootstrap_ci([[np.nan]]))
+
+
+def test_paired_change_removes_the_test_seed_effect():
+    ref = np.array([150.0, 200.0, 120.0, 180.0, 160.0])  # large seed-to-seed variation
+    table = np.stack([ref * 1.05, ref * 1.05 + 1, ref * 1.05 - 1])
+    change, lo, hi = paired_change_ci(table, ref)
+    assert change == pytest.approx(5.0, abs=0.1)
+    assert 4.0 < lo <= change <= hi < 6.0
+    # unpaired, the same data would be indistinguishable from the reference
+    _, rlo, rhi = crossed_bootstrap_ci(ref)
+    assert rlo < table.mean() < rhi

@@ -49,6 +49,7 @@ METRIC_LABELS = {
     "throughput_per_h": "Throughput (veh/h)",
     "unfinished": "Unfinished vehicles",
     "teleports_total": "Teleports",
+    "never_inserted": "Never-inserted vehicles",
     "co2_total_kg": "CO2 total (kg)",
     "co2_g_per_km": "CO2 (g/km)",
     "nox_total_g": "NOx total (g)",
