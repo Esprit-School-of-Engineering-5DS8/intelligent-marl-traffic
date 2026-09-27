@@ -86,4 +86,4 @@ reproduce:
 	bash scripts/reproduce_all.sh
 
 clean:
-	$(PY) -m cotraffic clean
+	$(PY) -c "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('results/tmp', 'sumo_files/routes', 'sumo_files/tmp')]"
