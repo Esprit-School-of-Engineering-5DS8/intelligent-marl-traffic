@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from cotraffic.forecasting.dataset import DATA_DIR
-from cotraffic.forecasting.models import FEATURES, LAGS, make_features
+from cotraffic.forecasting.features import FEATURES, LAGS, make_features
 
 
 def export_ridge(network: str, data_dir: Path = DATA_DIR) -> Path:

@@ -100,9 +100,11 @@ def _real_district() -> str:
     from cotraffic.networks.build import ensure_network
 
     ensure_network("real_district")
-    row = _quick("mp", "real_district", ["incident", "emergency", "buses", "pedestrians"])
+    # no pedestrians on the district: its OpenStreetMap import has almost no sidewalks
+    # (FAILURES F-011); evaluation refuses that scenario there
+    row = _quick("mp", "real_district", ["incident", "emergency", "buses"])
     assert row["ev_count"] > 0 and row["bus_count"] > 0 and row["incident_start"] != ""
-    return f"7 signals, all route scenarios: travel time {row['mean_travel_time']:.0f}s"
+    return f"7 signals, incident + emergency + buses: travel time {row['mean_travel_time']:.0f}s"
 
 
 @check("scenarios_grid4x4")
@@ -225,6 +227,12 @@ def _dashboard() -> str:
 
 
 def run_smoke(only: list[str] | None = None) -> int:
+    # All checks share one process. pandas and scikit-learn import pyarrow, whose DLLs
+    # clash with the Arrow library bundled in libsumo once libsumo is loaded; load them
+    # before the first simulation, as the single-purpose commands do.
+    import pandas  # noqa: F401
+    import sklearn  # noqa: F401
+
     failures = 0
     for name, fn in CHECKS.items():
         if only and name not in only:
