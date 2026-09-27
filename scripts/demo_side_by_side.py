@@ -14,7 +14,9 @@ in one colour per type - cars blue-grey, buses amber, emergency vehicles (ambula
 white with a green cross, the accident vehicle magenta, pedestrians cyan - with a legend naming the
 controller in each window. The view opens 300 m wide around the signals (``--view-width``);
 zoom and pan with the mouse. ``--follow-ev`` makes the camera follow each emergency
-vehicle (ids ``ev_0``, ``ev_1``...) from departure to arrival, in both windows.
+vehicle (ids ``ev_0``, ``ev_1``...) from departure to arrival, in both windows; the
+simulation fast-forwards to 30 s before the first one departs. Both windows wait for each
+other at that point (or after the first minute), then run in step.
 ``--snapshot-at 900 1800`` saves screenshots of both windows at those simulation times
 (``results/tmp/demo/``), e.g. for the report.
 
@@ -24,7 +26,9 @@ vehicle (ids ``ev_0``, ``ev_1``...) from departure to arrival, in both windows.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import multiprocessing as mp
+import time
 from pathlib import Path
 
 from cotraffic.controllers.registry import BASELINES
@@ -65,7 +69,7 @@ SETTINGS = """<viewsettings>
         </persons>
         <junctions junctionMode="0" drawCrossingsAndWalkingareas="1"/>
     </scheme>
-    <delay value="{delay}"/>
+    <delay value="0"/>
     <decal file="{legend}" screenRelative="1" centerX="{cx}" centerY="{cy}"
            width="{w}" height="{h}" layer="1000"/>
 </viewsettings>
@@ -148,14 +152,13 @@ def frame_view(env, net_file: Path, width_m: float) -> float:
     return zoom_to(env, width_m, signal_centre(net_file))
 
 
-def view_settings(title: str, tag: str, delay: int) -> Path:
+def view_settings(title: str, tag: str) -> Path:
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
     legend = DEMO_DIR / f"legend_{tag}.png"
     w, h = draw_legend(title, legend)
     settings = DEMO_DIR / f"view_{tag}.xml"
     settings.write_text(
         SETTINGS.format(
-            delay=delay,
             legend=legend.as_posix(),
             cx=w // 2 + 10,
             cy=h // 2 + 10,
@@ -165,6 +168,19 @@ def view_settings(title: str, tag: str, delay: int) -> Path:
         encoding="utf-8",
     )
     return settings
+
+
+def ev_departures(episode) -> list[float]:
+    """Departure times of the emergency vehicles (ids ev_0, ev_1, ...) of the episode."""
+    import re
+
+    times: list[float] = []
+    for f in episode.bundle.route_files:
+        text = Path(f).read_text(encoding="utf-8")
+        times += [
+            float(t) for t in re.findall(r'<vehicle id="ev_\d+"[^>]*depart="([0-9.]+)"', text)
+        ]
+    return sorted(times)
 
 
 def style_types(env) -> None:
@@ -192,6 +208,7 @@ def run(
     stop_after_snapshots: bool = False,
     view_width: float = 300.0,
     follow_ev: bool = False,
+    sync=None,
 ) -> None:
     from cotraffic.analysis.style import label
     from cotraffic.controllers.registry import make_controller
@@ -211,9 +228,19 @@ def run(
     _, runtime = split_scenarios(scenarios)
     options: list[str] = []
     hooks = list(controller.step_hooks())
+    # pacing: sumo-gui runs without its own delay; we pause after each simulated second,
+    # except while fast-forwarding (TraCI cannot change the delay of the window)
+    pace = {"on": True}
+
+    def pause(env, now: float) -> None:
+        if pace["on"] and delay > 0:
+            time.sleep(delay / 1000)
+
+    if gui:
+        hooks.append(pause)
     if gui:
         side = "left" if x == 0 else "right"
-        settings = view_settings(f"{side}: {label(method)}", f"{side}_{method}", delay)
+        settings = view_settings(f"{side}: {label(method)}", f"{side}_{method}")
         options = ["--window-pos", f"{x},30", "--window-size", "940,900"]
         options += ["--gui-settings-file", str(settings)]
     env = CoTrafficEnv(
@@ -232,6 +259,18 @@ def run(
     reframe_until = 60.0 if gui else -1.0  # the window may be resized while it opens
     pending = sorted(snapshot_at)
     tracked: str | None = None
+    meet_at = None  # simulation time at which both windows wait for each other
+    if gui:
+        meet_at = reframe_until
+        departures = ev_departures(episode) if follow_ev else []
+        if follow_ev and not departures:
+            print(f"{method}: no emergency vehicle in this scenario (add --scenarios emergency)")
+        if departures:
+            meet_at = max(reframe_until, departures[0] - 30.0)
+            times = ", ".join(f"{t:.0f}" for t in departures)
+            print(f"{method}: emergency vehicles depart at t = {times} s (simulation time)")
+            print(f"{method}: fast-forward to t={meet_at:.0f} s, then normal speed")
+            pace["on"] = False
     if gui:
         style_types(env)
     while env.agents:
@@ -240,6 +279,12 @@ def run(
             width = frame_view(env, episode.net_file, view_width)
             if env.now + env.delta > reframe_until:
                 print(f"{method}: view {width:.0f} m wide")
+        if meet_at is not None and env.now >= meet_at:
+            if sync is not None:  # both windows continue together from here
+                with contextlib.suppress(Exception):  # the other window may have closed
+                    sync.wait(timeout=900)
+            pace["on"] = True
+            meet_at = None
         if gui and follow_ev:
             # the view is framed at view_width when following starts; while the camera
             # follows a vehicle the window is not redrawn between TraCI calls, so the zoom
@@ -296,6 +341,7 @@ def main() -> None:
         "--stop-after-snapshots", action="store_true", help="close once the screenshots exist"
     )
     args = parser.parse_args()
+    sync = None if args.headless else mp.Barrier(2)
     jobs = []
     for method, x in ((args.left, 0), (args.right, 960)):
         ckpt = None if method in BASELINES else args.checkpoint
@@ -316,6 +362,7 @@ def main() -> None:
                 args.stop_after_snapshots,
                 args.view_width,
                 args.follow_ev,
+                sync,
             ),
         )
         p.start()
