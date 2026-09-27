@@ -78,6 +78,7 @@ METRIC_LABELS = {
     "ev_travel_time": "EV travel time (s)",
     "ev_delay": "EV delay (s)",
     "inference_ms_per_decision": "Inference per decision (ms)",
+    "inference_ms_per_step": "Inference per step, all signals (ms)",
     "sim_wall_time_s": "Simulation wall time (s)",
 }
 HIGHER_IS_BETTER = {"throughput_per_h"}
