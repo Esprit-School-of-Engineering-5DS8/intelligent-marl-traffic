@@ -10,7 +10,7 @@
 | M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | done (2026-09-26) |
 | M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | done (2026-09-27) |
 | M7 | Full experiment matrix, statistics, figures, tables | done (2026-09-27) |
-| M8 | Dashboard, demo script, docs, README results | planned |
+| M8 | Dashboard, demo script, docs, README results | done (2026-09-27); demo video and remaining report sections by the team |
 
 ## M0 - summary (2026-09-24)
 
@@ -105,3 +105,15 @@
 - Problems: a race when parallel runs wrote the same signal plan (fixed); COOP-FULL
   gridlocks at peak with pedestrians (F-014).
 - Next: M8 - final README, dashboard and demo check.
+
+## M8 - summary (2026-09-27)
+
+- Works: README with results, findings and what did not work; dashboard (smoke check
+  passes on the full results); side-by-side demo (fixed-time vs COOP-FULL on the district
+  by default, checked headless); `scripts/reproduce_all.sh` covers the forecast model, the
+  full matrix, the sensitivity experiment and feature importance; report sections 8-10 in
+  `docs/report/`.
+- Tests: 113 passing.
+- Left to the team: demo video, Design Thinking interviews and tests with people
+  (`docs/design_thinking/`), report sections 1-7 and 11-12 (`docs/report_outline.md`).
+

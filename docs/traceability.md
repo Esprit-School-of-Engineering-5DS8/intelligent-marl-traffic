@@ -11,7 +11,7 @@ Status: **done** = implemented and evidenced, **impl.** = implemented, evidence 
 | Q4 How to evaluate performance? | `evaluation/metrics.py` (tested on hand-written SUMO outputs), `analysis/stats.py`, ADR-005 | REPORT_TABLES.md (CIs, Mann-Whitney + Holm, Cliff's delta) | done |
 | Q5 Which DS/AI approaches? | PPO + parameter sharing (ADR-008), Max-Pressure, forecasting (`src/cotraffic/forecasting`), statistics, explainability (`src/cotraffic/explainability`) | ADRs, reward study (F-007), forecasting table, Fig. 12 | impl. |
 | Q6 Factors beyond traffic flow | EVs, CO2, pedestrians, buses, incidents, failures, scale | RQ2-RQ5, Fig. 4-9, 11; report 8.2-8.7 | done |
-| Working prototype | whole repository; `make smoke` (12 checks), `make demo`, `dashboard/app.py` | smoke log, dashboard, demo video (team) | impl. |
+| Working prototype | whole repository; `make smoke` (12 checks), `make demo`, `dashboard/app.py` | smoke log, dashboard, demo video (team) | done (demo video: team) |
 | Experiments under different traffic conditions | `configs/demand`, `configs/scenarios`, `configs/experiments/full_matrix.yaml` | REPORT_TABLES.md, Fig. 2, 7 | impl. |
 | Comparison with baselines | `src/cotraffic/controllers` (FT Webster, ACT, MP, EV-RULE), ADR-004 | journal M2, REPORT_TABLES.md, Fig. 2-3 | done |
 | Evidence of strengths and limitations | `analysis/`, `docs/FAILURES.md` (F-001..F-007) | significance tests, paired analysis, negative results (F-001..F-012), report section 10 | done |

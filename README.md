@@ -49,6 +49,7 @@ Windows without `make`. `python -m cotraffic <command> --help` lists the options
 | `make select` | `select` | choose the checkpoint of each run on validation seeds |
 | | `validate --agents ind coop --baselines mp` | compare variants on validation seeds (design choices) |
 | `make evaluate` | `evaluate --experiment full_matrix --jobs 2` | run an experiment matrix (skips runs already done) |
+| | `evaluate --experiment sensitivity --jobs 2` | forecast agent, EV weight, preemption and pedestrian rules on Max-Pressure |
 | `make aggregate` | `aggregate` | means, bootstrap CIs, Mann-Whitney U + Holm, Cliff's delta |
 | `make figures` | `figures` | the report figures, PNG + SVG, in `figures/` |
 | `make tables` | `tables` | `results/summary/REPORT_TABLES.md` |
@@ -71,7 +72,8 @@ src/cotraffic/  networks/ demand/ scenarios/ envs/ controllers/ training/ evalua
 sumo_files/     generated networks and route bundles (reproducible from configs)
 results/        raw/ (one CSV per run), summary/, logs/, training/
 figures/        report figures (PNG + SVG)
-docs/           Design Thinking, decisions (ADR), FAILURES, EXPERIMENT_JOURNAL, PROGRESS
+docs/           Design Thinking, decisions (ADR), FAILURES, EXPERIMENT_JOURNAL, PROGRESS,
+                report/ (results, ablations and limitations sections)
 tests/          pytest suite
 ```
 
