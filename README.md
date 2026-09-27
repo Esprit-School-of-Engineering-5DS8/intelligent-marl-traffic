@@ -56,7 +56,7 @@ Windows without `make`. `python -m cotraffic <command> --help` lists the options
 | `make forecast` | `forecast --net grid4x4` | inflow forecasting dataset, models and scores |
 | `make explain` | `explain --agent coop_full --net grid4x4` | decision log and feature-group importance |
 | `make dashboard` | (`streamlit run dashboard/app.py`) | interactive results (no SUMO needed) |
-| `make demo` | (`python scripts/demo_side_by_side.py`) | two sumo-gui windows: baseline vs COOP-FULL |
+| `make demo` | (`python scripts/demo_side_by_side.py`) | two sumo-gui windows, baseline vs COOP-FULL: vehicles and pedestrians coloured by type, legend, `--snapshot-at` for screenshots |
 | `make reproduce` | (`bash scripts/reproduce_all.sh`) | everything, from networks to tables |
 
 `docs/RUN_PLAN.md` explains how to split training and evaluation between machines,
