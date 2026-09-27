@@ -10,11 +10,13 @@ emergency-vehicle preemption (report, section 8.2).
         [--net real_district] [--demand peak] [--scenarios emergency] [--seed 3]
 
 Display only (the simulation is unchanged): vehicles and pedestrians are drawn as shapes
-in one colour per type - cars light grey, buses amber, emergency vehicles flashing
-red/blue, the accident vehicle magenta, pedestrians cyan - with a legend naming the
+in one colour per type - cars blue-grey, buses amber, emergency vehicles (ambulances)
+white with a green cross, the accident vehicle magenta, pedestrians cyan - with a legend naming the
 controller in each window. The view opens 300 m wide around the signals (``--view-width``);
-zoom and pan with the mouse. ``--snapshot-at 900 1800`` saves screenshots of both windows
-at those simulation times (``results/tmp/demo/``), e.g. for the report.
+zoom and pan with the mouse. ``--follow-ev`` makes the camera follow each emergency
+vehicle (ids ``ev_0``, ``ev_1``...) from departure to arrival, in both windows.
+``--snapshot-at 900 1800`` saves screenshots of both windows at those simulation times
+(``results/tmp/demo/``), e.g. for the report.
 
 ``--headless`` runs both controllers without windows (checks the setup).
 """
@@ -31,17 +33,17 @@ DEMO_DIR = Path(__file__).resolve().parents[1] / "results" / "tmp" / "demo"
 
 # RGB 0-255, chosen for contrast on dark roads and a light background
 TYPE_STYLE = {
-    "car": ((190, 195, 205), "passenger/sedan"),
+    "car": ((125, 140, 165), "passenger/sedan"),
     "bus": ((255, 176, 0), "bus"),
-    "emergency": ((230, 30, 30), "emergency"),
+    "emergency": ((255, 255, 255), "emergency"),  # sumo-gui draws it white, green cross
     "incident": ((200, 0, 200), "passenger"),
     "DEFAULT_PEDTYPE": ((0, 190, 255), "pedestrian"),
 }
-EV_FLASH = ((230, 30, 30), (30, 90, 255))
+EV_VIEW_WIDTH = 120.0  # metres shown while the camera follows an emergency vehicle
 LEGEND = [
     ("car", "car"),
     ("bus", "bus"),
-    ("emergency", "emergency vehicle (flashing)"),
+    ("emergency", "ambulance (white, green cross)"),
     ("incident", "accident vehicle"),
     ("DEFAULT_PEDTYPE", "pedestrian"),
 ]
@@ -84,11 +86,21 @@ def draw_legend(title: str, out: Path) -> tuple[int, int]:
     for i, (vtype, label) in enumerate(LEGEND):
         y = 0.72 - i * 0.15
         rgb = [c / 255 for c in TYPE_STYLE[vtype][0]]
-        ax.add_patch(plt.Rectangle((0.04, y - 0.05), 0.09, 0.1, color=rgb, transform=ax.transAxes))
+        box = plt.Rectangle(
+            (0.04, y - 0.05), 0.09, 0.1, facecolor=rgb, edgecolor="0.4", transform=ax.transAxes
+        )
+        ax.add_patch(box)
         if vtype == "emergency":
-            blue = [c / 255 for c in EV_FLASH[1]]
-            ax.add_patch(
-                plt.Rectangle((0.085, y - 0.05), 0.045, 0.1, color=blue, transform=ax.transAxes)
+            ax.text(
+                0.085,
+                y,
+                "+",
+                color="#1f7a3d",
+                fontsize=10,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
             )
         ax.text(0.17, y, label, fontsize=9, va="center", transform=ax.transAxes)
     fig.savefig(out, facecolor=fig.get_facecolor())
@@ -109,8 +121,8 @@ def signal_centre(net_file: Path) -> tuple[float, float]:
     )
 
 
-def frame_view(env, net_file: Path, width_m: float) -> float:
-    """Centre the view on the signals and zoom until it is ``width_m`` wide.
+def zoom_to(env, width_m: float, centre: tuple[float, float] | None = None) -> float:
+    """Zoom until the view is ``width_m`` wide (optionally centred on ``centre``).
 
     The zoom unit of sumo-gui depends on the window size, which is only final once the
     window is drawn, so we measure the visible area and correct the zoom proportionally.
@@ -118,10 +130,10 @@ def frame_view(env, net_file: Path, width_m: float) -> float:
     import time
 
     gui = env.conn.gui
-    cx, cy = signal_centre(net_file)
     width = width_m
     for _ in range(6):
-        gui.setOffset("View #0", cx, cy)
+        if centre is not None:
+            gui.setOffset("View #0", *centre)
         time.sleep(0.4)  # let the window redraw before measuring it
         (x0, _), (x1, _) = gui.getBoundary("View #0")
         width = x1 - x0
@@ -129,6 +141,11 @@ def frame_view(env, net_file: Path, width_m: float) -> float:
             break
         gui.setZoom("View #0", gui.getZoom("View #0") * width / width_m)
     return width
+
+
+def frame_view(env, net_file: Path, width_m: float) -> float:
+    """Centre the view on the most central signal, ``width_m`` wide."""
+    return zoom_to(env, width_m, signal_centre(net_file))
 
 
 def view_settings(title: str, tag: str, delay: int) -> Path:
@@ -160,12 +177,6 @@ def style_types(env) -> None:
             vt.setShapeClass(vtype, shape)
 
 
-def flash_emergency(env, now: float) -> None:
-    rgb = EV_FLASH[int(now) % 2]
-    for ev in env.ev_ids:
-        env.conn.vehicle.setColor(ev, (*rgb, 255))
-
-
 def run(
     method: str,
     checkpoint: str | None,
@@ -180,6 +191,7 @@ def run(
     snapshot_at: tuple[float, ...] = (),
     stop_after_snapshots: bool = False,
     view_width: float = 300.0,
+    follow_ev: bool = False,
 ) -> None:
     from cotraffic.analysis.style import label
     from cotraffic.controllers.registry import make_controller
@@ -204,7 +216,6 @@ def run(
         settings = view_settings(f"{side}: {label(method)}", f"{side}_{method}", delay)
         options = ["--window-pos", f"{x},30", "--window-size", "940,900"]
         options += ["--gui-settings-file", str(settings)]
-        hooks.append(flash_emergency)
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
@@ -220,6 +231,7 @@ def run(
     controller.reset(env)
     reframe_until = 60.0 if gui else -1.0  # the window may be resized while it opens
     pending = sorted(snapshot_at)
+    tracked: str | None = None
     if gui:
         style_types(env)
     while env.agents:
@@ -228,12 +240,30 @@ def run(
             width = frame_view(env, episode.net_file, view_width)
             if env.now + env.delta > reframe_until:
                 print(f"{method}: view {width:.0f} m wide")
+        if gui and follow_ev:
+            # the view is framed at view_width when following starts; while the camera
+            # follows a vehicle the window is not redrawn between TraCI calls, so the zoom
+            # is scaled by a fixed factor instead of being measured
+            factor = view_width / EV_VIEW_WIDTH
+            if tracked is not None and tracked not in env.ev_ids:  # it has arrived
+                env.conn.gui.trackVehicle("View #0", "")
+                env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") / factor)
+                frame_view(env, episode.net_file, view_width)
+                tracked = None
+            if tracked is None and env.ev_ids:
+                tracked = sorted(env.ev_ids)[0]
+                env.conn.gui.trackVehicle("View #0", tracked)
+                env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") * factor)
+                print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
         if gui and pending and env.now >= pending[0]:
             shot = DEMO_DIR / f"{network}_{method}_t{int(pending.pop(0))}.png"
             env.conn.gui.screenshot("View #0", str(shot))
             print(f"{method}: screenshot {shot}")
             if not pending and stop_after_snapshots:
-                env.step(controller.act(env, obs))  # the screenshot is written at the next step
+                try:  # the screenshot is written at the next step
+                    env.step(controller.act(env, obs))
+                except Exception as exc:  # sumo-gui may close first; the file is usually there
+                    print(f"{method}: last step after the screenshot failed ({exc})")
                 break
     env.close()
     print(f"{method}: finished at t={env.now:.0f} s, {env.teleports} teleports")
@@ -253,6 +283,9 @@ def main() -> None:
     parser.add_argument("--delay", type=int, default=40, help="ms per simulation step")
     parser.add_argument(
         "--view-width", type=float, default=300.0, help="metres shown across the window"
+    )
+    parser.add_argument(
+        "--follow-ev", action="store_true", help="the camera follows each emergency vehicle"
     )
     parser.add_argument("--headless", action="store_true", help="no window (checks the setup)")
     parser.add_argument("--quick", action="store_true", help="short episode")
@@ -282,6 +315,7 @@ def main() -> None:
                 tuple(args.snapshot_at),
                 args.stop_after_snapshots,
                 args.view_width,
+                args.follow_ev,
             ),
         )
         p.start()
