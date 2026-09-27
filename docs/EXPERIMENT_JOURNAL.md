@@ -525,3 +525,21 @@ emergency cell at peak, against COOP-FULL t1 (lambda_ev = 2): EV delay 109.7 s (
 63.3 s (-2%, not significant); travel time +4.4% and +1.7%. This suggests that
 lambda_ev >= 2 is needed and that a larger weight adds nothing, but each value rests on a
 single training run and the spread between runs is large (COOP t2): indicative only.
+
+## 2026-09-27 - Extended matrix complete
+
+`evaluate --experiment extended` (430 runs, 4 workers, 00:08-01:55). Two fixed-time runs
+failed at the start: four workers wrote the same fixed-time plan at once and Windows
+refused the rename (fixed in `controllers/programs.py`, test with six concurrent writers)
+and were rerun. Full matrix: 1 220 runs, sensitivity: 70 runs, none missing. Results in
+report section 8.10 (exploratory family). New findings:
+
+- COOP-FULL gridlocks in 4 of 15 runs at peak with pedestrians (FAILURES F-014); the other
+  11 runs are close to Max-Pressure.
+- Accident on the district: Max-Pressure serves the affected vehicles worst (+13.8% vs
+  ACT); IND is 11.3% better than Max-Pressure there - the opposite of the grid.
+- Emergency vehicles at medium demand repeat the peak result: preemption -60% EV delay on
+  either base at +0.1-0.2% travel time; COOP-FULL -31% vs COOP, behind EV-RULE-MP.
+- Buses at peak: COOP-FULL -7.9% bus delay vs Max-Pressure, +4.0% person-weighted delay.
+- Elsewhere the learned agents stay 2.4-3.7% behind the best baseline (medium demand,
+  grid8x8) or within the noise (district low and rush profile).

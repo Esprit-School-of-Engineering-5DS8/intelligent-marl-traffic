@@ -9,7 +9,7 @@
 | M4 | COOP (neighbour communication), reward normalisation | done (2026-09-26) |
 | M5 | COOP-ECO, COOP-FULL, incident evaluation, real district training | done (2026-09-26) |
 | M6 | Pedestrians, buses, sensor noise, comm dropout, grid8x8, forecasting, explainability - feature freeze | done (2026-09-27) |
-| M7 | Full experiment matrix, statistics, figures, tables | in progress: core and sensitivity done; extended matrix running |
+| M7 | Full experiment matrix, statistics, figures, tables | done (2026-09-27) |
 | M8 | Dashboard, demo script, docs, README results | planned |
 
 ## M0 - summary (2026-09-24)
@@ -86,3 +86,22 @@
 - Problems: laptop shutdown and standby interrupted runs (resumed and verified, journal);
   pedestrians impossible on the district (F-011); shield blind to failed detectors (F-012).
 - Next: sensitivity experiment (forecast agent, lambda_ev), extended matrix, M8.
+
+## M6 - summary (2026-09-27)
+
+- Works: pedestrians, buses, sensor faults, communication dropout, grid8x8 zero-shot,
+  forecasting (models and forecast agent), explainability (decision logs, permutation
+  importance), EV-RULE-MP and PED-RULE-MP baselines.
+- Measured: forecast agent = IND (no gain, RQ6); EV weight >= 2 suggested (one run per
+  value); PED-RULE-MP caps pedestrian waits at no vehicle cost, COOP-FULL has the lower
+  mean wait at +2.6% travel time.
+
+## M7 - summary (2026-09-27)
+
+- Works: full matrix (1 220 runs) and sensitivity (70 runs) complete; statistics with
+  two-way bootstrap, paired differences, fixed confirmatory Holm family; all figures and
+  report tables regenerated; report sections 8-10 (8.10 = extended, exploratory).
+- Measured: see report sections 8-10 and README.
+- Problems: a race when parallel runs wrote the same signal plan (fixed); COOP-FULL
+  gridlocks at peak with pedestrians (F-014).
+- Next: M8 - final README, dashboard and demo check.

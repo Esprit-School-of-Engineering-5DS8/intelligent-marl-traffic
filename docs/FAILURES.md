@@ -186,3 +186,23 @@ entries at the bottom. Negative results that belong in the report are marked **[
 - **Fix / lesson:** EV-RULE-MP added as a baseline; every mechanism is reported against
   its own base controller. Compare a mechanism with the same mechanism on the strongest
   base available before crediting the learned agent.
+
+## F-014 - COOP-FULL gridlocks with pedestrians at peak (2026-09-27) [report]
+
+- **Tried:** COOP-FULL (pedestrian block and pedestrian term in the reward, trained with
+  pedestrians in every episode) evaluated at peak demand with pedestrians (extended
+  matrix, 3 training runs x 5 test seeds).
+- **Evidence:** 4 of 15 runs gridlock (mean travel time 441-638 s; 34 to 1 140 vehicles
+  still in the network at the end, 24.8 teleports per run on average); the other 11 runs
+  are at 235-306 s, close to Max-Pressure (237-297 s), and every training run is affected
+  at least once. No other controller gridlocks in this cell (Max-Pressure 0.2 teleports
+  per run).
+- **Diagnosis (hypothesis, not verified):** at peak, serving the crossings the reward
+  asks for costs vehicle capacity; once queues spill back to the upstream junction the
+  network locks, and neither the shield nor the observation has any notion of spillback.
+  Training episodes draw the demand level at random, so saturated peak episodes with
+  pedestrians are a minority of what the policy saw.
+- **Fix / lesson:** reported as a failure of the learned multi-objective agent; a
+  deployment would need a spillback guard in the shield and training weighted toward
+  saturated conditions. A mean over 15 runs hides such tails: look at the worst runs
+  and at unfinished vehicles, not only at the mean.

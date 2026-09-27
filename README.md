@@ -87,8 +87,9 @@ tests/          pytest suite
 
 ## Results
 
-Core experiment matrix: 790 runs, 5 test seeds per cell, 3 training runs per learned
-variant (checkpoints chosen on validation seeds). Write-up per research question:
+Full experiment matrix: 1 220 runs (core 790, extended 430) plus 70 sensitivity runs,
+5 test seeds per cell, 3 training runs per learned variant (checkpoints chosen on
+validation seeds). Write-up per research question:
 `docs/report/08_results.md` (ablations and limitations in sections 9 and 10); every table,
 with 95% confidence intervals and tests: `results/summary/REPORT_TABLES.md`.
 
@@ -122,8 +123,9 @@ Mean travel time (s), normal traffic (lower is better; best in bold):
   pedestrian rule on Max-Pressure, at +2.6% of vehicle travel time; the rule caps the
   longest waits at no vehicle cost.
 - What did not work: messages between neighbouring agents (F-009), reward redesign
-  (F-007) and a forecast of arrivals in the observation did not close the gap; the learned agents handle accidents worse than
-  Max-Pressure (`docs/FAILURES.md`).
+  (F-007) and a forecast of arrivals in the observation did not close the gap; the
+  learned agents handle accidents worse than Max-Pressure on the grid, and COOP-FULL
+  gridlocks in 4 of 15 runs at peak with pedestrians (`docs/FAILURES.md`, F-014).
 - Contribution: a fair, reproducible benchmark (same shield, seeds, statistics and base
   controllers for every method) and the diagnosis of why learning does not beat
   Max-Pressure here (F-007, F-009, F-013).

@@ -18,8 +18,11 @@ The negative results below are part of the findings; each one is traced in
   threshold (30 s, fixed in advance): it caps the longest pedestrian waits at no vehicle
   cost, COOP-FULL has the lower mean wait at +2.6% of vehicle travel time. Whether a
   shorter threshold would dominate COOP-FULL is not established (section 8.7).
-- They handle an accident worse than Max-Pressure (+3 to +12% for the affected vehicles),
-  having never seen one in training (section 8.4).
+- They handle an accident worse than Max-Pressure on the grid (+3 to +12% for the
+  affected vehicles), having never seen one in training (section 8.4); on the district
+  the order is reversed (section 8.10).
+- COOP-FULL gridlocks in 4 of 15 runs at peak demand with pedestrians, a tail that its
+  mean hides (section 8.10, F-014); nothing in the shield prevents spillback.
 - Surrogate safety measures favour Max-Pressure and actuated control: the learned agents
   switch more often and produce 6-16% more conflicts with a time-to-collision below 1.5 s
   than Max-Pressure, depending on the demand, and more stops per vehicle (section 8.1).

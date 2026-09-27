@@ -37,8 +37,9 @@ p-values are optimistic, and we rely on the intervals as much as on p. Full tabl
   does better (F-013). CO2 follows travel time (correlation 0.93-0.99): there is no
   trade-off to trace.
 - Neither communication between neighbours (F-009), a different reward (F-007) nor a
-  forecast of arrivals (RQ6) closed the gap; the learned agents also handle an accident
-  worse than Max-Pressure.
+  forecast of arrivals (RQ6) closed the gap. The learned agents handle an accident worse
+  than Max-Pressure on the grid (better on the district, exploratory), and COOP-FULL
+  gridlocks in 4 of 15 runs at peak with pedestrians (F-014).
 - Our contribution is therefore a fair, reproducible benchmark - the same shield, seeds,
   statistics and base controllers for every method, each mechanism compared with the same
   mechanism on the strongest base - and the diagnosis of why learning does not beat
@@ -231,8 +232,10 @@ Policies trained on grid4x4 (16 signals) run unchanged on grid8x8 (64 signals), 
 | COOP | 313.1 [312.0, 314.6] | +4.1% [+3.7, +4.6] | -14.3% [-14.7, -13.9] |
 
 The gap to Max-Pressure does not grow with the network (IND: 3.5% on grid4x4 at peak, 4.0%
-on grid8x8). Parameter sharing and fixed-size, padded observations make the transfer
-possible: every junction runs the same policy on the same observation layout.
+on grid8x8; 3.6% at medium demand, section 8.10). Parameter sharing and fixed-size, padded
+observations make the transfer possible: every junction runs the same policy on the same
+observation layout. Computing the decisions of all 64 signals takes 2-7 ms per step on the
+laptop CPU (Figure 9), far below the 5-s decision interval.
 
 ## 8.6 RQ6 (Tier 3) - Does short-term forecasting help?
 
@@ -320,3 +323,43 @@ the three runs; COOP t1: 221 s at peak, against 224.6 s).
 - Per-decision explanations ("keeps north-south green: 12 halting on north-south, 4 on
   east-west; emergency vehicle 180 m from the south") are in
   `results/logs/decisions/explained__*.csv` and in the dashboard.
+
+## 8.10 Other conditions (extended matrix, exploratory)
+
+The extended matrix (430 runs, none failed after one rerun) covers the remaining cells of
+the design; its tests form the exploratory Holm family (ADR-005). Differences are paired by
+test seed against the best baseline of the cell unless stated.
+
+| Cell | Best baseline (s) | IND | COOP | COOP-FULL |
+|---|---|---|---|---|
+| grid4x4, incident, medium | ACT 157.0 | +2.4% [+2.0, +2.9] | +2.7% [+2.1, +3.3] | +2.9% [+2.5, +3.2] |
+| grid4x4, emergency, medium | ACT 157.0 | | +2.6% [+2.2, +2.9] | +2.6% [+2.3, +3.0] |
+| grid8x8, medium (zero-shot) | MP 278.8 | +3.6% [+3.3, +3.8] | +3.7% [+3.4, +4.1] | |
+| district, low | MP 104.7 | +0.5% [+0.0, +0.9] | +0.8% [+0.4, +1.2] | +1.0% [+0.2, +2.1] |
+| district, rush profile | ACT 127.6 | +0.4% [-3.3, +3.1] | -0.5% [-3.7, +2.2] | -0.4% [-3.9, +3.7] |
+| district, incident, peak | ACT 159.2 | -0.2% [-8.6, +9.2] | +0.4% [-6.1, +7.3] | -3.4% [-9.5, +2.9] |
+| grid4x4, buses, peak | MP 217.9 | | +5.6% [+1.7, +10.2] | +2.7% [+0.8, +4.8] |
+| grid4x4, pedestrians, peak | MP 265.2 | | +15.9% [+4.6, +27.8] | +29.6% [+4.2, +65.1] |
+
+- **The core picture holds.** At medium demand, with or without an incident or emergency
+  vehicles, and on the 64-junction grid, the learned agents stay 2.4-3.7% behind the best
+  baseline; on the district at low demand and on the rush profile all controllers except
+  fixed-time are within 1.5% of each other. On grid8x8 the learned agents have a 3-4% lower
+  95th-percentile wait than Max-Pressure.
+- **Emergency vehicles at medium demand** confirm section 8.2: preemption cuts the EV delay
+  by 60% on actuated control (+0.1% travel time) and on Max-Pressure (+0.2%); COOP-FULL
+  cuts it by 31% compared with COOP (no travel-time cost) and remains behind EV-RULE-MP
+  (EV delay +93% [+41, +167], travel time +2.0% [+1.7, +2.5]).
+- **Accident on the district** reverses the grid result: Max-Pressure serves the affected
+  vehicles worst (242.3 s, +13.8% [+7.5, +19.5] against actuated control), and IND is
+  11.3% better than Max-Pressure there ([-15.5, -6.4]). Network-wide, all controllers but
+  FT are within the noise.
+- **Buses at peak:** COOP-FULL's person-weighted reward lowers the bus delay by 7.9%
+  compared with Max-Pressure ([-13.7, -2.9]), for +2.7% of travel time and +4.0% of
+  person-weighted delay ([+0.8, +8.0]).
+- **Pedestrians at peak** are the hardest cell: fixed-time and actuated control produce
+  10-13 teleports per run. COOP-FULL gridlocks in 4 of its 15 runs (441-638 s, up to
+  1 140 unfinished vehicles; the other 11 runs are at 235-306 s, close to Max-Pressure's
+  237-297 s), which makes it the worst learned variant in this cell (FAILURES F-014).
+  PED-RULE-MP stays close to Max-Pressure (+3.0% [-1.1, +7.9]) and lowers the mean
+  pedestrian wait by 5% ([-9.2, -1.2]).
