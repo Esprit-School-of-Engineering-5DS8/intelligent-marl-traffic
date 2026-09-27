@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -155,11 +156,30 @@ def _write_programs(
     _atomic_write(path, ET.tostring(root, encoding="unicode") + "\n")
 
 
-def _atomic_write(path: Path, text: str) -> None:
-    """Write then rename, so a parallel run never reads a half-written file."""
+def _atomic_write(path: Path, text: str, attempts: int = 20) -> None:
+    """Write then rename, so a parallel run never reads a half-written file.
+
+    On Windows the rename fails while another process is replacing or reading the same
+    file; parallel runs write identical content, so we retry briefly and give up only if
+    the file that is there differs from ours.
+    """
     tmp = path.with_name(f"{path.name}.tmp{os.getpid()}")
     tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    for attempt in range(attempts):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            try:
+                same = path.read_text(encoding="utf-8") == text
+            except OSError:  # being replaced by another process right now
+                same = False
+            if same:
+                tmp.unlink(missing_ok=True)
+                return
+            time.sleep(0.05 * (attempt + 1))
+    tmp.unlink(missing_ok=True)
+    raise PermissionError(f"could not write {path}")
 
 
 def _cycle_phases(
