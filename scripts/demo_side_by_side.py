@@ -1,13 +1,13 @@
 """Two sumo-gui windows side by side, same demand and events, two controllers.
 
-Default: the real district at peak with emergency vehicles, fixed-time signals (the
+Default: the real district at peak with emergency vehicles and buses, fixed-time signals (the
 status quo) on the left and COOP-FULL on the right. Record the screen. For the strongest
 classical controller use ``--left mp``, or ``--left ev_rule_mp`` for Max-Pressure with
 emergency-vehicle preemption (report, section 8.2).
 
     python scripts/demo_side_by_side.py [--left ft] [--right coop_full]
         [--checkpoint results/checkpoints/coop_full/real_district/seed1.zip]
-        [--net real_district] [--demand peak] [--scenarios emergency] [--seed 3]
+        [--net real_district] [--demand peak] [--scenarios emergency buses] [--seed 3]
 
 Display only (the simulation is unchanged): vehicles and pedestrians are drawn as shapes
 in one colour per type - cars blue-grey, buses amber, emergency vehicles (ambulances)
@@ -19,6 +19,11 @@ simulation fast-forwards to 30 s before the first one departs. Both windows wait
 other at that point (or after the first minute), then run in step.
 ``--snapshot-at 900 1800`` saves screenshots of both windows at those simulation times
 (``results/tmp/demo/``), e.g. for the report.
+
+A third window charts both controllers live on the same traffic (stopped vehicles, mean
+trip time, arrivals), with the hour measured by the evaluation shaded; the chart is saved
+at the end (``--no-chart`` to skip it). The two windows wait for each other every
+simulated minute so that they show the same moment.
 
 ``--headless`` runs both controllers without windows (checks the setup).
 """
@@ -209,6 +214,7 @@ def run(
     view_width: float = 300.0,
     follow_ev: bool = False,
     sync=None,
+    stats=None,
 ) -> None:
     from cotraffic.analysis.style import label
     from cotraffic.controllers.registry import make_controller
@@ -238,6 +244,23 @@ def run(
 
     if gui:
         hooks.append(pause)
+    # live comparison: completed trips, measured the same way for both controllers
+    trips = {"dep": {}, "tt": [], "arrived": 0, "ev": {}}
+
+    def count_trips(env, now: float) -> None:
+        sim = env.conn.simulation
+        for v in sim.getDepartedIDList():
+            trips["dep"][v] = now
+        for v in sim.getArrivedIDList():
+            trips["arrived"] += 1
+            t0 = trips["dep"].pop(v, None)
+            if t0 is not None:
+                trips["tt"].append(now - t0)
+                if v.startswith("ev_"):
+                    trips["ev"][v] = now - t0
+
+    if stats is not None:
+        hooks.append(count_trips)
     if gui:
         side = "left" if x == 0 else "right"
         settings = view_settings(f"{side}: {label(method)}", f"{side}_{method}")
@@ -279,10 +302,18 @@ def run(
             width = frame_view(env, episode.net_file, view_width)
             if env.now + env.delta > reframe_until:
                 print(f"{method}: view {width:.0f} m wide")
+        if stats is not None:
+            lanes = [ln for i in env.intersections.values() for ln in i.in_lanes]
+            halting = sum(env.meas.halting[ln] for ln in lanes)
+            tt = trips["tt"]
+            mean_tt = sum(tt) / len(tt) if tt else float("nan")
+            stats.put(
+                (0 if x == 0 else 1, env.now, halting, trips["arrived"], mean_tt, dict(trips["ev"]))
+            )
+        if sync is not None and env.now % 60 < env.delta:  # both windows wait every minute
+            with contextlib.suppress(Exception):  # the other window may have closed
+                sync.wait(timeout=300)
         if meet_at is not None and env.now >= meet_at:
-            if sync is not None:  # both windows continue together from here
-                with contextlib.suppress(Exception):  # the other window may have closed
-                    sync.wait(timeout=900)
             pace["on"] = True
             meet_at = None
         if gui and follow_ev:
@@ -314,6 +345,160 @@ def run(
     print(f"{method}: finished at t={env.now:.0f} s, {env.teleports} teleports")
 
 
+def live_chart(stats, jobs, methods, measured, network) -> None:
+    """Third window: the two controllers on the same traffic, updated as they run.
+
+    Instantaneous queues are noisy, so the stopped-vehicle curve is a 1-minute average and a
+    second panel accumulates the waiting at the signals: a small, steady difference between
+    the controllers shows there as two curves drifting apart.
+    """
+    import queue
+
+    import matplotlib.pyplot as plt
+
+    from cotraffic.analysis.style import METHOD_COLORS, label
+
+    names = [label(m) for m in methods]
+    colors = [METHOD_COLORS.get(m, "#52514e") for m in methods]
+    rgb = [tuple(int(c[i : i + 2], 16) for i in (1, 3, 5)) for c in colors]
+    if sum((a - b) ** 2 for a, b in zip(*rgb, strict=True)) ** 0.5 < 120:
+        colors[1] = "#2a78d6"  # two similar hues would be hard to tell apart
+    plt.rcParams.update({"font.size": 11, "axes.titlesize": 12, "axes.titleweight": "bold"})
+    fig, axes = plt.subplots(2, 2, figsize=(13, 7.6))
+    ax_q, ax_w, ax_t, ax_ev = axes.ravel()
+    for ax in (ax_q, ax_w, ax_t):
+        ax.axvspan(measured[0] / 60, measured[1] / 60, color="0.94", zorder=0)
+        ax.set_xlabel("simulated time (min)")
+        ax.grid(alpha=0.3)
+        ax.spines[["top", "right"]].set_visible(False)
+    ax_q.set_title("Vehicles stopped at the signals (1-min average)")
+    ax_w.set_title("Waiting accumulated at the signals (vehicle-hours)")
+    ax_t.set_title("Mean trip time of completed trips (s)")
+    ax_ev.set_title("Emergency vehicles: trip time (s)")
+    ax_ev.spines[["top", "right"]].set_visible(False)
+    raw, smooth, cum, trip = [], [], [], []
+    for n, c in zip(names, colors, strict=True):
+        raw.append(ax_q.plot([], [], color=c, lw=0.8, alpha=0.25)[0])
+        smooth.append(ax_q.plot([], [], color=c, lw=2.4, label=n)[0])
+        cum.append(ax_w.plot([], [], color=c, lw=2.4, label=n)[0])
+        trip.append(ax_t.plot([], [], color=c, lw=2.4, label=n)[0])
+    ax_q.legend(loc="upper left", frameon=False)
+    status = fig.text(0.5, 0.945, "", ha="center", fontsize=11)
+    fig.suptitle(f"{names[0]} vs {names[1]} on {network}, same traffic", fontsize=14, y=0.99)
+    fig.text(
+        0.5, 0.012, "grey band: the period measured in the evaluation", ha="center", color="0.4"
+    )
+    fig.tight_layout(rect=(0, 0.03, 1, 0.935))
+    plt.show(block=False)
+    data = [{"t": [], "h": [], "a": [], "tt": [], "ev": {}} for _ in methods]
+    drawn_ev = None
+
+    def rolling(v, n=12):  # 12 decisions of 5 s = 1 minute
+        out, acc = [], 0.0
+        for i, x in enumerate(v):
+            acc += x - (v[i - n] if i >= n else 0.0)
+            out.append(acc / min(i + 1, n))
+        return out
+
+    def cumulative_hours(v):
+        out, acc = [], 0.0
+        for x in v:
+            acc += x * 5 / 3600  # vehicles stopped during a 5-s decision
+            out.append(acc)
+        return out
+
+    def draw_ev() -> None:
+        ax_ev.clear()
+        ax_ev.set_title("Emergency vehicles: trip time (s)")
+        ax_ev.spines[["top", "right"]].set_visible(False)
+        ids = sorted(set(data[0]["ev"]) | set(data[1]["ev"]), key=lambda v: int(v[3:]))
+        if not ids:
+            ax_ev.text(
+                0.5,
+                0.5,
+                "no emergency vehicle has arrived yet",
+                ha="center",
+                va="center",
+                color="0.45",
+                transform=ax_ev.transAxes,
+            )
+            ax_ev.set_xticks([])
+            ax_ev.set_yticks([])
+            return
+        for k in range(2):
+            xs = [i + (k - 0.5) * 0.38 for i in range(len(ids))]
+            ys = [data[k]["ev"].get(v, 0.0) for v in ids]
+            bars = ax_ev.bar(xs, ys, width=0.36, color=colors[k], label=names[k])
+            for b, v in zip(bars, ids, strict=True):
+                if v in data[k]["ev"]:
+                    ax_ev.text(
+                        b.get_x() + b.get_width() / 2,
+                        b.get_height(),
+                        f"{b.get_height():.0f}",
+                        ha="center",
+                        va="bottom",
+                        fontsize=9,
+                    )
+        ax_ev.set_xticks(range(len(ids)), [f"ambulance {v[3:]}" for v in ids])
+        ax_ev.legend(loc="upper left", frameon=False)
+        ax_ev.grid(axis="y", alpha=0.3)
+
+    draw_ev()
+    while any(p.is_alive() for p in jobs) or not stats.empty():
+        try:
+            while True:
+                k, now, halting, arrived, mean_tt, ev = stats.get_nowait()
+                d = data[k]
+                d["t"].append(now / 60)
+                d["h"].append(halting)
+                d["a"].append(arrived)
+                d["tt"].append(mean_tt)
+                d["ev"] = ev
+        except queue.Empty:
+            pass
+        if plt.fignum_exists(fig.number):
+            for k in range(len(methods)):
+                d = data[k]
+                raw[k].set_data(d["t"], d["h"])
+                smooth[k].set_data(d["t"], rolling(d["h"]))
+                cum[k].set_data(d["t"], cumulative_hours(d["h"]))
+                trip[k].set_data(d["t"], d["tt"])
+            for ax in (ax_q, ax_w, ax_t):
+                ax.relim()
+                ax.autoscale_view()
+            ev_now = (len(data[0]["ev"]), len(data[1]["ev"]))
+            if ev_now != drawn_ev:
+                draw_ev()
+                drawn_ev = ev_now
+            if data[0]["t"] and data[1]["t"]:
+                w = [cumulative_hours(d["h"])[-1] for d in data]
+                t = [d["tt"][-1] for d in data]
+                parts = [
+                    f"{n}: {tt:.0f} s mean trip, {wh:.1f} veh-h waiting"
+                    for n, tt, wh in zip(names, t, w, strict=True)
+                ]
+                status.set_text("   |   ".join(parts))
+            plt.pause(0.5)
+        else:
+            time.sleep(0.5)
+    print()
+    print("Same traffic, whole episode:")
+    for name, d in zip(names, data, strict=True):
+        if d["t"]:
+            ev = ", ".join(f"{v}: {t:.0f} s" for v, t in sorted(d["ev"].items()))
+            print(
+                f"  {name:12s} {d['a'][-1]:6d} vehicles arrived, mean trip {d['tt'][-1]:5.0f} s, "
+                f"{cumulative_hours(d['h'])[-1]:6.1f} vehicle-hours waiting at the signals"
+                + (f"; emergency vehicles {ev}" if ev else "")
+            )
+    DEMO_DIR.mkdir(parents=True, exist_ok=True)
+    out = DEMO_DIR / f"compare_{network}_{methods[0]}_vs_{methods[1]}.png"
+    fig.savefig(out, dpi=150)
+    print(f"chart saved: {out}")
+    if plt.fignum_exists(fig.number):
+        plt.show()  # stays open until closed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--left", default="ft")
@@ -323,7 +508,7 @@ def main() -> None:
     )
     parser.add_argument("--net", default="real_district")
     parser.add_argument("--demand", default="peak")
-    parser.add_argument("--scenarios", nargs="*", default=["emergency"])
+    parser.add_argument("--scenarios", nargs="*", default=["emergency", "buses"])
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--delay", type=int, default=40, help="ms per simulation step")
     parser.add_argument(
@@ -332,6 +517,7 @@ def main() -> None:
     parser.add_argument(
         "--follow-ev", action="store_true", help="the camera follows each emergency vehicle"
     )
+    parser.add_argument("--no-chart", action="store_true", help="no live comparison chart")
     parser.add_argument("--headless", action="store_true", help="no window (checks the setup)")
     parser.add_argument("--quick", action="store_true", help="short episode")
     parser.add_argument(
@@ -342,6 +528,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     sync = None if args.headless else mp.Barrier(2)
+    stats = None if args.headless or args.no_chart else mp.Queue()
     jobs = []
     for method, x in ((args.left, 0), (args.right, 960)):
         ckpt = None if method in BASELINES else args.checkpoint
@@ -363,10 +550,18 @@ def main() -> None:
                 args.view_width,
                 args.follow_ev,
                 sync,
+                stats,
             ),
         )
         p.start()
         jobs.append(p)
+    if stats is not None:
+        from cotraffic import config
+
+        ev = config.load_protocol()["quick" if args.quick else "evaluation"]
+        start = float(ev["warmup_s"])
+        measured = (start, start + float(ev["measure_s"]))
+        live_chart(stats, jobs, (args.left, args.right), measured, args.net)
     for p in jobs:
         p.join()
 
