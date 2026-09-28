@@ -297,7 +297,7 @@ def run(
             pace["on"] = False
     if gui:
         style_types(env)
-    from traci.exceptions import FatalTraCIError
+    from traci.exceptions import FatalTraCIError, TraCIException
 
     try:
         while env.agents:
@@ -337,11 +337,18 @@ def run(
                     env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") / factor)
                     frame_view(env, episode.net_file, view_width)
                     tracked = None
-                if tracked is None and env.ev_ids:
-                    tracked = sorted(env.ev_ids)[0]
-                    env.conn.gui.trackVehicle("View #0", tracked)
-                    env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") * factor)
-                    print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
+                # only a vehicle driving now (not one being teleported or just arrived)
+                on_road = sorted(set(env.ev_ids) & set(env.conn.vehicle.getIDList()))
+                if tracked is None and on_road:
+                    try:
+                        env.conn.gui.trackVehicle("View #0", on_road[0])
+                    except TraCIException:
+                        pass  # it left the network in between; try again at the next decision
+                    else:
+                        tracked = on_road[0]
+                        zoom = env.conn.gui.getZoom("View #0") * factor
+                        env.conn.gui.setZoom("View #0", zoom)
+                        print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
             if gui and pending and env.now >= pending[0]:
                 shot = DEMO_DIR / f"{network}_{method}_t{int(pending.pop(0))}.png"
                 env.conn.gui.screenshot("View #0", str(shot))
