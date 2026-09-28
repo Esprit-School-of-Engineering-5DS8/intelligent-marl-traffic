@@ -266,6 +266,7 @@ def run(
         settings = view_settings(f"{side}: {label(method)}", f"{side}_{method}")
         options = ["--window-pos", f"{x},30", "--window-size", "940,900"]
         options += ["--gui-settings-file", str(settings)]
+        options += ["--error-log", str(DEMO_DIR / f"sumo_{side}_{method}.log")]
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
@@ -296,51 +297,66 @@ def run(
             pace["on"] = False
     if gui:
         style_types(env)
-    while env.agents:
-        obs, *_ = env.step(controller.act(env, obs))
-        if env.now <= reframe_until:
-            width = frame_view(env, episode.net_file, view_width)
-            if env.now + env.delta > reframe_until:
-                print(f"{method}: view {width:.0f} m wide")
-        if stats is not None:
-            lanes = [ln for i in env.intersections.values() for ln in i.in_lanes]
-            halting = sum(env.meas.halting[ln] for ln in lanes)
-            tt = trips["tt"]
-            mean_tt = sum(tt) / len(tt) if tt else float("nan")
-            stats.put(
-                (0 if x == 0 else 1, env.now, halting, trips["arrived"], mean_tt, dict(trips["ev"]))
-            )
-        if sync is not None and env.now % 60 < env.delta:  # both windows wait every minute
-            with contextlib.suppress(Exception):  # the other window may have closed
-                sync.wait(timeout=300)
-        if meet_at is not None and env.now >= meet_at:
-            pace["on"] = True
-            meet_at = None
-        if gui and follow_ev:
-            # the view is framed at view_width when following starts; while the camera
-            # follows a vehicle the window is not redrawn between TraCI calls, so the zoom
-            # is scaled by a fixed factor instead of being measured
-            factor = view_width / EV_VIEW_WIDTH
-            if tracked is not None and tracked not in env.ev_ids:  # it has arrived
-                env.conn.gui.trackVehicle("View #0", "")
-                env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") / factor)
-                frame_view(env, episode.net_file, view_width)
-                tracked = None
-            if tracked is None and env.ev_ids:
-                tracked = sorted(env.ev_ids)[0]
-                env.conn.gui.trackVehicle("View #0", tracked)
-                env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") * factor)
-                print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
-        if gui and pending and env.now >= pending[0]:
-            shot = DEMO_DIR / f"{network}_{method}_t{int(pending.pop(0))}.png"
-            env.conn.gui.screenshot("View #0", str(shot))
-            print(f"{method}: screenshot {shot}")
-            if not pending and stop_after_snapshots:
-                try:  # the screenshot is written at the next step
-                    env.step(controller.act(env, obs))
-                except Exception as exc:  # sumo-gui may close first; the file is usually there
-                    print(f"{method}: last step after the screenshot failed ({exc})")
-                break
+    from traci.exceptions import FatalTraCIError
+
+    try:
+        while env.agents:
+            obs, *_ = env.step(controller.act(env, obs))
+            if env.now <= reframe_until:
+                width = frame_view(env, episode.net_file, view_width)
+                if env.now + env.delta > reframe_until:
+                    print(f"{method}: view {width:.0f} m wide")
+            if stats is not None:
+                lanes = [ln for i in env.intersections.values() for ln in i.in_lanes]
+                halting = sum(env.meas.halting[ln] for ln in lanes)
+                tt = trips["tt"]
+                mean_tt = sum(tt) / len(tt) if tt else float("nan")
+                stats.put(
+                    (
+                        0 if x == 0 else 1,
+                        env.now,
+                        halting,
+                        trips["arrived"],
+                        mean_tt,
+                        dict(trips["ev"]),
+                    )
+                )
+            if sync is not None and env.now % 60 < env.delta:  # both windows wait every minute
+                with contextlib.suppress(Exception):  # the other window may have closed
+                    sync.wait(timeout=300)
+            if meet_at is not None and env.now >= meet_at:
+                pace["on"] = True
+                meet_at = None
+            if gui and follow_ev:
+                # the view is framed at view_width when following starts; while the camera
+                # follows a vehicle the window is not redrawn between TraCI calls, so the zoom
+                # is scaled by a fixed factor instead of being measured
+                factor = view_width / EV_VIEW_WIDTH
+                if tracked is not None and tracked not in env.ev_ids:  # it has arrived
+                    env.conn.gui.trackVehicle("View #0", "")
+                    env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") / factor)
+                    frame_view(env, episode.net_file, view_width)
+                    tracked = None
+                if tracked is None and env.ev_ids:
+                    tracked = sorted(env.ev_ids)[0]
+                    env.conn.gui.trackVehicle("View #0", tracked)
+                    env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") * factor)
+                    print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
+            if gui and pending and env.now >= pending[0]:
+                shot = DEMO_DIR / f"{network}_{method}_t{int(pending.pop(0))}.png"
+                env.conn.gui.screenshot("View #0", str(shot))
+                print(f"{method}: screenshot {shot}")
+                if not pending and stop_after_snapshots:
+                    try:  # the screenshot is written at the next step
+                        env.step(controller.act(env, obs))
+                    except Exception as exc:  # sumo-gui may close first; the file is usually there
+                        print(f"{method}: last step after the screenshot failed ({exc})")
+                    break
+    except FatalTraCIError:  # the window was closed, or sumo-gui stopped (e.g. its 3D view)
+        print(f"{method}: the SUMO window closed; the other window goes on alone")
+        if sync is not None:
+            sync.abort()  # never leave the other window waiting for this one
+        return
     env.close()
     print(f"{method}: finished at t={env.now:.0f} s, {env.teleports} teleports")
 
