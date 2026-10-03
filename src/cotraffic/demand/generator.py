@@ -40,7 +40,7 @@ from cotraffic.utils.sumo import binary
 
 STREAMS = ("cars", "emergency", "pedestrians", "buses")
 # Bump when a code change alters the generated files, so cached bundles are rebuilt.
-GENERATOR_VERSION = 3
+GENERATOR_VERSION = 4
 # Scenario times in the configs refer to a 60-min demand hour; shorter hours scale them.
 REFERENCE_HOUR_S = 3600.0
 
@@ -359,7 +359,7 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
             f'departLane="{site["lane"]}" departPos="{pos:.1f}" departSpeed="0">\n'
             f'        <route edges="{edge.getID()}"/>\n'
             f'        <stop lane="{edge.getID()}_{site["lane"]}" endPos="{pos + 2.0:.1f}" '
-            f'duration="{float(inc["duration_s"]):.0f}"/>\n'
+            f'duration="{inc_duration:.0f}"/>\n'
             "    </vehicle>\n</routes>\n",
             encoding="utf-8",
         )
