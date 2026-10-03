@@ -175,7 +175,7 @@ CO2 over the measured hour (kg), grid4x4 (Figure 4):
 ## 8.4 RQ4 - How robust is the system to accidents, sensor faults and communication failures?
 
 **Accident** (a vehicle stopped 31 m before the stop line of a main approach, minutes
-35-55, peak; Figure 6). Travel time of all vehicles and of the 384 vehicles per run whose
+35-50, peak; Figure 6). Travel time of all vehicles and of the 384 vehicles per run whose
 route crosses the blocked approach:
 
 | Method | all vehicles (s) | affected vehicles (s) | affected vs MP, paired |

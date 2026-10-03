@@ -235,7 +235,7 @@ at peak. See FAILURES F-009 for the diagnosis.
 ## 2026-09-25 - Incident scenario redesign and district emergency vehicles
 
 **Incident.** With the stopped vehicle at 40% of the link, the incident barely changed the
-network: halting vehicles during the incident window (minutes 35-55) rose by 6.8 (ACT),
+network: halting vehicles during the incident window (minutes 35-50) rose by 6.8 (ACT),
 5.1 (MP) and -0.5 (FT) vehicles on the 5 test seeds, i.e. 2-4%, and travel times did not
 move (MP 212 vs 210 s). Vehicles merge past the obstacle and use both lanes again at the stop
 line; the one-lane section (about 1 800 veh/h) never limits the signal. We moved the stopped
@@ -371,7 +371,7 @@ all vehicles (s):
   vehicles whose emissions depend more on the speed profile than on time (heavy goods
   vehicles, gradients), which our demand does not contain.
 
-**RQ4 - incident (vehicle stopped 31 m before the stop line, minutes 35-55, peak).** Mean
+**RQ4 - incident (vehicle stopped 31 m before the stop line, minutes 35-50, peak).** Mean
 travel time of all vehicles and of the 384 vehicles per run whose route crosses the blocked
 approach (s):
 
@@ -543,3 +543,24 @@ report section 8.10 (exploratory family). New findings:
 - Buses at peak: COOP-FULL -7.9% bus delay vs Max-Pressure, +4.0% person-weighted delay.
 - Elsewhere the learned agents stay 2.4-3.7% behind the best baseline (medium demand,
   grid8x8) or within the noise (district low and rush profile).
+
+## 2026-10-03 - Incident duration in short episodes; accident in the demo
+
+The stopped vehicle's stop lasted `duration_s` (900 s) unscaled, while its start and the
+incident window recorded in the bundle were scaled to the episode length. In evaluation
+episodes (60-min measured hour, scale 1) both agree, so no reported result changes. In
+quick episodes (10-min hour) the vehicle stayed until the end of the episode instead of
+150 s; validation and training episodes never contain the incident. The stop now uses the
+scaled duration, and `GENERATOR_VERSION` is 4 so that cached bundles are rebuilt. We
+regenerated the evaluation bundles of the incident cell (grid4x4 and district, seed 0) and
+of the grid emergency cell: the route files are identical to the previous ones apart from
+duarouter's header comment.
+
+The side-by-side demo gained `--follow-incident`: it adds the incident scenario, fast-forwards
+to one minute before it, puts the camera on the stopped vehicle once it is on the road
+(a vehicle loaded but not yet inserted reports an invalid position), and charts the
+vehicles stopped on the blocked street and the trip time of the vehicles routed through it.
+On the district the blocked street is a two-lane avenue and drivers pass the stopped
+vehicle on the other lane: over the five evaluation runs of Max-Pressure the number of
+halted vehicles on that street, the stopped vehicle included, averaged 0.6 during minutes
+35-60 (3.0 on grid4x4), so the accident is far more visible on the grid.
