@@ -17,11 +17,15 @@ zoom and pan with the mouse. ``--follow-ev`` makes the camera follow each emerge
 vehicle (ids ``ev_0``, ``ev_1``...) from departure to arrival, in both windows; the
 simulation fast-forwards to 30 s before the first one departs. Both windows wait for each
 other at that point (or after the first minute), then run in step.
+``--follow-incident`` adds the accident scenario (a vehicle stopped on one lane just before
+a junction for 15 min, magenta) and puts the camera on the blocked street, in both
+windows; the simulation fast-forwards to 1 min before the accident.
 ``--snapshot-at 900 1800`` saves screenshots of both windows at those simulation times
 (``results/tmp/demo/``), e.g. for the report.
 
 A third window charts both controllers live on the same traffic (stopped vehicles, mean
-trip time, arrivals), with the hour measured by the evaluation shaded; the chart is saved
+trip time, arrivals), with the hour measured by the evaluation shaded (and the accident,
+with a panel for the vehicles stopped on the blocked street); the chart is saved
 at the end (``--no-chart`` to skip it). The two windows wait for each other every
 simulated minute so that they show the same moment.
 
@@ -49,6 +53,7 @@ TYPE_STYLE = {
     "DEFAULT_PEDTYPE": ((0, 190, 255), "pedestrian"),
 }
 EV_VIEW_WIDTH = 120.0  # metres shown while the camera follows an emergency vehicle
+INCIDENT_VIEW_WIDTH = 200.0  # metres shown around the accident vehicle
 LEGEND = [
     ("car", "car"),
     ("bus", "bus"),
@@ -215,6 +220,7 @@ def run(
     follow_ev: bool = False,
     sync=None,
     stats=None,
+    follow_incident: bool = False,
 ) -> None:
     from cotraffic.analysis.style import label
     from cotraffic.controllers.registry import make_controller
@@ -244,13 +250,23 @@ def run(
 
     if gui:
         hooks.append(pause)
-    # live comparison: completed trips, measured the same way for both controllers
-    trips = {"dep": {}, "tt": [], "arrived": 0, "ev": {}}
+    incident = episode.bundle.meta.get("incident")
+    # live comparison: completed trips, measured the same way for both controllers; with an
+    # accident, also the trips through the blocked street that depart from 10 min before it
+    # to its end (the population of the evaluation's incident metric)
+    trips = {"dep": {}, "tt": [], "arrived": 0, "ev": {}, "through": set(), "aff": []}
 
     def count_trips(env, now: float) -> None:
         sim = env.conn.simulation
         for v in sim.getDepartedIDList():
             trips["dep"][v] = now
+            if (
+                incident
+                and incident["start"] - 600 <= now < incident["end"]
+                and not v.startswith("incident_")
+                and incident["edge"] in env.conn.vehicle.getRoute(v)
+            ):
+                trips["through"].add(v)
         for v in sim.getArrivedIDList():
             trips["arrived"] += 1
             t0 = trips["dep"].pop(v, None)
@@ -258,6 +274,8 @@ def run(
                 trips["tt"].append(now - t0)
                 if v.startswith("ev_"):
                     trips["ev"][v] = now - t0
+                if v in trips["through"]:
+                    trips["aff"].append(now - t0)
 
     if stats is not None:
         hooks.append(count_trips)
@@ -284,17 +302,28 @@ def run(
     pending = sorted(snapshot_at)
     tracked: str | None = None
     meet_at = None  # simulation time at which both windows wait for each other
+    on_incident = False  # the camera shows the blocked street
     if gui:
         meet_at = reframe_until
+        targets = []
         departures = ev_departures(episode) if follow_ev else []
         if follow_ev and not departures:
             print(f"{method}: no emergency vehicle in this scenario (add --scenarios emergency)")
         if departures:
-            meet_at = max(reframe_until, departures[0] - 30.0)
+            targets.append(departures[0] - 30.0)
             times = ", ".join(f"{t:.0f}" for t in departures)
             print(f"{method}: emergency vehicles depart at t = {times} s (simulation time)")
-            print(f"{method}: fast-forward to t={meet_at:.0f} s, then normal speed")
-            pace["on"] = False
+        if follow_incident and incident:
+            targets.append(incident["start"] - 60.0)
+            print(
+                f"{method}: accident on street {incident['edge']} (lane {incident['lane']}) "
+                f"from t={incident['start']:.0f} to {incident['end']:.0f} s"
+            )
+        if targets:
+            meet_at = max(reframe_until, min(targets))
+            if meet_at > reframe_until:
+                print(f"{method}: fast-forward to t={meet_at:.0f} s, then normal speed")
+                pace["on"] = False
     if gui:
         style_types(env)
     from traci.exceptions import FatalTraCIError, TraCIException
@@ -311,6 +340,12 @@ def run(
                 halting = sum(env.meas.halting[ln] for ln in lanes)
                 tt = trips["tt"]
                 mean_tt = sum(tt) / len(tt) if tt else float("nan")
+                blocked = 0  # vehicles stopped on the blocked street, the accident excluded
+                if incident:
+                    edge = env.conn.edge
+                    blocked = edge.getLastStepHaltingNumber(incident["edge"])
+                    blocked -= "incident_0" in edge.getLastStepVehicleIDs(incident["edge"])
+                aff = trips["aff"]
                 stats.put(
                     (
                         0 if x == 0 else 1,
@@ -319,6 +354,8 @@ def run(
                         trips["arrived"],
                         mean_tt,
                         dict(trips["ev"]),
+                        max(blocked, 0),
+                        (len(aff), sum(aff) / len(aff) if aff else float("nan")),
                     )
                 )
             if sync is not None and env.now % 60 < env.delta:  # both windows wait every minute
@@ -337,6 +374,7 @@ def run(
                     env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") / factor)
                     frame_view(env, episode.net_file, view_width)
                     tracked = None
+                    on_incident = False
                 # only a vehicle driving now (not one being teleported or just arrived)
                 on_road = sorted(set(env.ev_ids) & set(env.conn.vehicle.getIDList()))
                 if tracked is None and on_road:
@@ -349,6 +387,24 @@ def run(
                         zoom = env.conn.gui.getZoom("View #0") * factor
                         env.conn.gui.setZoom("View #0", zoom)
                         print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
+            if gui and follow_incident and incident and tracked is None:
+                active = incident["start"] <= env.now < incident["end"]
+                # only once it is on the road: a vehicle loaded but not yet inserted (its
+                # lane full) has an invalid position; try again at the next decision
+                if active and not on_incident and "incident_0" in env.conn.vehicle.getIDList():
+                    with contextlib.suppress(TraCIException):  # it may leave in between
+                        zoom_to(
+                            env, INCIDENT_VIEW_WIDTH, env.conn.vehicle.getPosition("incident_0")
+                        )
+                        on_incident = True
+                        print(
+                            f"{method}: t={env.now:.0f} s, accident: the camera shows the "
+                            "blocked street (magenta vehicle)"
+                        )
+                elif on_incident and not active:
+                    frame_view(env, episode.net_file, view_width)
+                    on_incident = False
+                    print(f"{method}: t={env.now:.0f} s, the accident vehicle has left")
             if gui and pending and env.now >= pending[0]:
                 shot = DEMO_DIR / f"{network}_{method}_t{int(pending.pop(0))}.png"
                 env.conn.gui.screenshot("View #0", str(shot))
@@ -368,12 +424,42 @@ def run(
     print(f"{method}: finished at t={env.now:.0f} s, {env.teleports} teleports")
 
 
-def live_chart(stats, jobs, methods, measured, network) -> None:
+def incident_summary(data, names, incident) -> str:
+    """The accident, controller by controller.
+
+    Trips through the blocked street: those departing from 10 min before the accident to its
+    end, as in the evaluation (on a two-lane street most drivers pass the stopped vehicle on
+    the other lane, so their trip time shows the effect better than the queue). Queues: from
+    the accident to 10 min after it, since the queue it leaves takes a few minutes to clear.
+    """
+    t0, t1 = incident[0] / 60, incident[1] / 60 + 10
+    lines = []
+    for name, d in zip(names, data, strict=True):
+        idx = [i for i, t in enumerate(d["t"]) if t0 <= t <= t1]
+        if not idx:
+            return "the accident has not started yet"
+        blocked = [d["b"][i] for i in idx]
+        n, mean = d["aff"]
+        lines += [
+            name,
+            f"  trips through the blocked street: {n} done"
+            + (f", mean trip {mean:.0f} s" if n else ""),
+            f"  stopped on that street: {sum(blocked) / len(blocked):.1f} on average,"
+            f" {max(blocked):.0f} at most",
+            f"  waiting at all signals: {sum(d['h'][i] for i in idx) * 5 / 3600:.1f} veh-h",
+            "",
+        ]
+    return "\n".join(lines + [f"queues: minutes {t0:.0f}-{t1:.0f} (the accident + 10 min)"])
+
+
+def live_chart(stats, jobs, methods, measured, network, incident=None) -> None:
     """Third window: the two controllers on the same traffic, updated as they run.
 
     Instantaneous queues are noisy, so the stopped-vehicle curve is a 1-minute average and a
     second panel accumulates the waiting at the signals: a small, steady difference between
-    the controllers shows there as two curves drifting apart.
+    the controllers shows there as two curves drifting apart. With an accident (``incident``
+    = its start and end, simulation seconds) its period is shaded in red and a fifth panel
+    shows the vehicles stopped on the blocked street.
     """
     import queue
 
@@ -387,10 +473,19 @@ def live_chart(stats, jobs, methods, measured, network) -> None:
     if sum((a - b) ** 2 for a, b in zip(*rgb, strict=True)) ** 0.5 < 120:
         colors[1] = "#2a78d6"  # two similar hues would be hard to tell apart
     plt.rcParams.update({"font.size": 11, "axes.titlesize": 12, "axes.titleweight": "bold"})
-    fig, axes = plt.subplots(2, 2, figsize=(13, 7.6))
-    ax_q, ax_w, ax_t, ax_ev = axes.ravel()
-    for ax in (ax_q, ax_w, ax_t):
+    if incident:
+        fig, axes = plt.subplots(2, 3, figsize=(17, 7.8))
+        ax_q, ax_w, ax_b, ax_t, ax_ev, ax_s = axes.ravel()
+        timed = (ax_q, ax_w, ax_b, ax_t)
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(13, 7.6))
+        ax_q, ax_w, ax_t, ax_ev = axes.ravel()
+        ax_b = ax_s = None
+        timed = (ax_q, ax_w, ax_t)
+    for ax in timed:
         ax.axvspan(measured[0] / 60, measured[1] / 60, color="0.94", zorder=0)
+        if incident:
+            ax.axvspan(incident[0] / 60, incident[1] / 60, color="#f4c7c3", alpha=0.6, zorder=0)
         ax.set_xlabel("simulated time (min)")
         ax.grid(alpha=0.3)
         ax.spines[["top", "right"]].set_visible(False)
@@ -399,21 +494,33 @@ def live_chart(stats, jobs, methods, measured, network) -> None:
     ax_t.set_title("Mean trip time of completed trips (s)")
     ax_ev.set_title("Emergency vehicles: trip time (s)")
     ax_ev.spines[["top", "right"]].set_visible(False)
-    raw, smooth, cum, trip = [], [], [], []
+    raw, smooth, cum, trip, block = [], [], [], [], []
     for n, c in zip(names, colors, strict=True):
         raw.append(ax_q.plot([], [], color=c, lw=0.8, alpha=0.25)[0])
         smooth.append(ax_q.plot([], [], color=c, lw=2.4, label=n)[0])
         cum.append(ax_w.plot([], [], color=c, lw=2.4, label=n)[0])
         trip.append(ax_t.plot([], [], color=c, lw=2.4, label=n)[0])
+        if ax_b is not None:
+            block.append(ax_b.plot([], [], color=c, lw=2.4, label=n)[0])
     ax_q.legend(loc="upper left", frameon=False)
+    if ax_b is not None:
+        ax_b.set_title("Stopped on the blocked street (1-min average)")
+        ax_b.set_ylabel("accident vehicle not counted", color="0.4")
+        ax_s.set_axis_off()
+        summary = ax_s.text(0.02, 0.95, "", va="top", fontsize=11, transform=ax_s.transAxes)
+        ax_s.set_title("During the accident", loc="left")
     status = fig.text(0.5, 0.945, "", ha="center", fontsize=11)
     fig.suptitle(f"{names[0]} vs {names[1]} on {network}, same traffic", fontsize=14, y=0.99)
-    fig.text(
-        0.5, 0.012, "grey band: the period measured in the evaluation", ha="center", color="0.4"
-    )
+    note = "grey band: the period measured in the evaluation"
+    if incident:
+        note += "; red band: the accident (one lane blocked)"
+    fig.text(0.5, 0.012, note, ha="center", color="0.4")
     fig.tight_layout(rect=(0, 0.03, 1, 0.935))
     plt.show(block=False)
-    data = [{"t": [], "h": [], "a": [], "tt": [], "ev": {}} for _ in methods]
+    data = [
+        {"t": [], "h": [], "a": [], "tt": [], "ev": {}, "b": [], "aff": (0, float("nan"))}
+        for _ in methods
+    ]
     drawn_ev = None
 
     def rolling(v, n=12):  # 12 decisions of 5 s = 1 minute
@@ -462,16 +569,20 @@ def live_chart(stats, jobs, methods, measured, network) -> None:
                         va="bottom",
                         fontsize=9,
                     )
-        ax_ev.set_xticks(range(len(ids)), [f"ambulance {v[3:]}" for v in ids])
-        ax_ev.legend(loc="upper left", frameon=False)
+        ax_ev.set_xticks(range(len(ids)), [v[3:] for v in ids])
+        ax_ev.set_xlabel("emergency vehicle, in order of departure")
+        ax_ev.set_ylim(0, ax_ev.get_ylim()[1] * 1.25)  # room for the legend
+        ax_ev.legend(loc="upper right", ncols=2, frameon=False)
         ax_ev.grid(axis="y", alpha=0.3)
 
     draw_ev()
     while any(p.is_alive() for p in jobs) or not stats.empty():
         try:
             while True:
-                k, now, halting, arrived, mean_tt, ev = stats.get_nowait()
+                k, now, halting, arrived, mean_tt, ev, blocked, aff = stats.get_nowait()
                 d = data[k]
+                d["b"].append(blocked)
+                d["aff"] = aff
                 d["t"].append(now / 60)
                 d["h"].append(halting)
                 d["a"].append(arrived)
@@ -486,9 +597,13 @@ def live_chart(stats, jobs, methods, measured, network) -> None:
                 smooth[k].set_data(d["t"], rolling(d["h"]))
                 cum[k].set_data(d["t"], cumulative_hours(d["h"]))
                 trip[k].set_data(d["t"], d["tt"])
-            for ax in (ax_q, ax_w, ax_t):
+                if block:
+                    block[k].set_data(d["t"], rolling(d["b"]))
+            for ax in timed:
                 ax.relim()
                 ax.autoscale_view()
+            if incident and data[0]["t"] and data[1]["t"]:
+                summary.set_text(incident_summary(data, names, incident))
             ev_now = (len(data[0]["ev"]), len(data[1]["ev"]))
             if ev_now != drawn_ev:
                 draw_ev()
@@ -514,6 +629,10 @@ def live_chart(stats, jobs, methods, measured, network) -> None:
                 f"{cumulative_hours(d['h'])[-1]:6.1f} vehicle-hours waiting at the signals"
                 + (f"; emergency vehicles {ev}" if ev else "")
             )
+    if incident and all(d["t"] for d in data):
+        print("During the accident:")
+        for line in incident_summary(data, names, incident).splitlines():
+            print(f"  {line}")
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
     out = DEMO_DIR / f"compare_{network}_{methods[0]}_vs_{methods[1]}.png"
     fig.savefig(out, dpi=150)
@@ -540,6 +659,11 @@ def main() -> None:
     parser.add_argument(
         "--follow-ev", action="store_true", help="the camera follows each emergency vehicle"
     )
+    parser.add_argument(
+        "--follow-incident",
+        action="store_true",
+        help="add the accident scenario and show the blocked street",
+    )
     parser.add_argument("--no-chart", action="store_true", help="no live comparison chart")
     parser.add_argument("--headless", action="store_true", help="no window (checks the setup)")
     parser.add_argument("--quick", action="store_true", help="short episode")
@@ -550,6 +674,8 @@ def main() -> None:
         "--stop-after-snapshots", action="store_true", help="close once the screenshots exist"
     )
     args = parser.parse_args()
+    if args.follow_incident and "incident" not in args.scenarios:
+        args.scenarios = [*args.scenarios, "incident"]
     sync = None if args.headless else mp.Barrier(2)
     stats = None if args.headless or args.no_chart else mp.Queue()
     jobs = []
@@ -574,6 +700,7 @@ def main() -> None:
                 args.follow_ev,
                 sync,
                 stats,
+                args.follow_incident,
             ),
         )
         p.start()
@@ -584,7 +711,13 @@ def main() -> None:
         ev = config.load_protocol()["quick" if args.quick else "evaluation"]
         start = float(ev["warmup_s"])
         measured = (start, start + float(ev["measure_s"]))
-        live_chart(stats, jobs, (args.left, args.right), measured, args.net)
+        incident = None
+        if "incident" in args.scenarios:  # same timing as the demand generator
+            inc = config.load("scenarios", "incident")["incident"]
+            scale = float(ev["measure_s"]) / 3600
+            begin = start + float(inc["start_s"]) * scale
+            incident = (begin, begin + float(inc["duration_s"]) * scale)
+        live_chart(stats, jobs, (args.left, args.right), measured, args.net, incident)
     for p in jobs:
         p.join()
 
