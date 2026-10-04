@@ -7,7 +7,13 @@ emergency-vehicle preemption (report, section 8.2).
 
     python scripts/demo_side_by_side.py [--left ft] [--right coop_full]
         [--checkpoint results/checkpoints/coop_full/real_district/seed1.zip]
-        [--net real_district] [--demand peak] [--scenarios emergency buses] [--seed 3]
+        [--net real_district] [--demand peak] [--scenarios ...] [--seed 3]
+
+Scenarios by default: emergency vehicles and buses, plus pedestrians on the networks that
+have sidewalks. The district's OpenStreetMap import has almost none (FAILURES F-011);
+``--net real_district_ped`` is the same district with sidewalks and crossings on every
+street, for the demonstration only (not evaluated), driven by the agents trained on
+real_district.
 
 Display only (the simulation is unchanged): vehicles and pedestrians are drawn as shapes
 in one colour per type - cars blue-grey, buses amber, emergency vehicles (ambulances)
@@ -18,8 +24,10 @@ vehicle (ids ``ev_0``, ``ev_1``...) from departure to arrival, in both windows; 
 simulation fast-forwards to 30 s before the first one departs. Both windows wait for each
 other at that point (or after the first minute), then run in step.
 ``--follow-incident`` adds the accident scenario (a vehicle stopped on one lane just before
-a junction for 15 min, magenta) and puts the camera on the blocked street, in both
-windows; the simulation fast-forwards to 1 min before the accident.
+a junction for 15 min) and puts the camera on the blocked street, in both windows; the
+simulation fast-forwards to 1 min before the accident. The stopped vehicle is magenta with
+its hazard lights on, inside a flashing red zone, with an ACCIDENT sign beside the road
+(display only, as the colours).
 ``--snapshot-at 900 1800`` saves screenshots of both windows at those simulation times
 (``results/tmp/demo/``), e.g. for the report.
 
@@ -53,12 +61,14 @@ TYPE_STYLE = {
     "DEFAULT_PEDTYPE": ((0, 190, 255), "pedestrian"),
 }
 EV_VIEW_WIDTH = 120.0  # metres shown while the camera follows an emergency vehicle
-INCIDENT_VIEW_WIDTH = 200.0  # metres shown around the accident vehicle
+INCIDENT_VIEW_WIDTH = 150.0  # metres shown around the accident vehicle
+ACCIDENT_RED = (230, 0, 0)
+HAZARD_LIGHTS = 4 | 8  # TraCI signal bits: both blinkers (hazard lights) + brake lights
 LEGEND = [
     ("car", "car"),
     ("bus", "bus"),
     ("emergency", "ambulance (white, green cross)"),
-    ("incident", "accident vehicle"),
+    ("incident", "accident (red zone)"),
     ("DEFAULT_PEDTYPE", "pedestrian"),
 ]
 
@@ -72,7 +82,7 @@ SETTINGS = """<viewsettings>
             </colorScheme>
         </vehicles>
         <persons personMode="0" personQuality="2" person_minSize="1.00"
-                 person_exaggeration="4.00" person_constantSize="0">
+                 person_exaggeration="2.00" person_constantSize="1">
             <colorScheme name="given person/type color">
                 <entry color="yellow"/>
             </colorScheme>
@@ -203,6 +213,84 @@ def style_types(env) -> None:
             vt.setShapeClass(vtype, shape)
 
 
+def draw_accident_sign(out: Path) -> None:
+    """Warning sign (PNG, transparent): red triangle with "!" over an ACCIDENT label."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(2.4, 2.0), dpi=100)
+    ax = fig.add_axes((0, 0, 1, 1))
+    ax.set_axis_off()
+    ax.set_xlim(0, 1.2)
+    ax.set_ylim(0, 1)
+    red = [c / 255 for c in ACCIDENT_RED]
+    ax.add_patch(
+        plt.Polygon(
+            [(0.3, 0.33), (0.9, 0.33), (0.6, 0.97)],
+            closed=True,
+            facecolor="white",
+            edgecolor=red,
+            linewidth=7,
+            joinstyle="round",
+        )
+    )
+    ax.text(0.6, 0.53, "!", fontsize=34, fontweight="bold", ha="center", va="center")
+    ax.text(
+        0.6,
+        0.13,
+        "ACCIDENT",
+        fontsize=17,
+        fontweight="bold",
+        color="white",
+        ha="center",
+        va="center",
+        bbox={"boxstyle": "round,pad=0.25", "facecolor": red, "edgecolor": "none"},
+    )
+    fig.savefig(out, transparent=True)
+    plt.close(fig)
+
+
+def show_accident(env, sign: Path) -> bool:
+    """Red zone, warning sign and hazard lights around the stopped vehicle (display only:
+    polygons and points of interest do not interact with traffic)."""
+    import math
+
+    from traci.exceptions import TraCIException
+
+    conn = env.conn
+    try:
+        x, y = conn.vehicle.getPosition("incident_0")
+        heading = math.radians(conn.vehicle.getAngle("incident_0"))  # 0 = north, clockwise
+        conn.vehicle.setSignals("incident_0", HAZARD_LIGHTS)
+    except TraCIException:
+        return False  # it left the network in between
+    circle = [
+        (x + 11 * math.cos(k * math.pi / 12), y + 11 * math.sin(k * math.pi / 12))
+        for k in range(24)
+    ]
+    conn.polygon.add("accident_zone", circle, (*ACCIDENT_RED, 100), fill=True, layer=5)
+    conn.polygon.add(
+        "accident_ring", [*circle, circle[0]], (*ACCIDENT_RED, 255), layer=5, lineWidth=1.2
+    )
+    # the sign stands beside the road, to the right of the direction of travel
+    sx, sy = x + 17 * math.cos(heading), y - 17 * math.sin(heading)
+    conn.poi.add("accident_sign", sx, sy, (255, 255, 255, 255), "accident", 6, str(sign), 22, 18)
+    return True
+
+
+def hide_accident(env) -> None:
+    conn = env.conn
+    for remove, shape in (
+        (conn.polygon.remove, "accident_zone"),
+        (conn.polygon.remove, "accident_ring"),
+        (conn.poi.remove, "accident_sign"),
+    ):
+        with contextlib.suppress(Exception):  # the window may be closing
+            remove(shape)
+
+
 def run(
     method: str,
     checkpoint: str | None,
@@ -238,6 +326,7 @@ def run(
         additional=controller.additional_files(network, demand),
     )
     _, runtime = split_scenarios(scenarios)
+    incident = episode.bundle.meta.get("incident")
     options: list[str] = []
     hooks = list(controller.step_hooks())
     # pacing: sumo-gui runs without its own delay; we pause after each simulated second,
@@ -250,7 +339,16 @@ def run(
 
     if gui:
         hooks.append(pause)
-    incident = episode.bundle.meta.get("incident")
+    accident = {"shown": False, "tries": 0}  # shown: the red zone and the sign are drawn
+
+    def flash(env, now: float) -> None:
+        if accident["shown"]:
+            alpha = 120 if int(now) % 2 == 0 else 30
+            with contextlib.suppress(Exception):
+                env.conn.polygon.setColor("accident_zone", (*ACCIDENT_RED, alpha))
+
+    if gui and incident:
+        hooks.append(flash)
     # live comparison: completed trips, measured the same way for both controllers; with an
     # accident, also the trips through the blocked street that depart from 10 min before it
     # to its end (the population of the evaluation's incident metric)
@@ -285,6 +383,9 @@ def run(
         options = ["--window-pos", f"{x},30", "--window-size", "940,900"]
         options += ["--gui-settings-file", str(settings)]
         options += ["--error-log", str(DEMO_DIR / f"sumo_{side}_{method}.log")]
+        sign = DEMO_DIR / f"accident_sign_{side}.png"
+        if incident:
+            draw_accident_sign(sign)
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
@@ -387,24 +488,35 @@ def run(
                         zoom = env.conn.gui.getZoom("View #0") * factor
                         env.conn.gui.setZoom("View #0", zoom)
                         print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
-            if gui and follow_incident and incident and tracked is None:
-                active = incident["start"] <= env.now < incident["end"]
-                # only once it is on the road: a vehicle loaded but not yet inserted (its
-                # lane full) has an invalid position; try again at the next decision
-                if active and not on_incident and "incident_0" in env.conn.vehicle.getIDList():
-                    with contextlib.suppress(TraCIException):  # it may leave in between
-                        zoom_to(
-                            env, INCIDENT_VIEW_WIDTH, env.conn.vehicle.getPosition("incident_0")
-                        )
-                        on_incident = True
+            if gui and incident:
+                # the stopped vehicle is in the network from its insertion (at the accident's
+                # start, later if its lane is full) until it drives off at the end
+                here = env.now >= incident["start"] and "incident_0" in env.conn.vehicle.getIDList()
+                if here and not accident["shown"]:
+                    accident["shown"] = show_accident(env, sign)
+                    if accident["shown"]:
                         print(
-                            f"{method}: t={env.now:.0f} s, accident: the camera shows the "
-                            "blocked street (magenta vehicle)"
+                            f"{method}: t={env.now:.0f} s, accident: one lane blocked until "
+                            f"t={incident['end']:.0f} s (red zone)"
                         )
-                elif on_incident and not active:
-                    frame_view(env, episode.net_file, view_width)
-                    on_incident = False
+                elif accident["shown"] and not here:
+                    hide_accident(env)
+                    accident["shown"] = False
                     print(f"{method}: t={env.now:.0f} s, the accident vehicle has left")
+                    if on_incident:
+                        frame_view(env, episode.net_file, view_width)
+                        on_incident = False
+                aim = follow_incident and accident["shown"] and not on_incident
+                if aim and tracked is None and accident["tries"] < 3:
+                    with contextlib.suppress(TraCIException):  # it may leave in between
+                        pos = env.conn.vehicle.getPosition("incident_0")
+                        width = zoom_to(env, INCIDENT_VIEW_WIDTH, pos)
+                        accident["tries"] += 1
+                        # a window not redrawn yet is measured wrong: retry at the next decision
+                        if abs(width - INCIDENT_VIEW_WIDTH) < 0.2 * INCIDENT_VIEW_WIDTH:
+                            on_incident = True
+                            accident["tries"] = 0
+                            print(f"{method}: the camera shows the blocked street")
             if gui and pending and env.now >= pending[0]:
                 shot = DEMO_DIR / f"{network}_{method}_t{int(pending.pop(0))}.png"
                 env.conn.gui.screenshot("View #0", str(shot))
@@ -641,16 +753,31 @@ def live_chart(stats, jobs, methods, measured, network, incident=None) -> None:
         plt.show()  # stays open until closed
 
 
+# networks without their own trained agents: the agents of the network they derive from
+TRAINED_ON = {"real_district_ped": "real_district", "grid8x8": "grid4x4"}
+
+
+def default_checkpoint(agent: str, network: str) -> str:
+    return f"results/checkpoints/{agent}/{TRAINED_ON.get(network, network)}/seed1.zip"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--left", default="ft")
     parser.add_argument("--right", default="coop_full")
     parser.add_argument(
-        "--checkpoint", default="results/checkpoints/coop_full/real_district/seed1.zip"
+        "--checkpoint",
+        default=None,
+        help="policy of the learned controller (default: its training run 1 on the network)",
     )
     parser.add_argument("--net", default="real_district")
     parser.add_argument("--demand", default="peak")
-    parser.add_argument("--scenarios", nargs="*", default=["emergency", "buses"])
+    parser.add_argument(
+        "--scenarios",
+        nargs="*",
+        default=None,
+        help="default: emergency buses, plus pedestrians where the network has sidewalks",
+    )
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--delay", type=int, default=40, help="ms per simulation step")
     parser.add_argument(
@@ -674,13 +801,28 @@ def main() -> None:
         "--stop-after-snapshots", action="store_true", help="close once the screenshots exist"
     )
     args = parser.parse_args()
+    from cotraffic.envs.episodes import unsupported
+
+    excluded = unsupported(args.net)
+    if args.scenarios is None:
+        args.scenarios = ["emergency", "buses"]
+        if "pedestrians" not in excluded:
+            args.scenarios.append("pedestrians")
+    if excluded & set(args.scenarios):
+        parser.error(
+            f"{args.net} cannot run {', '.join(sorted(excluded & set(args.scenarios)))}: its "
+            "OpenStreetMap import has almost no sidewalks (FAILURES F-011); "
+            "pedestrians are on the grids, e.g. --net grid4x4"
+        )
     if args.follow_incident and "incident" not in args.scenarios:
         args.scenarios = [*args.scenarios, "incident"]
     sync = None if args.headless else mp.Barrier(2)
     stats = None if args.headless or args.no_chart else mp.Queue()
     jobs = []
     for method, x in ((args.left, 0), (args.right, 960)):
-        ckpt = None if method in BASELINES else args.checkpoint
+        ckpt = (
+            None if method in BASELINES else args.checkpoint or default_checkpoint(method, args.net)
+        )
         p = mp.Process(
             target=run,
             args=(

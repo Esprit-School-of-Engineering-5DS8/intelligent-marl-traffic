@@ -9,8 +9,10 @@ live measurements, so they need the demo: ``scripts/demo_side_by_side.py``.
     python scripts/open_in_sumo.py [--net real_district] [--demand peak]
         [--scenarios emergency buses] [--seed 3] [--controller ft] [--quick]
 
-Colours come from the vehicle types: cars yellow, buses blue, emergency vehicles drawn as
-white ambulances, the accident vehicle magenta. The window stays open at the end.
+Scenarios by default: emergency vehicles and buses, plus pedestrians where the network has
+sidewalks (``--net real_district_ped`` for the district with sidewalks). Colours come from
+the vehicle types: cars yellow, buses blue, emergency vehicles drawn as white ambulances,
+the accident vehicle magenta. The window stays open at the end.
 """
 
 from __future__ import annotations
@@ -65,7 +67,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--net", default="real_district")
     parser.add_argument("--demand", default="peak")
-    parser.add_argument("--scenarios", nargs="*", default=["emergency", "buses"])
+    parser.add_argument("--scenarios", nargs="*", default=None)
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument(
         "--controller", choices=["ft", "act"], default="ft", help="signal program to run"
@@ -73,6 +75,12 @@ def main() -> None:
     parser.add_argument("--delay", type=int, default=50, help="ms per simulation step")
     parser.add_argument("--quick", action="store_true", help="short episode")
     args = parser.parse_args()
+    if args.scenarios is None:
+        from cotraffic.envs.episodes import unsupported
+
+        args.scenarios = ["emergency", "buses"]
+        if "pedestrians" not in unsupported(args.net):
+            args.scenarios.append("pedestrians")
     cmd = build_command(args)
     print(
         f"sumo-gui: {args.net}, {args.demand}, {' + '.join(args.scenarios) or 'normal'}, "
