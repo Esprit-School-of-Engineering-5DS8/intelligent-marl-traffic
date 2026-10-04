@@ -592,3 +592,24 @@ variant): Max-Pressure 133 s mean travel time on real_district, 160 s on the var
 137 pedestrians (mean wait 21 s); COOP-FULL (district run 1, never trained with
 pedestrians there) 136 s and 168 s (pedestrian wait 22 s). Single short episodes, for the
 demonstration only; the variant is not part of the evaluation.
+
+## 2026-10-04 - Demo look and live chart
+
+Display only; no simulation or result changes.
+
+**Windows.** Three levels of lightness now separate the street from the blocks: dark
+asphalt for roads and junctions, light paving for sidewalks and crossings, mid-light green
+for the blocks (sumo-gui lane and junction colour schemes). Road users stand out on what
+they move on: light blue cars on the asphalt, deep blue pedestrians on the paving, drawn at
+a constant size on the screen; vehicles use sumo-gui's detailed shapes. The legend carries
+the colour of the window's line in the live chart and is drawn at twice the screen size.
+Turning on sumo-gui's antialiasing made the windows lag: screenshots showed frames from
+minutes earlier, so it stays off.
+
+**Live chart.** Rewritten in `scripts/demo_chart.py`: headline tiles give each measure for
+both controllers and the difference between them (within 1%: "about the same", the noise of
+one episode), followed by the measures over time on a fixed time axis. The report's method
+colours are not distinct in every pair: MP orange against COOP-FULL yellow fails the
+normal-vision separation check (Delta E 13.7, floor 15), so the demo marks the windows
+instead, left blue and right orange (Delta E 33.6, colour-blind separation 24.7). New
+measure: pedestrians standing still, counted each decision, with their accumulated waiting.
