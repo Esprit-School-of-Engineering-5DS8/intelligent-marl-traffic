@@ -154,6 +154,12 @@ entries at the bottom. Negative results that belong in the report are marked **[
   runs retrained (about 1.5 h of compute lost). Look at what a scenario does to the
   simulation before training on it - the symptom (a flat training curve) appeared far from
   the cause.
+- **Later (2026-10-04, demonstration only):** the cause is netconvert's default of guessing
+  sidewalks and crossings only on roads up to 50 km/h. `real_district_ped` rebuilds the
+  district from the same extract with both guessed on every street (106 of 112 edges with
+  a sidewalk, 57 crossings, one connected walking network). Max-Pressure with pedestrians
+  there: 160 s mean travel time in a quick peak episode, no collapse. It is used by the
+  demo with the agents trained on real_district and is not part of the evaluation.
 
 ## F-012 - The anti-starvation rule only protects movements it can see (2026-09-26) [report]
 

@@ -564,3 +564,31 @@ On the district the blocked street is a two-lane avenue and drivers pass the sto
 vehicle on the other lane: over the five evaluation runs of Max-Pressure the number of
 halted vehicles on that street, the stopped vehicle included, averaged 0.6 during minutes
 35-60 (3.0 on grid4x4), so the accident is far more visible on the grid.
+
+## 2026-10-04 - Accident and pedestrians in the demo
+
+**Accident display.** In the demo the stopped vehicle was a small magenta car among many;
+viewers did not see it. It now has its hazard lights on, a flashing red zone around it and
+an ACCIDENT sign beside the road, drawn with SUMO polygons and points of interest, which do
+not interact with traffic. The camera aims at it once it is on the road and checks the
+width of the view it obtained (a window not redrawn yet is measured wrong), retrying at the
+next decision.
+
+**Pedestrians in the district (demonstration variant).** The district import has sidewalks
+on 4 of its 112 edges because netconvert guesses sidewalks, and crossings at junctions,
+only on roads up to 50 km/h, and 106 of the imported edges are faster (70-142 km/h;
+FAILURES F-011). A first variant with sidewalks everywhere but default crossings (21
+crossings) failed: SUMO found no walking route between two streets and stopped. With
+crossings guessed at every junction
+too, `real_district_ped` (same extract, same signals and demand) has sidewalks on 106 edges,
+57 crossings and one connected walking network of 107 edges. Its signals keep at most 3
+vehicle green phases, as the district, so the agents trained on real_district drive it;
+the junction at Place du 14 Janvier 2011 has 5 crossings where the padding has 4, and the
+network config accepts that the fifth is signalled but not observed
+(`extra_crossings_unobserved`, refused everywhere else).
+
+One quick episode at peak, seed 3, emergency vehicles and buses (with pedestrians on the
+variant): Max-Pressure 133 s mean travel time on real_district, 160 s on the variant with
+137 pedestrians (mean wait 21 s); COOP-FULL (district run 1, never trained with
+pedestrians there) 136 s and 168 s (pedestrian wait 22 s). Single short episodes, for the
+demonstration only; the variant is not part of the evaluation.
