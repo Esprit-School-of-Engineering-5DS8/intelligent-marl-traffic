@@ -58,10 +58,18 @@ class Padding:
     lanes_per_side: int
     max_phases: int
     max_crossings: int
+    # a junction with more crossings than max_crossings is refused, unless the network
+    # accepts that the extra ones are signalled but not observed (demonstration variant)
+    extra_crossings_unobserved: bool = False
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> Padding:
-        return cls(int(d["lanes_per_side"]), int(d["max_phases"]), int(d["max_crossings"]))
+        return cls(
+            int(d["lanes_per_side"]),
+            int(d["max_phases"]),
+            int(d["max_crossings"]),
+            bool(d.get("extra_crossings_unobserved", False)),
+        )
 
 
 def block_sizes(cfg: ObservationConfig, pad: Padding) -> dict[str, int]:
@@ -162,7 +170,8 @@ class ObservationBuilder:
             raise ValueError(
                 f"{inter.id} has {inter.n_phases} phases, padding allows {self.pad.max_phases}"
             )
-        if len(inter.crossings) > self.pad.max_crossings and self.cfg.pedestrians:
+        too_many = len(inter.crossings) > self.pad.max_crossings
+        if too_many and self.cfg.pedestrians and not self.pad.extra_crossings_unobserved:
             raise ValueError(
                 f"{inter.id} has {len(inter.crossings)} crossings, padding allows "
                 f"{self.pad.max_crossings}"

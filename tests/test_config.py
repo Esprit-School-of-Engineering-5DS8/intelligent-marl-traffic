@@ -74,3 +74,34 @@ def test_every_config_uses_its_own_seed_range():
         check_seeds(config.load_agent(name)["validation"]["seeds"], VALIDATION_SEEDS, name)
     for name in config.available("experiments"):
         check_seeds(config.load("experiments", name)["seeds"], TEST_SEEDS, name)
+
+
+def test_district_variant_keeps_the_district_layout():
+    # the demonstration variant with sidewalks is driven by the agents trained on
+    # real_district, so the observation and action layouts must be the same
+    base = Padding.from_dict(config.load("networks", "real_district")["padding"])
+    variant = Padding.from_dict(config.load("networks", "real_district_ped")["padding"])
+    assert variant.extra_crossings_unobserved and not base.extra_crossings_unobserved
+    assert (variant.lanes_per_side, variant.max_phases, variant.max_crossings) == (
+        base.lanes_per_side,
+        base.max_phases,
+        base.max_crossings,
+    )
+
+
+def test_extra_crossings_are_refused_unless_accepted():
+    from types import SimpleNamespace
+
+    from cotraffic.envs.observations import ObservationBuilder
+
+    protocol = config.load_protocol()
+    cfg = ObservationConfig.from_dict({"pedestrians": True})
+    inter = SimpleNamespace(id="J", n_phases=2, crossings=["c0", "c1", "c2", "c3", "c4"])
+    for accept in (False, True):
+        pad = Padding(3, 3, 4, extra_crossings_unobserved=accept)
+        builder = ObservationBuilder(cfg, pad, protocol["timing"], protocol["observation"])
+        if accept:
+            builder.check(inter)
+        else:
+            with pytest.raises(ValueError, match="5 crossings"):
+                builder.check(inter)
