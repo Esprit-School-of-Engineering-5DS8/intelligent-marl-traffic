@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# SUMO outputs
+results/
+*.gz
+tripinfo*.xml
+summary*.xml
+fcd*.xml
+emission*.xml
+
+# Simulation metrics (auto-generated)
+simulation_metrics.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Secrets
+*.env
