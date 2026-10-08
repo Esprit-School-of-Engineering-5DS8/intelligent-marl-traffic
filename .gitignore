@@ -23,6 +23,8 @@ emission*.xml
 
 # Simulation metrics (auto-generated)
 simulation_metrics.csv
+*metrics*.csv
+*.csv
 
 # OS
 .DS_Store
