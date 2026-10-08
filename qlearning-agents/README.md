@@ -1,7 +1,7 @@
 ## Welcome to SUMO Traffic Simulator Tutorial
 
 ## Introduction
-This is a wide range of tutorial codes for SUMO traci applications ranging from. You can find the video tutorials in our website [Link to Videos in Our Website](https://roadwayvr.com/)
+
 
 ## 1. Vehicle Value Retrieval (for example, extracting trajectory of all cars)
    
