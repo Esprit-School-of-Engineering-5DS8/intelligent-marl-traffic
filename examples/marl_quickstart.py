@@ -20,7 +20,7 @@ from environment.multi_agent_env import SumoMARLEnv
 
 def main():
     parser = argparse.ArgumentParser(description="Quickstart demonstration for SumoMARLEnv")
-    parser.add_argument("--scenario", choices=["2x2", "3x3"], default="3x3", help="Grid scenario to run")
+    parser.add_argument("--scenario", choices=["2x2", "3x3", "monaco"], default="3x3", help="Scenario to run")
     parser.add_argument("--steps", type=int, default=100, help="Number of simulation steps")
     parser.add_argument("--gui", action="store_true", help="Launch SUMO with graphical interface")
     parser.add_argument(
@@ -31,10 +31,13 @@ def main():
     )
     args = parser.parse_args()
 
-    scenario_dir = f"grid_{args.scenario}"
-    sumocfg = os.path.join(PROJECT_ROOT, "scenarios", scenario_dir, f"grid{args.scenario}.sumocfg")
+    if args.scenario == "monaco":
+        sumocfg = os.path.join(PROJECT_ROOT, "scenarios", "monaco", "most.sumocfg")
+    else:
+        scenario_dir = f"grid_{args.scenario}"
+        sumocfg = os.path.join(PROJECT_ROOT, "scenarios", scenario_dir, f"grid{args.scenario}.sumocfg")
 
-    print(f"=== Initializing SumoMARLEnv for {args.scenario} grid ===")
+    print(f"=== Initializing SumoMARLEnv for {args.scenario} scenario ===")
     if args.gui:
         print(f"Running in GUI mode with {args.delay}ms step delay for smooth visualization.")
 

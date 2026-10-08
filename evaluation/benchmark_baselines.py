@@ -98,13 +98,16 @@ def run_benchmark_trial(
 
 
 def run_full_benchmark(scenario: str = "3x3", steps: int = 300):
-    scenario_dir = f"grid_{scenario}"
-    sumocfg = os.path.join(PROJECT_ROOT, "scenarios", scenario_dir, f"grid{scenario}.sumocfg")
-
-    controllers = ["fixed_time", "actuated", "green_wave", "max_pressure"]
+    if scenario == "monaco":
+        sumocfg = os.path.join(PROJECT_ROOT, "scenarios", "monaco", "most.sumocfg")
+        controllers = ["fixed_time", "actuated", "max_pressure"]
+    else:
+        scenario_dir = f"grid_{scenario}"
+        sumocfg = os.path.join(PROJECT_ROOT, "scenarios", scenario_dir, f"grid{scenario}.sumocfg")
+        controllers = ["fixed_time", "actuated", "green_wave", "max_pressure"]
 
     print(f"\n=======================================================")
-    print(f"  SUMO MARL BASELINE BENCHMARK — {scenario.upper()} GRID")
+    print(f"  SUMO MARL BASELINE BENCHMARK — {scenario.upper()} SCENARIO")
     print(f"=======================================================\n")
 
     results = []
@@ -132,7 +135,7 @@ def run_full_benchmark(scenario: str = "3x3", steps: int = 300):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark reference baseline controllers")
-    parser.add_argument("--scenario", choices=["2x2", "3x3"], default="3x3", help="Grid scenario to benchmark")
+    parser.add_argument("--scenario", choices=["2x2", "3x3", "monaco"], default="3x3", help="Grid scenario to benchmark")
     parser.add_argument("--steps", type=int, default=300, help="Simulation steps per controller trial")
     args = parser.parse_args()
 
