@@ -160,7 +160,13 @@ class MultiAgentEnvironment:
 
     def start(self):
         """Launches SUMO and initializes agents."""
-        binary = "sumo-gui" if self.use_gui else "sumo"
+        binary_name = "sumo-gui" if self.use_gui else "sumo"
+        try:
+            import sumolib
+            binary = sumolib.checkBinary(binary_name)
+        except Exception:
+            binary = f"{binary_name}.exe" if sys.platform == "win32" else binary_name
+
         sumo_cmd = [
             binary,
             "-c", self.sumocfg_path,
