@@ -2,6 +2,7 @@
 environment/multi_agent_env.py
 Standardized Multi-Agent Reinforcement Learning (MARL) Environment for SUMO.
 Complies with PettingZoo ParallelEnv and Gymnasium APIs.
+Supports multi-modal traffic: passenger cars, buses, emergency vehicles, and pedestrians.
 
 Author: Hazem Mrad (Simulation & Environment Lead)
 Course: Advanced Data Science Project - Esprit (5DS8)
@@ -109,8 +110,9 @@ class SumoMARLEnv(ParallelEnv):
 
     Key Features:
     - ParallelEnv API: step(actions_dict) -> (obs, rewards, terminations, truncations, infos)
+    - Multi-modal support: passenger cars, buses, emergency vehicles, and pedestrians.
     - Vectorized observation spaces for RL policies (DQN, PPO, MAPPO).
-    - Multi-objective reward structure (delay, queue, emissions, pedestrian wait).
+    - Multi-objective reward structure (delay, queue, emissions, pedestrian wait, emergency priority).
     - Automatic yellow clearance & minimum green safety enforcement.
     - Global system KPI logging for evaluation benchmarks.
     """
@@ -143,8 +145,8 @@ class SumoMARLEnv(ParallelEnv):
             "waiting_time": -0.01,
             "queue": -0.2,
             "co2": 0.0,
-            "pedestrian": 0.0,
-            "emergency": 0.0,
+            "pedestrian": -0.02,
+            "emergency": -1.0,
         }
         if reward_weights:
             self.reward_weights.update(reward_weights)
@@ -169,7 +171,7 @@ class SumoMARLEnv(ParallelEnv):
         self._build_spaces()
 
     def _discover_network_layout(self):
-        """Temporarily boots SUMO to discover TLS IDs and incoming lanes."""
+        """Temporarily boots SUMO to discover TLS IDs, incoming lanes, and phase programs."""
         sumo_bin = sumolib.checkBinary("sumo")
         cmd = [sumo_bin, "-c", self.sumocfg_path, "--no-warnings", "true"]
         traci.start(cmd)
@@ -185,15 +187,29 @@ class SumoMARLEnv(ParallelEnv):
             logics = traci.trafficlight.getAllProgramLogics(tls_id)
             green_phases = [0, 2]
             yellow_phases = {0: 1, 2: 3}
+
             if logics and len(logics[0].phases) >= 4:
                 phases = logics[0].phases
-                greens = [i for i, p in enumerate(phases) if "G" in p.state or "g" in p.state]
-                if len(greens) >= 2:
-                    green_phases = greens[:2]
-                    yellow_phases = {
-                        green_phases[0]: min(green_phases[0] + 1, len(phases) - 1),
-                        green_phases[1]: min(green_phases[1] + 1, len(phases) - 1),
-                    }
+                phase_states = [p.state for p in phases]
+                
+                # Auto-detect green phases and their corresponding yellow clearance phases
+                yellow_indices = [i for i, s in enumerate(phase_states) if "y" in s.lower()]
+                if yellow_indices:
+                    found_greens = []
+                    found_yellows = {}
+                    for y_idx in yellow_indices:
+                        prev_green = (y_idx - 1) % len(phase_states)
+                        curr = prev_green
+                        main_green = prev_green
+                        while curr >= 0 and ("G" in phase_states[curr] or "g" in phase_states[curr]):
+                            main_green = curr
+                            curr -= 1
+                        if main_green not in found_greens:
+                            found_greens.append(main_green)
+                            found_yellows[main_green] = y_idx
+                    if len(found_greens) >= 2:
+                        green_phases = found_greens[:2]
+                        yellow_phases = {g: found_yellows[g] for g in green_phases}
 
             self.controllers[tls_id] = SumoTLSController(
                 tls_id=tls_id,
@@ -291,7 +307,7 @@ class SumoMARLEnv(ParallelEnv):
         traci.simulationStep()
         self.step_count += 1
 
-        # 3. System-wide metric aggregation
+        # 3. Multi-modal system metric aggregation
         veh_ids = traci.vehicle.getIDList()
         n_vehs = len(veh_ids)
         total_wait = sum(traci.vehicle.getWaitingTime(v) for v in veh_ids)
@@ -300,12 +316,29 @@ class SumoMARLEnv(ParallelEnv):
         total_fuel = sum(traci.vehicle.getFuelConsumption(v) for v in veh_ids)
         arrived = traci.simulation.getArrivedNumber()
 
+        # Emergency vehicles
+        ev_ids = [v for v in veh_ids if traci.vehicle.getVehicleClass(v) == "emergency"]
+        total_ev_wait = sum(traci.vehicle.getWaitingTime(v) for v in ev_ids)
+
+        # Pedestrians
+        try:
+            ped_ids = traci.person.getIDList()
+            n_peds = len(ped_ids)
+            total_ped_wait = sum(traci.person.getWaitingTime(p) for p in ped_ids)
+        except Exception:
+            n_peds = 0
+            total_ped_wait = 0.0
+
         system_record = {
             "step": self.step_count,
             "active_vehicles": n_vehs,
+            "active_evs": len(ev_ids),
+            "active_pedestrians": n_peds,
             "arrived_vehicles": arrived,
             "avg_speed_m_s": round(total_speed / n_vehs, 2) if n_vehs > 0 else 0.0,
             "total_waiting_time_s": round(total_wait, 2),
+            "ev_waiting_time_s": round(total_ev_wait, 2),
+            "pedestrian_waiting_time_s": round(total_ped_wait, 2),
             "co2_mg_s": round(total_co2, 2),
             "fuel_ml_s": round(total_fuel, 2),
         }
@@ -313,12 +346,12 @@ class SumoMARLEnv(ParallelEnv):
 
         # 4. Agent observations, rewards, and status
         obs = self._get_observations()
-        rewards = self._compute_rewards()
-        infos = self._get_infos(system_record=system_record)
+        rewards = self._compute_rewards(ev_ids=ev_ids)
+        infos = self._get_infos(system_record=system_record, ev_ids=ev_ids)
 
         # Check termination & truncation
         is_truncated = self.step_count >= self.max_steps
-        is_terminated = False  # SUMO runs until max_steps unless network crashes
+        is_terminated = False
 
         terminations = {agent: is_terminated for agent in self.agents}
         truncations = {agent: is_truncated for agent in self.agents}
@@ -351,33 +384,84 @@ class SumoMARLEnv(ParallelEnv):
             obs[agent_id] = np.array(features, dtype=np.float32)
         return obs
 
-    def _compute_rewards(self) -> Dict[str, float]:
+    def _compute_rewards(self, ev_ids: Optional[List[str]] = None) -> Dict[str, float]:
         """Calculates multi-objective rewards per agent."""
+        ev_ids = ev_ids or []
         rewards = {}
+
+        # Cache pedestrians and waiting times
+        try:
+            ped_ids = traci.person.getIDList()
+            ped_locations = {p: traci.person.getRoadID(p) for p in ped_ids}
+            ped_waits = {p: traci.person.getWaitingTime(p) for p in ped_ids}
+        except Exception:
+            ped_locations = {}
+            ped_waits = {}
+
         for agent_id in self.possible_agents:
             lanes = self.incoming_lanes_map[agent_id]
             total_queue = sum(traci.lane.getLastStepHaltingNumber(l) for l in lanes)
             total_wait = sum(traci.lane.getWaitingTime(l) for l in lanes)
             total_co2 = sum(traci.lane.getCO2Emission(l) for l in lanes)
 
+            # Emergency delay on agent incoming lanes
+            ev_wait = sum(
+                traci.vehicle.getWaitingTime(v)
+                for v in ev_ids
+                if traci.vehicle.getLaneID(v) in lanes
+            )
+
+            # Pedestrian delay at this intersection's crossings
+            agent_ped_wait = sum(
+                wait for p, wait in ped_waits.items()
+                if ped_locations.get(p, "").startswith(f":{agent_id}_")
+            )
+
             # Linear scalarization of reward objectives
             reward = (
                 self.reward_weights["waiting_time"] * total_wait
                 + self.reward_weights["queue"] * total_queue
                 + self.reward_weights["co2"] * total_co2
+                + self.reward_weights["pedestrian"] * agent_ped_wait
+                + self.reward_weights["emergency"] * ev_wait
             )
             rewards[agent_id] = float(reward)
         return rewards
 
-    def _get_infos(self, system_record: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
-        """Provides rich metadata (raw lane statistics and system KPIs)."""
+    def _get_infos(
+        self,
+        system_record: Optional[Dict[str, Any]] = None,
+        ev_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Provides rich metadata (raw lane statistics, pedestrian/EV states, and system KPIs)."""
+        ev_ids = ev_ids or []
         infos = {}
+
+        try:
+            ped_ids = traci.person.getIDList()
+            ped_locations = {p: traci.person.getRoadID(p) for p in ped_ids}
+            ped_waits = {p: traci.person.getWaitingTime(p) for p in ped_ids}
+        except Exception:
+            ped_locations = {}
+            ped_waits = {}
+
         for agent_id in self.possible_agents:
             lanes = self.incoming_lanes_map[agent_id]
             ctrl = self.controllers[agent_id]
             lane_queues = {l: traci.lane.getLastStepHaltingNumber(l) for l in lanes}
             lane_waiting = {l: traci.lane.getWaitingTime(l) for l in lanes}
             lane_counts = {l: traci.lane.getLastStepVehicleNumber(l) for l in lanes}
+
+            # Emergency vehicles on approach
+            approaching_evs = [v for v in ev_ids if traci.vehicle.getLaneID(v) in lanes]
+            ev_wait = sum(traci.vehicle.getWaitingTime(v) for v in approaching_evs)
+
+            # Pedestrians on intersection crossings
+            crossing_peds = [
+                p for p, loc in ped_locations.items()
+                if loc.startswith(f":{agent_id}_")
+            ]
+            ped_wait = sum(ped_waits.get(p, 0.0) for p in crossing_peds)
 
             infos[agent_id] = {
                 "tls_id": agent_id,
@@ -386,6 +470,10 @@ class SumoMARLEnv(ParallelEnv):
                 "is_yellow": ctrl.is_yellow,
                 "total_queue": sum(lane_queues.values()),
                 "total_waiting_time": sum(lane_waiting.values()),
+                "pedestrian_count": len(crossing_peds),
+                "pedestrian_waiting_time": ped_wait,
+                "emergency_approaching_count": len(approaching_evs),
+                "emergency_waiting_time": ev_wait,
                 "lane_queues": lane_queues,
                 "lane_waiting": lane_waiting,
                 "lane_counts": lane_counts,

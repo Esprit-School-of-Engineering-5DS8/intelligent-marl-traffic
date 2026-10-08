@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
-generate_routes.py
-Generates traffic demand for the 3x3 SUMO grid network.
+generate_routes.py (grid_3x3)
+Multi-modal traffic demand generator for the 3x3 SUMO grid benchmark.
+
 Supports:
-1. Synthetic corridor flows (East-West and North-South flows + turns)
-2. Uniform random trips via SUMO's randomTrips tool
+- Vehicle classes: Passenger cars, Public transit buses, Emergency vehicles (EVs)
+- Pedestrian flows: Pedestrians walking along sidewalks and crossing signalized junctions
+- Dynamic traffic scenarios:
+    * balanced        : Standard baseline traffic flow across 9 intersections
+    * rush_hour       : Asymmetric high-volume arterial surge (East-West & South-North)
+    * emergency_surge : Periodic emergency vehicle dispatches (Green Corridor tests)
+    * pedestrian_heavy: Dense pedestrian crossings (School/Downtown safety tests)
 """
 
 import os
@@ -13,28 +19,20 @@ import argparse
 import random
 import xml.etree.ElementTree as ET
 
-def generate_corridor_routes(output_file, duration=3600, total_vehicles=1800, seed=42):
-    """
-    Directly generates realistic synthetic route demand without external dependencies.
-    Includes major arterial flows across the grid plus cross-grid movements.
-    """
+
+def generate_multimodal_routes(
+    output_file="grid3x3.rou.xml",
+    scenario="balanced",
+    duration=3600,
+    total_vehicles=1800,
+    total_pedestrians=250,
+    seed=42,
+):
     random.seed(seed)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     out_path = os.path.join(script_dir, output_file)
 
-    # Inbound boundary entry edges
-    west_entries = ["left0A0", "left1A1", "left2A2"]
-    east_entries = ["right0C0", "right1C1", "right2C2"]
-    south_entries = ["bottom0A0", "bottom1B0", "bottom2C0"]
-    north_entries = ["top0A2", "top1B2", "top2C2"]
-
-    # Outbound boundary exit edges
-    west_exits = ["A0left0", "A1left1", "A2left2"]
-    east_exits = ["C0right0", "C1right1", "C2right2"]
-    south_exits = ["A0bottom0", "B0bottom1", "C0bottom2"]
-    north_exits = ["A2top0", "B2top1", "C2top2"]
-
-    # Pre-defined arterial paths (West <-> East and South <-> North)
+    # Pre-defined arterial paths (3x3 grid)
     arterial_routes = [
         # West to East corridors
         ("w_to_e_row0", "left0A0 A0B0 B0C0 C0right0"),
@@ -60,13 +58,32 @@ def generate_corridor_routes(output_file, duration=3600, total_vehicles=1800, se
         ("turn_n_to_w_2", "top2C2 C2B2 B2A2 A2left2"),
     ]
 
+    # Pedestrian walking corridors across the 3x3 network
+    pedestrian_routes = [
+        "left0A0 A0B0 B0C0 C0right0",
+        "right0C0 C0B0 B0A0 A0left0",
+        "left1A1 A1B1 B1C1 C1right1",
+        "right1C1 C1B1 B1A1 A1left1",
+        "left2A2 A2B2 B2C2 C2right2",
+        "right2C2 C2B2 B2A2 A2left2",
+        "bottom0A0 A0A1 A1A2 A2top0",
+        "top0A2 A2A1 A1A0 A0bottom0",
+        "bottom1B0 B0B1 B1B2 B2top1",
+        "top1B2 B2B1 B1B0 B0bottom1",
+        "bottom2C0 C0C1 C1C2 C2top2",
+        "top2C2 C2C1 C1C0 C0bottom2",
+        "left1A1 A1A0 A0B0 B0right0",
+        "bottom1B0 B0B1 B1C1 C1right1",
+    ]
+
     root = ET.Element("routes")
     root.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
     root.set("xsi:noNamespaceSchemaLocation", "http://sumo.dlr.de/xsd/routes_file.xsd")
 
-    # Define vehicle types
+    # 1. Define Multi-Modal Vehicle Types
     vtype_car = ET.SubElement(root, "vType")
     vtype_car.set("id", "passenger")
+    vtype_car.set("vClass", "passenger")
     vtype_car.set("accel", "2.6")
     vtype_car.set("decel", "4.5")
     vtype_car.set("sigma", "0.5")
@@ -76,6 +93,7 @@ def generate_corridor_routes(output_file, duration=3600, total_vehicles=1800, se
 
     vtype_bus = ET.SubElement(root, "vType")
     vtype_bus.set("id", "bus")
+    vtype_bus.set("vClass", "bus")
     vtype_bus.set("accel", "1.2")
     vtype_bus.set("decel", "3.0")
     vtype_bus.set("sigma", "0.3")
@@ -83,85 +101,119 @@ def generate_corridor_routes(output_file, duration=3600, total_vehicles=1800, se
     vtype_bus.set("maxSpeed", "11.11")
     vtype_bus.set("color", "1.0,0.8,0.2")
 
-    # Add routes
+    vtype_ev = ET.SubElement(root, "vType")
+    vtype_ev.set("id", "emergency")
+    vtype_ev.set("vClass", "emergency")
+    vtype_ev.set("guiShape", "emergency")
+    vtype_ev.set("accel", "3.5")
+    vtype_ev.set("decel", "6.0")
+    vtype_ev.set("sigma", "0.1")
+    vtype_ev.set("length", "6.5")
+    vtype_ev.set("maxSpeed", "20.0")
+    vtype_ev.set("speedFactor", "1.4")
+    vtype_ev.set("color", "1.0,0.0,0.0")
+
+    # 2. Add Route Definitions
     for r_id, edges in arterial_routes:
         r_el = ET.SubElement(root, "route")
         r_el.set("id", r_id)
         r_el.set("edges", edges)
 
-    # Generate departures
-    route_ids = [r[0] for r in arterial_routes]
-    
-    # We distribute vehicles across the time window [0, duration]
-    # We can model a mild peak in the middle
-    departure_times = []
-    for _ in range(total_vehicles):
-        # A mix of uniform and peak distribution
-        if random.random() < 0.5:
-            t = random.uniform(0, duration)
-        else:
-            # Peak centered at duration * 0.4 with std duration * 0.2
-            t = random.gauss(duration * 0.45, duration * 0.2)
-            t = max(0.0, min(float(duration), t))
-        departure_times.append(t)
-    
-    departure_times.sort()
+    # 3. Configure Scenario Parameters
+    ev_dispatches = []
+    if scenario == "rush_hour":
+        # 80% traffic concentrated in main West->East and South->North corridors
+        weights = [4 if ("w_to_e" in r[0] or "s_to_n" in r[0]) else 1 for r in arterial_routes]
+        ev_interval = 300
+    elif scenario == "emergency_surge":
+        weights = [1] * len(arterial_routes)
+        ev_interval = 120  # Emergency vehicle dispatched every 2 minutes
+    elif scenario == "pedestrian_heavy":
+        weights = [1] * len(arterial_routes)
+        total_pedestrians *= 3
+        ev_interval = 400
+    else:  # balanced
+        weights = [1] * len(arterial_routes)
+        ev_interval = 300
 
-    for idx, dep_time in enumerate(departure_times):
+    # Schedule Emergency Vehicles
+    t_ev = 60.0
+    while t_ev < duration:
+        ev_dispatches.append(t_ev)
+        t_ev += ev_interval
+
+    # 4. Generate Vehicular Departures
+    vehicle_records = []
+    route_choices = [r[0] for r in arterial_routes]
+
+    for i in range(total_vehicles):
+        if scenario == "rush_hour":
+            # Peak surge centered at 45% of duration with Gaussian peak
+            t = random.gauss(duration * 0.45, duration * 0.15) if random.random() < 0.75 else random.uniform(0, duration)
+        else:
+            t = random.uniform(0, duration)
+        t = max(0.0, min(float(duration), t))
+        chosen_route = random.choices(route_choices, weights=weights, k=1)[0]
+        v_type = "bus" if random.random() < 0.1 else "passenger"
+        vehicle_records.append((t, f"veh_{i}", v_type, chosen_route))
+
+    # Add Emergency Vehicles
+    ev_routes = ["w_to_e_row1", "s_to_n_col1", "w_to_e_row0", "s_to_n_col2"]
+    for ev_idx, t in enumerate(ev_dispatches):
+        chosen_route = random.choice(ev_routes)
+        vehicle_records.append((t, f"ev_{ev_idx}", "emergency", chosen_route))
+
+    vehicle_records.sort(key=lambda x: x[0])
+
+    for t, v_id, v_type, r_id in vehicle_records:
         v_el = ET.SubElement(root, "vehicle")
-        v_el.set("id", f"veh_{idx}")
-        # 90% cars, 10% buses
-        v_type = "passenger" if random.random() > 0.1 else "bus"
+        v_el.set("id", v_id)
         v_el.set("type", v_type)
-        v_el.set("route", random.choice(route_ids))
-        v_el.set("depart", f"{dep_time:.2f}")
+        v_el.set("route", r_id)
+        v_el.set("depart", f"{t:.2f}")
         v_el.set("departLane", "best")
         v_el.set("departSpeed", "max")
+
+    # 5. Generate Pedestrian Departures
+    pedestrian_records = []
+    for p_i in range(total_pedestrians):
+        t_ped = random.uniform(0, duration)
+        p_edges = random.choice(pedestrian_routes)
+        pedestrian_records.append((t_ped, f"ped_{p_i}", p_edges))
+
+    pedestrian_records.sort(key=lambda x: x[0])
+
+    for t_ped, p_id, p_edges in pedestrian_records:
+        p_el = ET.SubElement(root, "person")
+        p_el.set("id", p_id)
+        p_el.set("depart", f"{t_ped:.2f}")
+        w_el = ET.SubElement(p_el, "walk")
+        w_el.set("edges", p_edges)
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="    ", level=0)
     tree.write(out_path, encoding="utf-8", xml_declaration=True)
-    print(f"[generate_routes] Successfully wrote {len(departure_times)} vehicles to {out_path}!")
+    print(
+        f"[generate_routes] Generated scenario '{scenario}' ({len(vehicle_records)} vehicles, "
+        f"{len(ev_dispatches)} EVs, {len(pedestrian_records)} pedestrians) -> {out_path}"
+    )
 
-def generate_random_trips(output_file, duration=3600, period=2.0):
-    """
-    Alternative generator using SUMO's randomTrips.py if SUMO tools are available.
-    """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    net_path = os.path.join(script_dir, "grid3x3.net.xml")
-    out_path = os.path.join(script_dir, output_file)
-
-    sumo_home = os.environ.get("SUMO_HOME", "/usr/share/sumo")
-    rt_script = os.path.join(sumo_home, "tools", "randomTrips.py")
-
-    if not os.path.exists(rt_script):
-        print(f"[generate_routes] {rt_script} not found, falling back to synthetic generator.")
-        generate_corridor_routes(output_file, duration)
-        return
-
-    import subprocess
-    cmd = [
-        sys.executable,
-        rt_script,
-        "-n", net_path,
-        "-e", str(duration),
-        "-p", str(period),
-        "--route-file", out_path
-    ]
-    print(f"[generate_routes] Running randomTrips.py...")
-    subprocess.run(cmd, check=True)
-    print(f"[generate_routes] Successfully generated {out_path}!")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate route demand for 3x3 SUMO grid")
+    parser = argparse.ArgumentParser(description="Multi-modal demand generator for 3x3 grid")
     parser.add_argument("--out", default="grid3x3.rou.xml", help="Output route XML file")
-    parser.add_argument("--duration", type=int, default=3600, help="Simulation duration in seconds")
+    parser.add_argument("--scenario", choices=["balanced", "rush_hour", "emergency_surge", "pedestrian_heavy"], default="balanced")
+    parser.add_argument("--duration", type=int, default=3600, help="Simulation duration (s)")
     parser.add_argument("--vehicles", type=int, default=1800, help="Total vehicles to spawn")
+    parser.add_argument("--pedestrians", type=int, default=250, help="Total pedestrians to spawn")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--method", choices=["corridor", "randomtrips"], default="corridor")
     args = parser.parse_args()
 
-    if args.method == "corridor":
-        generate_corridor_routes(args.out, duration=args.duration, total_vehicles=args.vehicles, seed=args.seed)
-    else:
-        generate_random_trips(args.out, duration=args.duration)
+    generate_multimodal_routes(
+        output_file=args.out,
+        scenario=args.scenario,
+        duration=args.duration,
+        total_vehicles=args.vehicles,
+        total_pedestrians=args.pedestrians,
+        seed=args.seed,
+    )

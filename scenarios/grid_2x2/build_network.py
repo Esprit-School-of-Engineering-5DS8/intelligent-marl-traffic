@@ -65,6 +65,8 @@ def build_grid_network(
         f"--default.lanenumber={lanes}",
         f"--default.speed={speed_limit}",
         "--tls.guess=true",
+        "--sidewalks.guess=true",
+        "--crossings.guess=true",
         f"--output-file={out_path}"
     ]
 
