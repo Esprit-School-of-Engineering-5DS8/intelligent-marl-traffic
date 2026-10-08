@@ -3,8 +3,26 @@
 # Run script for 2x2 SUMO Multi-Agent Scenario
 # ====================================================================
 
-export SUMO_HOME=${SUMO_HOME:-/usr/share/sumo}
-export PYTHONPATH=$SUMO_HOME/tools:$PYTHONPATH
+# Keep a system-wide/WSL SUMO install working when present (no-op with pip-installed SUMO).
+if [ -z "${SUMO_HOME:-}" ] && [ -d /usr/share/sumo ]; then
+  export SUMO_HOME=/usr/share/sumo
+fi
+if [ -n "${SUMO_HOME:-}" ] && [ -d "$SUMO_HOME/tools" ]; then
+  export PYTHONPATH="$SUMO_HOME/tools:${PYTHONPATH:-}"
+fi
+
+# Pick a Python interpreter that has SUMO/traci installed:
+#   1. an activated virtualenv, 2. ~/.venvs/sumo (Amen's machine), 3. PATH.
+PY="${PYTHON:-}"
+if [ -z "$PY" ]; then
+  if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+    PY="$VIRTUAL_ENV/bin/python"
+  elif [ -x "$HOME/.venvs/sumo/bin/python" ]; then
+    PY="$HOME/.venvs/sumo/bin/python"
+  else
+    PY="python3"
+  fi
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
@@ -40,8 +58,8 @@ while [[ $# -gt 0 ]]; do
       ;;
     --rebuild)
       echo "[run.sh] Rebuilding network and routes..."
-      python3 build_network.py
-      python3 generate_routes.py
+      "$PY" build_network.py
+      "$PY" generate_routes.py
       shift
       ;;
     *)
@@ -60,7 +78,7 @@ echo " GUI Enabled     : $([ -n "$GUI_FLAG" ] && echo "Yes (delay: ${DELAY}ms)" 
 echo "=================================================="
 
 if [ -n "$GUI_FLAG" ]; then
-  python3 runner.py --gui --mode "$MODE" --steps "$STEPS" --delay "$DELAY"
+  "$PY" runner.py --gui --mode "$MODE" --steps "$STEPS" --delay "$DELAY"
 else
-  python3 runner.py --mode "$MODE" --steps "$STEPS" --delay 0
+  "$PY" runner.py --mode "$MODE" --steps "$STEPS" --delay 0
 fi

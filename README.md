@@ -62,6 +62,20 @@ cd intelligent-marl-traffic
 pip install -r requirements.txt
 ```
 
+### Linux quick start
+
+On Linux, use the root launcher. It automatically finds a Python with SUMO
+installed (an activated venv, `~/.venvs/sumo`, or `python3` on PATH):
+
+```bash
+./run.sh --scenario grid_2x2 --mode max_pressure --steps 1000
+./run.sh --scenario grid_2x2 --mode max_pressure --gui   # with SUMO-GUI
+./run.sh --scenario grid_3x3 --mode sumo_default --steps 1000
+```
+
+To use a different environment: activate it first, or run with
+`PYTHON=/path/to/venv/bin/python ./run.sh ...`
+
 ### Run the 2x2 scenario (Phase 1 Validation)
 ```powershell
 cd scenarios/grid_2x2
