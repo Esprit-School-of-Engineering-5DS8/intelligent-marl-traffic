@@ -4,7 +4,7 @@ Demonstration of using SumoMARLEnv (PettingZoo / Gymnasium compliant)
 for multi-agent traffic signal control.
 
 Usage:
-    python examples/marl_quickstart.py --scenario 3x3 --steps 100
+    python examples/marl_quickstart.py --scenario 2x2 --steps 120 --gui --delay 150
 """
 
 import os
@@ -23,22 +23,34 @@ def main():
     parser.add_argument("--scenario", choices=["2x2", "3x3"], default="3x3", help="Grid scenario to run")
     parser.add_argument("--steps", type=int, default=100, help="Number of simulation steps")
     parser.add_argument("--gui", action="store_true", help="Launch SUMO with graphical interface")
+    parser.add_argument(
+        "--delay",
+        type=int,
+        default=150,
+        help="Delay in milliseconds per step in GUI mode (default: 150ms for human visualization)",
+    )
     args = parser.parse_args()
 
     scenario_dir = f"grid_{args.scenario}"
     sumocfg = os.path.join(PROJECT_ROOT, "scenarios", scenario_dir, f"grid{args.scenario}.sumocfg")
 
     print(f"=== Initializing SumoMARLEnv for {args.scenario} grid ===")
+    if args.gui:
+        print(f"Running in GUI mode with {args.delay}ms step delay for smooth visualization.")
+
     env = SumoMARLEnv(
         sumocfg_path=sumocfg,
         use_gui=args.gui,
         max_steps=args.steps,
         min_green=10,
         yellow_time=3,
+        delay_ms=args.delay,
         reward_weights={
             "waiting_time": -0.01,
             "queue": -0.2,
             "co2": -0.0001,
+            "pedestrian": -0.02,
+            "emergency": -1.0,
         },
     )
 
@@ -64,7 +76,8 @@ def main():
                 sys_kpis = infos.get("__system__", {})
                 print(
                     f"Step {step+1:3d}/{args.steps} | "
-                    f"Active: {sys_kpis.get('active_vehicles', 0):2d} | "
+                    f"Active: {sys_kpis.get('active_vehicles', 0):2d} (EVs: {sys_kpis.get('active_evs', 0):1d}) | "
+                    f"Peds: {sys_kpis.get('active_pedestrians', 0):2d} | "
                     f"Avg Speed: {sys_kpis.get('avg_speed_m_s', 0):.2f} m/s | "
                     f"Total Delay: {sys_kpis.get('total_waiting_time_s', 0):.1f}s"
                 )
@@ -76,6 +89,9 @@ def main():
         print("\nEpisode complete. Cumulative rewards per agent:")
         for agent, tot_r in total_rewards.items():
             print(f"  {agent}: {tot_r:.2f}")
+
+        if args.gui:
+            input("\nSimulation complete! Press Enter in this terminal to close the SUMO GUI window...")
 
     finally:
         env.close(output_csv="quickstart_metrics.csv")

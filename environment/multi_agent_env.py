@@ -258,10 +258,15 @@ class SumoMARLEnv(ParallelEnv):
             "-c", self.sumocfg_path,
             "--step-length", str(self.step_length),
             "--no-warnings", "true",
-            "--quit-on-end", "true",
         ]
         if self.use_gui:
-            cmd.extend(["--start", "true", "--delay", str(self.delay_ms)])
+            effective_delay = self.delay_ms if self.delay_ms > 0 else 150
+            cmd.extend(["--start", "true", "--delay", str(effective_delay)])
+            view_cfg = os.path.join(os.path.dirname(self.sumocfg_path), "viewsettings.xml")
+            if os.path.exists(view_cfg):
+                cmd.extend(["--gui-settings-file", view_cfg])
+        else:
+            cmd.extend(["--quit-on-end", "true"])
 
         traci.start(cmd)
         self.is_running = True
