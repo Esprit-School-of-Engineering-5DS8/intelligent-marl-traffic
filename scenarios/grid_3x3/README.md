@@ -30,7 +30,7 @@ Starter simulation scenario built for **Eclipse SUMO** inside **WSL Ubuntu**, sp
 ## 2. Directory Structure
 
 ```
-scenario_3x3/
+scenarios/grid_3x3/
 ├── grid3x3.net.xml           # Road network generated via netgenerate
 ├── grid3x3.rou.xml           # Vehicle demand & routes
 ├── grid3x3.sumocfg           # SUMO simulation configuration file
@@ -49,7 +49,7 @@ scenario_3x3/
 
 ### Option A: From inside WSL Ubuntu Terminal
 ```bash
-cd /mnt/c/Users/Hazem/Desktop/SUMO/scenario_3x3
+cd /mnt/c/Users/Hazem/Desktop/SUMO/scenarios/grid_3x3
 
 # Run with SUMO GUI (opens graphical window via WSLg/X11)
 ./run.sh --gui
@@ -67,7 +67,8 @@ cd /mnt/c/Users/Hazem/Desktop/SUMO/scenario_3x3
 ### Option B: From Windows PowerShell
 ```powershell
 # In PowerShell:
-wsl -d Ubuntu -e bash -lc "cd /mnt/c/Users/Hazem/Desktop/SUMO/scenario_3x3 && ./run.sh --gui"
+cd scenarios\grid_3x3
+python runner.py --mode max_pressure --steps 1000
 ```
 
 ---

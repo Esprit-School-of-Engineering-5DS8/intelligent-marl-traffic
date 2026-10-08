@@ -21,9 +21,9 @@ We use [Eclipse SUMO](https://sumo.dlr.de) as the microscopic traffic simulator 
 
 | Phase | Scenario | Status |
 |-------|----------|--------|
-| Phase 1 | 2×2 Grid — toy validation | 🟡 In Progress |
-| Phase 2 | 3×3 Grid — main benchmark | 🟠 In Progress |
-| Phase 3 | Monaco — real-world use case | 🔴 Planned |
+| Phase 1 | 2x2 Grid - toy validation | 🟡 In Progress |
+| Phase 2 | 3x3 Grid - main benchmark | 🟠 In Progress |
+| Phase 3 | Monaco - real-world use case | 🔴 Planned |
 
 ---
 
@@ -32,9 +32,9 @@ We use [Eclipse SUMO](https://sumo.dlr.de) as the microscopic traffic simulator 
 ```
 intelligent-marl-traffic/
 ├── scenarios/
-│   ├── grid_2x2/        # Phase 1 — 4-intersection toy grid
-│   ├── grid_3x3/        # Phase 2 — 9-intersection benchmark
-│   └── monaco/          # Phase 3 — Real OSM network (TBD)
+│   ├── grid_2x2/        # Phase 1 - 4-intersection toy grid
+│   ├── grid_3x3/        # Phase 2 - 9-intersection benchmark
+│   └── monaco/          # Phase 3 - Real OSM network (TBD)
 ├── agents/              # Traffic light controller policies
 │   └── rl/              # Deep RL agents (DQN, PPO)
 ├── environment/         # Core multi-agent SUMO environment
@@ -62,14 +62,21 @@ cd intelligent-marl-traffic
 pip install -r requirements.txt
 ```
 
-### Run the 3×3 scenario (Windows)
+### Run the 2x2 scenario (Phase 1 Validation)
+```powershell
+cd scenarios/grid_2x2
+python runner.py --mode max_pressure --steps 1000
+
+# Or with GUI
+python runner.py --gui --mode max_pressure --steps 1000
+```
+
+### Run the 3x3 scenario (Phase 2 Grid)
 ```powershell
 cd scenarios/grid_3x3
 python runner.py --mode max_pressure --steps 1000
-```
 
-### Run with GUI
-```powershell
+# Or with GUI
 python runner.py --gui --mode sumo_default --steps 1000
 ```
 
@@ -121,4 +128,5 @@ This project follows the **Design Thinking** methodology:
 
 ## 📜 License
 
-MIT License — see [LICENSE](LICENSE)
+MIT License - see [LICENSE](LICENSE)
+
