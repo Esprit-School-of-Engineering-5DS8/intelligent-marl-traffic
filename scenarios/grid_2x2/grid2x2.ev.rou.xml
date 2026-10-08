@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='utf-8'?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="emergency" vClass="emergency" guiShape="emergency" accel="3.5" decel="6.0" sigma="0.1" length="6.5" maxSpeed="20.0" speedFactor="1.4" color="1.0,0.0,0.0" />
+    <route id="ev_w_to_e" edges="left0A0 A0B0 B0right0" />
+    <route id="ev_e_to_w" edges="right1B1 B1A1 A1left1" />
+    <route id="ev_s_to_n" edges="bottom1B0 B0B1 B1top1" />
+    <route id="ev_n_to_s" edges="top0A1 A1A0 A0bottom0" />
+    <route id="ev_s_to_e" edges="bottom0A0 A0B0 B0right0" />
+    <route id="ev_n_to_w" edges="top1B1 B1A1 A1left1" />
+    <vehicle id="ev_0" type="emergency" route="ev_n_to_s" depart="0.00" departLane="best" departSpeed="max" />
+    <vehicle id="ev_1" type="emergency" route="ev_e_to_w" depart="209.39" departLane="best" departSpeed="max" />
+    <vehicle id="ev_2" type="emergency" route="ev_s_to_n" depart="406.13" departLane="best" departSpeed="max" />
+    <vehicle id="ev_3" type="emergency" route="ev_s_to_e" depart="598.43" departLane="best" departSpeed="max" />
+    <vehicle id="ev_4" type="emergency" route="ev_w_to_e" depart="867.31" departLane="best" departSpeed="max" />
+    <vehicle id="ev_5" type="emergency" route="ev_n_to_w" depart="1112.76" departLane="best" departSpeed="max" />
+    <vehicle id="ev_6" type="emergency" route="ev_n_to_s" depart="1363.61" departLane="best" departSpeed="max" />
+    <vehicle id="ev_7" type="emergency" route="ev_e_to_w" depart="1547.43" departLane="best" departSpeed="max" />
+    <vehicle id="ev_8" type="emergency" route="ev_s_to_n" depart="1738.67" departLane="best" departSpeed="max" />
+    <vehicle id="ev_9" type="emergency" route="ev_s_to_e" depart="1946.59" departLane="best" departSpeed="max" />
+    <vehicle id="ev_10" type="emergency" route="ev_w_to_e" depart="2198.83" departLane="best" departSpeed="max" />
+    <vehicle id="ev_11" type="emergency" route="ev_n_to_w" depart="2446.18" departLane="best" departSpeed="max" />
+    <vehicle id="ev_12" type="emergency" route="ev_n_to_s" depart="2712.10" departLane="best" departSpeed="max" />
+    <vehicle id="ev_13" type="emergency" route="ev_e_to_w" depart="2976.26" departLane="best" departSpeed="max" />
+    <vehicle id="ev_14" type="emergency" route="ev_s_to_n" depart="3206.61" departLane="best" departSpeed="max" />
+    <vehicle id="ev_15" type="emergency" route="ev_s_to_e" depart="3440.51" departLane="best" departSpeed="max" />
+</routes>

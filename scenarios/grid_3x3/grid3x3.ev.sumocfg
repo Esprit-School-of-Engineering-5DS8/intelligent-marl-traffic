@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <net-file value="grid3x3.net.xml"/>
+        <route-files value="grid3x3.rou.xml,grid3x3.ev.rou.xml"/>
+        <gui-settings-file value="viewsettings.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="3600"/>
+        <step-length value="1.0"/>
+    </time>
+    <processing>
+        <collision.action value="none"/>
+        <time-to-teleport value="180"/>
+    </processing>
+    <report>
+        <verbose value="false"/>
+        <no-step-log value="true"/>
+    </report>
+    <output>
+        <tripinfo-output value="tripinfo_ev.xml"/>
+        <tripinfo-output.write-unfinished value="true"/>
+    </output>
+    <gui_only>
+        <start value="false"/>
+        <quit-on-end value="false"/>
+        <delay value="100"/>
+    </gui_only>
+</configuration>
