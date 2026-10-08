@@ -1,8 +1,8 @@
-# 🚦 Intelligent Multi-Agent Urban Traffic Management
+# Intelligent Multi-Agent Urban Traffic Management
 
-> **Course:** Advanced Data Science Project — Esprit School of Engineering (5DS8)  
+> **Course:** Advanced Data Science Project - Esprit School of Engineering (5DS8)  
 > **Supervisor:** Islem Maiti  
-> **Team:** Hazem Mrad, Bilel Brini, Lina Haddad, Amen Allah Ben Aissa + Member 5
+> **Team:** Hazem Mrad, Bilel Brini, Lina Haddad, Amen Allah Ben Aissa, Rami Ben Slimen
 
 ---
 
@@ -87,21 +87,21 @@ python runner.py --gui --mode sumo_default --steps 1000
 
 | Member | Role | Objectives |
 |--------|------|------------|
-| Hazem Mrad | Simulation & Environment Lead | F1, F2 — SUMO scenarios, data pipeline, baselines |
-| Bilel Brini | RL Agent Developer | F3, M1, M3 — DQN/PPO, multi-agent, emissions |
-| Lina Haddad | Pedestrian & Safety Module | S1, S2, S3 — pedestrian-adaptive signals, safety |
-| Amen Allah Ben Aissa | Emergency Priority | E1, E2 — green corridor, EV detection & ETA |
-| Member 5 | Evaluation & Forecasting | F4, F5, M2 — experiments, visualization, reporting |
+| Hazem Mrad | Simulation & Environment Lead | F1, F2 - SUMO scenarios, data pipeline, baselines |
+| Bilel Brini | RL Agent Developer | F3, M1, M3 - DQN/PPO, multi-agent, emissions |
+| Lina Haddad | Pedestrian & Safety Module | S1, S2, S3 - pedestrian-adaptive signals, safety |
+| Amen Allah Ben Aissa | Emergency Priority | E1, E2 - green corridor, EV detection & ETA |
+| Rami Ben Slimen | Evaluation & Forecasting | F4, F5, M2 - experiments, visualization, reporting |
 
 ---
 
 ## 📊 Key Metrics Tracked
 
-- `avg_speed_m_s` — Network mean vehicle speed
-- `total_waiting_time_s` — Total vehicle delay per step
-- `arrived_vehicles` — Throughput (vehicles reaching destination)
-- `co2_mg_s` — CO₂ emissions
-- `fuel_ml_s` — Fuel consumption
+- `avg_speed_m_s` - Network mean vehicle speed
+- `total_waiting_time_s` - Total vehicle delay per step
+- `arrived_vehicles` - Throughput (vehicles reaching destination)
+- `co2_mg_s` - CO2 emissions
+- `fuel_ml_s` - Fuel consumption
 
 ---
 
