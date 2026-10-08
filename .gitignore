@@ -34,3 +34,7 @@ Thumbs.db
 
 # Secrets
 *.env
+
+# Documents & Presentations
+*.docx
+*.pdf
