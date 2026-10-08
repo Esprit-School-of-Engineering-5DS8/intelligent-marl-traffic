@@ -1,0 +1,15 @@
+# Normalize text files to LF inside the repository
+* text=auto
+
+# Linux/macOS/WSL scripts and Python sources: always LF
+*.sh text eol=lf
+*.py text eol=lf
+
+# Windows-native scripts: always CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries: never convert
+*.docx binary
+*.pdf binary
+*.png binary
