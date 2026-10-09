@@ -25,7 +25,7 @@ RESULTS_DIR = os.path.join(PROJECT_ROOT, "results", "ev")
 ETA_HORIZON_M = 400.0
 
 
-def build_environment(scenario, use_gui=False, seed=42):
+def build_environment(scenario, use_gui=False, seed=42, delay_ms=50):
     scenario_dir = os.path.join(PROJECT_ROOT, "scenarios", f"grid_{scenario}")
     if scenario_dir not in sys.path:
         sys.path.insert(0, scenario_dir)
@@ -63,7 +63,7 @@ def build_environment(scenario, use_gui=False, seed=42):
     if not os.path.exists(cfg_path):
         raise FileNotFoundError(f"EV config not found: {cfg_path}")
 
-    return SeededMultiAgentEnvironment(cfg_path, use_gui=use_gui), runner
+    return SeededMultiAgentEnvironment(cfg_path, use_gui=use_gui, delay_ms=delay_ms), runner
 
 
 def load_priority_policy():
@@ -89,8 +89,8 @@ def parse_tripinfo(path):
 
 
 def run_trial(scenario, mode, steps, seed, collect_eta=False, rl_policy_path=None,
-              rl_epsilon=1.0, collect_rl=False, skip_summary=False):
-    env, runner = build_environment(scenario, seed=seed)
+              rl_epsilon=1.0, collect_rl=False, skip_summary=False, gui=False, delay=100):
+    env, runner = build_environment(scenario, use_gui=gui, seed=seed, delay_ms=delay)
     scenario_dir = os.path.join(PROJECT_ROOT, "scenarios", f"grid_{scenario}")
     tripinfo_path = os.path.join(scenario_dir, "tripinfo_ev.xml")
     if os.path.exists(tripinfo_path):
@@ -326,11 +326,14 @@ def main():
     parser.add_argument("--collect-rl", action="store_true", help="Record RL decision episodes")
     parser.add_argument("--no-summary", action="store_true",
                         help="Do not append this trial to results/ev/summary.csv")
+    parser.add_argument("--gui", action="store_true", help="Run in SUMO-GUI")
+    parser.add_argument("--delay", type=int, default=100, help="GUI step delay in ms")
     args = parser.parse_args()
 
     run_trial(args.scenario, args.mode, args.steps, args.seed, collect_eta=args.collect_eta,
               rl_policy_path=args.rl_policy, rl_epsilon=args.rl_epsilon,
-              collect_rl=args.collect_rl, skip_summary=args.no_summary)
+              collect_rl=args.collect_rl, skip_summary=args.no_summary,
+              gui=args.gui, delay=args.delay)
 
 
 if __name__ == "__main__":
