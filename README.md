@@ -58,10 +58,34 @@ Windows without `make`. `python -m cotraffic <command> --help` lists the options
 | `make dashboard` | (`streamlit run dashboard/app.py`) | interactive results (no SUMO needed) |
 | `make demo` | (`python scripts/demo_side_by_side.py`) | two sumo-gui windows, baseline vs COOP-FULL, plus a live chart: vehicles and pedestrians coloured by type, legend, `--follow-ev` (camera on each emergency vehicle), `--follow-incident` (accident, camera on the blocked street), `--snapshot-at` for screenshots; `--net real_district_ped`: the district with sidewalks and pedestrians (demonstration only, not evaluated) |
 | | (`python scripts/open_in_sumo.py`) | one episode in sumo-gui on its own (fixed-time or actuated signals), e.g. to explore it in SUMO's 3D view |
+| | `ask "Quel contrôleur est le meilleur à la pointe ?"` | question about the results, answered in French from the result files (local language model, below) |
+| | `demo-plan "MP contre COOP-FULL à Tunis avec un accident" [--run]` | side-by-side demo described in plain words |
+| | `llm-status` | is the local language model ready? |
 | `make reproduce` | (`bash scripts/reproduce_all.sh`) | everything, from networks to tables |
 
 `docs/RUN_PLAN.md` explains how to split training and evaluation between machines,
 Kaggle (`notebooks/kaggle_train.ipynb`) and Colab (`notebooks/colab_train.ipynb`).
+
+## Assistant (local language model)
+
+The dashboard's *Assistant* tab and the `ask` / `demo-plan` commands accept requests in
+plain French. A small model runs on the laptop through [Ollama](https://ollama.com) - free,
+offline, no account:
+
+```bash
+# Windows: winget install --id Ollama.Ollama -e --source winget   (or the installer from ollama.com)
+ollama pull qwen2.5:3b
+python -m cotraffic llm-status
+python -m cotraffic ask "Compare COOP et MP sur le quartier à la pointe" --table
+python -m cotraffic demo-plan "MP contre COOP-FULL à Tunis avec un accident et des piétons" --run
+```
+
+Keywords read the request (the model reads only those they cannot classify, as JSON
+restricted to values that exist in the results); code finds the answer in `results/summary/`
+and the decision logs; the model phrases it, and a text with a number that is not in those
+files is replaced by a sentence written by code. An answer takes 10-25 s on the laptop
+(`--fast` skips the phrasing). Without Ollama everything still works (ADR-011).
+`COTRAFFIC_LLM_MODEL` selects another model, e.g. `qwen2.5:7b` (better, slower).
 
 ## Repository layout
 

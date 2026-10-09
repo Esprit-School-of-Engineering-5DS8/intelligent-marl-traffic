@@ -613,3 +613,37 @@ colours are not distinct in every pair: MP orange against COOP-FULL yellow fails
 normal-vision separation check (Delta E 13.7, floor 15), so the demo marks the windows
 instead, left blue and right orange (Delta E 33.6, colour-blind separation 24.7). New
 measure: pedestrians standing still, counted each decision, with their accumulated waiting.
+
+## 2026-10-09 - Assistant with a local language model
+
+Questions about the results and demo requests in plain French, answered from the result
+files (ADR-011): Ollama 0.40.2 serving `qwen2.5:3b` on the laptop (i5-1135G7, 12 GB, CPU
+only). Measured with `scripts/check_assistant.py` on 15 questions and 6 demo requests whose
+correct reading is fixed in the script:
+
+| reading | questions | demo requests |
+|---|---|---|
+| keywords | 14 / 15 | 6 / 6 |
+| model alone | 5 / 15 | 4 / 6 |
+| assistant (final design) | 14 / 15 | 6 / 6 |
+
+The model alone fills fields the request does not mention: a network ("le quartier" for a
+question naming none), "normal" traffic, another measure. In the first design, where the
+model's reading was kept for every field the user had not written, two of six full answers
+were wrong for that reason (the emergency-vehicle delay of EV-RULE-MP taken from the
+district instead of the grid). Keywords now read first; the model reads only a question the
+keywords cannot classify, and a network or demand level the question does not mention is
+left to the defaults. The one request missed by all readings is a paraphrase ("l'agent qui
+gère aussi les piétons et les urgences" for COOP-FULL). One reading by the model takes 6-18 s.
+
+Writing: the model phrases the answer from the facts found by code. Of six full answers in
+the first run, four passed the number guard; one had dropped the minus sign of an interval
+bound ("de 4,7 à 15,8 %" for [-4.7, 15.8]) and passed, and one wrote "quatre contrôleurs"
+for three. The guard now keeps the sign of interval bounds and reads numbers written in
+words, and "4×4" or "IC 95 %" no longer count as values. Final run: five of six answers
+written by the model, the sixth (the COOP-MP comparison on the district) rejected by the
+guard and replaced by the sentence written by code; 9-24 s per answer. Run again alone, the
+same question was answered by the model and accepted: outputs are not strictly identical
+between runs on this CPU despite temperature 0 and a fixed seed, which the guard and the
+fallback absorb. Wording remains imperfect at times (Max-Pressure called an "agent"), never
+with a number outside the facts.
