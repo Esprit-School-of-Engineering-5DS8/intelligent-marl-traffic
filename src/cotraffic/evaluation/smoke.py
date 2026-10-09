@@ -206,6 +206,20 @@ def _forecast() -> str:
     return f"{len(scores)} scores for 4 models"
 
 
+@check("assistant")
+def _assistant() -> str:
+    """Questions and demo requests answered from the result files, without a language model
+    (the fallback path every answer can take)."""
+    from cotraffic.assistant.ask import ask
+    from cotraffic.assistant.scenario import plan_demo
+
+    reply = ask("Quel est le meilleur contrôleur à la pointe sur la grille ?", llm=None)
+    assert reply.finding.found and reply.finding.table is not None, reply.text
+    plan = plan_demo("MP contre COOP-FULL à Tunis avec un accident et des piétons", llm=None)
+    assert plan.spec.network == "real_district_ped" and "--follow-incident" in plan.command
+    return f"best on grid4x4 peak: {reply.finding.table.iloc[0, 0]}; demo: {plan.spec.network}"
+
+
 @check("dashboard")
 def _dashboard() -> str:
     """In a separate process: streamlit loads pyarrow, whose DLLs clash with the Arrow

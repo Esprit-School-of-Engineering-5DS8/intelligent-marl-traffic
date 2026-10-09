@@ -32,3 +32,11 @@ TRAINING_DIR = RESULTS_DIR / "training"
 CHECKPOINTS_DIR = RESULTS_DIR / "checkpoints"
 FIGURES_DIR = REPO_ROOT / "figures"
 DOCS_DIR = REPO_ROOT / "docs"
+
+# networks without their own trained agents run the agents of the network they derive from
+TRAINED_ON = {"real_district_ped": "real_district", "grid8x8": "grid4x4"}
+
+
+def default_checkpoint(agent: str, network: str) -> Path:
+    """Training run 1 of ``agent`` on ``network`` (or on the network it derives from)."""
+    return CHECKPOINTS_DIR / agent / TRAINED_ON.get(network, network) / "seed1.zip"

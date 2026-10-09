@@ -183,6 +183,59 @@ def cmd_tables(args: argparse.Namespace) -> int:
     return 0
 
 
+def _llm(args: argparse.Namespace):
+    from cotraffic.assistant.llm import LocalLLM
+
+    if args.no_llm:
+        return None
+    llm = LocalLLM()
+    usable, message = llm.status()
+    if not usable:
+        print(f"(local model not used: {message})")
+        return None
+    return llm
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    from cotraffic.assistant.ask import ask
+
+    reply = ask(" ".join(args.question), _llm(args), write=not args.fast)
+    print(reply.text)
+    if reply.finding.table is not None and args.table:
+        print()
+        print(reply.finding.table.to_string(index=False))
+    print(
+        f"\n[question lue par : {reply.read_by} ; réponse écrite par : {reply.written_by}"
+        + (f" ; source : {reply.finding.source}" if reply.finding.source else "")
+        + (f" ; {reply.note}" if reply.note else "")
+        + "]"
+    )
+    return 0
+
+
+def cmd_demo_plan(args: argparse.Namespace) -> int:
+    import subprocess
+
+    from cotraffic.assistant.scenario import plan_demo
+
+    plan = plan_demo(" ".join(args.request), _llm(args))
+    print("command:", subprocess.list2cmdline(plan.command))
+    for note in plan.notes:
+        print("note:", note)
+    print(f"[requête lue par : {plan.read_by}]")
+    if args.run:
+        return subprocess.call(plan.command)
+    return 0
+
+
+def cmd_llm_status(args: argparse.Namespace) -> int:
+    from cotraffic.assistant.llm import LocalLLM
+
+    usable, message = LocalLLM().status()
+    print(("ok: " if usable else "not ready: ") + message)
+    return 0 if usable else 1
+
+
 def cmd_smoke(args: argparse.Namespace) -> int:
     _libsumo_default()
     from cotraffic.evaluation.smoke import run_smoke
@@ -288,6 +341,22 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("tables", help="write results/summary/REPORT_TABLES.md")
     p.set_defaults(func=cmd_tables)
 
+    p = sub.add_parser("ask", help="question about the results, answered in French")
+    p.add_argument("question", nargs="+")
+    p.add_argument("--no-llm", action="store_true", help="keywords and fixed sentences only")
+    p.add_argument("--fast", action="store_true", help="the model reads the question only")
+    p.add_argument("--table", action="store_true", help="also print the table of values")
+    p.set_defaults(func=cmd_ask)
+
+    p = sub.add_parser("demo-plan", help="side-by-side demo described in plain words")
+    p.add_argument("request", nargs="+")
+    p.add_argument("--no-llm", action="store_true", help="keywords only")
+    p.add_argument("--run", action="store_true", help="launch the demo")
+    p.set_defaults(func=cmd_demo_plan)
+
+    p = sub.add_parser("llm-status", help="is the local language model (Ollama) ready?")
+    p.set_defaults(func=cmd_llm_status)
+
     p = sub.add_parser("smoke", help="quick end-to-end check of every feature")
     p.add_argument("--only", nargs="*", default=None, help="run only these checks")
     p.set_defaults(func=cmd_smoke)
@@ -295,6 +364,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):  # French text and symbols on a Windows console
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args = build_parser().parse_args(argv)
     return int(args.func(args) or 0)
 

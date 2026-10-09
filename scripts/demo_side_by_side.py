@@ -54,6 +54,7 @@ from pathlib import Path
 from demo_chart import SIDE_COLORS
 
 from cotraffic.controllers.registry import BASELINES
+from cotraffic.paths import default_checkpoint
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "results" / "tmp" / "demo"
 
@@ -586,14 +587,6 @@ def run(
         return
     env.close()
     print(f"{method}: finished at t={env.now:.0f} s, {env.teleports} teleports")
-
-
-# networks without their own trained agents: the agents of the network they derive from
-TRAINED_ON = {"real_district_ped": "real_district", "grid8x8": "grid4x4"}
-
-
-def default_checkpoint(agent: str, network: str) -> str:
-    return f"results/checkpoints/{agent}/{TRAINED_ON.get(network, network)}/seed1.zip"
 
 
 def main() -> None:

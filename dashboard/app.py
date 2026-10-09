@@ -68,15 +68,18 @@ cell = summary[
 ].copy()
 cell["Method"] = cell["method"].map(label)
 
-tab_overview, tab_time, tab_tradeoff, tab_training, tab_decisions, tab_models = st.tabs(
-    [
-        "Overview",
-        "Over time",
-        "Travel time vs CO2",
-        "Training",
-        "Decisions",
-        "Forecast & importance",
-    ]
+tab_overview, tab_time, tab_tradeoff, tab_training, tab_decisions, tab_models, tab_assistant = (
+    st.tabs(
+        [
+            "Overview",
+            "Over time",
+            "Travel time vs CO2",
+            "Training",
+            "Decisions",
+            "Forecast & importance",
+            "Assistant",
+        ]
+    )
 )
 
 with tab_overview:
@@ -236,3 +239,86 @@ with tab_models:
             )
         )
         st.altair_chart(chart, width="stretch")
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def llm_status() -> tuple[bool, str]:
+    from cotraffic.assistant.llm import LocalLLM
+
+    return LocalLLM().status()
+
+
+@st.cache_data(show_spinner=False)
+def answer(question: str, fast: bool, use_llm: bool):
+    from cotraffic.assistant.ask import ask
+    from cotraffic.assistant.llm import LocalLLM
+
+    reply = ask(question, LocalLLM() if use_llm else None, write=not fast)
+    caption = f"Question lue par : {reply.read_by} · réponse écrite par : {reply.written_by}"
+    if reply.finding.source:
+        caption += f" · source : {reply.finding.source}"
+    if reply.note:
+        caption += f" · {reply.note}"
+    return reply.text, reply.finding.table, caption
+
+
+@st.cache_data(show_spinner=False)
+def demo_plan(request: str, use_llm: bool):
+    from cotraffic.assistant.llm import LocalLLM
+    from cotraffic.assistant.scenario import plan_demo
+
+    plan = plan_demo(request, LocalLLM() if use_llm else None)
+    return plan.command, plan.notes, plan.read_by
+
+
+with tab_assistant:
+    import subprocess
+    import sys
+
+    from cotraffic.paths import REPO_ROOT
+
+    usable, message = llm_status()
+    if usable:
+        st.caption(
+            f"Modèle local : {message}. Les chiffres viennent toujours des fichiers de résultats."
+        )
+    else:
+        st.caption(
+            f"Sans modèle local ({message}) : lecture par mots-clés, réponses écrites par le code."
+        )
+
+    st.subheader("Questions sur les résultats")
+    question = st.text_input(
+        "Question",
+        placeholder="Quel contrôleur est le meilleur à la pointe sur la grille ?",
+        key="assistant_question",
+    )
+    fast = st.checkbox(
+        "Réponse rapide : le modèle lit la question, le texte est écrit par le code",
+        key="assistant_fast",
+    )
+    if question:
+        with st.spinner("Recherche dans les résultats..."):
+            text, table, caption = answer(question, fast, usable)
+        st.markdown(text)
+        if table is not None:
+            st.dataframe(table, hide_index=True)
+        st.caption(caption)
+
+    st.subheader("Démo à partir d'une phrase")
+    request = st.text_input(
+        "Ce que vous voulez voir",
+        placeholder="MP contre COOP-FULL à Tunis avec un accident et des piétons",
+        key="assistant_demo",
+    )
+    if request:
+        with st.spinner("Préparation de la démo..."):
+            command, notes, read_by = demo_plan(request, usable)
+        st.code(subprocess.list2cmdline(command), language="bash")
+        for note in notes:
+            st.info(note)
+        st.caption(f"Demande lue par : {read_by}")
+        if st.button("Lancer la démo", key="assistant_run"):
+            flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0) if sys.platform == "win32" else 0
+            subprocess.Popen(command, cwd=REPO_ROOT, creationflags=flags)
+            st.success("La démo s'ouvre dans de nouvelles fenêtres.")
