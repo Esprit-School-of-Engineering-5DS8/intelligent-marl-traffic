@@ -29,3 +29,6 @@ results/training/**/validation_logs/
 results/tmp/
 sumo_files/*/tls/
 results/forecasting/tmp/
+
+# Personal notes
+COMMANDES.md
