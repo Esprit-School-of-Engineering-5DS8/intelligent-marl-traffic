@@ -88,7 +88,8 @@ def parse_tripinfo(path):
     return trips
 
 
-def run_trial(scenario, mode, steps, seed, collect_eta=False):
+def run_trial(scenario, mode, steps, seed, collect_eta=False, rl_policy_path=None,
+              rl_epsilon=1.0, collect_rl=False, skip_summary=False):
     env, runner = build_environment(scenario, seed=seed)
     scenario_dir = os.path.join(PROJECT_ROOT, "scenarios", f"grid_{scenario}")
     tripinfo_path = os.path.join(scenario_dir, "tripinfo_ev.xml")
@@ -105,7 +106,24 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False):
         tag += f"_evdist{ev_distance}"
     if mode == "priority" and eta_trigger and float(eta_trigger) > 0:
         tag += f"_etatrig{eta_trigger}"
+    if mode == "rl" and rl_epsilon < 1.0:
+        tag += f"_eps{rl_epsilon}"
     step_log_path = os.path.join(RESULTS_DIR, f"{tag}_steps.csv")
+
+    rl_controller = None
+    if mode == "rl":
+        from agents.emergency_rl import EVRLController, EVRLPolicy
+        from agents.emergency_priority import select_action_max_pressure as ev_fallback
+        rl_policy = EVRLPolicy().load(rl_policy_path) if rl_policy_path else None
+        predictor = None
+        try:
+            from forecasting.ev_arrival_predictor import EVArrivalPredictor
+            predictor = EVArrivalPredictor().load()
+        except Exception:
+            pass
+        rl_controller = EVRLController(
+            fallback_policy=ev_fallback,
+            predictor=predictor, policy=rl_policy, epsilon=rl_epsilon, run_tag=tag)
 
     env.start()
     step_rows = []
@@ -124,17 +142,20 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False):
         for step in range(steps):
             states = env.get_states()
             if mode != "sumo_default":
-                actions = {}
-                for tls_id, state in states.items():
-                    if mode == "fixed":
-                        actions[tls_id] = runner.select_action_fixed(tls_id, step)
-                    elif mode == "max_pressure":
-                        actions[tls_id] = runner.select_action_max_pressure(state)
-                    else:
-                        if priority_policy is not None:
-                            actions[tls_id] = priority_policy(tls_id, state)
-                        else:
+                if mode == "rl":
+                    actions = rl_controller.act(runner.traci, states)
+                else:
+                    actions = {}
+                    for tls_id, state in states.items():
+                        if mode == "fixed":
+                            actions[tls_id] = runner.select_action_fixed(tls_id, step)
+                        elif mode == "max_pressure":
                             actions[tls_id] = runner.select_action_max_pressure(state)
+                        else:
+                            if priority_policy is not None:
+                                actions[tls_id] = priority_policy(tls_id, state)
+                            else:
+                                actions[tls_id] = runner.select_action_max_pressure(state)
                 env.apply_actions(actions)
 
             env.step()
@@ -236,6 +257,18 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False):
             writer.writerows(eta_completed)
         print(f"[driver] ETA dataset: {len(eta_completed)} rows -> {eta_path}")
 
+    if rl_controller is not None:
+        episodes = rl_controller.finish(sim_time=step_rows[-1]["step"] if step_rows else 0)
+        if collect_rl and episodes:
+            ep_path = os.path.join(RESULTS_DIR, f"{tag}_rl_episodes.csv")
+            fieldnames = (["run_tag", "ev_id", "tls_id", "action", "strategy", "duration_s",
+                           "ev_delay_s", "civilian_wait_mean_s", "reward"] + FEATURE_COLUMNS)
+            with open(ep_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(episodes)
+            print(f"[driver] RL episodes: {len(episodes)} rows -> {ep_path}")
+
     trips = parse_tripinfo(tripinfo_path)
     ev_trips = [t for t in trips if t["vType"] == "emergency"]
     total_stops_loop = sum(ev_red_stops.values())
@@ -264,12 +297,13 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False):
     }
 
     summary_path = os.path.join(RESULTS_DIR, "summary.csv")
-    write_header = not os.path.exists(summary_path)
-    with open(summary_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(summary.keys()))
-        if write_header:
-            writer.writeheader()
-        writer.writerow(summary)
+    if not skip_summary:
+        write_header = not os.path.exists(summary_path)
+        with open(summary_path, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(summary.keys()))
+            if write_header:
+                writer.writeheader()
+            writer.writerow(summary)
 
     print("\n===== TRIAL SUMMARY =====")
     for key, value in summary.items():
@@ -281,15 +315,22 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False):
 def main():
     parser = argparse.ArgumentParser(description="Emergency vehicle priority experiment driver")
     parser.add_argument("--scenario", choices=["2x2", "3x3"], default="2x2")
-    parser.add_argument("--mode", choices=["sumo_default", "fixed", "max_pressure", "priority"],
+    parser.add_argument("--mode", choices=["sumo_default", "fixed", "max_pressure", "priority", "rl"],
                         default="fixed")
     parser.add_argument("--steps", type=int, default=3600)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--collect-eta", action="store_true",
                         help="Record ETA training data (features + actual time to each upcoming light)")
+    parser.add_argument("--rl-policy", default=None, help="Path to a trained RL policy artifact")
+    parser.add_argument("--rl-epsilon", type=float, default=1.0, help="Exploration rate for RL decisions")
+    parser.add_argument("--collect-rl", action="store_true", help="Record RL decision episodes")
+    parser.add_argument("--no-summary", action="store_true",
+                        help="Do not append this trial to results/ev/summary.csv")
     args = parser.parse_args()
 
-    run_trial(args.scenario, args.mode, args.steps, args.seed, collect_eta=args.collect_eta)
+    run_trial(args.scenario, args.mode, args.steps, args.seed, collect_eta=args.collect_eta,
+              rl_policy_path=args.rl_policy, rl_epsilon=args.rl_epsilon,
+              collect_rl=args.collect_rl, skip_summary=args.no_summary)
 
 
 if __name__ == "__main__":
