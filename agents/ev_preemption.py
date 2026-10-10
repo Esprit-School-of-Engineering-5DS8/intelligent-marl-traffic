@@ -2,109 +2,143 @@
 agents/ev_preemption.py
 Rule-based emergency-vehicle pre-emption — baseline arm A3.
 
-For each EV, for each of its next `lookahead_tls` traffic lights:
-- compute ETA = distance / speed (with a floor on speed),
-- if ETA <= eta_trigger_s (or the EV is within reactive_distance_m, which also
-  covers a stopped EV at a red light), force the action that serves the EV's
-  exact approach link (topology-derived, correct for turns),
-- keep forcing until the EV passes the stop line (the TLS drops out of its
-  next-TLS list) — this is the hold/release semantics of the preempt directive.
+A3 is a *directive source*, not a separate control path: every step it proposes
+`preempt` envelopes that run through the same arbiter and DirectiveLayer as the
+LLM team (plan Appendix B), so A3 and A4 share the safety and arbitration code.
 
-Two EVs wanting different axes at the same TLS: earliest ETA wins (arbiter
-rule 3). No TraCI here: it consumes EVState snapshots, so it is unit-testable.
+For each EV and each of its next `lookahead_tls` traffic lights:
+- ETA = distance / speed with a floor on speed,
+- trigger when ETA <= eta_trigger_s or the EV is within reactive_distance_m
+  (which also covers a stopped EV at a red light),
+- propose `preempt(phase=EV approach axis, start_in_s=0, hold_s=ETA+margin)`.
+  The hold window is refreshed every step while the EV needs the phase; when
+  the EV crosses a junction it disappears from the sensor list for a couple of
+  steps (internal lanes), and the remaining hold window keeps the pre-emption
+  alive, which is the grace behavior of the pre-Phase-2 implementation.
+- once the EV is observed beyond a traffic light (or its route turns away from
+  it), propose `preempt(..., hold_s=0)`, which releases the pre-emption
+  immediately — the same release the old `begin_step()` pruning provided.
 
-`begin_step(evs)` must be called once per simulation step before the per-TLS
-`select_action` calls. It prunes stale preemptions with a grace window: while
-an EV crosses a junction it sits on an internal lane and disappears from the
-sensor list for a couple of steps — releasing the preemption then would let
-the base policy commit to the opposite phase and the EV would arrive at red.
+The 25 s trigger horizon (not the plan's 20 s) must be preserved: the base
+policy can commit to the opposite phase just before the EV enters a 20 s
+window; 25 s covers in-flight transition + min_green + yellow plus margin.
+Axis comes from `topology.action_for_link(link_index)`, exact for turns.
+No TraCI here: it consumes EVState snapshots, so it is unit-testable.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from agents.llm.schemas import ACTION_TO_AXIS
 from environment.ev import EVState
 from environment.topology import TLSTopology
 
 
 @dataclass(frozen=True)
 class PreemptionConfig:
-    """
-    eta_trigger_s must cover the worst-case time for a TLS that is (or just
-    committed to) the opposite phase: in-flight transition (~3 s) + min_green
-    (10 s) + yellow (3 s), with margin. At 20 s the base policy can start the
-    opposite transition just before the EV enters the window and the EV loses
-    the race; 25 s leaves ~9 s of margin.
-    """
     eta_trigger_s: float = 25.0
     reactive_distance_m: float = 60.0
     lookahead_tls: int = 3
     min_speed_m_s: float = 1.0
+    release_margin_s: float = 8.0
     release_grace_steps: int = 5
+    max_hold_s: float = 40.0
+    max_ttl_s: float = 60.0
 
 
 @dataclass(frozen=True)
-class ActivePreemption:
+class EVCandidate:
     veh_id: str
+    tls_id: str
     action: int
     eta_s: float
+    distance_m: float
 
 
 class RuleBasedEVPreemption:
-    """Overrides base actions with EV priority while an EV needs the phase."""
+    """Proposes preempt directives for the EVs currently in the network."""
 
     def __init__(self, topologies: Dict[str, TLSTopology],
                  config: Optional[PreemptionConfig] = None):
         self.topologies = topologies
         self.config = config or PreemptionConfig()
-        self._active: Dict[str, ActivePreemption] = {}
-        self._missing_steps: Dict[str, int] = {}
+        self._issued: Dict[Tuple[str, str], Tuple[str, int]] = {}
 
-    def begin_step(self, evs: List[EVState]):
-        """Prune preemptions whose EV passed the TLS or has been gone too long."""
-        for tls_id, active in list(self._active.items()):
-            ev = next((candidate for candidate in evs if candidate.veh_id == active.veh_id), None)
-            if ev is None:
-                missing = self._missing_steps.get(tls_id, 0) + 1
-                if missing > self.config.release_grace_steps:
-                    del self._active[tls_id]
-                    self._missing_steps.pop(tls_id, None)
-                else:
-                    self._missing_steps[tls_id] = missing
-                continue
-
-            self._missing_steps.pop(tls_id, None)
-            if not any(nxt.tls_id == tls_id for nxt in ev.next_tls[:self.config.lookahead_tls]):
-                del self._active[tls_id]
-
-    def select_action(self, tls_id: str, base_action: int, evs: List[EVState]) -> int:
-        candidate = self._best_candidate(tls_id, evs)
-        if candidate is not None:
-            active = self._active.get(tls_id)
-            if active is None or active.veh_id == candidate.veh_id or candidate.eta_s <= active.eta_s:
-                self._active[tls_id] = candidate
-        active = self._active.get(tls_id)
-        return active.action if active is not None else base_action
-
-    def active_preemptions(self) -> Dict[str, ActivePreemption]:
-        """Current preemptions (tls -> ActivePreemption), for logging."""
-        return dict(self._active)
-
-    def _best_candidate(self, tls_id: str, evs: List[EVState]) -> Optional[ActivePreemption]:
-        topology = self.topologies[tls_id]
-        best: Optional[ActivePreemption] = None
+    def candidates(self, evs: List[EVState]) -> List[EVCandidate]:
+        """Best (lowest-ETA) triggered candidate per TLS, across all EVs."""
+        best: Dict[str, EVCandidate] = {}
         for ev in evs:
             for nxt in ev.next_tls[:self.config.lookahead_tls]:
-                if nxt.tls_id != tls_id:
+                topology = self.topologies.get(nxt.tls_id)
+                if topology is None:
                     continue
                 action = topology.action_for_link(nxt.link_index)
                 if action is None:
                     continue
                 eta = nxt.distance_m / max(ev.speed_m_s, self.config.min_speed_m_s)
-                reactive = nxt.distance_m <= self.config.reactive_distance_m
-                if eta <= self.config.eta_trigger_s or reactive:
-                    if best is None or eta < best.eta_s:
-                        best = ActivePreemption(ev.veh_id, action, eta)
-        return best
+                if eta > self.config.eta_trigger_s and nxt.distance_m > self.config.reactive_distance_m:
+                    continue
+                candidate = EVCandidate(ev.veh_id, nxt.tls_id, action, eta, nxt.distance_m)
+                current = best.get(nxt.tls_id)
+                if current is None or eta < current.eta_s:
+                    best[nxt.tls_id] = candidate
+        return list(best.values())
+
+    def propose(self, evs: List[EVState], t: float = 0.0) -> List[Dict[str, Any]]:
+        """One envelope with a preempt per triggered TLS, plus releases."""
+        directives: List[Dict[str, Any]] = []
+        candidates = self.candidates(evs)
+        best_keys = {(c.tls_id, c.veh_id): c for c in candidates}
+        observed = {ev.veh_id: ev for ev in evs}
+
+        for (tls_id, veh_id), candidate in best_keys.items():
+            axis = ACTION_TO_AXIS[candidate.action]
+            directives.append(self._preempt(tls_id, veh_id, axis, candidate.eta_s))
+            self._issued[(tls_id, veh_id)] = (axis, 0)
+
+        for key, (axis, missing) in list(self._issued.items()):
+            if key in best_keys:
+                continue
+            tls_id, veh_id = key
+            ev = observed.get(veh_id)
+            if ev is None:
+                # EV on an internal lane (or despawned): keep the pre-emption
+                # alive for a short grace window, like begin_step() did.
+                if missing + 1 > self.config.release_grace_steps:
+                    del self._issued[key]
+                else:
+                    self._issued[key] = (axis, missing + 1)
+                continue
+            upcoming = {nxt.tls_id for nxt in ev.next_tls[:self.config.lookahead_tls]}
+            if tls_id not in upcoming:
+                directives.append(self._preempt(tls_id, veh_id, axis, eta_s=0.0, hold_s=0.0))
+                del self._issued[key]
+            else:
+                self._issued[key] = (axis, 0)
+
+        if not directives:
+            return []
+        return [{
+            "agent": "emergency",
+            "t": t,
+            "directives": directives,
+            "alerts": [],
+            "explanation": f"rule-based pre-emption for {len(directives)} traffic light(s)",
+        }]
+
+    def _preempt(self, tls_id: str, veh_id: str, axis: str, eta_s: float,
+                 hold_s: Optional[float] = None) -> Dict[str, Any]:
+        if hold_s is None:
+            hold_s = min(self.config.max_hold_s, eta_s + self.config.release_margin_s)
+        return {
+            "tls": tls_id,
+            "type": "preempt",
+            "phase": axis,
+            "ev": veh_id,
+            "start_in_s": 0.0,
+            "hold_s": hold_s,
+            "eta_s": eta_s,
+            "ttl_s": min(self.config.max_ttl_s, hold_s + 5.0),
+        }

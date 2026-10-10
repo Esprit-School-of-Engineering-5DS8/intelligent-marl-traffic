@@ -13,7 +13,12 @@ incident). Arms:
     sumo_default : SUMO's built-in pre-timed program (no controller)
     fixed        : baselines.fixed_time.FixedTimeAgent
     max_pressure : agents.max_pressure.MaxPressureAgent (topology lane groups)
-    ev_priority  : max_pressure + agents.ev_preemption (rule-based A3)
+    ev_priority  : max_pressure + agents.ev_preemption (rule-based A3, through
+                   the arbiter/DirectiveLayer)
+    llm_team     : max_pressure + arbiter/DirectiveLayer + Supervisor (A4).
+                   Phase 2 uses MockLLM, which emits empty directives, so an
+                   llm_team run is bit-identical to max_pressure; Phase 3
+                   swaps in the real LLM clients.
 
 Seeds: `--seeds 0` runs without an explicit --seed (SUMO default RNG); pass
 e.g. `--seeds 1,2,3` for reproducible multi-seed runs. Each run writes
@@ -36,7 +41,12 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from agents.ev_preemption import RuleBasedEVPreemption
+from agents.llm.agent import LLMAgent
+from agents.llm.client import CallLogger, MockLLM
 from agents.max_pressure import MaxPressureAgent
+from agents.supervisor.arbiter import Arbiter
+from agents.supervisor.directive_layer import DirectiveLayer
+from agents.supervisor.supervisor import Supervisor
 from baselines.fixed_time import FixedTimeAgent
 from environment.ev import get_active_evs
 from environment.incidents import IncidentInjector
@@ -46,7 +56,7 @@ from evaluation.scenarios import SCENARIOS
 import traci
 from traci.exceptions import FatalTraCIError
 
-ARMS = ("sumo_default", "fixed", "max_pressure", "ev_priority")
+ARMS = ("sumo_default", "fixed", "max_pressure", "ev_priority", "llm_team")
 
 SUMMARY_COLUMNS = [
     "scenario", "arm", "seed", "steps",
@@ -66,7 +76,7 @@ AGG_METRICS = [
 def _build_policies(arm: str, tls_ids: List[str]) -> Dict[str, object]:
     if arm == "fixed":
         return {tls_id: FixedTimeAgent(tls_id) for tls_id in tls_ids}
-    if arm in ("max_pressure", "ev_priority"):
+    if arm in ("max_pressure", "ev_priority", "llm_team"):
         return {tls_id: MaxPressureAgent(tls_id) for tls_id in tls_ids}
     return {}
 
@@ -91,10 +101,27 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     if policies:
         env.build_agents()
 
-    preemption = None
+    arbiter = None
+    layer = None
+    ev_source = None
+    supervisor = None
     if arm == "ev_priority":
         topologies = {tls_id: env.agents[tls_id].topology for tls_id in tls_ids}
-        preemption = RuleBasedEVPreemption(topologies)
+        arbiter = Arbiter(tls_ids)
+        layer = DirectiveLayer()
+        ev_source = RuleBasedEVPreemption(topologies)
+    elif arm == "llm_team":
+        arbiter = Arbiter(tls_ids)
+        layer = DirectiveLayer()
+        supervisor = Supervisor(
+            agents={
+                "operator": LLMAgent("operator", MockLLM()),
+                "emergency": LLMAgent("emergency", MockLLM()),
+            },
+            arbiter=arbiter,
+            logger=CallLogger(os.path.join(run_dir, "decisions.jsonl")),
+            neighbors=env.neighbors,
+        )
 
     incident_spec = spec.incident
     if incident_spec is not None:
@@ -109,24 +136,33 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
 
     try:
         for _ in range(steps):
+            sim_time = traci.simulation.getTime()
             if injector is not None:
-                injector.apply(traci.simulation.getTime())
+                injector.apply(sim_time)
             if policies:
                 states = env.get_states()
-                evs = get_active_evs() if preemption is not None else []
-                if preemption is not None:
-                    preemption.begin_step(evs)
+                evs = get_active_evs() if (ev_source is not None or supervisor is not None) else []
+                if ev_source is not None:
+                    for envelope in ev_source.propose(evs, sim_time):
+                        result = arbiter.submit("emergency", envelope, sim_time, states)
+                        layer.install(result.accepted, sim_time)
+                if supervisor is not None and supervisor.should_run(sim_time, evs):
+                    for result in supervisor.run(sim_time, states, evs):
+                        layer.install(result.accepted, sim_time)
                 actions = {}
                 for tls_id in tls_ids:
                     action = policies[tls_id].select_action(states[tls_id])
-                    if preemption is not None:
-                        action = preemption.select_action(tls_id, action, evs)
+                    if layer is not None:
+                        action = layer.apply(tls_id, states[tls_id], action, sim_time)
                     actions[tls_id] = action
                 env.apply_actions(actions)
             env.step()
     except FatalTraCIError:
         pass
     finally:
+        if layer is not None and supervisor is not None:
+            for event in layer.drain_events():
+                supervisor.logger.log(event)
         env.close(output_csv=step_csv)
 
     tripinfo_result = parse_tripinfo(tripinfo)
@@ -134,6 +170,11 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     summary.update(summarize_step_csv(step_csv))
     summary.update(tripinfo_result["summary"])
     summary.update(summarize_evs(tripinfo_result["vehicles"]))
+    if supervisor is not None:
+        summary["llm_calls"] = supervisor.stats["calls"]
+        summary["llm_fallbacks"] = supervisor.stats["fallbacks"]
+        summary["llm_tokens_in"] = supervisor.stats["tokens_in"]
+        summary["llm_tokens_out"] = supervisor.stats["tokens_out"]
     with open(os.path.join(run_dir, "summary.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
     return summary

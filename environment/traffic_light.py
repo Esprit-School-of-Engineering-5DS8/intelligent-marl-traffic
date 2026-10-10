@@ -65,9 +65,14 @@ class TrafficLightAgent:
             else:
                 ew_queue += halting
 
+        current_axis = None
+        if self.topology.is_green_phase(self.current_phase):
+            current_axis = "NS" if self.current_phase == self.topology.ns_green_phase else "EW"
+
         return {
             "tls_id": self.tls_id,
             "current_phase": self.current_phase,
+            "current_axis": current_axis,
             "time_in_phase": self.time_in_phase,
             "is_yellow": not self.topology.is_green_phase(self.current_phase),
             "in_transition": bool(self._transition),

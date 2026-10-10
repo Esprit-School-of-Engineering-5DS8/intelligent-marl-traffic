@@ -1,11 +1,11 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: Phases 0–1 implemented and committed.
+> Branch: `feat/llm-agents`. Status: Phases 0–2 implemented (Phase 2 uncommitted at end of session).
 
 ---
 
-## HANDOFF — session state (2026-10-10)
+## HANDOFF — session state (2026-10-10, session 2)
 
 **Progress**
 
@@ -13,40 +13,45 @@
 |---|---|---|
 | 0 — foundation & honest baselines | ✅ done | `4dd053c` |
 | 1 — S1/S2/S3 scenarios + rule-based EV pre-emption (A3) | ✅ done | `26371b6` |
-| 2 — LLM plumbing, DirectiveLayer, arbiter | next | — |
+| 2 — LLM plumbing, DirectiveLayer, arbiter, snapshot | ✅ done (uncommitted) | — |
+| 3 — Operator agent, real LLM | next | — |
 
-**Decisions taken while implementing (beyond this plan)**
+**Decisions taken while implementing Phase 2 (beyond this plan)**
 
-- Additive strategy: `runner.py` untouched; canonical modules are new files under `environment/` (`topology.py`, `traffic_light.py`, `ev.py`, `incidents.py`, `_bootstrap.py`).
-- Max-pressure lane groups come from the TLS program (`topology.action_for_link`), never lane-ID strings; phase durations pinned after every `setPhase`.
-- Peak demand (S1) = separate seeded route file `grid3x3.peak.rou.xml` (2400 veh, seed 42), not SUMO `--scale` (which would also duplicate EVs).
-- Scenario registry in `evaluation/scenarios.py`; A3 arm name is `ev_priority` (= max_pressure + `agents/ev_preemption.py`).
-- A3 implemented fresh with topology link→phase mapping; Amen's `agents/emergency_priority.py` heuristics not used. His ETA predictor (`forecasting/ev_arrival_predictor.py` + joblib artifacts on `origin/amen/ev-priority`) is deferred to Phase 4.
-- A3 trigger horizon is **25 s, not the plan's 20 s**: the base policy can commit to the opposite phase just before the EV enters a 20 s window; 25 s covers in-flight transition + min_green + yellow. A 5-step grace window also keeps the preemption alive while the EV crosses a junction (it disappears from EV sensing on internal lanes).
-- Incident S3: edge `A1A0` (busiest interior edge, 308 veh at peak), 300 s starting at t=1200; incident config disables teleporting (`time-to-teleport -1`), otherwise SUMO removes the queue after 180 s.
-- Civilian KPIs exclude `ev_*` and `incident_*` ids; EV KPIs (`ev_count`, mean/max duration, waiting) are separate columns.
-- `--seeds 0` = no explicit `--seed` (reproduces the plan's sanity table); use `--seeds 1,2,3` for real runs.
+- Directive semantics are time windows in `DirectiveLayer` (all types: TTL; preempt: `[issued+start_in_s, issued+min(start_in_s+hold_s, ttl_s))`). `hold_s=0` on a preempt **releases** it. The arbiter validates/clips/role-checks and picks the winner (`preempt > serve_ped > hold`); biases are merged by the layer (product of factors, clipped).
+- A3 `RuleBasedEVPreemption` is now a **directive source** (plan Appendix B), not a parallel controller: 25 s trigger, `hold_s=ETA+8`, min-speed floor 1 m/s, reactive 60 m, lookahead 3; emits `hold_s=0` releases when the EV is observed past the TLS; unobservable EVs keep their window for `release_grace_steps=5`. Results are identical to pre-migration A3 (see below).
+- Starvation guard lives in the layer: an override chain favoring the same axis is dropped after `max_red_s=90` (+60 s if a preempt is in the chain), with a 30 s cooldown.
+- Neutral `bias` (1.0/1.0) reproduces max-pressure exactly — the empty-directive equivalence depends on this.
+- `current_axis` ("NS"/"EW"/None) added to every TLS state; `environment/snapshot.py` is pure (no TraCI). Snapshot ETA = `dist / max(speed, 1)`.
+- Supervisor triggers: Operator every `delta_s=30` from t=0; Emergency every `ev_replan_s=10` while EVs are active. Arbiter feedback is posted to the blackboard as `arbiter_result`; agent alerts under their `kind`.
+- `llm_team` (A4) uses `MockLLM` (default responder: empty directives), so an `llm_team` run is bit-identical to `max_pressure`; the acceptance check is an exact CSV diff.
+- LLM log: `results/<scenario>/llm_team/seed_n/decisions.jsonl` (t, agent, prompt_hash, attempts, tokens, latency, raw/parsed, arbiter outcome). `OpenAICompatClient` and `ReplayLLM` exist but are not wired into the arm yet.
 
 **Verified numbers (`results/` is gitignored)**
 
-- S0 exact reproduction: sumo_default 132.09 / fixed 87.96 / max_pressure 11.45 s mean step wait.
-- S1 peak: 27.75 ± 0.81 s step wait, 2369 ± 1.5 of 2400 arrive.
-- S2 single diagonal EV: EV travel 100.0 ± 3.5 s (A2) vs **64.3 ± 9.2 s (A3)**; dual overlapping EVs: 72.3 ± 2.6 s vs **55.3 ± 5.8 s**; civilian cost ≤ ~5%.
-- S3: A3 bit-identical to A2 (no EVs) — no-regression check.
+- `pytest`: **91 passed**.
+- S0, seed 1, 3600 steps: `llm_team` step CSV **bit-identical** to `max_pressure` (11.14 s mean step wait, 1184 arrived).
+- S2 after the A3 migration matches the session-1 recording exactly: single EV 28.13 ± 0.92 step wait and EV 64.33 ± 9.24 s; dual EV 29.20 ± 0.92, EV 55.33 ± 5.77 s; max_pressure unchanged (EV 100.0 / 72.3 s).
+- Smoke with a non-empty MockLLM: 10 operator calls, 10 directives accepted/installed, alerts posted, log complete.
 
 **Known gaps / warnings for the next session**
 
-- While an EV is queued at rank-1, distance/speed ETA to rank-2 explodes → the corridor preempts late; one seed still shows one stop. Phase 4's ETA model should fix this.
-- A3 must migrate onto the Phase 2 `DirectiveLayer` (Appendix B) without losing `begin_step()` semantics (grace window) and the 25 s horizon.
+- `run_experiments.run_one` hardcodes `MockLLM()` for `llm_team`; Phase 3 should add client selection (e.g. `--llm mock|openai|replay`) and wrap the client in `ReplayLLM` for record/replay.
+- Alerts do not yet trigger an immediate Operator run (`Supervisor.should_run` is periodic + EV only); the Phase-3 detector should pass alerts and fire the Operator.
+- `serve_ped` is implemented/tested (min-green guarantee on the current axis, forced window otherwise) but S4 does not exist; revisit in Phase 5.
+- `agents/llm/prompts/` does not exist; `LLMAgent` falls back to a generic system prompt. Phase 3 adds `operator.md`.
+- "Two preempts: earliest ETA wins" uses the optional `eta_s` directive field, filled by A3. The Phase-4 LLM emergency agent must fill it too.
 - `MultiAgentEnv.build_agents()` pins phases and disables SUMO's timer — never call it for `sumo_default`.
 - Run parallel experiments with distinct ports (`run_experiments` assigns them automatically).
 
 **Verification**
 
 ```bash
-~/.venvs/sumo/bin/python -m pytest tests/ -q     # 30 passed
-~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_ev,grid_3x3_ev2 \
-    --arms max_pressure,ev_priority --seeds 1,2,3 --steps 3600 --jobs 4
+~/.venvs/sumo/bin/python -m pytest tests/ -q     # 91 passed
+~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3 \
+    --arms max_pressure,llm_team --seeds 1 --steps 3600 --jobs 2
+cmp results/grid_3x3/max_pressure/seed_1/simulation_metrics.csv \
+    results/grid_3x3/llm_team/seed_1/simulation_metrics.csv      # bit-identical
 ```
 
 ---
@@ -369,7 +374,7 @@ Done when: A0/A1/A2 run via `run_experiments` and reproduce the table in 5.2 (A2
 Tasks: EV vType and EV generation in `generate_routes.py` (seeded, configurable depart/route); peak-demand option; incident injector (validate with a quick test); rule-based EV pre-emption (A3), coordinating with the owner of `agents/emergency_priority.py`.
 Done when: S1/S2/S3 run for A2 and A3, and EV travel time is measured. A3 beats A2 on EV time.
 
-### Phase 2: LLM plumbing, directive layer, arbiter (L)
+### Phase 2: LLM plumbing, directive layer, arbiter (L) — ✅ done (uncommitted)
 Tasks:
 1. `agents/llm/client.py` (`OpenAICompat`, `Mock`, `Replay`), `schemas.py`, JSONL call logger.
 2. `agents/supervisor/blackboard.py`, `arbiter.py`, `supervisor.py`, `DirectiveLayer`.
@@ -379,7 +384,7 @@ Tasks:
 
 Done when: a full S0 run with `MockLLM` completes, produces a decision log, and A4-with-empty-directives equals A2 exactly.
 
-### Phase 3: Operator agent, real LLM (M)
+### Phase 3: Operator agent, real LLM (M) — next
 Tasks: system prompt + 2-3 few-shot examples; alert detector (code); run S0, S1, S3 with the real LLM; record to `ReplayLLM` cache; inspect logs and fix prompt problems.
 Done when: invalid-output rate is under about 5%, no S0 regression (H1), and S3 results are available.
 
