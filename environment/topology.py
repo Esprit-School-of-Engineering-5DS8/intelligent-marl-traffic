@@ -66,6 +66,20 @@ class TLSTopology:
         """Map the binary action space (0 = NS, 1 = EW) to a green phase index."""
         return self.ns_green_phase if action % 2 == 0 else self.ew_green_phase
 
+    def action_for_link(self, link_index: int) -> Optional[int]:
+        """
+        Action (0 = NS, 1 = EW) whose green phase serves this signal link,
+        or None if neither green phase serves it.
+
+        Used to translate an emergency vehicle's upcoming TLS link into the
+        phase it needs — exact even when the vehicle turns.
+        """
+        for action, phase_index in ((0, self.ns_green_phase), (1, self.ew_green_phase)):
+            state = self.phases[phase_index].state
+            if 0 <= link_index < len(state) and state[link_index] in GREEN_CHARS:
+                return action
+        return None
+
     def phase(self, index: int) -> Phase:
         return self.phases[index]
 

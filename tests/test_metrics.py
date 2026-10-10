@@ -1,4 +1,4 @@
-from evaluation.metrics import parse_tripinfo, summarize_step_csv
+from evaluation.metrics import parse_tripinfo, summarize_evs, summarize_step_csv
 
 TRIPINFO_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <tripinfos>
@@ -32,6 +32,38 @@ def test_parse_tripinfo_empty(tmp_path):
     result = parse_tripinfo(str(path))
     assert result["summary"]["arrived_vehicles"] == 0
     assert result["summary"]["mean_duration_s"] == 0.0
+
+
+MIXED_TRIPINFO_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<tripinfos>
+    <tripinfo id="veh_0" depart="0" arrival="20" duration="20" routeLength="200" waitingTime="4" waitingCount="1" timeLoss="6"/>
+    <tripinfo id="ev_0" depart="0" arrival="30" duration="30" routeLength="300" waitingTime="1" waitingCount="0" timeLoss="2"/>
+    <tripinfo id="ev_1" depart="0" arrival="50" duration="50" routeLength="300" waitingTime="3" waitingCount="2" timeLoss="5"/>
+    <tripinfo id="incident_B1B2_0" depart="0" arrival="400" duration="400" routeLength="10" waitingTime="395" waitingCount="1" timeLoss="395"/>
+</tripinfos>
+"""
+
+
+def test_parse_tripinfo_excludes_evs_and_blockers(tmp_path):
+    path = tmp_path / "tripinfo.xml"
+    path.write_text(MIXED_TRIPINFO_XML)
+    result = parse_tripinfo(str(path))
+    assert result["summary"]["vehicles_total"] == 4
+    assert result["summary"]["arrived_vehicles"] == 1
+    assert result["summary"]["mean_duration_s"] == 20.0
+    assert len(result["vehicles"]) == 4
+
+
+def test_summarize_evs(tmp_path):
+    path = tmp_path / "tripinfo.xml"
+    path.write_text(MIXED_TRIPINFO_XML)
+    result = parse_tripinfo(str(path))
+    ev = summarize_evs(result["vehicles"])
+    assert ev["ev_count"] == 2
+    assert ev["ev_mean_duration_s"] == 40.0
+    assert ev["ev_mean_waiting_s"] == 2.0
+    assert ev["ev_mean_waiting_count"] == 1.0
+    assert ev["ev_max_duration_s"] == 50.0
 
 
 def test_summarize_step_csv(tmp_path):

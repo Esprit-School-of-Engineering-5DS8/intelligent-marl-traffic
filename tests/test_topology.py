@@ -31,6 +31,15 @@ def test_groups_and_action_mapping():
     assert topology.green_phase_for_action(2) == 0
 
 
+def test_action_for_link_maps_approach_to_axis():
+    topology = build_topology("T0", GRID_PHASES, GRID_LINKS)
+    assert topology.action_for_link(0) == 0
+    assert topology.action_for_link(1) == 0
+    assert topology.action_for_link(2) == 1
+    assert topology.action_for_link(3) == 1
+    assert topology.action_for_link(99) is None
+
+
 def test_phase_classification():
     topology = build_topology("T0", GRID_PHASES, GRID_LINKS)
     assert topology.phase(0).is_green

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="emergency" vClass="emergency" guiShape="emergency" accel="3.5" decel="6.0" sigma="0.1" length="6.5" maxSpeed="20.0" speedFactor="1.4" color="1.0,0.0,0.0" />
+    <route id="ev_w_to_e" edges="left0A0 A0B0 B0C0 C0right0" />
+    <route id="ev_e_to_w" edges="right2C2 C2B2 B2A2 A2left2" />
+    <route id="ev_s_to_n" edges="bottom1B0 B0B1 B1B2 B2top1" />
+    <route id="ev_n_to_s" edges="top0A2 A2A1 A1A0 A0bottom0" />
+    <route id="ev_s_to_e" edges="bottom0A0 A0B0 B0C0 C0right0" />
+    <route id="ev_n_to_w" edges="top2C2 C2B2 B2A2 A2left2" />
+    <route id="ev_sw_to_ne" edges="bottom0A0 A0B0 B0C0 C0C1 C1C2 C2top2" />
+    <vehicle id="ev_0" type="emergency" route="ev_sw_to_ne" depart="600.00" departLane="best" departSpeed="max" />
+</routes>
