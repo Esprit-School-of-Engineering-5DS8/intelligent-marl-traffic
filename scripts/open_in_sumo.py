@@ -6,7 +6,11 @@ Useful to explore the network and the traffic freely, including in SUMO's 3D vie
 Windows application log), as it does while a program drives the simulation (the
 side-by-side demo); started in 3D it runs normally. The 3D view shows no text labels: this
 SUMO build cannot read the system font for them ("arial.ttf: file not handled"), which is
-harmless. The signals run a classical program: fixed-time (Webster) by default, or
+harmless. It opens on the whole network; controls (SUMO documentation): drag with the right
+mouse button to zoom (the wheel does not zoom in 3D), with the left button to move, with the
+middle button to rotate; the arrow keys move forward, back and sideways; F switches to the
+"ego" camera, steered with the mouse. The signals run a classical program: fixed-time
+(Webster) by default, or
 actuated control (``--controller act``). Max-Pressure and the learned agents decide from
 live measurements, so they need the demo: ``scripts/demo_side_by_side.py``.
 
