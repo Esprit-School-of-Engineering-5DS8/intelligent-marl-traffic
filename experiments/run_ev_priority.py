@@ -89,7 +89,8 @@ def parse_tripinfo(path):
 
 
 def run_trial(scenario, mode, steps, seed, collect_eta=False, rl_policy_path=None,
-              rl_epsilon=1.0, collect_rl=False, skip_summary=False, gui=False, delay=100):
+              rl_epsilon=1.0, collect_rl=False, skip_summary=False, gui=False, delay=100,
+              show_predictions=False, predict_every=5):
     env, runner = build_environment(scenario, use_gui=gui, seed=seed, delay_ms=delay)
     scenario_dir = os.path.join(PROJECT_ROOT, "scenarios", f"grid_{scenario}")
     tripinfo_path = os.path.join(scenario_dir, "tripinfo_ev.xml")
@@ -110,20 +111,22 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False, rl_policy_path=Non
         tag += f"_eps{rl_epsilon}"
     step_log_path = os.path.join(RESULTS_DIR, f"{tag}_steps.csv")
 
+    eta_predictor = None
+    if mode == "rl" or show_predictions:
+        try:
+            from forecasting.ev_arrival_predictor import EVArrivalPredictor
+            eta_predictor = EVArrivalPredictor().load()
+        except Exception:
+            eta_predictor = None
+
     rl_controller = None
     if mode == "rl":
         from agents.emergency_rl import EVRLController, EVRLPolicy
         from agents.emergency_priority import select_action_max_pressure as ev_fallback
         rl_policy = EVRLPolicy().load(rl_policy_path) if rl_policy_path else None
-        predictor = None
-        try:
-            from forecasting.ev_arrival_predictor import EVArrivalPredictor
-            predictor = EVArrivalPredictor().load()
-        except Exception:
-            pass
         rl_controller = EVRLController(
             fallback_policy=ev_fallback,
-            predictor=predictor, policy=rl_policy, epsilon=rl_epsilon, run_tag=tag)
+            predictor=eta_predictor, policy=rl_policy, epsilon=rl_epsilon, run_tag=tag)
 
     env.start()
     step_rows = []
@@ -195,6 +198,23 @@ def run_trial(scenario, mode, steps, seed, collect_eta=False, rl_policy_path=Non
                 pass_total += 1
                 ev_prev_first.pop(v, None)
                 ev_prev_char.pop(v, None)
+
+            if show_predictions and eta_predictor is not None and (step + 1) % predict_every == 0:
+                for v in ev_ids:
+                    upcoming = traci.vehicle.getNextTLS(v)
+                    if not upcoming:
+                        continue
+                    light_id, link_index, distance, signal_field = upcoming[0]
+                    features = extract_ev_features(traci, v, light_id, 1)
+                    if features is None:
+                        continue
+                    eta = eta_predictor.predict(features)
+                    prob_text = ""
+                    if eta_predictor.red_model is not None:
+                        prob_text = f" P(red)={eta_predictor.predict_red_prob(features):.2f}"
+                    char = link_signal_char(link_index, signal_field)
+                    print(f"[pred] t={traci.simulation.getTime():5.0f}s {v} -> {light_id} "
+                          f"dist={distance:5.0f}m light={char} ETA={eta:5.1f}s{prob_text}")
 
             if collect_eta:
                 sim_time = traci.simulation.getTime()
@@ -328,12 +348,17 @@ def main():
                         help="Do not append this trial to results/ev/summary.csv")
     parser.add_argument("--gui", action="store_true", help="Run in SUMO-GUI")
     parser.add_argument("--delay", type=int, default=100, help="GUI step delay in ms")
+    parser.add_argument("--show-predictions", action="store_true",
+                        help="Print live ETA and red-arrival predictions for ambulances")
+    parser.add_argument("--predict-every", type=int, default=5,
+                        help="Seconds between prediction printouts")
     args = parser.parse_args()
 
     run_trial(args.scenario, args.mode, args.steps, args.seed, collect_eta=args.collect_eta,
               rl_policy_path=args.rl_policy, rl_epsilon=args.rl_epsilon,
               collect_rl=args.collect_rl, skip_summary=args.no_summary,
-              gui=args.gui, delay=args.delay)
+              gui=args.gui, delay=args.delay,
+              show_predictions=args.show_predictions, predict_every=args.predict_every)
 
 
 if __name__ == "__main__":

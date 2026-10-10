@@ -6,7 +6,6 @@ Gives green to the direction with the most queued vehicles.
 from agents.base_agent import BaseTrafficAgent
 from typing import Dict, Any
 
-
 class MaxPressureAgent(BaseTrafficAgent):
     """Decentralized adaptive pressure-based heuristic (no learning required)."""
 

@@ -14,12 +14,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import GradientBoostingRegressor
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from forecasting.ev_arrival_predictor import (EVArrivalPredictor, FEATURE_COLUMNS,
                                               physics_eta)
+from agents.emergency_rl import STRATEGY_NAMES
 
 RESULTS = os.path.join(PROJECT_ROOT, "results", "ev")
 OUT = os.path.join(PROJECT_ROOT, "showcase", "figures")
@@ -130,12 +132,66 @@ def fig_models(mae, auc):
     plt.close(fig)
 
 
+def fig_rl():
+    files = sorted(glob.glob(os.path.join(RESULTS, "3x3_rl*_episodes.csv")))
+    if not files:
+        print(f"no RL episode data found, skipping {os.path.join(OUT, 'fig4_rl.png')}")
+        return
+    df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+    df = df[~df["run_tag"].str.contains("eps0.0")]
+    actions = sorted(df["action"].unique())
+    means = df.groupby("action")["reward"].mean()
+    counts = df.groupby("action")["reward"].size()
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    names = [STRATEGY_NAMES[a] for a in actions]
+    colors = ["#2a9d8f" if a == int(means.idxmax()) else "#8d99ae" for a in actions]
+    axes[0].bar(names, [means[a] for a in actions], color=colors)
+    for i, a in enumerate(actions):
+        axes[0].text(i, means[a] - 1.6, f"n={counts[a]}", ha="center", fontsize=8)
+    axes[0].set_ylabel("Mean episode reward")
+    axes[0].set_title(f"Observed reward per strategy ({len(df)} episodes)")
+    axes[0].tick_params(axis="x", rotation=20)
+    axes[0].grid(axis="y", alpha=0.3)
+
+    tags = sorted(df["run_tag"].unique())
+    test = df[df["run_tag"].isin(tags[::6])].copy()
+    train = df[~df["run_tag"].isin(tags[::6])].copy()
+    train["action_feat"] = train["action"]
+    model = GradientBoostingRegressor(n_estimators=300, max_depth=3, learning_rate=0.05,
+                                      subsample=0.8, random_state=42)
+    model.fit(train[FEATURE_COLUMNS + ["action_feat"]], train["reward"])
+    holdout = test[FEATURE_COLUMNS]
+    q = np.column_stack([model.predict(holdout.assign(action_feat=a)) for a in actions])
+    reference = actions.index(2)
+    margins = [0, 2, 5, 8, 10, 15, 20, 30, 50]
+    deviations, deltas = [], []
+    for margin in margins:
+        raw = q.argmax(axis=1)
+        choice = np.where(q.max(axis=1) >= q[:, reference] + margin, raw, reference)
+        deviations.append(100.0 * (choice != reference).mean())
+        deltas.append(float((q[np.arange(len(q)), choice] - q[:, reference]).mean()))
+
+    axes[1].bar([str(m) for m in margins], deviations, color="#e9c46a")
+    axes[1].set_xlabel("safety margin (reward units)")
+    axes[1].set_ylabel("deviations from best fixed (%)")
+    twin = axes[1].twinx()
+    twin.plot([str(m) for m in margins], deltas, color="#264653", marker="o")
+    twin.axhline(0.0, color="black", lw=1, ls="--")
+    twin.set_ylabel("predicted gain over best fixed (reward)")
+    axes[1].set_title("Held-out margin sweep")
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, "fig4_rl.png"), dpi=150)
+    plt.close(fig)
+
+
 def main():
     runs = load_runs()
     fig_ev_time(runs)
     fig_impact(runs)
     mae, auc = model_metrics()
     fig_models(mae, auc)
+    fig_rl()
 
     rows = [[name,
              run["ev_mean_duration_s"],

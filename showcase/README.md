@@ -1,34 +1,55 @@
-# Emergency Vehicle Priority — Showcase
+# Emergency Vehicle Priority
 
-Part of the Intelligent Multi-Agent Urban Traffic Management project.
-Owner: Amen Allah Ben Aissa. Branch: `amen/ev-priority`.
+Amen Allah Ben Aissa. Branch: `amen/ev-priority`.
 
-Goal: ambulances cross the signalized grid with minimum delay (E1), with an
-arrival-time model that predicts when they reach each light (E2), and an RL
-layer that decides when to pre-empt (M4).
+Goal: get ambulances through the signalized 3x3 grid with minimal delay (E1),
+predict their arrival at each traffic light (E2), and test a reinforcement
+learning layer that decides when pre-emption is worth it (M4).
 
-## Live demo (SUMO-GUI)
+## Showcase commands
 
-Priority policy — watch the red ambulance and the lights clearing for it:
+### 1. Live demo: priority policy with model predictions (main demo)
 
 ```bash
 /home/logmoon/.venvs/sumo/bin/python experiments/run_ev_priority.py \
-    --scenario 3x3 --mode priority --gui --delay 100 --steps 1200 --no-summary
+    --scenario 3x3 --mode priority --gui --delay 100 --steps 1200 \
+    --show-predictions --predict-every 10 --no-summary
 ```
 
-Fixed-time baseline — same scene, no priority:
+What you see:
+- SUMO-GUI runs about 2 minutes (20 simulated minutes).
+- A red ambulance spawns every ~4 minutes, rotating over six fixed routes.
+- The terminal prints the models live, for example:
+  `[pred] t=10s ev_0 -> A1 dist=192m light=G ETA=20.7s P(red)=0.12`
+- Watch the light switch or hold green for the ambulance direction. Yellow and
+  minimum green are always enforced; the policy only expresses a preference.
+
+What to point out: the GUI shows the behavior, the terminal shows the models
+behind it (predicted arrival seconds and probability of arriving on red).
+
+### 2. Live baseline: same scene, no priority
 
 ```bash
 /home/logmoon/.venvs/sumo/bin/python experiments/run_ev_priority.py \
     --scenario 3x3 --mode fixed --gui --delay 100 --steps 1200 --no-summary
 ```
 
-Talking points while it runs:
-- one ambulance every ~4 minutes, six fixed routes (both axes and turns)
-- the rule reacts only within 150 m; yellow and minimum green always apply
-- the stats block at the end is the same measurement used for the tables below
+### 3. Offline model demo (terminal only)
 
-## Results (3x3 grid, one simulated hour, seed 42)
+```bash
+/home/logmoon/.venvs/sumo/bin/python showcase/model_demo.py
+```
+
+Prints three real held-out traffic states: the model prediction, the physics
+baseline, and what actually happened.
+
+### 4. Regenerate the figures and the results table
+
+```bash
+/home/logmoon/.venvs/sumo/bin/python experiments/make_report_figures.py
+```
+
+## Results (3x3 grid, one hour, seed 42)
 
 | Controller | EV time (s) | EV wait (s) | Red stops | Green arrivals (%) | Civilian wait (s/veh) | Throughput |
 |---|---|---|---|---|---|---|
@@ -37,22 +58,25 @@ Talking points while it runs:
 | **Priority (rule)** | **37.2** | **2.4** | **6** | **87.5** | **1.37** | 1196 |
 | RL (safe margin) | 40.6 | 5.1 | 7 | 81.2 | 1.41 | 1197 |
 
+The rule cuts ambulance travel time by 33 percent versus fixed-time, removes
+most red-light stops, and does not hurt normal traffic (civilian wait is lower
+than both baselines).
+
 ![EV travel time](figures/fig1_ev_time.png)
-![Civilian cost and service](figures/fig2_impact.png)
+![Civilian cost and ambulance service](figures/fig2_impact.png)
 
 ## Models
 
-Both models share one feature extractor (12 inputs) used identically at
-training and at run time: distance, speed, acceleration, leader gap, vehicles
-on lane, signal state, time-to-switch, time-in-phase, turn flag, plus the
-same signal/distance features of the first upcoming light (so second-light
-predictions know about the first stop).
+All models share one feature extractor (12 inputs per ambulance and upcoming
+light): distance, speed, acceleration, leader gap, vehicles on lane, signal
+color, time to switch, time in phase, turn flag, plus the same signal and
+distance features of the first upcoming light. Second-light predictions
+therefore know about the first stop.
 
 ### ETA regression (`forecasting/ev_arrival_predictor.py`)
 
-- input: 12 features for one (ambulance, upcoming light) pair
-- output: seconds until the ambulance passes that light
-- held-out error (runs never seen in training):
+- Input: 12 features. Output: seconds until the ambulance passes that light.
+- Held-out error (runs never seen in training):
 
 | | next light | second light |
 |---|---|---|
@@ -61,44 +85,46 @@ predictions know about the first stop).
 
 ### Red-arrival classifier (same file)
 
-- input: same 12 features
-- output: probability the ambulance reaches that light on a non-green signal
-- held-out AUC: 0.965 next light, 0.752 next light beyond 150 m, 0.715 second light
-- status: trained and saved (`ev_red.joblib`) but **not wired into control** —
-  it remains an evaluated signal for the report and future gating
+- Input: 12 features. Output: probability the ambulance reaches that light on
+  a non-green signal.
+- Held-out AUC: 0.965 next light, 0.752 next light beyond 150 m, 0.715 second
+  light.
+- Status: trained and saved (`ev_red.joblib`) but not wired into control. It
+  is an evaluated signal for the report and for future use.
 
 ![Model accuracy](figures/fig3_models.png)
 
 ### RL policy (`agents/emergency_rl.py`)
 
-- one decision per (ambulance, light): pick one of six strategies — do
-  nothing, pre-empt at 100/150/250 m, ETA-trigger at 8/15 s
-- reward: −(ambulance waiting seconds + 0.25 × civilian wait-seconds)
-- trained by fitted Q-iteration on 1,440 decision episodes (random + guided
-  exploration), evaluated online with a safety margin over the best fixed
-  strategy
+- One decision per ambulance and light: choose one of six strategies (do
+  nothing, pre-empt at 100/150/250 m, ETA-trigger at 8/15 s).
+- Reward: minus (ambulance waiting seconds + 0.25 times civilian wait seconds).
+- Trained by fitted Q-iteration on 1,440 decision episodes (random then guided
+  exploration) and evaluated online with a safety margin.
 
 Honest outcome: on this grid, held-out data justified no deviation from the
-best fixed strategy (`dist_150`), so the safe policy converges to the
-rule-based one. The pipeline works and is ready for harder scenarios (longer
-corridors, heavier traffic); the negative result is supported by margin
-sweeps and per-context reward tables.
+best fixed strategy, so the safe policy converges to the rule-based one. The
+pipeline works and is ready for harder scenarios (longer corridors, heavier
+traffic).
+
+![RL evidence](figures/fig4_rl.png)
 
 ## Limitations
 
-- baselines measured on seed 42 only; priority has 3-seed support
-- RL mode has a small residual mechanics gap vs priority mode (40.6 s vs
-  37.2 s on seed 42) under investigation
-- ETA-triggered early greens were neutral on this grid; kept behind an
-  environment flag, default off
+- Baselines measured on seed 42 only; priority has 3-seed support.
+- RL mode has a small residual mechanics gap versus priority mode (40.6 s
+  versus 37.2 s on seed 42), under investigation.
+- ETA-triggered early green was neutral on this grid; kept behind an
+  environment flag, default off.
+- The classifier is not used in control yet.
 
-## Reproduce
+## Full reproduction
 
 ```bash
-# figures and results table
+# results table and all figures
 /home/logmoon/.venvs/sumo/bin/python experiments/make_report_figures.py
 
-# rule-based priority (headless)
+# rule-based priority, full hour
 /home/logmoon/.venvs/sumo/bin/python experiments/run_ev_priority.py \
     --scenario 3x3 --mode priority --steps 3600 --seed 42
 
@@ -121,11 +147,12 @@ sweeps and per-context reward tables.
 
 | Piece | Path |
 |---|---|
-| Priority rule + shared classifier | `agents/emergency_priority.py` |
-| RL controller + policy | `agents/emergency_rl.py` |
-| ETA regression + classifier + features | `forecasting/ev_arrival_predictor.py` |
-| Experiment driver (all modes, GUI, data collection) | `experiments/run_ev_priority.py` |
+| Priority rule and shared max-pressure fallback | `agents/emergency_priority.py` |
+| RL controller and policy | `agents/emergency_rl.py` |
+| ETA model, classifier, shared features | `forecasting/ev_arrival_predictor.py` |
+| Experiment driver (all modes, GUI, data collection, live predictions) | `experiments/run_ev_priority.py` |
 | RL training | `experiments/train_ev_rl.py` |
 | Figures generator | `experiments/make_report_figures.py` |
-| EV demand generator (2x2 + 3x3) | `scenarios/generate_ev_routes.py` |
-| All raw results | `results/ev/summary.csv` + per-run CSVs |
+| Offline model demo | `showcase/model_demo.py` |
+| EV demand generator (2x2 and 3x3) | `scenarios/generate_ev_routes.py` |
+| Raw results | `results/ev/summary.csv` and per-run CSVs |
