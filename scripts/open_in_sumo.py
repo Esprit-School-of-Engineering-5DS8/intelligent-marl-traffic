@@ -1,13 +1,17 @@
 """Open one traffic episode in sumo-gui on its own, with no program attached to it.
 
-Useful to explore the network and the traffic freely, including SUMO's experimental 3D
-view, which can crash sumo-gui while a program drives it step by step (as the side-by-side
-demo does). The signals run a classical program: fixed-time (Webster) by default, or
+Useful to explore the network and the traffic freely, including in SUMO's 3D view:
+``--3d`` starts sumo-gui directly in it. Opening the 3D view later from the 2D window
+(View > Open new 3D view) crashes sumo-gui on our laptop (access violation in ntdll.dll,
+Windows application log), as it does while a program drives the simulation (the
+side-by-side demo); started in 3D it runs normally. The 3D view shows no text labels: this
+SUMO build cannot read the system font for them ("arial.ttf: file not handled"), which is
+harmless. The signals run a classical program: fixed-time (Webster) by default, or
 actuated control (``--controller act``). Max-Pressure and the learned agents decide from
 live measurements, so they need the demo: ``scripts/demo_side_by_side.py``.
 
     python scripts/open_in_sumo.py [--net real_district] [--demand peak]
-        [--scenarios emergency buses] [--seed 3] [--controller ft] [--quick]
+        [--scenarios emergency buses] [--seed 3] [--controller ft] [--quick] [--3d]
 
 Scenarios by default: emergency vehicles and buses, plus pedestrians where the network has
 sidewalks (``--net real_district_ped`` for the district with sidewalks). Colours come from
@@ -60,6 +64,8 @@ def build_command(args: argparse.Namespace, gui: bool = True) -> list[str]:
         settings = DEMO_DIR / "explore_view.xml"
         settings.write_text(SETTINGS.format(delay=args.delay), encoding="utf-8")
         cmd += ["--gui-settings-file", str(settings)]
+        if getattr(args, "three_d", False):
+            cmd += ["--osg-view", "true"]  # the 3D view from the start, see the docstring
     return cmd
 
 
@@ -74,6 +80,7 @@ def main() -> None:
     )
     parser.add_argument("--delay", type=int, default=50, help="ms per simulation step")
     parser.add_argument("--quick", action="store_true", help="short episode")
+    parser.add_argument("--3d", dest="three_d", action="store_true", help="start in SUMO's 3D view")
     args = parser.parse_args()
     if args.scenarios is None:
         from cotraffic.envs.episodes import unsupported
@@ -84,7 +91,8 @@ def main() -> None:
     cmd = build_command(args)
     print(
         f"sumo-gui: {args.net}, {args.demand}, {' + '.join(args.scenarios) or 'normal'}, "
-        f"signals: {args.controller}. Close the window to finish."
+        f"signals: {args.controller}{', 3D view' if args.three_d else ''}. "
+        "Close the window to finish."
     )
     subprocess.run(cmd, check=False)
 
