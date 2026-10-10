@@ -11,11 +11,11 @@ class MaxPressureAgent(BaseTrafficAgent):
     """Decentralized adaptive pressure-based heuristic (no learning required)."""
 
     def select_action(self, state: Dict[str, Any]) -> int:
-        ns_queue, ew_queue = 0, 0
-        for lane_id, queue in state.get("lane_queues", {}).items():
-            # Heuristic: lanes with vertical IDs → NS, horizontal → EW
-            if any(v in lane_id for v in ["A1", "A2", "B1", "B2", "C1", "C2"]):
-                ns_queue += queue
-            else:
-                ew_queue += queue
+        # Lane groups come from the TLS program via environment.topology —
+        # never from lane-ID string matching.
+        ns_lanes = state["ns_lanes"]
+        ew_lanes = state["ew_lanes"]
+        lane_queues = state["lane_queues"]
+        ns_queue = sum(queue for lane, queue in lane_queues.items() if lane in ns_lanes)
+        ew_queue = sum(queue for lane, queue in lane_queues.items() if lane in ew_lanes)
         return 0 if ns_queue >= ew_queue else 1
