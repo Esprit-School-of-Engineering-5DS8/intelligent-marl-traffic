@@ -1,7 +1,53 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: plan, nothing implemented yet.
+> Branch: `feat/llm-agents`. Status: Phases 0–1 implemented and committed.
+
+---
+
+## HANDOFF — session state (2026-10-10)
+
+**Progress**
+
+| Phase | Status | Commit |
+|---|---|---|
+| 0 — foundation & honest baselines | ✅ done | `4dd053c` |
+| 1 — S1/S2/S3 scenarios + rule-based EV pre-emption (A3) | ✅ done | `26371b6` |
+| 2 — LLM plumbing, DirectiveLayer, arbiter | next | — |
+
+**Decisions taken while implementing (beyond this plan)**
+
+- Additive strategy: `runner.py` untouched; canonical modules are new files under `environment/` (`topology.py`, `traffic_light.py`, `ev.py`, `incidents.py`, `_bootstrap.py`).
+- Max-pressure lane groups come from the TLS program (`topology.action_for_link`), never lane-ID strings; phase durations pinned after every `setPhase`.
+- Peak demand (S1) = separate seeded route file `grid3x3.peak.rou.xml` (2400 veh, seed 42), not SUMO `--scale` (which would also duplicate EVs).
+- Scenario registry in `evaluation/scenarios.py`; A3 arm name is `ev_priority` (= max_pressure + `agents/ev_preemption.py`).
+- A3 implemented fresh with topology link→phase mapping; Amen's `agents/emergency_priority.py` heuristics not used. His ETA predictor (`forecasting/ev_arrival_predictor.py` + joblib artifacts on `origin/amen/ev-priority`) is deferred to Phase 4.
+- A3 trigger horizon is **25 s, not the plan's 20 s**: the base policy can commit to the opposite phase just before the EV enters a 20 s window; 25 s covers in-flight transition + min_green + yellow. A 5-step grace window also keeps the preemption alive while the EV crosses a junction (it disappears from EV sensing on internal lanes).
+- Incident S3: edge `A1A0` (busiest interior edge, 308 veh at peak), 300 s starting at t=1200; incident config disables teleporting (`time-to-teleport -1`), otherwise SUMO removes the queue after 180 s.
+- Civilian KPIs exclude `ev_*` and `incident_*` ids; EV KPIs (`ev_count`, mean/max duration, waiting) are separate columns.
+- `--seeds 0` = no explicit `--seed` (reproduces the plan's sanity table); use `--seeds 1,2,3` for real runs.
+
+**Verified numbers (`results/` is gitignored)**
+
+- S0 exact reproduction: sumo_default 132.09 / fixed 87.96 / max_pressure 11.45 s mean step wait.
+- S1 peak: 27.75 ± 0.81 s step wait, 2369 ± 1.5 of 2400 arrive.
+- S2 single diagonal EV: EV travel 100.0 ± 3.5 s (A2) vs **64.3 ± 9.2 s (A3)**; dual overlapping EVs: 72.3 ± 2.6 s vs **55.3 ± 5.8 s**; civilian cost ≤ ~5%.
+- S3: A3 bit-identical to A2 (no EVs) — no-regression check.
+
+**Known gaps / warnings for the next session**
+
+- While an EV is queued at rank-1, distance/speed ETA to rank-2 explodes → the corridor preempts late; one seed still shows one stop. Phase 4's ETA model should fix this.
+- A3 must migrate onto the Phase 2 `DirectiveLayer` (Appendix B) without losing `begin_step()` semantics (grace window) and the 25 s horizon.
+- `MultiAgentEnv.build_agents()` pins phases and disables SUMO's timer — never call it for `sumo_default`.
+- Run parallel experiments with distinct ports (`run_experiments` assigns them automatically).
+
+**Verification**
+
+```bash
+~/.venvs/sumo/bin/python -m pytest tests/ -q     # 30 passed
+~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_ev,grid_3x3_ev2 \
+    --arms max_pressure,ev_priority --seeds 1,2,3 --steps 3600 --jobs 4
+```
 
 ---
 
@@ -308,7 +354,7 @@ Null results are fine for the report as long as they are measured honestly. "LLM
 
 Effort: S = a few hours, M = about a day, L = multiple days. Each phase ends with a runnable command and acceptance criteria.
 
-### Phase 0: Foundation & honest baselines (M)
+### Phase 0: Foundation & honest baselines (M) — ✅ done (`4dd053c`)
 Tasks:
 1. Branch `feat/llm-agents`. Do **not** edit teammates' stubs (`emergency_priority.py`, `pedestrian_adaptive.py`, `agents/rl/*`); add new files instead.
 2. Move `TrafficLightAgent` into `environment/` (for example `environment/traffic_light.py`), add `get_states()`/`apply_actions()` to `MultiAgentEnv`. Keep `runner.py` working (thin it later).
@@ -319,7 +365,7 @@ Tasks:
 
 Done when: A0/A1/A2 run via `run_experiments` and reproduce the table in 5.2 (A2 about 11 s mean step waiting, single seed), and results land in `results/` as CSV.
 
-### Phase 1: Scenarios + rule-based EV baseline (M)
+### Phase 1: Scenarios + rule-based EV baseline (M) — ✅ done (`26371b6`)
 Tasks: EV vType and EV generation in `generate_routes.py` (seeded, configurable depart/route); peak-demand option; incident injector (validate with a quick test); rule-based EV pre-emption (A3), coordinating with the owner of `agents/emergency_priority.py`.
 Done when: S1/S2/S3 run for A2 and A3, and EV travel time is measured. A3 beats A2 on EV time.
 
