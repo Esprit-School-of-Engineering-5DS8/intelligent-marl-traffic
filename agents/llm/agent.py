@@ -54,6 +54,9 @@ class AgentCall:
     prompt_hash: str = ""
     attempts: int = 1
     effort: str = ""
+    # Role-specific reviewer notes (e.g. the Emergency agent's corridor checks
+    # and rule fallback); surfaced in the decision log when set.
+    review: Optional[Dict[str, Any]] = None
 
     @property
     def failed(self) -> bool:

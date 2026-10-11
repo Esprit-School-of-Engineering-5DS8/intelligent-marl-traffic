@@ -5,6 +5,7 @@ from agents.llm.client import CallLogger, LLMError, LLMResponse, MockLLM
 from agents.supervisor.arbiter import Arbiter
 from agents.supervisor.blackboard import Blackboard
 from agents.supervisor.supervisor import Supervisor, SupervisorConfig
+from environment.ev import EVState, UpcomingTLS
 
 TLS = ["A"]
 STATES = {
@@ -71,6 +72,39 @@ def test_emergency_runs_on_ev_cadence():
     supervisor.run(0.0, STATES, evs)
     assert not supervisor.should_run(1.0, STATES, evs)
     assert supervisor.should_run(10.0, STATES, evs)
+
+
+def _ev(veh_id="ev_0", distance_m=200.0, speed=10.0):
+    return EVState(veh_id, "edge", "edge_0", speed,
+                   (UpcomingTLS("A", 2, distance_m, "r"),))
+
+
+def test_ev_events_trigger_off_cadence():
+    supervisor = make_supervisor()
+    ev = _ev(distance_m=200.0)                    # min ETA 20 s
+    assert supervisor.should_run(0.0, STATES, [ev]) is True
+    supervisor.run(0.0, STATES, [ev])
+    assert supervisor.stats["emergency_calls"] == 1
+
+    # ETA drops from 20 to 14: crosses the 15 s threshold -> immediate run.
+    assert supervisor.should_run(4.0, STATES, [_ev(distance_m=140.0)]) is True
+    supervisor.run(4.0, STATES, [_ev(distance_m=140.0)])
+    assert supervisor.stats["emergency_calls"] == 2
+
+    # A new EV id appears -> immediate run.
+    assert supervisor.should_run(8.0, STATES, [_ev("ev_1", 180.0)]) is True
+
+    # Nothing changed and the cadence is not due -> no run.
+    supervisor.run(8.0, STATES, [_ev("ev_1", 180.0)])
+    assert supervisor.should_run(9.0, STATES, [_ev("ev_1", 180.0)]) is False
+
+
+def test_ev_events_can_be_disabled():
+    config = SupervisorConfig(ev_event_triggers=False)
+    supervisor = make_supervisor(config=config)
+    ev = _ev()
+    supervisor.run(0.0, STATES, [ev])
+    assert supervisor.should_run(4.0, STATES, [_ev(distance_m=140.0)]) is False
 
 
 def test_client_failure_falls_back_to_empty_envelope(tmp_path):

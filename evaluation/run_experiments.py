@@ -16,7 +16,8 @@ incident). Arms:
     ev_priority  : max_pressure + agents.ev_preemption (rule-based A3, through
                    the arbiter/DirectiveLayer)
     llm_team     : max_pressure + arbiter/DirectiveLayer + Supervisor (A4) with
-                   the Operator agent. `--llm` selects the backend:
+                   the Operator and Emergency agents. `--llm` selects the
+                   backend:
                      mock   : deterministic stand-in, empty directives
                               (a run is bit-identical to max_pressure)
                      openai : OpenAICompatClient from .env/LLM_* variables,
@@ -50,6 +51,7 @@ if REPO_ROOT not in sys.path:
 from agents.ev_preemption import RuleBasedEVPreemption
 from agents.llm.agent import LLMAgent
 from agents.llm.client import CallLogger, LLMClient, MockLLM, OpenAICompatClient, ReplayLLM
+from agents.llm.emergency_agent import EmergencyAgent
 from agents.llm.env import load_repo_env
 from agents.max_pressure import MaxPressureAgent
 from agents.supervisor.arbiter import Arbiter
@@ -73,6 +75,8 @@ SUMMARY_COLUMNS = [
     "mean_duration_s", "mean_tripinfo_waiting_s", "mean_time_loss_s",
     "ev_count", "ev_mean_duration_s", "ev_mean_waiting_s",
     "ev_mean_waiting_count", "ev_max_duration_s",
+    "llm_calls", "llm_operator_calls", "llm_emergency_calls",
+    "llm_fallbacks", "llm_retries", "detector_alerts",
 ]
 
 AGG_METRICS = [
@@ -91,7 +95,7 @@ def _build_policies(arm: str, tls_ids: List[str]) -> Dict[str, object]:
 
 
 def _build_llm_client(backend: str, run_dir: str) -> LLMClient:
-    """LLM backend for the Operator: mock (offline), openai, or replay."""
+    """LLM backend shared by the Operator and Emergency agents."""
     if backend == "mock":
         return MockLLM()
     cache_path = os.path.join(run_dir, "llm_cache.jsonl")
@@ -142,13 +146,23 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
         max_calls = int(os.environ.get("LLM_MAX_CALLS", "400") or "400")
         base_effort = os.environ.get("LLM_REASONING_EFFORT", "")
         escalate_effort = os.environ.get("LLM_ESCALATE_EFFORT", "medium")
-        supervisor = Supervisor(
-            agents={
-                "operator": LLMAgent("operator", _build_llm_client(llm_backend, run_dir)),
-                # Emergency stays offline until its Phase 4 agent exists; the
-                # mock never emits directives, so no unguided preemptions.
+        topologies = {tls_id: env.agents[tls_id].topology for tls_id in tls_ids}
+        if llm_backend == "mock":
+            # Offline stand-ins only: no unguided preemptions, so the arm is
+            # bit-identical to max_pressure when the grid has no events.
+            agents = {
+                "operator": LLMAgent("operator", MockLLM()),
                 "emergency": LLMAgent("emergency", MockLLM()),
-            },
+            }
+        else:
+            client = _build_llm_client(llm_backend, run_dir)
+            agents = {
+                "operator": LLMAgent("operator", client),
+                # Real LLM corridor planning + reviewer + rule-based fallback.
+                "emergency": EmergencyAgent(client, topologies=topologies),
+            }
+        supervisor = Supervisor(
+            agents=agents,
             arbiter=arbiter,
             logger=CallLogger(decisions_path),
             neighbors=env.neighbors,
@@ -211,6 +225,8 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     summary.update(summarize_evs(tripinfo_result["vehicles"]))
     if supervisor is not None:
         summary["llm_calls"] = supervisor.stats["calls"]
+        summary["llm_operator_calls"] = supervisor.stats.get("operator_calls", 0)
+        summary["llm_emergency_calls"] = supervisor.stats.get("emergency_calls", 0)
         summary["llm_fallbacks"] = supervisor.stats["fallbacks"]
         summary["llm_retries"] = supervisor.stats["retries"]
         summary["llm_escalated"] = supervisor.stats["escalated"]
@@ -314,9 +330,10 @@ def main():
     parser.add_argument("--incident-duration", type=float, default=None,
                         help="override incident duration (incident scenarios only)")
     parser.add_argument("--llm", default="mock", choices=("mock", "openai", "replay"),
-                        help="Operator LLM backend for the llm_team arm "
-                             "(mock: offline stand-in; openai: .env/LLM_* endpoint, "
-                             "recording a replay cache; replay: strict cache only)")
+                        help="LLM backend for the llm_team arm's Operator + "
+                             "Emergency agents (mock: offline stand-ins; openai: "
+                             ".env/LLM_* endpoint, recording a replay cache; "
+                             "replay: strict cache only)")
     args = parser.parse_args()
 
     env_path = load_repo_env()

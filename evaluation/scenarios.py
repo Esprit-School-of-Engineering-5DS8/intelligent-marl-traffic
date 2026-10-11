@@ -35,6 +35,10 @@ SCENARIOS: Dict[str, ScenarioSpec] = {
     "grid_3x3_ev2": ScenarioSpec(
         "grid_3x3_ev2", "grid_3x3", "grid3x3.ev2.sumocfg",
         "S2: two overlapping EVs (t=600, 615) in peak demand"),
+    "grid_3x3_ev_incident": ScenarioSpec(
+        "grid_3x3_ev_incident", "grid_3x3", "grid3x3.ev_incident.sumocfg",
+        "S2: one EV at t=600 while B1B0 is blocked t=620..860 (teleport disabled)",
+        incident=IncidentSpec(edge_id="B1B0", start_s=620.0, duration_s=240.0)),
     "grid_3x3_incident": ScenarioSpec(
         "grid_3x3_incident", "grid_3x3", "grid3x3.incident.sumocfg",
         "S3: interior edge A1A0 blocked for 300 s (teleport disabled)",

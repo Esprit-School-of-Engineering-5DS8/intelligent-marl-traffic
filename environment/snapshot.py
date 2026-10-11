@@ -54,6 +54,9 @@ def _ev(ev: Any) -> Dict[str, Any]:
         "next_tls": [
             {
                 "tls": upcoming.tls_id,
+                # Raw signal-link index: lets topology-aware agents derive the
+                # exact approach axis (Phase 4 Emergency agent).
+                "link_index": int(getattr(upcoming, "link_index", -1)),
                 "dist_m": round(float(upcoming.distance_m), 1),
                 "eta_s": _eta_s(float(upcoming.distance_m), speed),
                 "signal": getattr(upcoming, "signal", ""),

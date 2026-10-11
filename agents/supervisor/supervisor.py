@@ -19,7 +19,7 @@ already collected and returns accepted directives for the DirectiveLayer.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from agents.llm.agent import AgentCall, LLMAgent
 from agents.llm.client import CallLogger
@@ -46,6 +46,14 @@ class SupervisorConfig:
     congested_queue_threshold: int = 15  # any axis at/above this = congested
     base_effort: str = ""           # "" = client/provider default
     escalate_effort: str = "medium"  # used on congested snapshots ("" disables)
+    # EV event triggers: run the Emergency agent immediately (not only on the
+    # 10 s cadence) when a new EV appears, an EV's upcoming-TLS list changes
+    # (it crossed a light or emerged from a junction) or its minimum ETA
+    # crosses a threshold. Debounced by `ev_event_min_gap_s`.
+    ev_event_triggers: bool = True
+    ev_event_min_gap_s: float = 3.0
+    ev_eta_thresholds: Tuple[float, ...] = (25.0, 15.0, 5.0)
+    ev_eta_min_speed_m_s: float = 1.0  # ETA floor, matches the snapshot
 
 
 class Supervisor:
@@ -64,6 +72,8 @@ class Supervisor:
         self.pedestrian_trigger = bool(pedestrian_trigger)
         self._last_run: Dict[str, float] = {}
         self._budget_logged = False
+        self._ev_seen: Dict[str, Dict[str, Any]] = {}
+        self._last_ev_event_t: float = float("-inf")
         self.stats: Dict[str, int] = {
             "calls": 0, "fallbacks": 0, "retries": 0, "escalated": 0,
             "tokens_in": 0, "tokens_out": 0, "tokens_cached": 0,
@@ -126,12 +136,53 @@ class Supervisor:
         return last is None or (t - last) >= self._interval(role, complexity)
 
     def _agent_due(self, role: str, t: float, evs: Sequence[Any],
-                   complexity: str) -> bool:
+                   complexity: str, ev_event: bool = False) -> bool:
         if role == "emergency":
-            return bool(evs) and self._due(role, t, complexity)
+            return bool(evs) and (ev_event or self._due(role, t, complexity))
         if role == "pedestrian":
             return self.pedestrian_trigger and self._due(role, t, complexity)
         return self._due(role, t, complexity)
+
+    # ── EV event triggers ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _ev_field(ev: Any, name: str, default: Any = None) -> Any:
+        if isinstance(ev, Mapping):
+            return ev.get(name, default)
+        return getattr(ev, name, default)
+
+    def _ev_signature(self, evs: Sequence[Any]) -> Dict[str, Dict[str, Any]]:
+        signature: Dict[str, Dict[str, Any]] = {}
+        for ev in evs:
+            veh_id = str(self._ev_field(ev, "veh_id", "") or "")
+            speed = max(float(self._ev_field(ev, "speed_m_s", 0.0) or 0.0),
+                        self.config.ev_eta_min_speed_m_s)
+            next_tls = tuple(self._ev_field(ev, "next_tls", ()) or ())
+            tls_ids = tuple(str(self._ev_field(nxt, "tls_id", "")) for nxt in next_tls)
+            etas = [float(self._ev_field(nxt, "distance_m", 0.0) or 0.0) / speed
+                    for nxt in next_tls]
+            signature[veh_id] = {"tls": tls_ids,
+                                 "min_eta": min(etas) if etas else None}
+        return signature
+
+    def _ev_event(self, t: float, evs: Sequence[Any]) -> bool:
+        """True when the Emergency agent should run off-cadence (non-mutating)."""
+        if not self.config.ev_event_triggers or not evs:
+            return False
+        if t - self._last_ev_event_t < self.config.ev_event_min_gap_s:
+            return False
+        for veh_id, now in self._ev_signature(evs).items():
+            before = self._ev_seen.get(veh_id)
+            if before is None:
+                return True        # new EV entered the network
+            if now["tls"] != before["tls"]:
+                return True        # crossed a light / emerged from a junction
+            if before["min_eta"] is not None and now["min_eta"] is not None:
+                crossed = any(before["min_eta"] > threshold >= now["min_eta"]
+                              for threshold in self.config.ev_eta_thresholds)
+                if crossed:
+                    return True    # ETA crossed 25 s / 15 s / 5 s
+        return False
 
     # ── orchestration ───────────────────────────────────────────────────────
 
@@ -143,6 +194,8 @@ class Supervisor:
         if not self._budget_available():
             return False
         complexity = self.classify(t, states, evs, alerts)
+        if "emergency" in self.agents and self._ev_event(t, evs):
+            return True
         return any(self._agent_due(role, t, evs, complexity) for role in self.agents)
 
     def run(self, t: float, states: Mapping[str, Mapping[str, Any]],
@@ -158,6 +211,10 @@ class Supervisor:
             self._log_budget_once(t)
             return []
         complexity = self.classify(t, states, evs, alerts)
+        ev_event = "emergency" in self.agents and self._ev_event(t, evs)
+        self._ev_seen = self._ev_signature(evs)
+        if ev_event:
+            self._last_ev_event_t = t
         effort = self._effort_for(complexity)
         messages = self.blackboard.active(t)
         snapshot = build_snapshot(t, states, self.neighbors, evs, alerts, messages)
@@ -167,7 +224,8 @@ class Supervisor:
             if not self._budget_available():
                 self._log_budget_once(t)
                 break
-            if role not in force_roles and not self._agent_due(role, t, evs, complexity):
+            if role not in force_roles and not self._agent_due(role, t, evs, complexity,
+                                                              ev_event):
                 continue
             self._last_run[role] = t
             call = agent.ask(t, snapshot, messages, effort=effort)
@@ -199,6 +257,7 @@ class Supervisor:
     def _submit(self, role: str, call: AgentCall, t: float,
                 states: Mapping[str, Mapping[str, Any]], complexity: str):
         self.stats["calls"] += 1
+        self.stats[f"{role}_calls"] = self.stats.get(f"{role}_calls", 0) + 1
         if complexity == COMPLEXITY_CONGESTED and self.config.escalate_effort:
             self.stats["escalated"] += 1
         if call.response is not None:
@@ -233,6 +292,7 @@ class Supervisor:
             "latency_s": getattr(response, "latency_s", None) if response else None,
             "raw_response": getattr(response, "raw", None) if response else None,
             "parsed": call.envelope,
+            "review": call.review,
             "arbiter": result.to_record() if result is not None else None,
         }
         self.logger.log(record)

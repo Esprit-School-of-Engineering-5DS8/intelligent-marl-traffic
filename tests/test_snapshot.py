@@ -37,6 +37,7 @@ def test_snapshot_shape_and_aggregates():
     ev = snapshot["evs"][0]
     assert ev["speed"] == 13.9
     assert ev["next_tls"][0]["tls"] == "A1"
+    assert ev["next_tls"][0]["link_index"] == 2
     assert ev["next_tls"][0]["dist_m"] == 62.0
     assert ev["next_tls"][0]["eta_s"] == round(62.0 / 13.9, 1)
     assert ev["next_tls"][0]["signal"] == "r"
