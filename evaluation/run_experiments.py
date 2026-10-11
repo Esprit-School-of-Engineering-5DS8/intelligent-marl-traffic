@@ -15,10 +15,17 @@ incident). Arms:
     max_pressure : agents.max_pressure.MaxPressureAgent (topology lane groups)
     ev_priority  : max_pressure + agents.ev_preemption (rule-based A3, through
                    the arbiter/DirectiveLayer)
-    llm_team     : max_pressure + arbiter/DirectiveLayer + Supervisor (A4).
-                   Phase 2 uses MockLLM, which emits empty directives, so an
-                   llm_team run is bit-identical to max_pressure; Phase 3
-                   swaps in the real LLM clients.
+    llm_team     : max_pressure + arbiter/DirectiveLayer + Supervisor (A4) with
+                   the Operator agent. `--llm` selects the backend:
+                     mock   : deterministic stand-in, empty directives
+                              (a run is bit-identical to max_pressure)
+                     openai : OpenAICompatClient from .env/LLM_* variables,
+                              wrapped in a ReplayLLM cache (records)
+                     replay : ReplayLLM in strict mode; cache misses raise,
+                              so replays never spend tokens
+
+The code queue detector feeds `queue_growth` alerts to the Operator and
+triggers an immediate run when a new alert fires (S3 incident path).
 
 Seeds: `--seeds 0` runs without an explicit --seed (SUMO default RNG); pass
 e.g. `--seeds 1,2,3` for reproducible multi-seed runs. Each run writes
@@ -42,12 +49,14 @@ if REPO_ROOT not in sys.path:
 
 from agents.ev_preemption import RuleBasedEVPreemption
 from agents.llm.agent import LLMAgent
-from agents.llm.client import CallLogger, MockLLM
+from agents.llm.client import CallLogger, LLMClient, MockLLM, OpenAICompatClient, ReplayLLM
+from agents.llm.env import load_repo_env
 from agents.max_pressure import MaxPressureAgent
 from agents.supervisor.arbiter import Arbiter
 from agents.supervisor.directive_layer import DirectiveLayer
-from agents.supervisor.supervisor import Supervisor
+from agents.supervisor.supervisor import Supervisor, SupervisorConfig
 from baselines.fixed_time import FixedTimeAgent
+from environment.detectors import QueueAlertDetector
 from environment.ev import get_active_evs
 from environment.incidents import IncidentInjector
 from environment.multi_agent_env import MultiAgentEnv
@@ -81,10 +90,21 @@ def _build_policies(arm: str, tls_ids: List[str]) -> Dict[str, object]:
     return {}
 
 
+def _build_llm_client(backend: str, run_dir: str) -> LLMClient:
+    """LLM backend for the Operator: mock (offline), openai, or replay."""
+    if backend == "mock":
+        return MockLLM()
+    cache_path = os.path.join(run_dir, "llm_cache.jsonl")
+    if backend == "replay":
+        return ReplayLLM(OpenAICompatClient(), cache_path, strict=True)
+    return ReplayLLM(OpenAICompatClient(), cache_path)
+
+
 def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
             out_root: str, port: int,
             incident_start: Optional[float] = None,
-            incident_duration: Optional[float] = None) -> Dict:
+            incident_duration: Optional[float] = None,
+            llm_backend: str = "mock") -> Dict:
     """Run one (scenario, arm, seed) simulation in its own process."""
     spec = SCENARIOS[scenario]
     sumocfg = os.path.join(REPO_ROOT, "scenarios", spec.folder, spec.cfg)
@@ -94,6 +114,10 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     os.makedirs(run_dir, exist_ok=True)
     step_csv = os.path.join(run_dir, "simulation_metrics.csv")
     tripinfo = os.path.join(run_dir, "tripinfo.xml")
+    # Per-run log is rebuilt every run; the replay cache persists (keyed).
+    decisions_path = os.path.join(run_dir, "decisions.jsonl")
+    if os.path.exists(decisions_path):
+        os.remove(decisions_path)
 
     env = MultiAgentEnv(sumocfg, seed=seed, tripinfo_output=tripinfo, port=port)
     tls_ids = env.start()
@@ -105,6 +129,7 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     layer = None
     ev_source = None
     supervisor = None
+    detector = None
     if arm == "ev_priority":
         topologies = {tls_id: env.agents[tls_id].topology for tls_id in tls_ids}
         arbiter = Arbiter(tls_ids)
@@ -113,14 +138,22 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     elif arm == "llm_team":
         arbiter = Arbiter(tls_ids)
         layer = DirectiveLayer()
+        detector = QueueAlertDetector()
+        max_calls = int(os.environ.get("LLM_MAX_CALLS", "400") or "400")
+        base_effort = os.environ.get("LLM_REASONING_EFFORT", "")
+        escalate_effort = os.environ.get("LLM_ESCALATE_EFFORT", "medium")
         supervisor = Supervisor(
             agents={
-                "operator": LLMAgent("operator", MockLLM()),
+                "operator": LLMAgent("operator", _build_llm_client(llm_backend, run_dir)),
+                # Emergency stays offline until its Phase 4 agent exists; the
+                # mock never emits directives, so no unguided preemptions.
                 "emergency": LLMAgent("emergency", MockLLM()),
             },
             arbiter=arbiter,
-            logger=CallLogger(os.path.join(run_dir, "decisions.jsonl")),
+            logger=CallLogger(decisions_path),
             neighbors=env.neighbors,
+            config=SupervisorConfig(max_calls=max_calls, base_effort=base_effort,
+                                    escalate_effort=escalate_effort),
         )
 
     incident_spec = spec.incident
@@ -146,9 +179,15 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
                     for envelope in ev_source.propose(evs, sim_time):
                         result = arbiter.submit("emergency", envelope, sim_time, states)
                         layer.install(result.accepted, sim_time)
-                if supervisor is not None and supervisor.should_run(sim_time, evs):
-                    for result in supervisor.run(sim_time, states, evs):
-                        layer.install(result.accepted, sim_time)
+                new_alerts = detector.update(states, sim_time) if detector is not None else []
+                if supervisor is not None:
+                    periodic = supervisor.should_run(sim_time, states, evs, new_alerts)
+                    if periodic or new_alerts:
+                        active_alerts = [a.to_dict() for a in detector.active(sim_time)]
+                        force_roles = ("operator",) if new_alerts else ()
+                        for result in supervisor.run(sim_time, states, evs, active_alerts,
+                                                     force_roles):
+                            layer.install(result.accepted, sim_time)
                 actions = {}
                 for tls_id in tls_ids:
                     action = policies[tls_id].select_action(states[tls_id])
@@ -173,8 +212,13 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     if supervisor is not None:
         summary["llm_calls"] = supervisor.stats["calls"]
         summary["llm_fallbacks"] = supervisor.stats["fallbacks"]
+        summary["llm_retries"] = supervisor.stats["retries"]
+        summary["llm_escalated"] = supervisor.stats["escalated"]
         summary["llm_tokens_in"] = supervisor.stats["tokens_in"]
         summary["llm_tokens_out"] = supervisor.stats["tokens_out"]
+        summary["llm_tokens_cached"] = supervisor.stats["tokens_cached"]
+    if detector is not None:
+        summary["detector_alerts"] = detector.count
     with open(os.path.join(run_dir, "summary.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
     return summary
@@ -269,7 +313,17 @@ def main():
                         help="override incident start time (incident scenarios only)")
     parser.add_argument("--incident-duration", type=float, default=None,
                         help="override incident duration (incident scenarios only)")
+    parser.add_argument("--llm", default="mock", choices=("mock", "openai", "replay"),
+                        help="Operator LLM backend for the llm_team arm "
+                             "(mock: offline stand-in; openai: .env/LLM_* endpoint, "
+                             "recording a replay cache; replay: strict cache only)")
     args = parser.parse_args()
+
+    env_path = load_repo_env()
+    if env_path:
+        print(f"[env] loaded {env_path}")
+    if args.llm != "mock" and "llm_team" not in args.arms:
+        print(f"[warn] --llm {args.llm} has no effect without the llm_team arm")
 
     scenarios = [s.strip() for s in args.scenario.split(",") if s.strip()]
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
@@ -294,7 +348,8 @@ def main():
     with ProcessPoolExecutor(max_workers=args.jobs, mp_context=context) as pool:
         futures = {
             pool.submit(run_one, *job, args.steps, out_root, 8813 + index,
-                        args.incident_start, args.incident_duration): job
+                        args.incident_start, args.incident_duration,
+                        args.llm): job
             for index, job in enumerate(jobs)
         }
         for future in as_completed(futures):

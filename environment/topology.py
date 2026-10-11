@@ -184,12 +184,14 @@ def neighbor_map_from_net(net_file: str, tls_ids: Iterable[str]) -> Dict[str, Di
             sources.setdefault(to_node, set()).add(from_node)
 
     neighbors: Dict[str, Dict[str, str]] = {}
-    for tls_id, from_nodes in sources.items():
+    # sorted(): set iteration order depends on per-process string hashing, and
+    # this map ends up in LLM prompts; unsorted it breaks record/replay.
+    for tls_id, from_nodes in sorted(sources.items()):
         if tls_id not in coords:
             continue
         x, y = coords[tls_id]
         labeled: Dict[str, str] = {}
-        for from_node in from_nodes:
+        for from_node in sorted(from_nodes):
             if from_node not in coords:
                 continue
             dx = coords[from_node][0] - x

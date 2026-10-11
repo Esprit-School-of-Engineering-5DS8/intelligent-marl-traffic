@@ -1,11 +1,11 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: Phases 0–2 implemented (Phase 2 uncommitted at end of session).
+> Branch: `feat/llm-agents`. Status: Phases 0–3 implemented (Phase 3 uncommitted at end of session; Phases 0–2 committed).
 
 ---
 
-## HANDOFF — session state (2026-10-10, session 2)
+## HANDOFF — session state (2026-10-11, session 3)
 
 **Progress**
 
@@ -13,45 +13,65 @@
 |---|---|---|
 | 0 — foundation & honest baselines | ✅ done | `4dd053c` |
 | 1 — S1/S2/S3 scenarios + rule-based EV pre-emption (A3) | ✅ done | `26371b6` |
-| 2 — LLM plumbing, DirectiveLayer, arbiter, snapshot | ✅ done (uncommitted) | — |
-| 3 — Operator agent, real LLM | next | — |
+| 2 — LLM plumbing, DirectiveLayer, arbiter, snapshot | ✅ done | `27d9e25` |
+| 3 — Operator agent, real LLM (S0/S1/S3) | ✅ done (uncommitted) | — |
+| 4 — Emergency agent | next | — |
 
-**Decisions taken while implementing Phase 2 (beyond this plan)**
+**Phase 2 decisions (unchanged, for reference)**
 
-- Directive semantics are time windows in `DirectiveLayer` (all types: TTL; preempt: `[issued+start_in_s, issued+min(start_in_s+hold_s, ttl_s))`). `hold_s=0` on a preempt **releases** it. The arbiter validates/clips/role-checks and picks the winner (`preempt > serve_ped > hold`); biases are merged by the layer (product of factors, clipped).
-- A3 `RuleBasedEVPreemption` is now a **directive source** (plan Appendix B), not a parallel controller: 25 s trigger, `hold_s=ETA+8`, min-speed floor 1 m/s, reactive 60 m, lookahead 3; emits `hold_s=0` releases when the EV is observed past the TLS; unobservable EVs keep their window for `release_grace_steps=5`. Results are identical to pre-migration A3 (see below).
-- Starvation guard lives in the layer: an override chain favoring the same axis is dropped after `max_red_s=90` (+60 s if a preempt is in the chain), with a 30 s cooldown.
-- Neutral `bias` (1.0/1.0) reproduces max-pressure exactly — the empty-directive equivalence depends on this.
-- `current_axis` ("NS"/"EW"/None) added to every TLS state; `environment/snapshot.py` is pure (no TraCI). Snapshot ETA = `dist / max(speed, 1)`.
-- Supervisor triggers: Operator every `delta_s=30` from t=0; Emergency every `ev_replan_s=10` while EVs are active. Arbiter feedback is posted to the blackboard as `arbiter_result`; agent alerts under their `kind`.
-- `llm_team` (A4) uses `MockLLM` (default responder: empty directives), so an `llm_team` run is bit-identical to `max_pressure`; the acceptance check is an exact CSV diff.
-- LLM log: `results/<scenario>/llm_team/seed_n/decisions.jsonl` (t, agent, prompt_hash, attempts, tokens, latency, raw/parsed, arbiter outcome). `OpenAICompatClient` and `ReplayLLM` exist but are not wired into the arm yet.
+- Directive semantics are time windows in `DirectiveLayer` (all types: TTL; preempt: `[issued+start_in_s, issued+min(start_in_s+hold_s, ttl_s))`). `hold_s=0` on a preempt releases it. Arbiter validates/clips/role-checks, winner = `preempt > serve_ped > hold`; biases merged by the layer. Starvation guard: override chain > `max_red_s=90` (+60 s if a preempt) dropped with a 30 s cooldown.
+- A3 is a directive source (25 s trigger, `hold_s=ETA+8`, reactive 60 m, explicit releases, 5-step grace), sharing the arbiter/layer with A4; results match session 1 exactly.
 
-**Verified numbers (`results/` is gitignored)**
+**Phase 3 decisions (this session, beyond the plan)**
 
-- `pytest`: **91 passed**.
-- S0, seed 1, 3600 steps: `llm_team` step CSV **bit-identical** to `max_pressure` (11.14 s mean step wait, 1184 arrived).
-- S2 after the A3 migration matches the session-1 recording exactly: single EV 28.13 ± 0.92 step wait and EV 64.33 ± 9.24 s; dual EV 29.20 ± 0.92, EV 55.33 ± 5.77 s; max_pressure unchanged (EV 100.0 / 72.3 s).
-- Smoke with a non-empty MockLLM: 10 operator calls, 10 directives accepted/installed, alerts posted, log complete.
+- Provider: `OpenAICompatClient` already speaks the opencode-go endpoint; added generic `LLM_API_KEY_FILE` + `LLM_API_KEY_JSON` (point it at `~/.local/share/opencode/auth.json` / `opencode-go.key`), `LLM_EXTRA_HEADERS` (JSON; the endpoint requires `x-opencode-session`), non-default User-Agent (Cloudflare blocks `Python-urllib`), `LLM_TIMEOUT_S=90`. Config lives in gitignored `.env`; `.env.example` is committed and provider-agnostic.
+- `--llm mock|openai|replay` for `llm_team`: `openai` records `llm_cache.jsonl` via `ReplayLLM`; `replay` is strict (cache miss raises, never spends tokens). `decisions.jsonl` is truncated per run; the cache persists. `LLM_MAX_CALLS=400` guard (`SupervisorConfig.max_calls`).
+- `agents/llm/prompts/operator.md`: rules + 4 few-shots. The key rule learned from S3 logs: a queue that keeps growing **while its axis is green** signals a downstream blockage — stop feeding it green, serve the other axis, stay consistent while the alert persists.
+- `environment/detectors.py`: `QueueAlertDetector` (threshold 15 halted on an axis, 20 s sustain, 120 s cooldown, 120 s alert TTL, severity high at 30). A new alert triggers an **immediate** Operator run (`Supervisor.run(force_roles=("operator",))`); active alerts ride in every snapshot.
+- Determinism bug found while verifying replay: `neighbor_map_from_net` iterated a set (per-process hash randomization) and prompt JSON was not canonical, so cache keys differed across processes. Fixed with `sorted()` + `json.dumps(sort_keys=True)`; strict replay then reproduced S3 bit-identically.
+- Emergency agent still runs `MockLLM` in Phase 3 (no unguided preemptions); swap in Phase 4.
+
+**Phase 3 speed profile (same session, validated before commit)**
+
+- **Reasoning effort**: `LLM_REASONING_EFFORT=low` (agnostic env → `reasoning_effort` payload; 400 → retry once without it). Escalation knob `LLM_ESCALATE_EFFORT` exists but is **off**: measured medium = 19.1 s/call vs low = 4.8 s median 2.1 s, with no S3 gain (−35.6% without vs −33.6% with).
+- **Adaptive cadence** (HiLLTS-style, `SupervisorConfig`): quiet (<8 queued on every axis) = 60 s, normal = 30 s, congested (queue ≥15 / alert / EV / traffic message) = 15 s; alerts still force an immediate run. `snapshot_complexity()` drives cadence and the effort tier.
+- **Brevity rule** in `operator.md` (one-sentence explanations); output tokens dropped ~384 → ~270 on the benchmark prompt.
+- Provider **prompt caching** works through opencode-go: ~2.4k of ~2.6k input tokens/call served from cache (parsed into `tokens_cached` since `_usage_counts`).
+- `_payload`/cache-key correctness: a falsey per-call effort resolves to the client default (an empty supervisor effort must not shadow `LLM_REASONING_EFFORT`); effort is part of the replay key.
+- Async reasoning/cached guidance (CoLLMLight/Astra) deliberately **not** implemented: in our batch setup the sim runs ~100x real-time, so a non-blocking LLM would publish guidance ~1000 sim-seconds stale. Async is the right architecture for a real-time deployment demo, not a batch speedup.
+
+**Verified numbers (`results/` is gitignored, seeds 1–3, 3600 steps, opencode-go `deepseek-v4.1-flash`, final speed profile)**
+
+- `pytest`: **127 passed**.
+- S0: llm_team step CSV **bit-identical** to `max_pressure` on every seed (3-seed mean 11.30 ± 0.26 s, 1183.3 ± 0.6 arrived, both arms) — H1 no-regression holds rigidly.
+- S1 peak: tie with `max_pressure` on every seed (27.75 ± 0.81 s, 2369.3 ± 1.5 arrived, both arms); the Operator accepted 0 directives — honest null, revisit in Phase 6.
+- S3 incident: **199.78 ± 33.45 vs 296.68 ± 47.19 s mean step wait (−32.7%, 3 seeds)**; per seed −35.8% / −32.0% / −30.2% (incident window −38.4% / −35.2% / −37.7%). Pre-incident identical; first divergence at 1339/1357/1335, right at the detector alerts. Across effort variants the effect is stable at ≈ −33% ± 2.
+- LLM ops across the 9 recorded runs: **589 calls** (was 1083), 0 fallbacks, 1 retry, latency mean 5.22 s (median 2.21 s, max 80.3 s); ~1.05M input tokens served from provider cache. Per-run API time: S0 2.2–2.5 min, S1 3.3–3.7 min, S3 9.0–12.7 min; the 18-run batch (jobs 6) wall-drops from ~35 min to ~13 min.
+- Benchmark (same prompt, 5 calls each): default 9.7 s / low 4.9 s / medium 3.7 s mean; endpoint accepts `reasoning_effort`.
+- Strict `--llm replay` rerun of S3 is **bit-identical** to the recorded `openai` run.
+- Note: recorded `decisions.jsonl` from this pass logs `effort: ""` (client default, i.e. resolved `low`); `run_experiments` now passes `base_effort` explicitly so future runs log `low`. Caches are keyed on the resolved effort and replay correctly.
 
 **Known gaps / warnings for the next session**
 
-- `run_experiments.run_one` hardcodes `MockLLM()` for `llm_team`; Phase 3 should add client selection (e.g. `--llm mock|openai|replay`) and wrap the client in `ReplayLLM` for record/replay.
-- Alerts do not yet trigger an immediate Operator run (`Supervisor.should_run` is periodic + EV only); the Phase-3 detector should pass alerts and fire the Operator.
-- `serve_ped` is implemented/tested (min-green guarantee on the current axis, forced window otherwise) but S4 does not exist; revisit in Phase 5.
-- `agents/llm/prompts/` does not exist; `LLMAgent` falls back to a generic system prompt. Phase 3 adds `operator.md`.
-- "Two preempts: earliest ETA wins" uses the optional `eta_s` directive field, filled by A3. The Phase-4 LLM emergency agent must fill it too.
+- Seeds 1–3 recorded and validated (all seeds improve S3 by >30%). If the Operator prompt changes in Phase 4/5, re-record; the current caches are canonical and replay bit-identically.
+- S1 passivity: the Operator's "prefer nothing" default means tie with max-pressure. If a stronger S1 intervention is wanted, tune thresholds/rules, then re-check H1.
+- Remaining S3 tail latency is model-side: incident snapshots make the model emit 2–4k tokens (hidden reasoning) and rare ~80 s gateway stalls appear (1–2 per 226 calls). Keep `LLM_TIMEOUT_S=90`; do not cap `max_tokens` (truncated JSON would retry).
+- `replay` mode still constructs `OpenAICompatClient` for the model string in the cache key, so it needs `LLM_BASE_URL`/`LLM_MODEL` env even though it never calls out (a keyless offline replay path would need a model override).
+- Detector thresholds (15/20 s) and cadence tiers are global constants; consider per-scenario calibration when S4/pedestrian arrives.
+- "Two preempts: earliest ETA wins" uses the optional `eta_s` field; the Phase-4 Emergency agent must fill it.
 - `MultiAgentEnv.build_agents()` pins phases and disables SUMO's timer — never call it for `sumo_default`.
 - Run parallel experiments with distinct ports (`run_experiments` assigns them automatically).
 
 **Verification**
 
 ```bash
-~/.venvs/sumo/bin/python -m pytest tests/ -q     # 91 passed
-~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3 \
-    --arms max_pressure,llm_team --seeds 1 --steps 3600 --jobs 2
-cmp results/grid_3x3/max_pressure/seed_1/simulation_metrics.csv \
-    results/grid_3x3/llm_team/seed_1/simulation_metrics.csv      # bit-identical
+~/.venvs/sumo/bin/python -m pytest tests/ -q     # 127 passed
+~/.venvs/sumo/bin/python evaluation/run_experiments.py \
+    --scenario grid_3x3,grid_3x3_peak,grid_3x3_incident \
+    --arms max_pressure,llm_team --llm openai --seeds 1,2,3 --steps 3600 --jobs 6
+# free, bit-identical replay of a recorded run:
+~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_incident \
+    --arms llm_team --llm replay --seeds 1 --steps 3600 --jobs 1
 ```
 
 ---
@@ -384,11 +404,11 @@ Tasks:
 
 Done when: a full S0 run with `MockLLM` completes, produces a decision log, and A4-with-empty-directives equals A2 exactly.
 
-### Phase 3: Operator agent, real LLM (M) — next
+### Phase 3: Operator agent, real LLM (M) — ✅ done (uncommitted)
 Tasks: system prompt + 2-3 few-shot examples; alert detector (code); run S0, S1, S3 with the real LLM; record to `ReplayLLM` cache; inspect logs and fix prompt problems.
 Done when: invalid-output rate is under about 5%, no S0 regression (H1), and S3 results are available.
 
-### Phase 4: Emergency agent (M-L)
+### Phase 4: Emergency agent (M-L) — next
 Tasks: prompt with ETA table and lead-time rule; corridor plan to `preempt` directives; compare with A3 on S2 (one and two EVs, EV + incident).
 Done when: H2 is measured (win, tie or loss is reported), and the corridor logs are readable.
 

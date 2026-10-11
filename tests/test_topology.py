@@ -99,6 +99,18 @@ def test_neighbor_map_directions(tmp_path):
     assert neighbors["A0"] == {"N": "A1", "E": "B0", "S": "C0"}
 
 
+def test_neighbor_map_order_is_deterministic(tmp_path):
+    # Edges in a different document order: insertion order must be stable
+    # (sorted by junction id) because this map ends up in LLM prompts.
+    shuffled = NET_XML.replace(
+        '<edge id="A1A0" from="A1" to="A0"/>\n    <edge id="B0A0" from="B0" to="A0"/>',
+        '<edge id="B0A0" from="B0" to="A0"/>\n    <edge id="A1A0" from="A1" to="A0"/>')
+    net_file = tmp_path / "shuffled.net.xml"
+    net_file.write_text(shuffled)
+    neighbors = neighbor_map_from_net(str(net_file), ["A0", "A1", "B0", "C0"])
+    assert list(neighbors["A0"].keys()) == ["N", "E", "S"]
+
+
 def test_net_file_from_sumocfg(tmp_path):
     cfg = tmp_path / "scenario.sumocfg"
     cfg.write_text(

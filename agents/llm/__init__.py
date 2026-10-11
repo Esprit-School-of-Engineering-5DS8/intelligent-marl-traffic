@@ -10,8 +10,10 @@ from agents.llm.client import (
     MockLLM,
     OpenAICompatClient,
     ReplayLLM,
+    key_from_file,
     prompt_hash,
 )
+from agents.llm.env import load_env_file, load_repo_env, parse_env_file
 from agents.llm.schemas import (
     ACTION_TO_AXIS,
     AXES,
@@ -31,7 +33,8 @@ from agents.llm.schemas import (
 __all__ = [
     "AgentCall", "LLMAgent", "load_system_prompt",
     "CallLogger", "LLMClient", "LLMError", "LLMResponse", "LLMResponseError",
-    "MockLLM", "OpenAICompatClient", "ReplayLLM", "prompt_hash",
+    "MockLLM", "OpenAICompatClient", "ReplayLLM", "key_from_file", "prompt_hash",
+    "load_env_file", "load_repo_env", "parse_env_file",
     "ACTION_TO_AXIS", "AXES", "AXIS_TO_ACTION", "DIRECTIVE_ENVELOPE_SCHEMA",
     "DIRECTIVE_TYPES", "EMPTY_ENVELOPE", "ROLE_PERMISSIONS", "Directive",
     "EnvelopeResult", "RejectedDirective", "SchemaError", "validate_directive",

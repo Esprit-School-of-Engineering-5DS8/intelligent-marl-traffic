@@ -46,6 +46,13 @@ def test_snapshot_shape_and_aggregates():
     assert snapshot["t"] == 420.0
 
 
+def test_snapshot_is_plain_json():
+    import json
+    # STATES carries sets for the lane groups; the snapshot must not leak them
+    # (it has to serialize without json.dumps(default=...)).
+    json.dumps(build_snapshot(0, STATES), sort_keys=True)
+
+
 def test_eta_floors_speed():
     ev = EVState("ev0", "left1A1", "left1A1_0", 0.0, (UpcomingTLS("A1", 0, 30.0, "r"),))
     snapshot = build_snapshot(0, STATES, evs=[ev])

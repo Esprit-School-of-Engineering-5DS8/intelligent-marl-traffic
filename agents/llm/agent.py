@@ -53,6 +53,7 @@ class AgentCall:
     error: Optional[str] = None
     prompt_hash: str = ""
     attempts: int = 1
+    effort: str = ""
 
     @property
     def failed(self) -> bool:
@@ -73,18 +74,23 @@ class LLMAgent:
         for message in blackboard:
             context["blackboard"].append(
                 message.to_dict() if hasattr(message, "to_dict") else dict(message))
+        # sort_keys: canonical JSON regardless of dict insertion order, so the
+        # same state always yields the same prompt (record/replay keys, and
+        # provider-side prefix caching, depend on byte stability).
         return json.dumps({"tick": t, "snapshot": snapshot, "context": context},
-                          ensure_ascii=False, default=str)
+                          ensure_ascii=False, sort_keys=True, default=str)
 
     def ask(self, t: float, snapshot: Mapping[str, Any],
-            blackboard: Iterable[Any] = ()) -> AgentCall:
+            blackboard: Iterable[Any] = (),
+            effort: Optional[str] = None) -> AgentCall:
         user = self.build_user_message(t, snapshot, blackboard)
         last_error: Optional[str] = None
         response: Optional[LLMResponse] = None
 
         for attempt in range(1, self.max_retries + 2):
             try:
-                response = self.client.complete(self.system_prompt, user, DIRECTIVE_ENVELOPE_SCHEMA)
+                response = self.client.complete(self.system_prompt, user,
+                                                DIRECTIVE_ENVELOPE_SCHEMA, effort=effort)
                 parsed = response.parsed
                 if not isinstance(parsed, Mapping):
                     raise SchemaError(f"envelope must be a JSON object, got {type(parsed).__name__}")
@@ -94,6 +100,7 @@ class LLMAgent:
                     response=response,
                     prompt_hash=prompt_hash(self.system_prompt, user),
                     attempts=attempt,
+                    effort=effort or "",
                 )
             except (LLMError, SchemaError) as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
@@ -106,4 +113,5 @@ class LLMAgent:
             error=last_error,
             prompt_hash=prompt_hash(self.system_prompt, user),
             attempts=self.max_retries + 1,
+            effort=effort or "",
         )
