@@ -1,7 +1,7 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: Phases 0–3 implemented (Phase 3 uncommitted at end of session; Phases 0–2 committed).
+> Branch: `feat/llm-agents`. Status: Phases 0–3 implemented and committed.
 
 ---
 
@@ -14,7 +14,7 @@
 | 0 — foundation & honest baselines | ✅ done | `4dd053c` |
 | 1 — S1/S2/S3 scenarios + rule-based EV pre-emption (A3) | ✅ done | `26371b6` |
 | 2 — LLM plumbing, DirectiveLayer, arbiter, snapshot | ✅ done | `27d9e25` |
-| 3 — Operator agent, real LLM (S0/S1/S3) | ✅ done (uncommitted) | — |
+| 3 — Operator agent, real LLM + speed profile (S0/S1/S3) | ✅ done | `97a1246` |
 | 4 — Emergency agent | next | — |
 
 **Phase 2 decisions (unchanged, for reference)**
