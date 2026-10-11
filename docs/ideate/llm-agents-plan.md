@@ -15,7 +15,7 @@
 | 1 — S1/S2/S3 scenarios + rule-based EV pre-emption (A3) | ✅ done | `26371b6` |
 | 2 — LLM plumbing, DirectiveLayer, arbiter, snapshot | ✅ done | `27d9e25` |
 | 3 — Operator agent, real LLM + speed profile (S0/S1/S3) | ✅ done | `97a1246` |
-| 4 — Emergency agent (incl. the 4.5 conflict/robustness iteration) | ✅ done | this commit |
+| 4 — Emergency agent (incl. the 4.5 conflict/robustness iteration) | ✅ done | `3036c25` |
 
 **Phase 2 decisions (unchanged, for reference)**
 
