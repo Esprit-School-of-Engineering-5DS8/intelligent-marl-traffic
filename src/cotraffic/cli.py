@@ -109,7 +109,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     _libsumo_default()
     from cotraffic.evaluation.matrix import run_matrix
 
-    failures = run_matrix(args.experiment, args.jobs, args.force, args.methods)
+    failures = run_matrix(args.experiment, args.jobs, args.force, args.methods, args.extra)
     return 1 if failures else 0
 
 
@@ -308,6 +308,11 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=None,
         help="only these methods ('baselines' = ft act mp ev_rule ev_rule_mp ped_rule_mp)",
+    )
+    p.add_argument(
+        "--extra",
+        action="store_true",
+        help="with the dashboard's extra measurements, stored in results/extra/",
     )
     p.set_defaults(func=cmd_evaluate)
 

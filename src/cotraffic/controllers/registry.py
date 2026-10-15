@@ -7,7 +7,7 @@ from pathlib import Path
 from cotraffic.controllers.base import Controller
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
-LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full")
+LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
 
 
 def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Controller:

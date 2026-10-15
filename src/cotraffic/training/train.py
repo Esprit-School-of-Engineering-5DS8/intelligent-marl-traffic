@@ -1,4 +1,5 @@
-"""PPO with parameter sharing: one policy for every intersection.
+"""PPO (or DQN, ``algorithm: dqn``) with parameter sharing: one policy for every
+intersection.
 
 The PettingZoo environment is turned into a Stable-Baselines3 vector environment with
 SuperSuit: each intersection becomes one slot of the vector, so every decision of every
@@ -128,14 +129,15 @@ def train(
 ) -> Path:
     """Train (or continue training) one variant on one network; returns the run folder."""
     import torch
-    from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
     from stable_baselines3.common.utils import set_random_seed
 
     torch.set_num_threads(threads)
     cfg = config.load_agent(agent)
-    ppo = dict(cfg["ppo"])
-    net_arch = ppo.pop("net_arch")
+    algorithm = cfg.get("algorithm", "ppo")
+    Algorithm = algorithm_class(algorithm)
+    hyper = dict(cfg[algorithm])
+    net_arch = hyper.pop("net_arch")
     training = cfg["training"]
     total = int(
         total_timesteps or (training["quick_timesteps"] if quick else training["total_timesteps"])
@@ -150,7 +152,7 @@ def train(
     started = time.strftime("%Y-%m-%d %H:%M:%S")
     if existing:
         steps_done, latest = existing[-1]
-        model = PPO.load(latest, env=vec, device="cpu")
+        model = Algorithm.load(latest, env=vec, device="cpu")
         print(f"resuming {agent}/{network}/seed{seed} from {latest.name} ({steps_done} steps)")
     else:
         steps_done = 0
@@ -158,14 +160,14 @@ def train(
         # does not implement (FAILURES F-006): we seed the libraries and our own
         # environment generator explicitly instead.
         set_random_seed(seed)
-        model = PPO(
+        model = Algorithm(
             "MlpPolicy",
             vec,
             device="cpu",
             verbose=0,
             tensorboard_log=str(folder / "tensorboard"),
             policy_kwargs={"net_arch": list(net_arch)},
-            **ppo,
+            **hyper,
         )
         model.action_space.seed(seed)
     # episodes logged after the starting point (all of them for a fresh start) belong to
@@ -186,7 +188,7 @@ def train(
             total_timesteps=remaining,
             callback=callbacks,
             reset_num_timesteps=False,
-            tb_log_name="ppo",
+            tb_log_name=algorithm,
         )
         model.save(ckpt_dir / f"model_{model.num_timesteps}_steps.zip")
     vec.close()
@@ -223,6 +225,16 @@ def train(
     }
     info_file.write_text(json.dumps(info, indent=2), encoding="utf-8")
     return folder
+
+
+def algorithm_class(name: str):
+    """The Stable-Baselines3 class of an agent config's ``algorithm`` (default PPO)."""
+    from stable_baselines3 import DQN, PPO
+
+    classes = {"ppo": PPO, "dqn": DQN}
+    if name not in classes:
+        raise ValueError(f"unknown algorithm {name!r}; expected one of {sorted(classes)}")
+    return classes[name]
 
 
 def _versions() -> dict[str, str]:

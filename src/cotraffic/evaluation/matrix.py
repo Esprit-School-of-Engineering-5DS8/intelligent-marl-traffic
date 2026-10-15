@@ -21,7 +21,7 @@ from typing import Any
 
 from cotraffic import config
 from cotraffic.controllers.registry import BASELINES
-from cotraffic.paths import CHECKPOINTS_DIR, LOGS_DIR, RAW_DIR, RESULTS_DIR
+from cotraffic.paths import CHECKPOINTS_DIR, EXTRA_DIR, LOGS_DIR, RAW_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS, check_seeds
 
 
@@ -36,6 +36,7 @@ class RunSpec:
     tag: str = ""
     quick: bool = False
     ssm: bool = True
+    extra: bool = False
 
 
 def find_checkpoints(method: str, network: str) -> list[tuple[int, Path]]:
@@ -89,9 +90,11 @@ def expand(exp: dict[str, Any]) -> tuple[list[RunSpec], list[str]]:
     return specs, warnings
 
 
-def _dirs(quick: bool) -> tuple[Path, Path]:
+def _dirs(quick: bool, extra: bool = False) -> tuple[Path, Path]:
     if quick:
         return RESULTS_DIR / "tmp" / "quick_raw", RESULTS_DIR / "tmp" / "quick_logs"
+    if extra:  # never mixed with the report's results
+        return EXTRA_DIR / "raw", EXTRA_DIR / "logs"
     return RAW_DIR, LOGS_DIR
 
 
@@ -100,7 +103,7 @@ def _execute(spec_dict: dict[str, Any]) -> tuple[str, str]:
     from cotraffic.evaluation.runner import run_episode
 
     spec = RunSpec(**spec_dict)
-    raw_dir, logs_dir = _dirs(spec.quick)
+    raw_dir, logs_dir = _dirs(spec.quick, spec.extra)
     try:
         row = run_episode(
             spec.method,
@@ -114,6 +117,7 @@ def _execute(spec_dict: dict[str, Any]) -> tuple[str, str]:
             tag=spec.tag,
             raw_dir=raw_dir,
             logs_dir=logs_dir,
+            extra=spec.extra,
         )
         return row["run_id"], ""
     except Exception:  # noqa: BLE001 - reported to the caller, the matrix goes on
@@ -121,13 +125,22 @@ def _execute(spec_dict: dict[str, Any]) -> tuple[str, str]:
 
 
 def run_matrix(
-    name: str, jobs: int = 2, force: bool = False, methods: list[str] | None = None
+    name: str,
+    jobs: int = 2,
+    force: bool = False,
+    methods: list[str] | None = None,
+    extra: bool = False,
 ) -> int:
-    """Run (or complete) an experiment; returns the number of failed runs."""
+    """Run (or complete) an experiment; returns the number of failed runs. ``extra`` runs
+    it with the dashboard's extra measurements, stored in results/extra/."""
+    from dataclasses import replace
+
     from cotraffic.evaluation.runner import run_id
 
     exp = config.load("experiments", name)
     specs, warnings = expand(exp)
+    if extra:
+        specs = [replace(s, extra=True) for s in specs]
     if methods:
         wanted = set(methods)
         if "baselines" in wanted:
@@ -137,7 +150,7 @@ def run_matrix(
         print(f"warning: {w}")
     todo = []
     for spec in specs:
-        raw_dir, _ = _dirs(spec.quick)
+        raw_dir, _ = _dirs(spec.quick, spec.extra)
         rid = run_id(spec.method, spec.network, spec.scenarios, spec.demand, spec.seed, spec.tag)
         if force or not (raw_dir / f"{rid}.csv").is_file():
             todo.append(spec)

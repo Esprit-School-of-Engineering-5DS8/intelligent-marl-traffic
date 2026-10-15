@@ -1,4 +1,5 @@
-"""A trained PPO policy used as a controller (deterministic actions, all agents batched)."""
+"""A trained policy (PPO or DQN) used as a controller (deterministic actions, all agents
+batched)."""
 
 from __future__ import annotations
 
@@ -27,14 +28,15 @@ class LearnedPolicy(Controller):
 
     def __init__(self, method: str, checkpoint: Path) -> None:
         super().__init__()
-        from stable_baselines3 import PPO
+        from cotraffic.training.train import algorithm_class
 
         self.name = method
         self.checkpoint = Path(checkpoint)
         if not self.checkpoint.is_file():
             raise FileNotFoundError(f"checkpoint not found: {self.checkpoint}")
         self.agent_cfg = checkpoint_agent_config(method, self.checkpoint)
-        self.model = PPO.load(self.checkpoint, device="cpu")
+        algorithm = algorithm_class(self.agent_cfg.get("algorithm", "ppo"))
+        self.model = algorithm.load(self.checkpoint, device="cpu")
 
     def reset(self, env) -> None:
         from cotraffic.forecasting.online import attach_forecaster

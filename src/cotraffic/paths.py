@@ -30,6 +30,7 @@ SUMMARY_DIR = RESULTS_DIR / "summary"
 LOGS_DIR = RESULTS_DIR / "logs"
 TRAINING_DIR = RESULTS_DIR / "training"
 CHECKPOINTS_DIR = RESULTS_DIR / "checkpoints"
+EXTRA_DIR = RESULTS_DIR / "extra"  # dashboard measurements, apart from the report's results
 FIGURES_DIR = REPO_ROOT / "figures"
 DOCS_DIR = REPO_ROOT / "docs"
 

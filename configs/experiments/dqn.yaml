@@ -1,0 +1,24 @@
+name: dqn
+description: >
+  DQN (IND's observation and reward, learned with DQN instead of PPO) on the normal-traffic
+  cells of core.yaml, and zero-shot on grid8x8 at peak like IND. Added after the report: its
+  tests form a Holm family of their own, so they change no p-value of the core or extended
+  results. The other methods of these cells are already in core.yaml.
+seeds: [0, 1, 2, 3, 4]
+cells:
+  - network: grid4x4
+    methods: [dqn]
+    demands: [low, medium, peak, rush_profile]
+    scenarios: [normal]
+    ssm: false
+  - network: real_district
+    methods: [dqn]
+    demands: [medium, peak]
+    scenarios: [normal]
+    ssm: false
+  - network: grid8x8
+    checkpoint_network: grid4x4
+    methods: [dqn]
+    demands: [peak]
+    scenarios: [normal]
+    ssm: false

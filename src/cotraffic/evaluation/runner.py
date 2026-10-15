@@ -51,8 +51,13 @@ def run_episode(
     keep_outputs: bool = False,
     scale: float = 1.0,
     mode: str = "evaluation",
+    extra: bool = False,
 ) -> dict[str, Any]:
-    """Simulate one episode with ``method`` and return (and store) its result row."""
+    """Simulate one episode with ``method`` and return (and store) its result row.
+
+    ``extra`` adds the measurements of :mod:`cotraffic.evaluation.extra` to the row and
+    writes their per-vehicle and per-green logs; the matrix stores such runs apart, in
+    ``results/extra/``."""
     protocol = config.load_protocol()
     scenarios = [s for s in scenarios if s != "normal"]
     controller = controller or make_controller(method, checkpoint)
@@ -82,6 +87,12 @@ def run_episode(
             incident_queue.append((now, env.conn.edge.getLastStepHaltingNumber(incident["edge"])))
 
     hooks = controller.step_hooks() + ([record_incident] if incident else [])
+    probe = None
+    if extra:
+        from cotraffic.evaluation.extra import ExtraProbe
+
+        probe = ExtraProbe((episode.measure_from, episode.measure_to))
+        hooks.append(probe)
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
@@ -121,6 +132,15 @@ def run_episode(
         ssm,
         incident,
     )
+    extra_metrics: dict[str, float] = {}
+    if probe is not None:
+        extra_metrics, ev_log, green_log = probe.finish(out_dir, episode.bundle.route_files)
+        for name, log in (("emergency", ev_log), ("pedestrian_greens", green_log)):
+            if not log.empty:
+                folder = logs_dir / name
+                folder.mkdir(parents=True, exist_ok=True)
+                log.insert(0, "run_id", rid)
+                log.to_csv(folder / f"{rid}.csv", index=False)
     if incident_queue:
         q = pd.DataFrame(incident_queue, columns=["time", "incident_edge_halting"])
         q["minute"] = (q["time"] // 60).astype(int)
@@ -143,6 +163,7 @@ def run_episode(
         "demand_scale": scale,
     }
     row.update(metrics)
+    row.update(extra_metrics)
     n_agents = max(1, len(env.possible_agents))
     row.update(
         {

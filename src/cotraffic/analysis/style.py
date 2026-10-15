@@ -17,6 +17,7 @@ METHOD_LABELS = {
     "coop_forecast": "COOP + forecast",
     "coop_full_ev1": "COOP-FULL (λ_ev=1)",
     "coop_full_ev4": "COOP-FULL (λ_ev=4)",
+    "dqn": "DQN",
     "random": "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS)
@@ -41,6 +42,7 @@ METHOD_COLORS = {
     "coop_forecast": "#5b8fb9",
     "coop_full_ev1": "#c98a00",
     "coop_full_ev4": "#f4c455",
+    "dqn": "#c2185b",
     "random": "#52514e",
 }
 SURFACE = "#fcfcfb"

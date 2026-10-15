@@ -55,11 +55,32 @@ def core_cells(experiment: str = "core") -> set[tuple[str, str, str, str]]:
     }
 
 
-def assign_families(comp: pd.DataFrame, core: set[tuple[str, str, str, str]]) -> pd.DataFrame:
-    """Holm correction within each (comparison, family) group; see ``core_cells``."""
+def other_families() -> dict[str, set[tuple[str, str, str, str]]]:
+    """Families of experiments added after the report (one family each)."""
+    from cotraffic import config
+
+    return {name: core_cells(name) for name in ("dqn",) if name in config.available("experiments")}
+
+
+def assign_families(
+    comp: pd.DataFrame,
+    core: set[tuple[str, str, str, str]],
+    others: dict[str, set[tuple[str, str, str, str]]] | None = None,
+) -> pd.DataFrame:
+    """Holm correction within each (comparison, family) group; see ``core_cells``.
+
+    ``others`` gives further families of their own (the DQN experiment, added after the
+    report), so that they change neither the core nor the exploratory p-values."""
     comp = comp.copy()
+    others = others or {}
+
+    def family(key: tuple[str, str, str, str]) -> str:
+        if key in core:
+            return "core"
+        return next((name for name, cells in others.items() if key in cells), "exploratory")
+
     comp["family"] = [
-        "core" if key in core else "exploratory"
+        family(key)
         for key in zip(
             comp["network"], comp["scenario"], comp["demand"], comp["method"], strict=True
         )
@@ -220,7 +241,7 @@ def run_aggregate(
         tables = [t for t in tables if not t.empty and "p_value" in t]
         if not tables:
             continue
-        comp = assign_families(pd.concat(tables, ignore_index=True), core)
+        comp = assign_families(pd.concat(tables, ignore_index=True), core, other_families())
         path = out_dir / f"comparisons_{metric}.csv"
         comp.to_csv(path, index=False)
         written.append(path)
