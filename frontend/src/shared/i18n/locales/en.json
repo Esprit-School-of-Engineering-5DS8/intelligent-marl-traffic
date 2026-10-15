@@ -253,7 +253,7 @@
     "heatmap": "Gain map",
     "heatmapText": "Gain (%) of each controller over the reference, scenario by scenario.",
     "table": "Statistical tests",
-    "tableText": "Paired Wilcoxon tests, Holm correction per family; effect: Cliff's delta.",
+    "tableText": "Mann-Whitney U test (rank-based, no normality assumption), Holm correction per family; effect: Cliff's delta.",
     "distribution": "Waiting-time distribution",
     "distributionText": "Vehicles per 15 s waiting bin, per run.",
     "gain": "Gain",

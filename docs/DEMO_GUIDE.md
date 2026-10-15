@@ -121,7 +121,8 @@ m/s).
   coopération, l'urgence et les piétons dans la récompense. Les tests ne montrent pas de
   différence significative, et nous le disons.
 - **D'où viennent les intervalles ?** Bootstrap sur les entraînements (3 graines) et les
-  graines de test (5) ; tests de Wilcoxon appariés, correction de Holm par famille.
+  graines de test (5) ; test de Mann-Whitney (rangs, sans hypothèse de loi normale),
+  correction de Holm par famille de tests, taille d'effet par le delta de Cliff.
 - **Le replay est-il truqué ?** Ce sont deux épisodes d'évaluation ordinaires (même
   demande, même graine), enregistrés par `scripts/record_replay.py` ; les résultats de
   l'épisode complet sont affichés sous la carte.

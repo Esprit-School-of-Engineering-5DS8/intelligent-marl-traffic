@@ -253,7 +253,7 @@
     "heatmap": "Carte des gains",
     "heatmapText": "Gain (%) de chaque contrôleur par rapport à la référence, scénario par scénario.",
     "table": "Tests statistiques",
-    "tableText": "Tests de Wilcoxon appariés, correction de Holm par famille ; effet : delta de Cliff.",
+    "tableText": "Test de Mann-Whitney (comparaison des rangs, sans hypothèse de loi normale), correction de Holm par famille ; effet : delta de Cliff.",
     "distribution": "Distribution des attentes",
     "distributionText": "Véhicules par tranche d'attente de 15 s, par run.",
     "gain": "Gain",
