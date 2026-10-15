@@ -22,7 +22,8 @@
     "analytics": "Comparative analysis",
     "settings": "Settings",
     "collapse": "Collapse menu",
-    "expand": "Expand menu"
+    "expand": "Expand menu",
+    "assistant": "Assistant"
   },
   "topbar": {
     "dataSource": "Data source",
@@ -76,6 +77,10 @@
     "settings": {
       "title": "Settings",
       "description": "Theme, language, units, data source and language-model provider."
+    },
+    "assistant": {
+      "title": "Assistant",
+      "description": "Plain-language questions about the results; every number comes from the result files."
     }
   },
   "common": {
@@ -390,7 +395,23 @@
     "notUnderstood": "I did not recognise the question. Try naming controllers (FT, MP, COOP-FULL...), a metric (waiting, travel time, CO2, emergency, pedestrians) and a network.",
     "you": "You",
     "error": "The assistant could not answer",
-    "clear": "Clear the conversation"
+    "clear": "Clear the conversation",
+    "answers": {
+      "compare": "{{a}} against {{b}} on {{metric}} ({{cell}}): {{va}} vs {{vb}}, i.e. {{gain}} ({{dir}}). 95% CI of the paired improvement: {{lo}} to {{hi}}; Holm-corrected p = {{p}} ({{sig}}).",
+      "compareMeans": "{{a}} against {{b}} on {{metric}} ({{cell}}): {{va}} vs {{vb}}, i.e. {{gain}} ({{dir}}). No paired test for this pair: means only.",
+      "best": "On {{metric}} ({{cell}}), the best controller is {{best}} ({{value}}), ahead of {{second}} ({{value2}}).",
+      "chart": "Here is {{metric}} by controller ({{cell}}).",
+      "run": "I suggest running {{left}} against {{right}} on {{network}} ({{events}}, {{demand}} demand). Nothing starts without your confirmation.",
+      "runOffline": "Running a simulation needs the backend: switch the source to \"Live backend\" in the settings.",
+      "focus": "Opening junction {{junction}} on the map.",
+      "missing": "No result for {{a}} on {{cell}} ({{metric}}).",
+      "better": "better",
+      "worse": "worse"
+    },
+    "toolChart": "Chart",
+    "toolCompare": "Comparison",
+    "proposed": "Proposed action",
+    "open": "Open"
   },
   "scenarioPage": {
     "replays": "Recorded replays",

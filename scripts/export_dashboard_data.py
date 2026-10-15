@@ -210,7 +210,10 @@ def export_timeseries(out: Path) -> list[str]:
         series["method"] = method_of(series["run_id"])
         cols = [c for c in series.columns if c not in ("run_id", "method", "minute")]
         mean = series.groupby(["method", "minute"])[cols].mean().reset_index()
-        payload: dict[str, Any] = {"cell": dict(zip(["network", "scenario", "demand"], key.split("__"), strict=True)), "methods": {}}
+        payload: dict[str, Any] = {
+            "cell": dict(zip(["network", "scenario", "demand"], key.split("__"), strict=True)),
+            "methods": {},
+        }
         for method, g in mean.groupby("method"):
             g = g.sort_values("minute")
             payload["methods"][method] = {
@@ -275,7 +278,9 @@ def export_decisions(out: Path) -> list[dict[str, Any]]:
 def export_training(out: Path) -> list[dict[str, Any]]:
     """Learning curves: one point per training episode, per seed."""
     index = []
-    for agent_dir in sorted(p for p in TRAINING.iterdir() if p.is_dir() and not p.name.startswith("_")):
+    for agent_dir in sorted(
+        p for p in TRAINING.iterdir() if p.is_dir() and not p.name.startswith("_")
+    ):
         for net_dir in sorted(p for p in agent_dir.iterdir() if p.is_dir()):
             if net_dir.name == "grid2x2":  # smoke-test runs, not part of the study
                 continue
@@ -299,7 +304,9 @@ def export_training(out: Path) -> list[dict[str, Any]]:
                         "meanHalting": df["mean_halting"].round(3).tolist(),
                         "demand": df["episode_demand"].astype(str).tolist(),
                         "switches": df["switches"].astype(int).tolist(),
-                        "shieldMinGreen": df.get("shield_min_green", pd.Series(dtype=int)).astype(int).tolist(),
+                        "shieldMinGreen": df.get("shield_min_green", pd.Series(dtype=int))
+                        .astype(int)
+                        .tolist(),
                     }
                 )
             if runs:
@@ -325,19 +332,25 @@ def export_pedestrian_greens(out: Path) -> None:
         return
     log = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
     meta = log["run_id"].str.split("__", expand=True)
-    log["method"], log["network"], log["demand"] = meta[0], meta[1], meta[3]
+    log["method"], log["network"], log["demand"] = method_of(log["run_id"]), meta[1], meta[3]
     cells: dict[str, Any] = {}
     for (network, demand), g in log.groupby(["network", "demand"]):
         methods = {}
         for method, m in g.groupby("method"):
             # waiting crowd -> mean green length (the slope the report discusses)
-            by_crowd = m.groupby(m["waiting_at_start"].clip(upper=20).round())["duration_s"]
+            stats = (
+                m.groupby(m["waiting_at_start"].clip(upper=20).round())["duration_s"]
+                .agg(["mean", "size"])
+                .reset_index()
+            )
+            # crowd sizes seen fewer than 10 times give noisy means: left out
+            stats = stats[stats["size"] >= 10]
             methods[method] = {
                 "greens": int(len(m)),
                 "crossed": int(m["crossed"].sum()),
-                "crowd": by_crowd.mean().index.astype(int).tolist(),
-                "meanDuration": by_crowd.mean().round(2).tolist(),
-                "count": by_crowd.size().astype(int).tolist(),
+                "crowd": stats["waiting_at_start"].astype(int).tolist(),
+                "meanDuration": stats["mean"].round(2).tolist(),
+                "count": stats["size"].astype(int).tolist(),
             }
         cells[f"{network}__pedestrians__{demand}"] = methods
     write(out, "pedestrian_greens.json", {"cells": cells})
@@ -352,7 +365,7 @@ def export_emergency_log(out: Path) -> None:
         return
     log = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
     meta = log["run_id"].str.split("__", expand=True)
-    log.insert(1, "method", meta[0])
+    log.insert(1, "method", method_of(log["run_id"]))
     log.insert(2, "network", meta[1])
     log.insert(3, "scenario", meta[2])
     log.insert(4, "demand", meta[3])
@@ -394,7 +407,9 @@ def export_network(out: Path, name: str) -> dict[str, Any] | None:
                     "shape": pts(lane.getShape()),
                     "width": round(lane.getWidth(), 2),
                     "allows": "both" if ped and road else ("pedestrian" if ped else "vehicle"),
-                    "kind": "crossing" if function == "crossing" else ("internal" if function == "internal" else "normal"),
+                    "kind": "crossing"
+                    if function == "crossing"
+                    else ("internal" if function == "internal" else "normal"),
                 }
             )
     junctions = []
@@ -439,9 +454,21 @@ def export_meta(out: Path, summary: pd.DataFrame, extras: dict[str, Any]) -> Non
         .apply(lambda m: sorted(set(m)))
         .reset_index()
     )
-    counts = pd.read_csv(SUMMARY / "run_counts.csv") if (SUMMARY / "run_counts.csv").exists() else None
+    counts = (
+        pd.read_csv(SUMMARY / "run_counts.csv") if (SUMMARY / "run_counts.csv").exists() else None
+    )
     extra_runs = len(list((EXTRA / "raw").glob("*.csv"))) if (EXTRA / "raw").exists() else 0
-    replays = sorted(p.stem for p in (out / "replays").glob("*.json")) if (out / "replays").exists() else []
+    replays = []
+    for path in sorted((out / "replays").glob("*.json")) if (out / "replays").exists() else []:
+        rec = json.loads(path.read_text(encoding="utf-8"))
+        replays.append(
+            {
+                "id": rec["id"],
+                "left": rec["sides"]["left"]["method"],
+                "right": rec["sides"]["right"]["method"],
+                "window": rec["window"],
+            }
+        )
     payload = {
         "generatedAt": datetime.now(UTC).isoformat(timespec="seconds"),
         "cells": [
@@ -486,7 +513,12 @@ def main() -> None:
     export_meta(
         out,
         summary,
-        {"timeseries": timeseries, "decisions": decisions, "training": training, "networks": networks},
+        {
+            "timeseries": timeseries,
+            "decisions": decisions,
+            "training": training,
+            "networks": networks,
+        },
     )
 
 

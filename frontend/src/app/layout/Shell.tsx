@@ -5,6 +5,7 @@ import { Outlet, useLocation } from "react-router";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { useUi } from "@/app/ui-store";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
+import { useLiveSocket } from "@/shared/api/live-socket";
 import { PageSkeleton } from "@/shared/ui/skeleton";
 
 import { Sidebar } from "./Sidebar";
@@ -28,6 +29,7 @@ export function Shell() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   useAssistantShortcut();
+  useLiveSocket();
 
   return (
     <div className="flex h-dvh overflow-hidden bg-bg text-text">

@@ -28,4 +28,6 @@ pyyaml==6.0.3
 pytest==9.1.1
 ruff==0.16.8
 streamlit==1.64.0
+fastapi==0.143.2       # dashboard backend (api/)
+uvicorn==0.53.0
 pyarrow==23.0.1       # must match the Arrow version libsumo 1.27.1 is built against

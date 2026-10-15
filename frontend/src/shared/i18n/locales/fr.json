@@ -22,7 +22,8 @@
     "analytics": "Analyse comparative",
     "settings": "Paramètres",
     "collapse": "Réduire le menu",
-    "expand": "Déplier le menu"
+    "expand": "Déplier le menu",
+    "assistant": "Assistant"
   },
   "topbar": {
     "dataSource": "Source des données",
@@ -76,6 +77,10 @@
     "settings": {
       "title": "Paramètres",
       "description": "Thème, langue, unités, source des données et fournisseur du modèle de langage."
+    },
+    "assistant": {
+      "title": "Assistant",
+      "description": "Questions en langage courant sur les résultats ; chaque chiffre vient des fichiers de résultats."
     }
   },
   "common": {
@@ -390,7 +395,23 @@
     "notUnderstood": "Je n'ai pas reconnu la question. Essayez de nommer des contrôleurs (FT, MP, COOP-FULL...), un indicateur (attente, trajet, CO2, urgences, piétons) et un réseau.",
     "you": "Vous",
     "error": "L'assistant n'a pas pu répondre",
-    "clear": "Effacer la conversation"
+    "clear": "Effacer la conversation",
+    "answers": {
+      "compare": "{{a}} face à {{b}} sur {{metric}} ({{cell}}) : {{va}} contre {{vb}}, soit {{gain}} ({{dir}}). IC 95 % de l'amélioration appariée : {{lo}} à {{hi}} ; p après correction de Holm = {{p}} ({{sig}}).",
+      "compareMeans": "{{a}} face à {{b}} sur {{metric}} ({{cell}}) : {{va}} contre {{vb}}, soit {{gain}} ({{dir}}). Pas de test apparié pour cette paire : comparaison des moyennes seulement.",
+      "best": "Sur {{metric}} ({{cell}}), le meilleur contrôleur est {{best}} ({{value}}), devant {{second}} ({{value2}}).",
+      "chart": "Voici {{metric}} par contrôleur ({{cell}}).",
+      "run": "Je propose de lancer {{left}} contre {{right}} sur {{network}} ({{events}}, demande {{demand}}). Rien ne démarre sans votre confirmation.",
+      "runOffline": "Le lancement d'une simulation demande le backend : passez la source sur « Backend en direct » dans les paramètres.",
+      "focus": "J'ouvre le carrefour {{junction}} sur la carte.",
+      "missing": "Pas de résultat pour {{a}} sur {{cell}} ({{metric}}).",
+      "better": "mieux",
+      "worse": "moins bien"
+    },
+    "toolChart": "Graphique",
+    "toolCompare": "Comparaison",
+    "proposed": "Action proposée",
+    "open": "Ouvrir"
   },
   "scenarioPage": {
     "replays": "Replays enregistrés",

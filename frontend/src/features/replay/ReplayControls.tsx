@@ -22,7 +22,8 @@ export function ReplayPicker({ meta }: { meta: Meta }) {
   const replayId = usePlayback((s) => s.replayId);
   const setReplay = usePlayback((s) => s.setReplay);
   useEffect(() => {
-    if (!replayId || !meta.replays.includes(replayId)) setReplay(meta.replays[0] ?? null);
+    if (!replayId || !meta.replays.some((r) => r.id === replayId))
+      setReplay(meta.replays[0]?.id ?? null);
   }, [meta.replays, replayId, setReplay]);
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -36,8 +37,8 @@ export function ReplayPicker({ meta }: { meta: Meta }) {
         className="h-9 min-w-0 rounded-md border border-border-strong bg-surface-2 px-2 text-sm text-text"
       >
         {meta.replays.map((r) => (
-          <option key={r} value={r}>
-            {replayTitle(r, f)}
+          <option key={r.id} value={r.id}>
+            {replayTitle(r.id, f)} · {f.methodName(r.left)} / {f.methodName(r.right)}
           </option>
         ))}
       </select>

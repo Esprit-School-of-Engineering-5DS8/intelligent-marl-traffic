@@ -365,3 +365,59 @@ export function heatmap(
     ],
   };
 }
+
+/** One labelled point per controller: two metrics against each other (a trade-off). */
+export function tradeoff(
+  t: ChartTokens,
+  {
+    points,
+    xName,
+    yName,
+    format,
+    rtl,
+  }: {
+    points: { label: string; x: number; y: number; color: string }[];
+    xName: string;
+    yName: string;
+    format: (v: number) => string;
+    rtl: boolean;
+  },
+): ChartOption {
+  const { axis, tooltip } = baseAxes(t);
+  return {
+    grid: { left: 8, right: 32, top: 24, bottom: 32, containLabel: true },
+    tooltip: {
+      ...tooltip,
+      trigger: "item",
+      formatter: (p: { value: [number, number, string] }) =>
+        `<b>${p.value[2]}</b><br/>${xName}: ${format(p.value[0])}<br/>${yName}: ${format(p.value[1])}`,
+    },
+    xAxis: {
+      type: "value",
+      name: xName,
+      nameLocation: "middle",
+      nameGap: 26,
+      scale: true,
+      inverse: rtl,
+      ...axis,
+    },
+    yAxis: { type: "value", name: yName, scale: true, position: rtl ? "right" : "left", ...axis },
+    series: [
+      {
+        type: "scatter",
+        symbolSize: 14,
+        data: points.map((p) => ({
+          value: [p.x, p.y, p.label],
+          itemStyle: { color: p.color, borderColor: t.surface, borderWidth: 1.5 },
+        })),
+        label: {
+          show: true,
+          position: "right",
+          color: t.text2,
+          fontSize: 11,
+          formatter: (p: { data: { value: [number, number, string] } }) => p.data.value[2],
+        },
+      },
+    ],
+  };
+}

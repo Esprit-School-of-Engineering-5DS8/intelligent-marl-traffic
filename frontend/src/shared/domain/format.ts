@@ -82,6 +82,13 @@ export function useFormat() {
       return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
     };
     const metricName = (m: string) => tx(`metrics.${m}`, { defaultValue: m });
+    /** The metric's name inside a sentence: lower-cased, except acronyms (CO2, ETA...). */
+    const metricInSentence = (m: string) => {
+      const name = metricName(m);
+      return /^\p{Lu}{2}/u.test(name)
+        ? name
+        : name.charAt(0).toLocaleLowerCase(locale) + name.slice(1);
+    };
     const metricUnit = (m: string) => unitLabel(metricInfo(m).unit);
     const metricTitle = (m: string) => {
       const unit = metricUnit(m);
@@ -108,6 +115,7 @@ export function useFormat() {
       date,
       unitLabel,
       metricName,
+      metricInSentence,
       metricUnit,
       metricTitle,
       methodName: methodLabel,

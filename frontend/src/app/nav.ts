@@ -1,4 +1,5 @@
 import {
+  Bot,
   BrainCircuit,
   ChartColumn,
   Cuboid,
@@ -20,6 +21,7 @@ export type PageKey =
   | "pedestrians"
   | "emergency"
   | "analytics"
+  | "assistant"
   | "settings";
 
 export interface NavItem {
@@ -48,6 +50,7 @@ export const NAV: NavGroup[] = [
     items: [
       { key: "agents", path: "/agents", icon: BrainCircuit },
       { key: "analytics", path: "/analytics", icon: ChartColumn },
+      { key: "assistant", path: "/assistant", icon: Bot },
     ],
   },
   {

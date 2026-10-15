@@ -56,7 +56,7 @@ export const Meta = z.object({
   runs: z.number().nullable(),
   extraRuns: num,
   dqnAvailable: z.boolean(),
-  replays: z.array(z.string()),
+  replays: z.array(z.object({ id: z.string(), left: z.string(), right: z.string(), window: num })),
   timeseries: z.array(z.string()),
   decisions: z.array(
     z.object({

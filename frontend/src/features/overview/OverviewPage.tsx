@@ -107,7 +107,7 @@ function Overview({
           {t(headline.pairedImprovementPct >= 0 ? "overview.headline" : "overview.headlineWorse", {
             controller: f.methodName(controller),
             reference: f.methodName(reference),
-            metric: f.metricName("mean_waiting_time").toLowerCase(),
+            metric: f.metricInSentence("mean_waiting_time"),
             value: f.pct(Math.abs(headline.pairedImprovementPct), 1, false),
           })}{" "}
           <span className="text-sm font-normal text-muted">({f.cellName(cell)})</span>

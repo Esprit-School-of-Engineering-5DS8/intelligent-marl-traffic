@@ -16,6 +16,7 @@ const PAGES: Record<PageKey, LazyExoticComponent<ComponentType>> = {
   pedestrians: lazy(() => import("@/features/pedestrians/PedestriansPage")),
   emergency: lazy(() => import("@/features/emergency/EmergencyPage")),
   analytics: lazy(() => import("@/features/analytics/AnalyticsPage")),
+  assistant: lazy(() => import("@/features/assistant/AssistantPage")),
   settings: lazy(() => import("@/features/settings/SettingsPage")),
 };
 
