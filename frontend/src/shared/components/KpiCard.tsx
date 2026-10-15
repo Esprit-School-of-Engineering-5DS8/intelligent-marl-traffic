@@ -7,6 +7,15 @@ import { cn } from "@/shared/lib/cn";
 import type { Comparison, SummaryRow } from "@/shared/schemas";
 import { Badge } from "@/shared/ui/badge";
 
+const EXTRA_METRICS = new Set([
+  "ped_p95_waiting_time",
+  "ped_crossings_in_green_pct",
+  "ped_green_slope_s_per_person",
+  "ev_stops_at_red_mean",
+  "ev_eta_error_mean_s",
+  "ev_eta_abs_error_mean_s",
+]);
+
 /**
  * One indicator of the selected controller against the reference. The gain is the paired
  * improvement of the statistical test when one exists (with its significance after Holm
@@ -55,7 +64,10 @@ export function KpiCard({
       ) : null}
       <div className="mt-auto flex flex-wrap items-center gap-1.5 text-xs">
         {gain === null ? (
-          <span className="text-muted">{t("kpi.noReference")}</span>
+          <span className="text-muted">
+            {/* the extra runs' metrics arrive controller by controller */}
+            {!row && EXTRA_METRICS.has(metric) ? t("data.pending") : t("kpi.noReference")}
+          </span>
         ) : (
           <>
             <Badge tone={better ? "flow" : worse ? "jam" : "neutral"}>

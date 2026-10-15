@@ -13,6 +13,17 @@ incident, emergency and failure conditions.
 
 Simulation: [SUMO](https://eclipse.dev/sumo/) 1.27 through libsumo. CPU only.
 
+## Dashboard
+
+A control-room web application (React, TypeScript) presents the results: overview with
+statistical comparisons, side-by-side replays on a map and in 3D, learning curves and
+explained decisions, pedestrian and emergency-vehicle analyses, and an assistant that
+answers questions from the result files. It runs without a backend on the exported
+results (`cd frontend && npm install && npm run dev`); the optional FastAPI backend
+(`uvicorn api.main:app`) adds the local language model and scenario runs. See
+[frontend/README.md](frontend/README.md), [docs/API_CONTRACT.md](docs/API_CONTRACT.md)
+and the demonstration guide [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md).
+
 ## Install
 
 Python 3.10 or newer. SUMO comes from pip, no system install is needed.

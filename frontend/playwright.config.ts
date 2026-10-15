@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 4173;
+const port = 4175;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -21,6 +21,6 @@ export default defineConfig({
     command: `npm run build && npm run preview -- --port ${port} --strictPort`,
     url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 300_000,
   },
 });

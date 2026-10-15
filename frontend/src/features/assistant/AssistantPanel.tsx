@@ -1,9 +1,12 @@
+import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useUi } from "@/app/ui-store";
 import { Sheet } from "@/shared/ui/sheet";
+import { Skeleton } from "@/shared/ui/skeleton";
 
-import { Chat } from "./Chat";
+// loaded when the panel first opens: keeps charts and markdown out of the first download
+const Chat = lazy(() => import("./Chat").then((m) => ({ default: m.Chat })));
 
 /** Side panel reachable from every page (button in the top bar or Ctrl+K). */
 export function AssistantPanel() {
@@ -19,7 +22,9 @@ export function AssistantPanel() {
       description={t("assistant.description")}
       closeLabel={t("common.close")}
     >
-      <Chat compact />
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <Chat compact />
+      </Suspense>
     </Sheet>
   );
 }
