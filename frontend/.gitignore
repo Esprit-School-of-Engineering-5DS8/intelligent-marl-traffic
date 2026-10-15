@@ -5,3 +5,6 @@ playwright-report
 test-results
 *.local
 .env
+
+# replays are regenerated with scripts/record_replay.py (several MB each)
+public/data/replays/

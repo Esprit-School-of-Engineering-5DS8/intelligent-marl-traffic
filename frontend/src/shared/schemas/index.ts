@@ -1,135 +1,177 @@
 /**
- * Data contract of the dashboard: every type is inferred from these Zod schemas, which the
- * backend's Pydantic models mirror (api/schemas.py). Values are those of the project's
- * result files (results/summary/summary.csv, results/extra/, decision and training logs).
+ * Data contract of the dashboard. Every file is validated on arrival; the types are
+ * inferred from these schemas. The files are written by scripts/export_dashboard_data.py
+ * and scripts/record_replay.py from the project's result files, and the FastAPI backend
+ * (api/) serves the same files, so the two data sources show identical numbers.
+ *
+ * Controllers and metrics are open strings: a new experiment must not break the screen.
+ * Known ones get labels, colours and units in shared/domain.
  */
 import { z } from "zod";
 
-export const Controller = z.enum([
-  "ft",
-  "act",
-  "mp",
-  "ev_rule",
-  "ev_rule_mp",
-  "ped_rule_mp",
-  "ind",
-  "coop",
-  "coop_eco05",
-  "coop_eco",
-  "coop_full",
-  "coop_forecast",
-  "dqn",
-]);
-export const BASELINES = ["ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp"] as const;
-export const LEARNED = [
-  "ind",
-  "coop",
-  "coop_eco05",
-  "coop_eco",
-  "coop_full",
-  "coop_forecast",
-  "dqn",
-] as const;
+const num = z.number();
+/** JSON has no NaN: a missing measurement is exported as null. */
+const maybe = z.number().nullable();
 
-export const Network = z.enum(["grid4x4", "grid8x8", "real_district", "real_district_ped"]);
-export const Scenario = z.enum([
-  "normal",
-  "incident",
-  "emergency",
-  "pedestrians",
-  "buses",
-  "sensor_noise",
-  "comm_dropout_10",
-  "comm_dropout_30",
-  "comm_dropout_50",
-]);
-export const Demand = z.enum(["low", "medium", "peak", "rush_profile"]);
+export const Cell = z.object({ network: z.string(), scenario: z.string(), demand: z.string() });
 
-/** Metrics of the report (results/raw) and of the dashboard's extra runs (results/extra). */
-export const Metric = z.enum([
-  "mean_travel_time",
-  "mean_waiting_time",
-  "mean_time_loss",
-  "stops_per_vehicle",
-  "throughput_per_h",
-  "mean_queue",
-  "p95_waiting_time",
-  "co2_g_per_km",
-  "co2_total_kg",
-  "ped_mean_waiting_time",
-  "ped_max_waiting_time",
-  "ev_delay",
-  "ev_travel_time",
-  "bus_delay",
-  "person_weighted_delay",
-  "ssm_conflicts_per_1000_veh",
-  "ped_p95_waiting_time",
-  "ped_crossings_in_green_pct",
-  "ped_green_slope_s_per_person",
-  "ev_stops_at_red_mean",
-  "ev_eta_error_mean_s",
-  "ev_eta_abs_error_mean_s",
-  "reward_delay",
-  "reward_co2",
-  "reward_ev",
-  "reward_ped",
-]);
-export const Cell = z.object({ network: Network, scenario: Scenario, demand: Demand });
-
-/** Aggregated result (95 % CI by bootstrap over training runs and test seeds). */
 export const SummaryRow = Cell.extend({
-  method: Controller,
-  metric: Metric,
-  n: z.number().int().positive(),
-  nTrain: z.number().int().nonnegative(),
-  mean: z.number(),
-  ciLo: z.number(),
-  ciHi: z.number(),
-  std: z.number(),
+  method: z.string(),
+  metric: z.string(),
+  n: num,
+  nTrain: num,
+  mean: maybe,
+  ciLo: maybe,
+  ciHi: maybe,
+  std: maybe,
 });
+export const Summary = z.array(SummaryRow);
+
 export const Comparison = Cell.extend({
-  method: Controller,
-  reference: Controller,
-  metric: Metric,
-  mean: z.number(),
-  referenceMean: z.number(),
-  pairedImprovementPct: z.number(),
-  pairedCiLo: z.number(),
-  pairedCiHi: z.number(),
-  pHolm: z.number().min(0).max(1),
+  method: z.string(),
+  reference: z.string(),
+  metric: z.string(),
+  mean: maybe,
+  referenceMean: maybe,
+  improvementPct: maybe,
+  pairedImprovementPct: maybe,
+  pairedCiLo: maybe,
+  pairedCiHi: maybe,
+  pValue: maybe,
+  pHolm: maybe,
+  cliffsDelta: maybe,
+  effect: z.string().nullable(),
   significant: z.boolean(),
-  family: z.enum(["core", "exploratory", "dqn"]),
+  n: num,
+  comparison: z.string(),
+  family: z.string(),
 });
-export const TimeseriesPoint = z.object({
-  minute: z.number().int().nonnegative(),
-  halting: z.number(),
-  running: z.number(),
-  waiting: z.number(),
-  meanWaitingTime: z.number(),
-  meanSpeed: z.number(),
+export const Comparisons = z.array(Comparison);
+
+export const Meta = z.object({
+  generatedAt: z.string(),
+  cells: z.array(Cell.extend({ methods: z.array(z.string()) })),
+  methods: z.array(z.string()),
+  metrics: z.array(z.string()),
+  runs: z.number().nullable(),
+  extraRuns: num,
+  dqnAvailable: z.boolean(),
+  replays: z.array(z.string()),
+  timeseries: z.array(z.string()),
+  decisions: z.array(
+    z.object({
+      runId: z.string(),
+      method: z.string(),
+      network: z.string(),
+      scenario: z.string(),
+      demand: z.string(),
+      seed: num,
+      decisions: num,
+    }),
+  ),
+  training: z.array(
+    z.object({ agent: z.string(), network: z.string(), seeds: z.array(num), episodes: num }),
+  ),
+  networks: z.array(z.object({ network: z.string() }).passthrough()),
 });
-export const RunSeries = z.object({
-  runId: z.string(),
-  method: Controller,
+
+const Series = z.array(maybe);
+export const TimeseriesCell = z.object({
   cell: Cell,
-  seed: z.number().int(),
-  points: z.array(TimeseriesPoint),
+  methods: z.record(
+    z.string(),
+    z
+      .object({
+        minute: z.array(num),
+        halting: Series,
+        running: Series,
+        waiting: Series,
+        meanWaitingTime: Series,
+        meanSpeed: Series,
+      })
+      .catchall(Series),
+  ),
 });
-export const TrainingPoint = z.object({
-  timesteps: z.number().int(),
-  episodeReward: z.number(),
-  meanHalting: z.number(),
-  demand: Demand,
+
+export const DistributionCell = z.object({
+  cell: Cell,
+  methods: z.record(
+    z.string(),
+    z.object({ from: z.array(num), to: z.array(num), vehicles: z.array(num) }),
+  ),
 });
+
+export const Decisions = z.object({
+  runId: z.string(),
+  method: z.string(),
+  network: z.string(),
+  scenario: z.string(),
+  demand: z.string(),
+  seed: num,
+  agents: z.array(z.string()),
+  time: z.array(num),
+  agent: z.array(z.string()),
+  requested: z.array(num),
+  executed: z.array(num),
+  shield: z.array(z.string()),
+  dependsOn: z.array(z.string()),
+  explanation: z.array(z.string()),
+});
+
+export const TrainingRun = z.object({
+  seed: num,
+  totalTimesteps: z.number().nullable().optional(),
+  algorithm: z.string(),
+  timesteps: z.array(num),
+  episodeReward: z.array(maybe),
+  meanHalting: z.array(maybe),
+  demand: z.array(z.string()),
+  switches: z.array(num),
+  shieldMinGreen: z.array(num),
+});
+export const Training = z.object({
+  agent: z.string(),
+  network: z.string(),
+  runs: z.array(TrainingRun),
+});
+
+export const PedestrianGreens = z.object({
+  cells: z.record(
+    z.string(),
+    z.record(
+      z.string(),
+      z.object({
+        greens: num,
+        crossed: num,
+        crowd: z.array(num),
+        meanDuration: z.array(maybe),
+        count: z.array(num),
+      }),
+    ),
+  ),
+});
+
+export const EmergencyVehicle = z
+  .object({
+    runId: z.string(),
+    method: z.string(),
+    network: z.string(),
+    scenario: z.string(),
+    demand: z.string(),
+    seed: num,
+  })
+  .catchall(z.union([z.number(), z.string(), z.boolean(), z.null()]));
+export const EmergencyLog = z.object({ vehicles: z.array(EmergencyVehicle) });
 
 /** Network geometry, SUMO coordinates in metres. */
-export const Point = z.tuple([z.number(), z.number()]);
+export const Point = z.tuple([num, num]);
 export const Lane = z.object({
   id: z.string(),
   edge: z.string(),
   shape: z.array(Point).min(2),
-  width: z.number().positive(),
+  width: num,
   allows: z.enum(["vehicle", "pedestrian", "both"]),
+  kind: z.enum(["normal", "internal", "crossing"]),
 });
 export const Junction = z.object({
   id: z.string(),
@@ -137,85 +179,94 @@ export const Junction = z.object({
   signalised: z.boolean(),
   shape: z.array(Point),
 });
+export const SignalLinks = z.object({
+  tls: z.string(),
+  links: z.array(z.object({ index: num, lane: z.string(), position: Point })),
+});
 export const NetworkGeometry = z.object({
-  network: Network,
+  network: z.string(),
   bounds: z.tuple([Point, Point]),
   lanes: z.array(Lane),
   junctions: z.array(Junction),
+  signals: z.array(SignalLinks),
 });
 
-/** One simulated second, live or replayed. */
-export const VehicleKind = z.enum(["car", "bus", "emergency", "incident"]);
-export const VehicleState = z.object({
+/**
+ * Side-by-side replay. Frames are flat integer arrays: vehicles as
+ * [id, kind, x dm, y dm, angle deg, speed dm/s] repeated, persons as [x dm, y dm, waiting].
+ * Signal states follow the order of `signals`.
+ */
+export const ReplayFrame = z.object({
+  t: num,
+  v: z.array(num),
+  p: z.array(num),
+  s: z.array(z.string()),
+});
+export const ReplaySide = z.object({
+  method: z.string(),
+  kpis: z.record(z.string(), maybe),
+  frames: z.array(ReplayFrame),
+  events: z.array(z.object({ t: num, type: z.string(), id: z.string() })),
+});
+export const Replay = z.object({
   id: z.string(),
-  kind: VehicleKind,
-  x: z.number(),
-  y: z.number(),
-  angle: z.number(),
-  speed: z.number().nonnegative(),
-});
-export const PersonState = z.object({
-  id: z.string(),
-  x: z.number(),
-  y: z.number(),
-  angle: z.number(),
-  waiting: z.boolean(),
-});
-export const SignalState = z.object({
-  tls: z.string(),
-  state: z.string().regex(/^[rRyYgGsuoO]+$/),
-  phase: z.number().int(),
-  remainingS: z.number().nonnegative(),
-});
-export const SimFrame = z.object({
-  runId: z.string(),
-  side: z.enum(["left", "right"]),
-  t: z.number().nonnegative(),
-  vehicles: z.array(VehicleState),
-  persons: z.array(PersonState),
-  signals: z.array(SignalState),
+  network: z.string(),
+  scenario: z.string(),
+  demand: z.string(),
+  seed: num,
+  every: num,
+  window: num,
+  start: num,
+  signals: z.array(z.string()),
+  kinds: z.array(z.string()),
+  sides: z.object({ left: ReplaySide, right: ReplaySide }),
 });
 
-/** A scenario to run: the options of scripts/demo_side_by_side.py. */
+/** A scenario to run on the backend: the options of scripts/record_replay.py. */
+export const NETWORKS = ["grid4x4", "real_district"] as const;
+export const EVENTS = ["emergency", "pedestrians", "incident", "buses"] as const;
+export const DEMANDS = ["low", "medium", "peak"] as const;
 export const ScenarioRequest = z
   .object({
-    network: Network,
-    demand: Demand,
-    events: z.array(Scenario.exclude(["normal"])).default([]),
+    network: z.enum(NETWORKS),
+    demand: z.enum(DEMANDS),
+    events: z.array(z.enum(EVENTS)),
     seed: z.number().int().min(0).max(999),
-    left: Controller,
-    right: Controller,
-    quick: z.boolean().default(true),
+    left: z.string().min(1),
+    right: z.string().min(1),
   })
-  .refine((r) => r.left !== r.right, { message: "two different controllers", path: ["right"] });
+  .refine((r) => r.left !== r.right, { message: "different", path: ["right"] });
 export const RunStatus = z.enum(["queued", "running", "done", "failed"]);
 export const Run = z.object({
   id: z.string(),
-  request: ScenarioRequest,
+  request: z.record(z.string(), z.unknown()),
   status: RunStatus,
   createdAt: z.string(),
-  error: z.string().optional(),
+  replayId: z.string().nullable().optional(),
+  log: z.array(z.string()).optional(),
+  error: z.string().nullable().optional(),
 });
 
 /** Assistant: the page the user sees, the tools the model may call, the streamed events. */
 export const PageContext = z.object({
   page: z.string(),
-  filters: Cell.partial().extend({ controllers: z.array(Controller).optional() }),
+  cell: Cell.partial().optional(),
+  controllers: z.array(z.string()).optional(),
 });
 export const ToolCall = z.discriminatedUnion("name", [
-  z.object({ name: z.literal("getKpis"), args: z.object({ cell: Cell, controller: Controller }) }),
+  z.object({ name: z.literal("getKpis"), args: z.object({ cell: Cell, controller: z.string() }) }),
   z.object({
     name: z.literal("compareControllers"),
-    args: z.object({ cell: Cell, a: Controller, b: Controller, metric: Metric }),
+    args: z.object({ cell: Cell, a: z.string(), b: z.string(), metric: z.string() }),
   }),
   z.object({
     name: z.literal("focusIntersection"),
-    args: z.object({ network: Network, junction: z.string() }),
+    args: z.object({ network: z.string(), junction: z.string() }),
   }),
   z.object({ name: z.literal("runScenario"), args: ScenarioRequest }),
   z.object({
     name: z.literal("generateChart"),
-    args: z.object({ cell: Cell, metric: Metric, controllers: z.array(Controller).min(1) }),
+    args: z.object({ cell: Cell, metric: z.string(), controllers: z.array(z.string()).min(1) }),
   }),
 ]);
 /** Tools that change state: the user confirms before they run. */
@@ -228,20 +279,20 @@ export const ChatEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
 
-export type Controller = z.infer<typeof Controller>;
-export type Network = z.infer<typeof Network>;
-export type Scenario = z.infer<typeof Scenario>;
-export type Demand = z.infer<typeof Demand>;
-export type Metric = z.infer<typeof Metric>;
 export type Cell = z.infer<typeof Cell>;
 export type SummaryRow = z.infer<typeof SummaryRow>;
 export type Comparison = z.infer<typeof Comparison>;
-export type TimeseriesPoint = z.infer<typeof TimeseriesPoint>;
-export type RunSeries = z.infer<typeof RunSeries>;
-export type TrainingPoint = z.infer<typeof TrainingPoint>;
+export type Meta = z.infer<typeof Meta>;
+export type TimeseriesCell = z.infer<typeof TimeseriesCell>;
+export type DistributionCell = z.infer<typeof DistributionCell>;
+export type Decisions = z.infer<typeof Decisions>;
+export type Training = z.infer<typeof Training>;
+export type TrainingRun = z.infer<typeof TrainingRun>;
+export type PedestrianGreens = z.infer<typeof PedestrianGreens>;
+export type EmergencyLog = z.infer<typeof EmergencyLog>;
 export type NetworkGeometry = z.infer<typeof NetworkGeometry>;
-export type VehicleKind = z.infer<typeof VehicleKind>;
-export type SimFrame = z.infer<typeof SimFrame>;
+export type Replay = z.infer<typeof Replay>;
+export type ReplayFrame = z.infer<typeof ReplayFrame>;
 export type ScenarioRequest = z.infer<typeof ScenarioRequest>;
 export type Run = z.infer<typeof Run>;
 export type PageContext = z.infer<typeof PageContext>;
