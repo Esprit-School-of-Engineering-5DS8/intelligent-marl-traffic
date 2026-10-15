@@ -1,20 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
-
-    <!-- Types de véhicules -->
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
     <vType id="car" vClass="passenger" color="1,1,0"/>
-    <vType id="emergency" vClass="emergency" color="1,0,0" guiShape="emergency" speedFactor="1.3"/>
+    <vType id="emergency" vClass="emergency" color="1,0,0"
+           guiShape="emergency" speedFactor="1.3"/>
 
-    <!-- Flux de voitures Est → Ouest (E3 → E4), maintenu pendant 10 minutes -->
-    <flow id="flow_EW" type="car" begin="0" end="600" number="200" from="E3" to="E4" departSpeed="max"/>
+    <route id="west_left" edges="E3 E6"/>
+    <route id="west_straight" edges="E3 E4"/>
+    <route id="west_right" edges="E3 -E5"/>
+    <route id="east_left" edges="-E4 -E5"/>
+    <route id="east_straight" edges="-E4 -E3"/>
+    <route id="east_right" edges="-E4 E6"/>
+    <route id="south_left" edges="E5 -E3"/>
+    <route id="south_straight" edges="E5 E6"/>
+    <route id="south_right" edges="E5 E4"/>
+    <route id="north_left" edges="-E6 E4"/>
+    <route id="north_straight" edges="-E6 -E5"/>
+    <route id="north_right" edges="-E6 -E3"/>
 
-    <!-- Flux de voitures Ouest → Est (-E4 → -E3), même débit qu'avant -->
-    <flow id="flow_WE" type="car" begin="0" end="600" number="200" from="-E4" to="-E3" departSpeed="max"/>
+    <flow id="flow_west_left" type="car" route="west_left" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_west_straight" type="car" route="west_straight" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_west_right" type="car" route="west_right" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_east_left" type="car" route="east_left" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_east_straight" type="car" route="east_straight" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_east_right" type="car" route="east_right" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_south_left" type="car" route="south_left" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_south_straight" type="car" route="south_straight" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_south_right" type="car" route="south_right" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_north_left" type="car" route="north_left" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_north_straight" type="car" route="north_straight" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
+    <flow id="flow_north_right" type="car" route="north_right" begin="0"
+          end="600" number="50" departSpeed="max" departLane="best"/>
 
-    <!-- Flux venant du sud (E5), même débit qu'avant -->
-    <flow id="flow_S" type="car" begin="10" end="600" number="98" from="E5" to="E4" departSpeed="max"/>
-
-    <!-- Une ambulance au milieu -->
     <trip id="ambulance" type="emergency" depart="25" from="E3" to="E4"/>
-
 </routes>

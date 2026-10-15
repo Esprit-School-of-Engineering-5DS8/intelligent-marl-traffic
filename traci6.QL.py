@@ -25,7 +25,7 @@ QUEUE_IMBALANCE_OVERRIDE = 3
 EMERGENCY_PREEMPTION_DISTANCE = 120.0
 Q_TABLE_PATH = Path(os.environ.get(
     "TRACI6_Q_TABLE_PATH",
-    Path(__file__).with_name("traci6_qtable.json"),
+    Path(__file__).with_name("traci6_qtable_v2.json"),
 ))
 
 ALPHA = 0.1
@@ -34,10 +34,31 @@ EPSILON_START = 0.2
 EPSILON_MIN = 0.02
 EPSILON_DECAY = 0.995
 
-EW, SOUTH = 0, 1
-ACTION_NAMES = ("EW", "Sud")
-GREEN_PHASES = {EW: 0, SOUTH: 2}
-YELLOW_PHASES = {EW: 1, SOUTH: 3}
+EW_THROUGH_RIGHT, NS_THROUGH_RIGHT, EW_LEFT, NS_LEFT = range(4)
+ACTION_NAMES = (
+    "E/O tout droit-droite",
+    "N/S tout droit-droite",
+    "E/O gauche",
+    "N/S gauche",
+)
+GREEN_PHASES = {
+    EW_THROUGH_RIGHT: 0,
+    NS_THROUGH_RIGHT: 2,
+    EW_LEFT: 4,
+    NS_LEFT: 6,
+}
+YELLOW_PHASES = {
+    EW_THROUGH_RIGHT: 1,
+    NS_THROUGH_RIGHT: 3,
+    EW_LEFT: 5,
+    NS_LEFT: 7,
+}
+ACTION_LANES = {
+    EW_THROUGH_RIGHT: (("E3", 0), ("E3", 1), ("-E4", 0), ("-E4", 1)),
+    NS_THROUGH_RIGHT: (("E5", 0), ("E5", 1), ("-E6", 0), ("-E6", 1)),
+    EW_LEFT: (("E3", 2), ("-E4", 2)),
+    NS_LEFT: (("E5", 2), ("-E6", 2)),
+}
 YELLOW_STEPS = round(YELLOW_SECONDS / STEP_LENGTH)
 ACTION_COUNT = len(ACTION_NAMES)
 
@@ -47,7 +68,15 @@ def load_model():
         return {}, EPSILON_START, 0
 
     model = json.loads(Q_TABLE_PATH.read_text(encoding="utf-8"))
-    if not isinstance(model, dict) or model.get("version") != 1:
+    if not isinstance(model, dict):
+        raise ValueError(f"Unsupported Q-learning model format in {Q_TABLE_PATH}")
+    if model.get("version") == 1:
+        print(
+            "Ancien modèle Q-learning à deux actions détecté : "
+            "réinitialisation nécessaire pour le carrefour à quatre branches."
+        )
+        return {}, EPSILON_START, 0
+    if model.get("version") != 2:
         raise ValueError(f"Unsupported Q-learning model format in {Q_TABLE_PATH}")
 
     q_values = model.get("q_values")
@@ -74,7 +103,7 @@ def load_model():
 
 def save_model(q_values, epsilon, updates):
     model = {
-        "version": 1,
+        "version": 2,
         "epsilon": epsilon,
         "updates": updates,
         "q_values": q_values,
@@ -88,21 +117,21 @@ def save_model(q_values, epsilon, updates):
 
 
 def get_queues():
-    """Return stopped-vehicle counts on the two approaches to J6."""
-    q_ew = (
-        traci.edge.getLastStepHaltingNumber("E3")
-        + traci.edge.getLastStepHaltingNumber("-E4")
+    """Return stopped-vehicle counts for each signalized movement group."""
+    return tuple(
+        sum(
+            traci.lane.getLastStepHaltingNumber(f"{edge_id}_{lane_index}")
+            for edge_id, lane_index in lanes
+        )
+        for lanes in (ACTION_LANES[action] for action in range(ACTION_COUNT))
     )
-    q_south = traci.edge.getLastStepHaltingNumber("E5")
-    return q_ew, q_south
 
 
 def current_green_group():
     phase = traci.trafficlight.getPhase(TLS_ID)
-    if phase in (0, 1):
-        return EW
-    if phase in (2, 3):
-        return SOUTH
+    for group, green_phase in GREEN_PHASES.items():
+        if phase in (green_phase, YELLOW_PHASES[group]):
+            return group
     raise RuntimeError(f"Unexpected traffic-light phase {phase} for {TLS_ID}")
 
 
@@ -119,17 +148,17 @@ def queue_bucket(queue):
 
 
 def get_state():
-    q_ew, q_south = get_queues()
-    return f"{queue_bucket(q_ew)},{queue_bucket(q_south)},{current_green_group()}"
+    queue_buckets = (queue_bucket(queue) for queue in get_queues())
+    return ",".join((*map(str, queue_buckets), str(current_green_group())))
 
 
-def choose_action(state, q_values, epsilon, q_ew, q_south):
+def choose_action(state, q_values, epsilon, queues):
     # Do not let a stale/undertrained Q-value keep a clearly longer queue red.
-    imbalance = q_ew - q_south
-    if imbalance >= QUEUE_IMBALANCE_OVERRIDE:
-        return EW
-    if imbalance <= -QUEUE_IMBALANCE_OVERRIDE:
-        return SOUTH
+    longest_queue = max(queues)
+    if longest_queue - min(queues) >= QUEUE_IMBALANCE_OVERRIDE:
+        return random.choice(
+            [action for action, queue in enumerate(queues) if queue == longest_queue]
+        )
 
     values = q_values.setdefault(state, [0.0] * ACTION_COUNT)
     if random.random() < epsilon:
@@ -150,8 +179,7 @@ def advance_one_step(reward_samples):
     if not simulation_has_work():
         return False
     traci.simulationStep()
-    q_ew, q_south = get_queues()
-    reward_samples.append(-(q_ew + q_south))
+    reward_samples.append(-sum(get_queues()))
     return True
 
 
@@ -185,7 +213,6 @@ def run_action(target_group):
 
         current_group = current_green_group()
         if target_group != current_group:
-            cleared_group = current_group
             traci.trafficlight.setPhase(TLS_ID, YELLOW_PHASES[current_group])
             if not settle_yellow(reward_samples):
                 return None, target_group, emergency_override
@@ -196,14 +223,7 @@ def run_action(target_group):
                 target_group = emergency_group
                 emergency_override = True
             if current_green_group() != target_group:
-                if target_group == cleared_group:
-                    # The yellow has cleared the old green; resume that same
-                    # approach if an emergency vehicle arrived during clearance.
-                    traci.trafficlight.setPhase(TLS_ID, GREEN_PHASES[target_group])
-                else:
-                    raise RuntimeError(
-                        f"Yellow phase did not lead to the requested green for {TLS_ID}"
-                    )
+                traci.trafficlight.setPhase(TLS_ID, GREEN_PHASES[target_group])
 
         # Keep the selected green active throughout this control interval.
         traci.trafficlight.setPhaseDuration(
@@ -235,10 +255,11 @@ def ambulance_priority_group():
             continue
 
         road_id = traci.vehicle.getRoadID(vehicle_id)
+        lane_index = traci.vehicle.getLaneIndex(vehicle_id)
         if road_id in ("E3", "-E4"):
-            return EW
-        if road_id == "E5":
-            return SOUTH
+            return EW_LEFT if lane_index == 2 else EW_THROUGH_RIGHT
+        if road_id in ("E5", "-E6"):
+            return NS_LEFT if lane_index == 2 else NS_THROUGH_RIGHT
     return None
 
 
@@ -268,11 +289,11 @@ def main():
                 break
 
             state = get_state()
-            q_ew, q_south = get_queues()
+            queues = get_queues()
             emergency_group = ambulance_priority_group()
             forced = emergency_group is not None
             action = emergency_group if forced else choose_action(
-                state, q_values, epsilon, q_ew, q_south
+                state, q_values, epsilon, queues
             )
             switching = current_green_group() != action
 
@@ -298,15 +319,18 @@ def main():
                 epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY)
                 save_model(q_values, epsilon, updates)
 
-            q_ew, q_south = get_queues()
+            queues = get_queues()
             decision += 1
             label = (
                 "PRIORITÉ URGENCE" if forced
                 else f"action={ACTION_NAMES[served_action]}"
             )
+            queue_summary = " ".join(
+                f"{name}={queue}" for name, queue in zip(ACTION_NAMES, queues)
+            )
             print(
                 f"Décision {decision:3d} | {label:18s} | "
-                f"EW arrêté={q_ew:2d} Sud arrêté={q_south:2d} | "
+                f"files: {queue_summary} | "
                 f"récompense={reward:6.2f} cumul={cumulative_reward:8.2f} "
                 f"| epsilon={epsilon:.3f}"
             )

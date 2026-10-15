@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<connections>
+    <!-- Approach ouest: voie droite, tout droit, gauche -->
+    <connection from="E3" to="-E5" fromLane="0" toLane="0" tl="J6" linkIndex="9"/>
+    <connection from="E3" to="E4" fromLane="1" toLane="1" tl="J6" linkIndex="10"/>
+    <connection from="E3" to="E6" fromLane="2" toLane="2" tl="J6" linkIndex="11"/>
+
+    <!-- Approach est -->
+    <connection from="-E4" to="E6" fromLane="0" toLane="0" tl="J6" linkIndex="3"/>
+    <connection from="-E4" to="-E3" fromLane="1" toLane="1" tl="J6" linkIndex="4"/>
+    <connection from="-E4" to="-E5" fromLane="2" toLane="2" tl="J6" linkIndex="5"/>
+
+    <!-- Approach sud -->
+    <connection from="E5" to="E4" fromLane="0" toLane="0" tl="J6" linkIndex="6"/>
+    <connection from="E5" to="E6" fromLane="1" toLane="1" tl="J6" linkIndex="7"/>
+    <connection from="E5" to="-E3" fromLane="2" toLane="2" tl="J6" linkIndex="8"/>
+
+    <!-- Approach nord -->
+    <connection from="-E6" to="-E3" fromLane="0" toLane="0" tl="J6" linkIndex="0"/>
+    <connection from="-E6" to="-E5" fromLane="1" toLane="1" tl="J6" linkIndex="1"/>
+    <connection from="-E6" to="E4" fromLane="2" toLane="2" tl="J6" linkIndex="2"/>
+</connections>
