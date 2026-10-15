@@ -181,7 +181,7 @@ def write_all_results(runs: Sequence[Dict[str, Any]], out_path: str) -> None:
                 extra_fields.append(key)
     fields = base_fields + sorted(extra_fields)
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         for run in sorted(runs, key=lambda r: (str(r["scenario"]), str(r["arm"]), str(r["seed"]))):
             record = {key: _round(run.get(key)) for key in fields}
@@ -204,7 +204,7 @@ def write_by_arm(runs: Sequence[Dict[str, Any]], scenario: str, out_path: str) -
         columns += [f"{metric}_mean", f"{metric}_std"]
 
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         for arm in sorted(by_arm):
             selected, seed_kind = _pick_runs(by_arm[arm])
@@ -235,7 +235,7 @@ def write_llm_ops(runs: Sequence[Dict[str, Any]], out_path: str) -> None:
         key=lambda r: (str(r["scenario"]), str(r["seed"])),
     )
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
