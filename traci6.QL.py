@@ -20,7 +20,10 @@ TLS_ID = "J6"
 SUMO_CONFIG = Path(__file__).with_name("Traci.sumocfg")
 SUMO_BINARY = os.environ.get("SUMO_BINARY", "sumo-gui")
 STEP_LENGTH = 0.1
-CONTROL_STEPS = 100             # Re-evaluate queues and emergency vehicles every 10 s.
+CONTROL_STEPS = 100             # Minimum green before reconsidering a movement.
+MAX_EXTRA_GREEN_SECONDS = 10.0
+EXTRA_GREEN_SECONDS_PER_VEHICLE = 0.5
+MIN_SECONDS_BETWEEN_PEDESTRIAN_PHASES = 30.0
 YELLOW_SECONDS = 3.0
 MAX_SIMULATION_STEPS = 12000    # Hard limit: 20 simulated minutes at this step length.
 QUEUE_IMBALANCE_OVERRIDE = 3
@@ -35,6 +38,9 @@ GAMMA = 0.9
 EPSILON_START = 0.2
 EPSILON_MIN = 0.02
 EPSILON_DECAY = 0.995
+PEDESTRIAN_EPSILON_START = 0.2
+PEDESTRIAN_EPSILON_MIN = 0.02
+PEDESTRIAN_EPSILON_DECAY = 0.995
 
 EW_THROUGH_RIGHT, NS_THROUGH_RIGHT, EW_LEFT, NS_LEFT = range(4)
 ACTION_NAMES = (
@@ -69,11 +75,12 @@ CROSSING_LANES = (
 )
 ACTIVE_SIGNAL_GROUP = EW_THROUGH_RIGHT
 SIGNAL_IS_YELLOW = False
+LAST_PEDESTRIAN_SERVICE_TIME = float("-inf")
 
 
 def load_model():
     if not Q_TABLE_PATH.exists():
-        return {}, EPSILON_START, 0
+        return {}, EPSILON_START, 0, {}, PEDESTRIAN_EPSILON_START, 0
 
     model = json.loads(Q_TABLE_PATH.read_text(encoding="utf-8"))
     if not isinstance(model, dict):
@@ -83,19 +90,31 @@ def load_model():
             "Ancien modèle Q-learning détecté : un nouveau modèle est utilisé "
             "pour le réseau avec passage piéton."
         )
-        return {}, EPSILON_START, 0
+        return {}, EPSILON_START, 0, {}, PEDESTRIAN_EPSILON_START, 0
     if model.get("version") != 3:
         raise ValueError(f"Unsupported Q-learning model format in {Q_TABLE_PATH}")
 
     q_values = model.get("q_values")
     epsilon = model.get("epsilon")
     updates = model.get("updates")
+    pedestrian_q_values = model.get("pedestrian_q_values", {})
+    pedestrian_epsilon = model.get(
+        "pedestrian_epsilon", PEDESTRIAN_EPSILON_START
+    )
+    pedestrian_updates = model.get("pedestrian_updates", 0)
     if not isinstance(q_values, dict):
         raise ValueError(f"Invalid Q-values in {Q_TABLE_PATH}")
     if not isinstance(epsilon, (int, float)) or not EPSILON_MIN <= epsilon <= 1:
         raise ValueError(f"Invalid exploration rate in {Q_TABLE_PATH}")
     if not isinstance(updates, int) or updates < 0:
         raise ValueError(f"Invalid update count in {Q_TABLE_PATH}")
+    if not isinstance(pedestrian_q_values, dict):
+        raise ValueError(f"Invalid pedestrian Q-values in {Q_TABLE_PATH}")
+    if (not isinstance(pedestrian_epsilon, (int, float))
+            or not PEDESTRIAN_EPSILON_MIN <= pedestrian_epsilon <= 1):
+        raise ValueError(f"Invalid pedestrian exploration rate in {Q_TABLE_PATH}")
+    if not isinstance(pedestrian_updates, int) or pedestrian_updates < 0:
+        raise ValueError(f"Invalid pedestrian update count in {Q_TABLE_PATH}")
 
     for state, values in q_values.items():
         if (not isinstance(state, str) or not isinstance(values, list)
@@ -106,15 +125,48 @@ def load_model():
             raise ValueError(f"Invalid Q-value for state {state!r} in {Q_TABLE_PATH}")
         q_values[state] = [float(value) for value in values]
 
-    return q_values, float(epsilon), updates
+    for agent_name, agent_values in pedestrian_q_values.items():
+        if not isinstance(agent_name, str) or not isinstance(agent_values, dict):
+            raise ValueError(f"Invalid pedestrian agent model in {Q_TABLE_PATH}")
+        for state, values in agent_values.items():
+            if (not isinstance(state, str) or not isinstance(values, list)
+                    or len(values) != 2):
+                raise ValueError(
+                    f"Invalid pedestrian state for {agent_name!r}: {state!r}"
+                )
+            if any(not isinstance(value, (int, float)) or not math.isfinite(value)
+                   for value in values):
+                raise ValueError(
+                    f"Invalid pedestrian Q-value for {agent_name!r}/{state!r}"
+                )
+            agent_values[state] = [float(value) for value in values]
+
+    return (
+        q_values,
+        float(epsilon),
+        updates,
+        pedestrian_q_values,
+        float(pedestrian_epsilon),
+        pedestrian_updates,
+    )
 
 
-def save_model(q_values, epsilon, updates):
+def save_model(
+    q_values,
+    epsilon,
+    updates,
+    pedestrian_q_values,
+    pedestrian_epsilon,
+    pedestrian_updates,
+):
     model = {
         "version": 3,
         "epsilon": epsilon,
         "updates": updates,
         "q_values": q_values,
+        "pedestrian_epsilon": pedestrian_epsilon,
+        "pedestrian_updates": pedestrian_updates,
+        "pedestrian_q_values": pedestrian_q_values,
     }
     temporary_path = Q_TABLE_PATH.with_suffix(Q_TABLE_PATH.suffix + ".tmp")
     temporary_path.write_text(
@@ -165,7 +217,7 @@ def set_all_red_signal():
     SIGNAL_IS_YELLOW = False
 
 
-def create_pedestrian_agents():
+def create_pedestrian_agents(pedestrian_q_values):
     controlled_links = traci.trafficlight.getControlledLinks(TLS_ID)
     agents = []
     for name, approach_edge, waiting_lane, crossing_lane in CROSSING_LANES:
@@ -190,6 +242,7 @@ def create_pedestrian_agents():
                 crossing_lane,
                 link_index,
                 STEP_LENGTH,
+                pedestrian_q_values.setdefault(name, {}),
             )
         )
     return agents
@@ -222,9 +275,24 @@ def queue_bucket(queue):
     return 4
 
 
-def get_state():
+def get_state(pedestrian_agents):
     queue_buckets = (queue_bucket(queue) for queue in get_queues())
-    return ",".join((*map(str, queue_buckets), str(current_green_group())))
+    pedestrian_count = sum(
+        agent.waiting_pedestrian_count() for agent in pedestrian_agents
+    )
+    pedestrian_requests = sum(agent.has_request() for agent in pedestrian_agents)
+    oldest_wait = max(
+        (agent.oldest_waiting_seconds() for agent in pedestrian_agents),
+        default=0.0,
+    )
+    pedestrian_features = (
+        queue_bucket(pedestrian_count),
+        pedestrian_requests,
+        queue_bucket(math.floor(oldest_wait / 15)),
+    )
+    return ",".join(
+        map(str, (*queue_buckets, current_green_group(), *pedestrian_features))
+    )
 
 
 def choose_action(state, q_values, epsilon, queues):
@@ -250,20 +318,26 @@ def simulation_has_work():
     )
 
 
-def advance_one_step(reward_samples):
+def advance_one_step(reward_samples, pedestrian_agents=()):
     if not simulation_has_work():
         return False
     traci.simulationStep()
-    reward_samples.append(-sum(get_queues()))
+    vehicle_queues = get_queues()
+    pedestrian_waiting = sum(
+        agent.waiting_pedestrian_count() for agent in pedestrian_agents
+    )
+    reward_samples.append(
+        -sum(vehicle_queues) - max(vehicle_queues) - pedestrian_waiting
+    )
     return True
 
 
-def settle_yellow(reward_samples, restore_green=True):
+def settle_yellow(reward_samples, restore_green=True, pedestrian_agents=()):
     """Finish a yellow phase before the next Q-learning decision."""
     if not SIGNAL_IS_YELLOW:
         return True
     for _ in range(YELLOW_STEPS):
-        if not advance_one_step(reward_samples):
+        if not advance_one_step(reward_samples, pedestrian_agents):
             return False
     if restore_green:
         set_vehicle_signal(current_green_group(), "green")
@@ -272,14 +346,20 @@ def settle_yellow(reward_samples, restore_green=True):
     return True
 
 
-def run_action(target_group):
+def run_action(target_group, pedestrian_agents):
     """Serve the selected approach and return its average queue reward."""
     reward_samples = []
-    if not settle_yellow(reward_samples):
-        return None, target_group, False
+    if not settle_yellow(reward_samples, pedestrian_agents=pedestrian_agents):
+        return None, target_group, False, 0.0
 
     emergency_override = False
-    for _ in range(CONTROL_STEPS):
+    initial_queue = get_queues()[target_group]
+    extra_green_seconds = min(
+        MAX_EXTRA_GREEN_SECONDS,
+        max(0, initial_queue - 4) * EXTRA_GREEN_SECONDS_PER_VEHICLE,
+    )
+    green_steps = CONTROL_STEPS + round(extra_green_seconds / STEP_LENGTH)
+    for step in range(green_steps):
         emergency_group = ambulance_priority_group()
         if emergency_group is not None:
             if not emergency_override:
@@ -290,7 +370,9 @@ def run_action(target_group):
         current_group = current_green_group()
         if target_group != current_group:
             set_vehicle_signal(current_group, "yellow")
-            if not settle_yellow(reward_samples):
+            if not settle_yellow(
+                reward_samples, pedestrian_agents=pedestrian_agents
+            ):
                 return None, target_group, emergency_override
             emergency_group = ambulance_priority_group()
             if emergency_group is not None:
@@ -301,12 +383,20 @@ def run_action(target_group):
             if current_green_group() != target_group:
                 set_vehicle_signal(target_group, "green")
 
-        if not advance_one_step(reward_samples):
+        if not advance_one_step(reward_samples, pedestrian_agents):
+            break
+        if step + 1 >= CONTROL_STEPS and get_queues()[target_group] == 0:
             break
 
     if not reward_samples:
-        return None, target_group, emergency_override
-    return sum(reward_samples) / len(reward_samples), target_group, emergency_override
+        return None, target_group, emergency_override, 0.0
+    duration = len(reward_samples) * STEP_LENGTH
+    return (
+        sum(reward_samples) / len(reward_samples),
+        target_group,
+        emergency_override,
+        duration,
+    )
 
 
 def update_q_value(q_values, state, action, reward, next_state, discount):
@@ -341,6 +431,7 @@ def ambulance_priority_group():
 
 def service_pedestrian_requests(pedestrian_agents):
     """Serve ready crossings together, sharing a single vehicle-red interval."""
+    global LAST_PEDESTRIAN_SERVICE_TIME
     requested_agents = [
         agent for agent in pedestrian_agents if agent.has_request()
     ]
@@ -349,7 +440,9 @@ def service_pedestrian_requests(pedestrian_agents):
 
     resume_group = current_green_group()
     set_vehicle_signal(resume_group, "yellow")
-    if not settle_yellow([], restore_green=False):
+    if not settle_yellow(
+        [], restore_green=False, pedestrian_agents=pedestrian_agents
+    ):
         return False
 
     for _ in range(ALL_RED_CLEARANCE_STEPS):
@@ -364,6 +457,18 @@ def service_pedestrian_requests(pedestrian_agents):
 
     requested_agents = [
         agent for agent in requested_agents if agent.has_request()
+    ]
+    if not requested_agents:
+        set_vehicle_signal(resume_group, "green")
+        return False
+
+    pedestrians_to_clear = {
+        agent.name: agent.pedestrians_to_clear()
+        for agent in requested_agents
+    }
+    requested_agents = [
+        agent for agent in requested_agents
+        if pedestrians_to_clear[agent.name]
     ]
     if not requested_agents:
         set_vehicle_signal(resume_group, "green")
@@ -387,7 +492,9 @@ def service_pedestrian_requests(pedestrian_agents):
         if (
             step >= minimum_green_steps
             and not any(
-                agent.has_pedestrians_to_clear()
+                agent.has_pedestrians_to_clear_from(
+                    pedestrians_to_clear[agent.name]
+                )
                 for agent in requested_agents
             )
         ):
@@ -398,7 +505,9 @@ def service_pedestrian_requests(pedestrian_agents):
         waiting_names = ", ".join(
             agent.name
             for agent in requested_agents
-            if agent.has_pedestrians_to_clear()
+            if agent.has_pedestrians_to_clear_from(
+                pedestrians_to_clear[agent.name]
+            )
         )
         raise RuntimeError(
             f"Pedestrian crossings did not clear within "
@@ -415,11 +524,21 @@ def service_pedestrian_requests(pedestrian_agents):
         emergency_group if emergency_group is not None else resume_group,
         "green",
     )
+    for agent in requested_agents:
+        agent.mark_served()
+    LAST_PEDESTRIAN_SERVICE_TIME = traci.simulation.getTime()
     return True
 
 
 def main():
-    q_values, epsilon, updates = load_model()
+    (
+        q_values,
+        epsilon,
+        updates,
+        pedestrian_q_values,
+        pedestrian_epsilon,
+        pedestrian_updates,
+    ) = load_model()
     traci.start([
         SUMO_BINARY,
         "-c", str(SUMO_CONFIG),
@@ -427,16 +546,18 @@ def main():
         "--delay", "50",
         "--lateral-resolution", "0.1",
     ])
-    pedestrian_agents = create_pedestrian_agents()
+    pedestrian_agents = create_pedestrian_agents(pedestrian_q_values)
     set_vehicle_signal(EW_THROUGH_RIGHT, "green")
 
     cumulative_reward = 0.0
     decision = 0
     print("\n=== Q-learning tabulaire pour le feu J6 ===")
-    print("=== Agents piétons indépendants actifs sur les quatre passages ===")
+    print("=== Agents piétons Q-learning coordonnés avec le feu véhicule ===")
     print(
         f"États appris: {len(q_values)} | mises à jour précédentes: {updates} "
-        f"| exploration epsilon: {epsilon:.3f}\n"
+        f"| epsilon véhicule: {epsilon:.3f} "
+        f"| epsilon piéton: {pedestrian_epsilon:.3f} "
+        f"| mises à jour piétons: {pedestrian_updates}\n"
     )
 
     try:
@@ -447,10 +568,33 @@ def main():
                 break
 
             emergency_group = ambulance_priority_group()
+            queues = get_queues()
+            vehicle_context = {
+                "vehicle_queues": queues,
+                "active_signal": current_green_group(),
+                "emergency": emergency_group is not None,
+            }
+            for agent in pedestrian_agents:
+                agent.decide(vehicle_context, pedestrian_epsilon)
+                if agent.learned_since_last_decision:
+                    pedestrian_updates += 1
+                    pedestrian_epsilon = max(
+                        PEDESTRIAN_EPSILON_MIN,
+                        pedestrian_epsilon * PEDESTRIAN_EPSILON_DECAY,
+                    )
+
             requested_agents = [
                 agent for agent in pedestrian_agents if agent.has_request()
             ]
-            if requested_agents and emergency_group is None:
+            pedestrian_cooldown_elapsed = (
+                traci.simulation.getTime() - LAST_PEDESTRIAN_SERVICE_TIME
+            )
+            if (
+                requested_agents
+                and emergency_group is None
+                and pedestrian_cooldown_elapsed
+                >= MIN_SECONDS_BETWEEN_PEDESTRIAN_PHASES
+            ):
                 if service_pedestrian_requests(pedestrian_agents):
                     crossing_names = ", ".join(
                         agent.name for agent in requested_agents
@@ -462,26 +606,22 @@ def main():
                     )
                 continue
 
-            state = get_state()
-            queues = get_queues()
+            state = get_state(pedestrian_agents)
             forced = emergency_group is not None
             action = emergency_group if forced else choose_action(
                 state, q_values, epsilon, queues
             )
-            switching = current_green_group() != action
-
-            reward, served_action, emergency_override = run_action(action)
+            reward, served_action, emergency_override, simulated_seconds = run_action(
+                action, pedestrian_agents
+            )
             if reward is None:
                 break
             cumulative_reward += reward
             forced = forced or emergency_override
 
             terminal = not simulation_has_work()
-            next_state = get_state()
+            next_state = get_state(pedestrian_agents)
             if not forced:
-                simulated_seconds = CONTROL_STEPS * STEP_LENGTH
-                if switching:
-                    simulated_seconds += YELLOW_SECONDS
                 discount = 0.0 if terminal else GAMMA ** (
                     simulated_seconds / (CONTROL_STEPS * STEP_LENGTH)
                 )
@@ -490,7 +630,14 @@ def main():
                 )
                 updates += 1
                 epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY)
-                save_model(q_values, epsilon, updates)
+                save_model(
+                    q_values,
+                    epsilon,
+                    updates,
+                    pedestrian_q_values,
+                    pedestrian_epsilon,
+                    pedestrian_updates,
+                )
 
             queues = get_queues()
             decision += 1
@@ -507,11 +654,23 @@ def main():
                 f"récompense={reward:6.2f} cumul={cumulative_reward:8.2f} "
                 f"| epsilon={epsilon:.3f}"
             )
+    except KeyboardInterrupt:
+        print("\nInterruption demandée ; sauvegarde de l'apprentissage...")
     finally:
         try:
-            save_model(q_values, epsilon, updates)
+            save_model(
+                q_values,
+                epsilon,
+                updates,
+                pedestrian_q_values,
+                pedestrian_epsilon,
+                pedestrian_updates,
+            )
         finally:
-            traci.close()
+            try:
+                traci.close()
+            except traci.exceptions.FatalTraCIError as error:
+                print(f"Connexion SUMO déjà fermée : {error}")
 
     print(f"\n=== Terminé : {updates} mises à jour Q sauvegardées dans {Q_TABLE_PATH.name} ===")
 
