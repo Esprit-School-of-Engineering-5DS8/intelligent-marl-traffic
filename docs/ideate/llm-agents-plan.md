@@ -1,7 +1,7 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: Phases 0–5 implemented and committed.
+> Branch: `feat/llm-agents`. Status: Phases 0–5 implemented, pushed and committed. Phase 6 planned below (start in a fresh session).
 
 ---
 
@@ -17,6 +17,47 @@
 | 3 — Operator agent, real LLM + speed profile (S0/S1/S3) | ✅ done | `97a1246` |
 | 4 — Emergency agent (incl. the 4.5 conflict/robustness iteration) | ✅ done | `3036c25` |
 | 5 — Pedestrian agent (S4) + composed multi-agent scenario (S5) | ✅ done | `d0a111f` |
+| 6 — full-grid evaluation + plots/report + Monaco MoST real scenario | ⏭ next | — |
+
+---
+
+## NEXT SESSION — Phase 6 plan (start here, fresh context)
+
+**Scope agreed with the user (session 5):** skip DQN/RL (A6) and the optional pure-LLM arm (A5) for now; compare against the existing baselines only. Two deliverables, both ending in committed tables/plots:
+
+### A. 3x3 clean full-grid package (no new LLM spend)
+
+1. `evaluation/collect_results.py` (new): walk `results/*/summary.json` → one committed `all_results.csv` plus per-scenario tables (arms × seeds: EV duration/wait, ped mean/p95 wait, civilian tripinfo wait/time-loss, step-wait, arrivals, LLM ops). Data already recorded:
+   - S0 `grid_3x3` sumo_default(1)/fixed(1)/max_pressure(3)/llm_team(3) — optionally top the two baselines up to 3 seeds (SUMO-only, minutes);
+   - S1 `grid_3x3_peak` max_pressure(3)/llm_team(3);
+   - S3 `grid_3x3_incident` + ev_priority(3);
+   - S2 `grid_3x3_ev` / `_ev2` / `_ev_incident`: 3 arms × 3 seeds;
+   - S4 `grid_3x3_ped`: max_pressure(5)/ped_priority(5)/llm_team(5);
+   - S5 `grid_3x3_ped_combo`: 4 arms × 3 seeds.
+2. `evaluation/report_plots.py` (new; do **not** touch `visualize_metrics.py`, owned by Member 5/F5):
+   - step-wait curves over time with event windows marked (S3 incident 1200–1500; S4 burst 300–540; S5 EV at 450 + incident 400–640);
+   - bars: EV duration, ped mean/p95 wait, civilian waiting/time-loss, arrivals;
+   - LLM ops per scenario (calls by role, latency, tokens).
+3. Report (proposed `docs/test/` or new `reports/`): H1–H5 with tables/figures, the S5 composition tradeoff, 4–6 annotated decision-log excerpts (H5), limitations (peak-demand S4 null; no agent ablations; S5 teleport-disabled congestion).
+
+### B. Monaco MoST real scenario, same treatment
+
+Source: `origin/feature/monaco-real-scenario` commit `6d84e4a` — a real OSM Monaco network with **12 signalized junctions**, ~1,700 edges, multimodal demand (84k pedestrians, buses, trains, commercial) and **specials that are 60% `vClass=emergency`** (real EVs for the Emergency agent). MoST is GPL (Codecà & Härri, VNC 2017) — note it in the README when integrating.
+
+1. Cherry-pick `6d84e4a` onto `feat/llm-agents` (scenario files + README + test; no conflicts expected).
+2. New `scenarios/monaco/monaco.llm.sumocfg`: **30-min morning-peak window (recommended `begin=25200`), `step-length=1.0`** (our scaffold; MoST recommends 0.25 for lateral fidelity — document the approximation), `time-to-teleport=120`, all multimodal routes.
+3. **Generalize `TLSTopology` for N-phase programs** (the only real engineering):
+   - MoST phase counts: 6/7/9/10 per TLS; vehicle-green phases 3–6; **8/12 TLS have 2 distinct vehicle-green lane sets, 4/12 have 3** (protected turns) — today `build_topology` raises on anything but 2 sets;
+   - cluster each TLS's distinct green lane sets into NS/EW by lane direction (lane → edge → junction coordinates); canonical phase per axis = first phase of the group; transitions stay via `transition_path` (program-safe);
+   - make `TrafficLightAgent` counters **time-based** (`time_in_phase += step_length`) instead of per-call increments, and pass `step_length` from `MultiAgentEnv`;
+   - tests: synthetic 3-set program + a Monaco regression building topology for all 12 TLS.
+4. Runner: register a `monaco` ScenarioSpec; arms `sumo_default` (SUMO's own programs — the real baseline), `max_pressure`, `llm_team` (Operator + Emergency; real specials will trigger the Emergency agent). Keep the prompt **files** byte-identical for cache safety — inject any Monaco-specific wording per run (user message/snapshot), never edit a prompt body for one scenario.
+5. Budget: `LLM_MAX_CALLS=600` (MoST has heavy real emergency traffic), **30-min window × 3 seeds** recommended (alternative 1 h × 2 seeds). Mandatory dry-run chain from section 9 before any openai batch.
+6. Same collector/plots/report for Monaco: A0 vs A2 vs A4, plus event/decision-log excerpts.
+
+**Why this order:** A is zero-risk and produces the clean deliverable immediately; B is the "real scenario" ask and its only risk is the N-phase topology generalization, which is unit-testable before any recording.
+
+---
 
 **Phase 2 decisions (unchanged, for reference)**
 
@@ -496,8 +537,8 @@ Tasks: build the separate crossing scenario (5.2-C); transition logic with pedes
 Done when: H4 is measured on S4.
 Result: H4 measured — pedestrian waits down 18–29% with no vehicle penalty (S4); on the composed S5 (EV + incident + pedestrian surge) the LLM team matches the EV rule and takes the best pedestrian waits at a lower civilian cost than either single-purpose rule. Details, numbers and the dry-run protocol in the HANDOFF.
 
-### Phase 6: Evaluation, extras, report (M-L)
-Tasks: full grid (arms x scenarios x seeds) from the replay cache; plots in `evaluation/visualize_metrics.py`; optional A5 pure-LLM arm and A6 DQN integration; annotated decision-log excerpts for the demo; update README and the Ideate/Test docs.
+### Phase 6: Evaluation, plots, report + Monaco real scenario (M-L) — ⏭ next session
+Scoped with the user in session 5: skip DQN/RL (A6) and the optional A5 pure-LLM arm; compare against existing baselines only. Deliverables: (A) consolidated full-grid results + plots + report for the 3x3 system (all scenarios already recorded; no new LLM spend), and (B) the Monaco MoST real scenario with the same tables/plots/report (cherry-pick `6d84e4a`, N-phase topology generalization, 30-min window × 3 seeds). The complete step-by-step plan, data inventory, budgets and the mandatory run-review protocol live in the HANDOFF's "NEXT SESSION — Phase 6 plan" section above.
 
 ### MVP = Phases 0-5
 Phases 0-4 are the core MVP; Phase 5 (pedestrians + S5) is now implemented, so the full three-agent system is available for the report.
@@ -542,6 +583,12 @@ docs/ideate/llm-agents-plan.md
 ## 9. Working agreements (for the coding agent / opencode)
 
 - Work phase by phase. Prompt example: *"Implement Phase 0 of docs/ideate/llm-agents-plan.md; stop when the acceptance criteria are met and show me the commands to verify."*
+- **Never commit to an expensive run blind (time AND money were wasted in session 5 on XML/wiring/incident bugs).** Mandatory review before any LLM batch:
+  1. dry-run the exact matrix with `--llm mock` (free) — and with SUMO-only arms first for any new scenario/config;
+  2. run one real seed with `--llm openai` and inspect `decisions.jsonl` + a strict `--llm replay` before the full seed matrix;
+  3. validate new scenario XMLs (persons/EVs/incidents) with a 100–300 step headless run;
+  4. never run two SUMO batches concurrently (TraCI port collisions silently attach to the wrong instance);
+  5. after touching injectors/sensing/RNG-affecting code, expect caches to invalidate and re-run the dry-run chain.
 - All LLM calls go through `LLMClient`. No vendor SDK calls scattered in agent code.
 - No TraCI calls in `agents/llm/*`. LLM output only becomes directives; only `DirectiveLayer`/`env` touch TraCI.
 - No API keys in the repo. Use environment variables; add `.env` to `.gitignore`.
