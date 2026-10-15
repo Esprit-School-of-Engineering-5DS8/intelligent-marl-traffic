@@ -73,7 +73,12 @@ function LogTable({ log, cell }: { log: EmergencyLog; cell: Cell }) {
   );
   if (!rows.length) return <EmptyData title={t("data.pending")} text={t("data.pendingText")} />;
   return (
-    <div className="max-h-[420px] overflow-auto rounded-md border border-border">
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label={t("emergency.log")}
+      className="max-h-[420px] overflow-auto rounded-md border border-border"
+    >
       <table className="w-full text-xs">
         <caption className="sr-only">{t("emergency.log")}</caption>
         <thead className="sticky top-0 bg-surface-2 text-text-2">

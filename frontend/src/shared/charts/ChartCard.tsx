@@ -71,7 +71,12 @@ export function ChartCard({
       <CardContent>
         {children}
         {showTable && table ? (
-          <div className="mt-3 max-h-72 overflow-auto rounded-md border border-border">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label={title}
+            className="mt-3 max-h-72 overflow-auto rounded-md border border-border"
+          >
             <table className="w-full text-start text-xs">
               <caption className="sr-only">{title}</caption>
               <thead className="sticky top-0 bg-surface-2">

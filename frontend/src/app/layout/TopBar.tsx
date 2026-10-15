@@ -69,12 +69,14 @@ export function TopBar() {
       <Button
         variant="secondary"
         onClick={() => openAssistant(true)}
-        aria-label={t("topbar.openAssistant")}
+        title={t("topbar.openAssistant")}
         aria-keyshortcuts="Control+K"
       >
         <Bot aria-hidden="true" />
-        <span className="hidden sm:inline">{t("topbar.assistant")}</span>
-        <Kbd className="hidden md:inline">Ctrl K</Kbd>
+        <span className="sr-only sm:not-sr-only">{t("topbar.assistant")}</span>
+        <Kbd aria-hidden="true" className="hidden md:inline">
+          Ctrl K
+        </Kbd>
       </Button>
     </header>
   );

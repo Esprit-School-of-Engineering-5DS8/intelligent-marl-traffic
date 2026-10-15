@@ -24,6 +24,8 @@ export default defineConfig([
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/consistent-type-imports": "error",
+      // scrollable tables are focusable regions so keyboard users can scroll them (WCAG 2.1.1)
+      "jsx-a11y/no-noninteractive-tabindex": ["error", { roles: ["tabpanel", "region"] }],
     },
   },
   {

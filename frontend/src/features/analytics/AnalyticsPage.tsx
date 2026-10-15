@@ -237,7 +237,12 @@ function TestsTable({ rows, metric }: { rows: Comparison[]; metric: string }) {
       table={csv}
       csvName={`tests_${metric}.csv`}
     >
-      <div className="max-h-[420px] overflow-auto rounded-md border border-border">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={t("analytics.table")}
+        className="max-h-[420px] overflow-auto rounded-md border border-border"
+      >
         <table className="w-full text-xs">
           <caption className="sr-only">{t("analytics.table")}</caption>
           <thead className="sticky top-0 z-10 bg-surface-2 text-text-2">

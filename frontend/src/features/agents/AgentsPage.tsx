@@ -312,7 +312,12 @@ function DecisionsView({ decisions }: { decisions: Decisions }) {
         </CardContent>
       </Card>
       <DecisionTimeline rows={rows} />
-      <div className="overflow-auto rounded-lg border border-border">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={t("agents.decisions")}
+        className="overflow-auto rounded-lg border border-border"
+      >
         <table className="w-full text-xs">
           <caption className="sr-only">{t("agents.decisions")}</caption>
           <thead className="bg-surface-2 text-text-2">
