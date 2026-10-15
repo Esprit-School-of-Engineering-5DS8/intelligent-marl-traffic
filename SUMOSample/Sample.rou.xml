@@ -18,30 +18,44 @@
     <route id="north_straight" edges="-E6 -E5"/>
     <route id="north_right" edges="-E6 -E3"/>
 
+    <!-- Un flux indépendant par passage piéton de l'intersection -->
+    <personFlow id="ped_west" begin="0" end="600" period="30">
+        <walk from="-E3" to="E3"/>
+    </personFlow>
+    <personFlow id="ped_east" begin="0" end="600" period="30">
+        <walk from="E4" to="-E4"/>
+    </personFlow>
+    <personFlow id="ped_south" begin="0" end="600" period="30">
+        <walk from="-E5" to="E5"/>
+    </personFlow>
+    <personFlow id="ped_north" begin="0" end="600" period="30">
+        <walk from="E6" to="-E6"/>
+    </personFlow>
+
     <flow id="flow_west_left" type="car" route="west_left" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_west_straight" type="car" route="west_straight" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_west_right" type="car" route="west_right" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_east_left" type="car" route="east_left" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_east_straight" type="car" route="east_straight" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_east_right" type="car" route="east_right" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_south_left" type="car" route="south_left" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_south_straight" type="car" route="south_straight" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_south_right" type="car" route="south_right" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_north_left" type="car" route="north_left" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_north_straight" type="car" route="north_straight" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
     <flow id="flow_north_right" type="car" route="north_right" begin="0"
-          end="600" number="50" departSpeed="max" departLane="best"/>
+          end="600" number="25" departSpeed="max" departLane="best"/>
 
     <trip id="ambulance" type="emergency" depart="25" from="E3" to="E4"/>
 </routes>

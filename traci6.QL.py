@@ -12,20 +12,22 @@ else:
 
 import traci
 
+from traci6_pedestrian_agent import PedestrianSignalAgent
+
 
 # ====================== CONFIG ======================
 TLS_ID = "J6"
 SUMO_CONFIG = Path(__file__).with_name("Traci.sumocfg")
 SUMO_BINARY = os.environ.get("SUMO_BINARY", "sumo-gui")
 STEP_LENGTH = 0.1
-CONTROL_STEPS = 50              # Re-evaluate queues and emergency vehicles every 5 s.
+CONTROL_STEPS = 100             # Re-evaluate queues and emergency vehicles every 10 s.
 YELLOW_SECONDS = 3.0
 MAX_SIMULATION_STEPS = 12000    # Hard limit: 20 simulated minutes at this step length.
 QUEUE_IMBALANCE_OVERRIDE = 3
 EMERGENCY_PREEMPTION_DISTANCE = 120.0
 Q_TABLE_PATH = Path(os.environ.get(
     "TRACI6_Q_TABLE_PATH",
-    Path(__file__).with_name("traci6_qtable_v2.json"),
+    Path(__file__).with_name("traci6_qtable_v3.json"),
 ))
 
 ALPHA = 0.1
@@ -41,26 +43,32 @@ ACTION_NAMES = (
     "E/O gauche",
     "N/S gauche",
 )
-GREEN_PHASES = {
-    EW_THROUGH_RIGHT: 0,
-    NS_THROUGH_RIGHT: 2,
-    EW_LEFT: 4,
-    NS_LEFT: 6,
-}
-YELLOW_PHASES = {
-    EW_THROUGH_RIGHT: 1,
-    NS_THROUGH_RIGHT: 3,
-    EW_LEFT: 5,
-    NS_LEFT: 7,
-}
 ACTION_LANES = {
-    EW_THROUGH_RIGHT: (("E3", 0), ("E3", 1), ("-E4", 0), ("-E4", 1)),
-    NS_THROUGH_RIGHT: (("E5", 0), ("E5", 1), ("-E6", 0), ("-E6", 1)),
-    EW_LEFT: (("E3", 2), ("-E4", 2)),
-    NS_LEFT: (("E5", 2), ("-E6", 2)),
+    EW_THROUGH_RIGHT: (("E3", 1), ("E3", 2), ("-E4", 1), ("-E4", 2)),
+    NS_THROUGH_RIGHT: (
+        ("E5", 1), ("E5", 2),
+        ("-E6", 1), ("-E6", 2),
+    ),
+    EW_LEFT: (("E3", 3), ("-E4", 3)),
+    NS_LEFT: (("E5", 3), ("-E6", 3)),
 }
 YELLOW_STEPS = round(YELLOW_SECONDS / STEP_LENGTH)
+ALL_RED_CLEARANCE_STEPS = round(1.0 / STEP_LENGTH)
 ACTION_COUNT = len(ACTION_NAMES)
+VEHICLE_SIGNAL_STATES = {
+    EW_THROUGH_RIGHT: ("rrrGGrrrrGGr", "rrryyrrrryyr"),
+    NS_THROUGH_RIGHT: ("GGrrrrGGrrrr", "yyrrrryyrrrr"),
+    EW_LEFT: ("rrrrrGrrrrrG", "rrrrryrrrrry"),
+    NS_LEFT: ("rrGrrrrrGrrr", "rryrrrrryrrr"),
+}
+CROSSING_LANES = (
+    ("nord", "E6", ":J6_w1_0", ":J6_c0_0"),
+    ("est", "E4", ":J6_w2_0", ":J6_c1_0"),
+    ("sud", "-E5", ":J6_w3_0", ":J6_c2_0"),
+    ("ouest", "-E3", ":J6_w0_0", ":J6_c3_0"),
+)
+ACTIVE_SIGNAL_GROUP = EW_THROUGH_RIGHT
+SIGNAL_IS_YELLOW = False
 
 
 def load_model():
@@ -70,13 +78,13 @@ def load_model():
     model = json.loads(Q_TABLE_PATH.read_text(encoding="utf-8"))
     if not isinstance(model, dict):
         raise ValueError(f"Unsupported Q-learning model format in {Q_TABLE_PATH}")
-    if model.get("version") == 1:
+    if model.get("version") in (1, 2):
         print(
-            "Ancien modèle Q-learning à deux actions détecté : "
-            "réinitialisation nécessaire pour le carrefour à quatre branches."
+            "Ancien modèle Q-learning détecté : un nouveau modèle est utilisé "
+            "pour le réseau avec passage piéton."
         )
         return {}, EPSILON_START, 0
-    if model.get("version") != 2:
+    if model.get("version") != 3:
         raise ValueError(f"Unsupported Q-learning model format in {Q_TABLE_PATH}")
 
     q_values = model.get("q_values")
@@ -103,7 +111,7 @@ def load_model():
 
 def save_model(q_values, epsilon, updates):
     model = {
-        "version": 2,
+        "version": 3,
         "epsilon": epsilon,
         "updates": updates,
         "q_values": q_values,
@@ -114,6 +122,77 @@ def save_model(q_values, epsilon, updates):
         encoding="utf-8",
     )
     temporary_path.replace(Q_TABLE_PATH)
+
+
+def set_vehicle_signal(group, stage):
+    """Set one vehicle movement green or yellow and keep every crossing red."""
+    global ACTIVE_SIGNAL_GROUP, SIGNAL_IS_YELLOW
+    if group not in VEHICLE_SIGNAL_STATES or stage not in ("green", "yellow"):
+        raise ValueError(f"Unsupported vehicle signal state: {group}, {stage}")
+
+    link_count = len(traci.trafficlight.getControlledLinks(TLS_ID))
+    if link_count < 12:
+        raise RuntimeError(
+            f"Expected at least 12 vehicle links at {TLS_ID}, got {link_count}"
+        )
+    state_index = 1 if stage == "yellow" else 0
+    vehicle_state = VEHICLE_SIGNAL_STATES[group][state_index]
+    state = vehicle_state + "r" * (link_count - len(vehicle_state))
+    traci.trafficlight.setRedYellowGreenState(TLS_ID, state)
+    ACTIVE_SIGNAL_GROUP = group
+    SIGNAL_IS_YELLOW = stage == "yellow"
+
+
+def set_crossing_signals(agents, color):
+    """Give requested crossings a signal while all other J6 links stay red."""
+    link_count = len(traci.trafficlight.getControlledLinks(TLS_ID))
+    state = ["r"] * link_count
+    for agent in agents:
+        if not 0 <= agent.link_index < link_count:
+            raise RuntimeError(
+                f"Invalid signal link {agent.link_index} for pedestrian crossing "
+                f"{agent.name}"
+            )
+        state[agent.link_index] = color
+    traci.trafficlight.setRedYellowGreenState(TLS_ID, "".join(state))
+
+
+def set_all_red_signal():
+    """Stop every vehicle and pedestrian movement at J6."""
+    global SIGNAL_IS_YELLOW
+    link_count = len(traci.trafficlight.getControlledLinks(TLS_ID))
+    traci.trafficlight.setRedYellowGreenState(TLS_ID, "r" * link_count)
+    SIGNAL_IS_YELLOW = False
+
+
+def create_pedestrian_agents():
+    controlled_links = traci.trafficlight.getControlledLinks(TLS_ID)
+    agents = []
+    for name, approach_edge, waiting_lane, crossing_lane in CROSSING_LANES:
+        link_index = None
+        for index, connections in enumerate(controlled_links):
+            if any(
+                from_lane == waiting_lane and to_lane == crossing_lane
+                for from_lane, to_lane, _ in connections
+            ):
+                link_index = index
+                break
+        if link_index is None:
+            raise RuntimeError(
+                f"Could not find signal link for pedestrian crossing {name}"
+            )
+        agents.append(
+            PedestrianSignalAgent(
+                traci,
+                name,
+                approach_edge,
+                waiting_lane,
+                crossing_lane,
+                link_index,
+                STEP_LENGTH,
+            )
+        )
+    return agents
 
 
 def get_queues():
@@ -128,11 +207,7 @@ def get_queues():
 
 
 def current_green_group():
-    phase = traci.trafficlight.getPhase(TLS_ID)
-    for group, green_phase in GREEN_PHASES.items():
-        if phase in (green_phase, YELLOW_PHASES[group]):
-            return group
-    raise RuntimeError(f"Unexpected traffic-light phase {phase} for {TLS_ID}")
+    return ACTIVE_SIGNAL_GROUP
 
 
 def queue_bucket(queue):
@@ -183,17 +258,18 @@ def advance_one_step(reward_samples):
     return True
 
 
-def settle_yellow(reward_samples):
+def settle_yellow(reward_samples, restore_green=True):
     """Finish a yellow phase before the next Q-learning decision."""
-    for _ in range(YELLOW_STEPS + 2):
-        phase = traci.trafficlight.getPhase(TLS_ID)
-        if phase in GREEN_PHASES.values():
-            return True
-        if phase not in YELLOW_PHASES.values():
-            raise RuntimeError(f"Unexpected traffic-light phase {phase} for {TLS_ID}")
+    if not SIGNAL_IS_YELLOW:
+        return True
+    for _ in range(YELLOW_STEPS):
         if not advance_one_step(reward_samples):
             return False
-    raise RuntimeError(f"Traffic light {TLS_ID} did not finish its yellow phase")
+    if restore_green:
+        set_vehicle_signal(current_green_group(), "green")
+    else:
+        set_all_red_signal()
+    return True
 
 
 def run_action(target_group):
@@ -213,7 +289,7 @@ def run_action(target_group):
 
         current_group = current_green_group()
         if target_group != current_group:
-            traci.trafficlight.setPhase(TLS_ID, YELLOW_PHASES[current_group])
+            set_vehicle_signal(current_group, "yellow")
             if not settle_yellow(reward_samples):
                 return None, target_group, emergency_override
             emergency_group = ambulance_priority_group()
@@ -223,12 +299,8 @@ def run_action(target_group):
                 target_group = emergency_group
                 emergency_override = True
             if current_green_group() != target_group:
-                traci.trafficlight.setPhase(TLS_ID, GREEN_PHASES[target_group])
+                set_vehicle_signal(target_group, "green")
 
-        # Keep the selected green active throughout this control interval.
-        traci.trafficlight.setPhaseDuration(
-            TLS_ID, CONTROL_STEPS * STEP_LENGTH + STEP_LENGTH
-        )
         if not advance_one_step(reward_samples):
             break
 
@@ -245,7 +317,7 @@ def update_q_value(q_values, state, action, reward, next_state, discount):
 
 
 def ambulance_priority_group():
-    """Return the approach an emergency vehicle needs, if it is near J6."""
+    """Return the signal group needed by an emergency vehicle near either light."""
     for vehicle_id in traci.vehicle.getIDList():
         if traci.vehicle.getTypeID(vehicle_id) != "emergency":
             continue
@@ -256,11 +328,94 @@ def ambulance_priority_group():
 
         road_id = traci.vehicle.getRoadID(vehicle_id)
         lane_index = traci.vehicle.getLaneIndex(vehicle_id)
+        if road_id in ("E5", "-E5"):
+            return NS_LEFT if lane_index == 3 else NS_THROUGH_RIGHT
+        if next_tls[0][0] != TLS_ID:
+            continue
         if road_id in ("E3", "-E4"):
-            return EW_LEFT if lane_index == 2 else EW_THROUGH_RIGHT
-        if road_id in ("E5", "-E6"):
-            return NS_LEFT if lane_index == 2 else NS_THROUGH_RIGHT
+            return EW_LEFT if lane_index == 3 else EW_THROUGH_RIGHT
+        if road_id == "-E6":
+            return NS_LEFT if lane_index == 3 else NS_THROUGH_RIGHT
     return None
+
+
+def service_pedestrian_requests(pedestrian_agents):
+    """Serve ready crossings together, sharing a single vehicle-red interval."""
+    requested_agents = [
+        agent for agent in pedestrian_agents if agent.has_request()
+    ]
+    if not requested_agents:
+        return False
+
+    resume_group = current_green_group()
+    set_vehicle_signal(resume_group, "yellow")
+    if not settle_yellow([], restore_green=False):
+        return False
+
+    for _ in range(ALL_RED_CLEARANCE_STEPS):
+        if not simulation_has_work():
+            return False
+        traci.simulationStep()
+
+    emergency_group = ambulance_priority_group()
+    if emergency_group is not None:
+        set_vehicle_signal(emergency_group, "green")
+        return False
+
+    requested_agents = [
+        agent for agent in requested_agents if agent.has_request()
+    ]
+    if not requested_agents:
+        set_vehicle_signal(resume_group, "green")
+        return False
+
+    set_crossing_signals(requested_agents, "G")
+
+    def advance_clearance_step():
+        if not simulation_has_work():
+            return False
+        traci.simulationStep()
+        return True
+
+    minimum_green_steps = max(
+        agent.minimum_green_steps for agent in requested_agents
+    )
+    maximum_green_steps = max(
+        agent.maximum_green_steps for agent in requested_agents
+    )
+    for step in range(maximum_green_steps):
+        if (
+            step >= minimum_green_steps
+            and not any(
+                agent.has_pedestrians_to_clear()
+                for agent in requested_agents
+            )
+        ):
+            break
+        if not advance_clearance_step():
+            return False
+    else:
+        waiting_names = ", ".join(
+            agent.name
+            for agent in requested_agents
+            if agent.has_pedestrians_to_clear()
+        )
+        raise RuntimeError(
+            f"Pedestrian crossings did not clear within "
+            f"{maximum_green_steps * STEP_LENGTH:g} seconds: {waiting_names}"
+        )
+
+    set_all_red_signal()
+    for _ in range(max(agent.clearance_steps for agent in requested_agents)):
+        if not advance_clearance_step():
+            return False
+
+    emergency_group = ambulance_priority_group()
+    set_vehicle_signal(
+        emergency_group if emergency_group is not None else resume_group,
+        "green",
+    )
+    return True
 
 
 def main():
@@ -272,10 +427,13 @@ def main():
         "--delay", "50",
         "--lateral-resolution", "0.1",
     ])
+    pedestrian_agents = create_pedestrian_agents()
+    set_vehicle_signal(EW_THROUGH_RIGHT, "green")
 
     cumulative_reward = 0.0
     decision = 0
     print("\n=== Q-learning tabulaire pour le feu J6 ===")
+    print("=== Agents piétons indépendants actifs sur les quatre passages ===")
     print(
         f"États appris: {len(q_values)} | mises à jour précédentes: {updates} "
         f"| exploration epsilon: {epsilon:.3f}\n"
@@ -288,9 +446,24 @@ def main():
             if not settle_yellow([]):
                 break
 
+            emergency_group = ambulance_priority_group()
+            requested_agents = [
+                agent for agent in pedestrian_agents if agent.has_request()
+            ]
+            if requested_agents and emergency_group is None:
+                if service_pedestrian_requests(pedestrian_agents):
+                    crossing_names = ", ".join(
+                        agent.name for agent in requested_agents
+                    )
+                    print(
+                        f"Agents piétons {crossing_names} : groupes servis "
+                        "ensemble, "
+                        "mouvements véhicules sécurisés au rouge."
+                    )
+                continue
+
             state = get_state()
             queues = get_queues()
-            emergency_group = ambulance_priority_group()
             forced = emergency_group is not None
             action = emergency_group if forced else choose_action(
                 state, q_values, epsilon, queues
