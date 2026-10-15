@@ -1,0 +1,128 @@
+{
+  "app": {
+    "name": "CoTraffic",
+    "tagline": "Centre de contrôle",
+    "skipToContent": "Aller au contenu"
+  },
+  "nav": {
+    "label": "Navigation principale",
+    "groups": {
+      "supervision": "Supervision",
+      "analysis": "Analyse",
+      "operations": "Opérations",
+      "system": "Système"
+    },
+    "overview": "Vue d'ensemble",
+    "liveMap": "Carte en direct",
+    "simulation3d": "Simulation 3D",
+    "scenarios": "Scénarios",
+    "agents": "Agents RL",
+    "pedestrians": "Piétons",
+    "emergency": "Urgences",
+    "analytics": "Analyse comparative",
+    "settings": "Paramètres",
+    "collapse": "Réduire le menu",
+    "expand": "Déplier le menu"
+  },
+  "topbar": {
+    "dataSource": "Source des données",
+    "sourceMock": "Résultats réels (export)",
+    "sourceLive": "Backend en direct",
+    "status": {
+      "offline": "Flux temps réel inactif",
+      "connecting": "Connexion…",
+      "online": "Flux temps réel connecté"
+    },
+    "language": "Langue",
+    "theme": "Thème",
+    "toDark": "Passer au thème sombre",
+    "toLight": "Passer au thème clair",
+    "assistant": "Assistant",
+    "openAssistant": "Ouvrir l'assistant (Ctrl+K)"
+  },
+  "pages": {
+    "overview": {
+      "title": "Vue d'ensemble",
+      "description": "Indicateurs clés des contrôleurs, comparés à la référence choisie."
+    },
+    "liveMap": {
+      "title": "Carte en direct",
+      "description": "Réseau, congestion par tronçon et état de chaque feu."
+    },
+    "simulation3d": {
+      "title": "Simulation 3D",
+      "description": "Le même scénario rejoué côte à côte : contrôleur classique contre agent."
+    },
+    "scenarios": {
+      "title": "Scénarios",
+      "description": "Préparer, lancer et rejouer des simulations ; exporter leurs résultats."
+    },
+    "agents": {
+      "title": "Agents RL",
+      "description": "Apprentissage, décomposition de la récompense et décisions des agents."
+    },
+    "pedestrians": {
+      "title": "Piétons",
+      "description": "Attente aux passages, traversées terminées au vert, durée du vert piéton."
+    },
+    "emergency": {
+      "title": "Urgences",
+      "description": "Interventions, temps de trajet, arrêts au rouge et retard imposé aux autres."
+    },
+    "analytics": {
+      "title": "Analyse comparative",
+      "description": "Comparaisons multi-scénarios avec intervalles de confiance."
+    },
+    "settings": {
+      "title": "Paramètres",
+      "description": "Thème, langue, unités, source des données et fournisseur du modèle de langage."
+    }
+  },
+  "common": {
+    "loading": "Chargement…",
+    "comingSoon": "En construction",
+    "comingSoonText": "Cette page arrive à l'étape {{step}} du plan de développement.",
+    "errorTitle": "Cette partie de l'écran a rencontré une erreur",
+    "errorText": "Les autres pages restent utilisables. Réessayez ; si l'erreur persiste, rechargez l'application.",
+    "retry": "Réessayer",
+    "notFoundTitle": "Page introuvable",
+    "notFoundText": "Cette adresse ne correspond à aucune page du tableau de bord.",
+    "backHome": "Retour à la vue d'ensemble",
+    "close": "Fermer"
+  },
+  "settings": {
+    "appearance": "Apparence",
+    "theme": "Thème",
+    "themeDark": "Sombre",
+    "themeLight": "Clair",
+    "themeSystem": "Selon le système",
+    "language": "Langue",
+    "units": "Unités",
+    "timeUnit": "Durées",
+    "timeSeconds": "secondes",
+    "timeMinutes": "minutes",
+    "speedUnit": "Vitesses",
+    "speedKmh": "km/h",
+    "speedMs": "m/s",
+    "data": "Données",
+    "dataSource": "Source des données",
+    "dataSourceMock": "Résultats réels exportés (sans backend)",
+    "dataSourceLive": "Backend FastAPI en direct",
+    "dataSourceHelp": "Les deux sources servent les mêmes résultats réels du projet ; le backend ajoute la simulation en direct et l'assistant.",
+    "llm": "Assistant",
+    "llmProvider": "Fournisseur du modèle de langage",
+    "llmOllama": "Modèle local (Ollama, gratuit, hors ligne)",
+    "llmClaude": "API Claude (clé sur le backend)",
+    "llmOpenai": "API OpenAI (clé sur le backend)",
+    "llmHelp": "Aucune clé n'est jamais stockée dans le navigateur : les appels passent par le backend.",
+    "reset": "Rétablir les valeurs par défaut",
+    "saved": "Enregistré",
+    "save": "Enregistrer",
+    "unsaved": "Modifications non enregistrées"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "description": "Posez une question sur les résultats ; les chiffres viennent des fichiers de résultats.",
+    "placeholder": "L'assistant arrive à l'étape 6 : réponses en streaming, outils et confirmation avant toute action."
+  }
+}

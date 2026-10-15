@@ -1,0 +1,128 @@
+{
+  "app": {
+    "name": "CoTraffic",
+    "tagline": "Control room",
+    "skipToContent": "Skip to content"
+  },
+  "nav": {
+    "label": "Main navigation",
+    "groups": {
+      "supervision": "Supervision",
+      "analysis": "Analysis",
+      "operations": "Operations",
+      "system": "System"
+    },
+    "overview": "Overview",
+    "liveMap": "Live map",
+    "simulation3d": "3D simulation",
+    "scenarios": "Scenarios",
+    "agents": "RL agents",
+    "pedestrians": "Pedestrians",
+    "emergency": "Emergencies",
+    "analytics": "Comparative analysis",
+    "settings": "Settings",
+    "collapse": "Collapse menu",
+    "expand": "Expand menu"
+  },
+  "topbar": {
+    "dataSource": "Data source",
+    "sourceMock": "Real results (export)",
+    "sourceLive": "Live backend",
+    "status": {
+      "offline": "Real-time feed idle",
+      "connecting": "Connecting…",
+      "online": "Real-time feed connected"
+    },
+    "language": "Language",
+    "theme": "Theme",
+    "toDark": "Switch to dark theme",
+    "toLight": "Switch to light theme",
+    "assistant": "Assistant",
+    "openAssistant": "Open the assistant (Ctrl+K)"
+  },
+  "pages": {
+    "overview": {
+      "title": "Overview",
+      "description": "Key indicators of the controllers, compared with the chosen reference."
+    },
+    "liveMap": {
+      "title": "Live map",
+      "description": "Network, congestion per link and the state of every signal."
+    },
+    "simulation3d": {
+      "title": "3D simulation",
+      "description": "The same scenario replayed side by side: classical controller against agent."
+    },
+    "scenarios": {
+      "title": "Scenarios",
+      "description": "Prepare, run and replay simulations; export their results."
+    },
+    "agents": {
+      "title": "RL agents",
+      "description": "Learning, reward breakdown and the agents' decisions."
+    },
+    "pedestrians": {
+      "title": "Pedestrians",
+      "description": "Waiting at crossings, crossings completed in green, pedestrian green time."
+    },
+    "emergency": {
+      "title": "Emergencies",
+      "description": "Interventions, trip times, stops at red and the delay imposed on others."
+    },
+    "analytics": {
+      "title": "Comparative analysis",
+      "description": "Comparisons across scenarios with confidence intervals."
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Theme, language, units, data source and language-model provider."
+    }
+  },
+  "common": {
+    "loading": "Loading…",
+    "comingSoon": "Under construction",
+    "comingSoonText": "This page arrives at step {{step}} of the development plan.",
+    "errorTitle": "This part of the screen ran into an error",
+    "errorText": "The other pages still work. Try again; if the error persists, reload the application.",
+    "retry": "Try again",
+    "notFoundTitle": "Page not found",
+    "notFoundText": "This address matches no page of the dashboard.",
+    "backHome": "Back to the overview",
+    "close": "Close"
+  },
+  "settings": {
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeSystem": "Follow the system",
+    "language": "Language",
+    "units": "Units",
+    "timeUnit": "Durations",
+    "timeSeconds": "seconds",
+    "timeMinutes": "minutes",
+    "speedUnit": "Speeds",
+    "speedKmh": "km/h",
+    "speedMs": "m/s",
+    "data": "Data",
+    "dataSource": "Data source",
+    "dataSourceMock": "Exported real results (no backend)",
+    "dataSourceLive": "Live FastAPI backend",
+    "dataSourceHelp": "Both sources serve the same real results of the project; the backend adds the live simulation and the assistant.",
+    "llm": "Assistant",
+    "llmProvider": "Language-model provider",
+    "llmOllama": "Local model (Ollama, free, offline)",
+    "llmClaude": "Claude API (key on the backend)",
+    "llmOpenai": "OpenAI API (key on the backend)",
+    "llmHelp": "No key is ever stored in the browser: calls go through the backend.",
+    "reset": "Restore the defaults",
+    "saved": "Saved",
+    "save": "Save",
+    "unsaved": "Unsaved changes"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "description": "Ask about the results; the numbers come from the result files.",
+    "placeholder": "The assistant arrives at step 6: streamed answers, tools and confirmation before any action."
+  }
+}
