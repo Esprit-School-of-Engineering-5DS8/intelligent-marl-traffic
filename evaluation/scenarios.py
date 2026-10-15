@@ -8,7 +8,7 @@ files; only the config differs, so the baseline net stays untouched.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from environment.incidents import IncidentSpec
 
@@ -25,6 +25,9 @@ class ScenarioSpec:
     # 20 s on pedestrian nets (6-phase programs) and 15 s elsewhere; N-phase
     # real networks need more (longest Monaco transition path is ~18 s).
     emergency_lead_s: Optional[float] = None
+    # Real-network emergency fleets have ordinary vehicle ids; these vTypes
+    # mark them for the EV KPIs and keep them out of the civilian summary.
+    ev_vtypes: Tuple[str, ...] = ()
 
 
 SCENARIOS: Dict[str, ScenarioSpec] = {
@@ -61,5 +64,5 @@ SCENARIOS: Dict[str, ScenarioSpec] = {
         "monaco", "monaco", "monaco.llm.sumocfg",
         "MoST Monaco real network (12 TLS, 3 with protected-turn/one-way phases), "
         "30-min morning peak 07:00-07:30, real specials (60% vClass=emergency)",
-        emergency_lead_s=25.0),
+        emergency_lead_s=25.0, ev_vtypes=("emergency",)),
 }

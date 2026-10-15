@@ -21,19 +21,25 @@ def _mean(values: Iterable[float]) -> float:
 
 def parse_tripinfo(path: str,
                    exclude_prefixes: Sequence[str] = (EV_PREFIX, INCIDENT_PREFIX),
+                   exclude_vtypes: Sequence[str] = (),
                    ) -> Dict[str, Any]:
     """
     Parse a SUMO tripinfo file into per-vehicle records plus a civilian summary.
 
-    Emergency vehicles (`ev_*`) and incident blockers (`incident_*`) are
-    excluded from the main summary; they are reported separately via
-    `summarize_evs`.
+    Emergency vehicles and incident blockers are excluded from the main
+    summary; they are reported separately via `summarize_evs`. Synthetic
+    scenarios mark those by id prefix (`ev_*`, `incident_*`); real networks
+    (MoST) carry real police/ambulance demand as ordinary vehicle ids, so
+    `exclude_vtypes` additionally excludes whole vehicle types (e.g.
+    `("emergency",)`).
     """
     root = ET.parse(path).getroot()
+    excluded_vtypes = set(exclude_vtypes)
     vehicles: List[Dict[str, Any]] = []
     for tripinfo in root.findall("tripinfo"):
         vehicles.append({
             "id": tripinfo.get("id"),
+            "vtype": tripinfo.get("vType", ""),
             "duration": float(tripinfo.get("duration", 0.0)),
             "waiting_time": float(tripinfo.get("waitingTime", 0.0)),
             "waiting_count": int(tripinfo.get("waitingCount", 0)),
@@ -44,7 +50,8 @@ def parse_tripinfo(path: str,
         })
 
     civilian = [v for v in vehicles
-                if not any(str(v["id"]).startswith(prefix) for prefix in exclude_prefixes)]
+                if not any(str(v["id"]).startswith(prefix) for prefix in exclude_prefixes)
+                and v["vtype"] not in excluded_vtypes]
     summary = {
         "arrived_vehicles": len(civilian),
         "vehicles_total": len(vehicles),
@@ -55,9 +62,17 @@ def parse_tripinfo(path: str,
     return {"vehicles": vehicles, "summary": summary}
 
 
-def summarize_evs(vehicles: Sequence[Dict[str, Any]], prefix: str = EV_PREFIX) -> Dict[str, Any]:
-    """Aggregate emergency-vehicle trip records from `parse_tripinfo`."""
-    evs = [v for v in vehicles if str(v["id"]).startswith(prefix)]
+def summarize_evs(vehicles: Sequence[Dict[str, Any]], prefix: str = EV_PREFIX,
+                  vtypes: Sequence[str] = ()) -> Dict[str, Any]:
+    """
+    Aggregate emergency-vehicle trip records from `parse_tripinfo`.
+
+    Matches synthetic EVs by id prefix (`ev_*`) and real fleets by vehicle
+    type (`vtypes`, e.g. `("emergency",)` on MoST).
+    """
+    wanted = set(vtypes)
+    evs = [v for v in vehicles
+           if str(v["id"]).startswith(prefix) or v.get("vtype") in wanted]
     return {
         "ev_count": len(evs),
         "ev_mean_duration_s": _mean(v["duration"] for v in evs),

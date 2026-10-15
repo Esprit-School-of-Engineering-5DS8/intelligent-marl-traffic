@@ -66,6 +66,31 @@ def test_summarize_evs(tmp_path):
     assert ev["ev_max_duration_s"] == 50.0
 
 
+REAL_FLEET_TRIPINFO_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<tripinfos>
+    <tripinfo id="commercial_1" vType="delivery" depart="0" arrival="20" duration="20" waitingTime="4" timeLoss="6"/>
+    <tripinfo id="special_1" vType="emergency" depart="0" arrival="60" duration="60" waitingTime="30" timeLoss="40"/>
+    <tripinfo id="special_2" vType="emergency" depart="0" arrival="80" duration="80" waitingTime="20" timeLoss="30"/>
+    <tripinfo id="special_3" vType="authority" depart="0" arrival="40" duration="40" waitingTime="8" timeLoss="10"/>
+</tripinfos>
+"""
+
+
+def test_real_fleet_ev_vtypes(tmp_path):
+    path = tmp_path / "tripinfo.xml"
+    path.write_text(REAL_FLEET_TRIPINFO_XML)
+    result = parse_tripinfo(str(path), exclude_vtypes=("emergency",))
+    # authority vehicles stay civilian; only the emergency type is excluded.
+    assert result["summary"]["arrived_vehicles"] == 2
+    assert result["summary"]["mean_duration_s"] == 30.0
+
+    ev = summarize_evs(result["vehicles"], vtypes=("emergency",))
+    assert ev["ev_count"] == 2
+    assert ev["ev_mean_duration_s"] == 70.0
+    assert ev["ev_mean_waiting_s"] == 25.0
+    assert ev["ev_max_duration_s"] == 80.0
+
+
 def test_summarize_step_csv(tmp_path):
     path = tmp_path / "steps.csv"
     path.write_text(STEP_CSV)

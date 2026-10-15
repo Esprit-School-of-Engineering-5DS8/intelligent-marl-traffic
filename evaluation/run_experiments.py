@@ -255,11 +255,11 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
                 supervisor.logger.log(event)
         env.close(output_csv=step_csv)
 
-    tripinfo_result = parse_tripinfo(tripinfo)
+    tripinfo_result = parse_tripinfo(tripinfo, exclude_vtypes=spec.ev_vtypes)
     summary: Dict = {"scenario": scenario, "arm": arm, "seed": seed_label}
     summary.update(summarize_step_csv(step_csv))
     summary.update(tripinfo_result["summary"])
-    summary.update(summarize_evs(tripinfo_result["vehicles"]))
+    summary.update(summarize_evs(tripinfo_result["vehicles"], vtypes=spec.ev_vtypes))
     summary.update(summarize_pedestrians(tripinfo))
     if supervisor is not None:
         summary["llm_calls"] = supervisor.stats["calls"]
