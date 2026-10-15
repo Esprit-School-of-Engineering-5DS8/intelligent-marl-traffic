@@ -25,18 +25,23 @@ Sumo_config = [
 traci.start(Sumo_config)
 
 # Step 6: Define Variables
-vehicle_speed = 0
-total_speed = 0
+moved = False   # drapeau pour ne déplacer qu'une seule fois
 
 # Step 7: Define Functions
 def process_vehicles():
-    #vehicles_list = traci.vehicle.getIDList()
-    if 'veh1' in traci.vehicle.getIDList():
-        traci.vehicle.moveToXY('veh1', 'E0.62', '0', 13, -10, 0, keepRoute=2)
-        position = traci.vehicle.getPosition('veh1') # Get the (x, y) position of the vehicle
-        angle = traci.vehicle.getAngle('veh1')
-        print(f"Vehicle ID: {'veh1'}, Position: {position}, Angle: {angle}")
-
+    global moved
+    if 't_0' in traci.vehicle.getIDList():
+        if not moved:
+            # On déplace t_0 UNE SEULE FOIS
+            traci.vehicle.moveToXY('t_0', 'E3', '0', -30, -17.7, angle=90, keepRoute=2)
+            moved = True
+            print(">>> Véhicule t_0 téléporté une seule fois")
+        
+        # Ensuite on lit juste la position et l'angle
+        position = traci.vehicle.getPosition('t_0')
+        angle = traci.vehicle.getAngle('t_0')
+        speed = traci.vehicle.getSpeed('t_0')
+        print(f"t_0 → Pos: {position}, Angle: {angle:.1f}°, Speed: {speed:.2f} m/s")
 # Step 8: Take simulation steps until there are no more vehicles in the network
 while traci.simulation.getMinExpectedNumber() > 0:
     traci.simulationStep() # Move simulation forward 1 step

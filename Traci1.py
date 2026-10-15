@@ -34,8 +34,8 @@ total_speed = 0
 while traci.simulation.getMinExpectedNumber() > 0:
     traci.simulationStep() # Move simulation forward 1 step
     # Here you can decide what to do with simulation data at each step
-    if 'veh1' in traci.vehicle.getIDList():
-        vehicle_speed = traci.vehicle.getSpeed('veh1')
+    if 't_0' in traci.vehicle.getIDList():
+        vehicle_speed = traci.vehicle.getSpeed('t_0')
         total_speed = total_speed + vehicle_speed
     # step_count = step_count + 1
     print(f"Vehicle speed: {vehicle_speed} m/s")

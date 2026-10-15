@@ -16,7 +16,7 @@ import sumolib
 #IT DOES NOT HAVE
 
 #Step 5:  Open connection between SUMO and SUMOLib
-net = sumolib.net.readNet('Traci.net.xml')  # Load network file for analysis
+net = sumolib.net.readNet('SUMOSample/Sample.net.xml')  # Load network file for analysis
 
 #Step 6: Define Variables
 speedsum = 0
