@@ -6,6 +6,7 @@ from agents.supervisor.arbiter import Arbiter
 from agents.supervisor.blackboard import Blackboard
 from agents.supervisor.supervisor import Supervisor, SupervisorConfig
 from environment.ev import EVState, UpcomingTLS
+from environment.pedestrians import PedestrianState
 
 TLS = ["A"]
 STATES = {
@@ -29,7 +30,9 @@ CONGESTED_STATES = _states(20)   # congested tier
 
 
 def make_supervisor(tmp_path=None, responder=None, roles=("operator", "emergency"),
-                    config=None):
+                    config=None, pedestrian=False):
+    if pedestrian and "pedestrian" not in roles:
+        roles = tuple(roles) + ("pedestrian",)
     agents = {role: LLMAgent(role, MockLLM(responder)) for role in roles}
     logger = CallLogger(str(tmp_path / "decisions.jsonl")) if tmp_path else None
     return Supervisor(
@@ -38,6 +41,7 @@ def make_supervisor(tmp_path=None, responder=None, roles=("operator", "emergency
         blackboard=Blackboard(),
         logger=logger,
         config=config or SupervisorConfig(delta_s=30.0, ev_replan_s=10.0),
+        pedestrian_trigger=pedestrian,
     )
 
 
@@ -105,6 +109,42 @@ def test_ev_events_can_be_disabled():
     ev = _ev()
     supervisor.run(0.0, STATES, [ev])
     assert supervisor.should_run(4.0, STATES, [_ev(distance_m=140.0)]) is False
+
+
+def _ped(tls_id="A", axis="NS", waiting=4, max_wait=22.0):
+    return PedestrianState(tls_id, axis, f":{tls_id}_c1", waiting, max_wait, 10.0)
+
+
+def test_pedestrian_runs_on_data_and_events():
+    supervisor = make_supervisor(pedestrian=True)
+    ped = _ped()
+    assert supervisor.should_run(0.0, STATES, (), (), [ped]) is True
+    supervisor.run(0.0, STATES, (), (), (), [ped])
+    assert supervisor.stats["pedestrian_calls"] == 1
+
+    # Same group, cadence not due, no event.
+    assert supervisor.should_run(1.0, STATES, (), (), [ped]) is False
+
+    # A new waiting group appears -> immediate run.
+    assert supervisor.should_run(8.0, STATES, (), (), [_ped("B", "EW")]) is True
+
+
+def test_pedestrian_does_not_run_without_data_or_trigger():
+    without_data = make_supervisor(pedestrian=True)
+    without_data.run(0.0, STATES)
+    assert without_data.should_run(1.0, STATES, (), (), []) is False
+
+    disabled = make_supervisor(pedestrian=False)
+    disabled.run(0.0, STATES, (), (), (), [_ped()])
+    assert disabled.stats.get("pedestrian_calls", 0) == 0
+    assert disabled.should_run(1.0, STATES, (), (), [_ped()]) is False
+
+
+def test_classify_congested_on_long_pedestrian_wait():
+    supervisor = make_supervisor(pedestrian=True)
+    assert supervisor.classify(0.0, STATES, pedestrians=[_ped(max_wait=25.0)]) == "congested"
+    assert supervisor.classify(0.0, STATES,
+                               pedestrians=[_ped(max_wait=8.0)]) == "quiet"
 
 
 def test_client_failure_falls_back_to_empty_envelope(tmp_path):

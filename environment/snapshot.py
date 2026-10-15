@@ -66,19 +66,35 @@ def _ev(ev: Any) -> Dict[str, Any]:
     }
 
 
+def _pedestrian(state: Any) -> Dict[str, Any]:
+    def get(name: str, default: Any = None) -> Any:
+        if isinstance(state, Mapping):
+            return state.get(name, default)
+        return getattr(state, name, default)
+
+    return {
+        "tls": get("tls_id", ""),
+        "axis": get("axis", ""),
+        "waiting": int(get("waiting", 0) or 0),
+        "max_wait_s": round(float(get("max_wait_s", 0.0) or 0.0), 1),
+        "mean_wait_s": round(float(get("mean_wait_s", 0.0) or 0.0), 1),
+    }
+
+
 def build_snapshot(t: float,
                    states: Mapping[str, Mapping[str, Any]],
                    neighbors: Optional[Mapping[str, Mapping[str, str]]] = None,
                    evs: Iterable[Any] = (),
                    alerts: Iterable[Mapping[str, Any]] = (),
-                   blackboard: Iterable[Any] = ()) -> Dict[str, Any]:
+                   blackboard: Iterable[Any] = (),
+                   pedestrians: Iterable[Any] = ()) -> Dict[str, Any]:
     """One JSON-ready document shared by all slow-layer agents."""
     neighbor_map = neighbors or {}
     messages = [
         message.to_dict() if hasattr(message, "to_dict") else dict(message)
         for message in (blackboard or ())
     ]
-    return {
+    snapshot: Dict[str, Any] = {
         "t": round(float(t), 1),
         "intersections": {
             tls_id: _intersection(states[tls_id], neighbor_map.get(tls_id))
@@ -88,3 +104,9 @@ def build_snapshot(t: float,
         "evs": [_ev(ev) for ev in (evs or ())],
         "blackboard": messages,
     }
+    # Key presence is gated on data: scenarios without pedestrians produce the
+    # exact same document as before, keeping recorded replay caches valid.
+    pedestrian_states = [_pedestrian(state) for state in (pedestrians or ())]
+    if pedestrian_states:
+        snapshot["pedestrians"] = pedestrian_states
+    return snapshot

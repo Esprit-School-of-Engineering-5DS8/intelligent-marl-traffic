@@ -1,5 +1,6 @@
 from agents.supervisor.blackboard import BlackboardMessage
 from environment.ev import EVState, UpcomingTLS
+from environment.pedestrians import PedestrianState
 from environment.snapshot import build_snapshot
 
 STATES = {
@@ -58,3 +59,16 @@ def test_eta_floors_speed():
     ev = EVState("ev0", "left1A1", "left1A1_0", 0.0, (UpcomingTLS("A1", 0, 30.0, "r"),))
     snapshot = build_snapshot(0, STATES, evs=[ev])
     assert snapshot["evs"][0]["next_tls"][0]["eta_s"] == 30.0
+
+
+def test_pedestrians_key_only_when_present():
+    # Absent by default: the S0-S3 documents stay byte-identical for replay.
+    assert "pedestrians" not in build_snapshot(0, STATES)
+
+    state = PedestrianState("A1", "NS", ":A1_c1", 4, 22.53, 11.257)
+    snapshot = build_snapshot(0, STATES, pedestrians=[state])
+    assert snapshot["pedestrians"] == [{
+        "tls": "A1", "axis": "NS", "waiting": 4,
+        "max_wait_s": 22.5, "mean_wait_s": 11.3,
+    }]
+    assert "pedestrians" not in build_snapshot(0, STATES, pedestrians=[])

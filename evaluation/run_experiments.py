@@ -15,9 +15,11 @@ incident). Arms:
     max_pressure : agents.max_pressure.MaxPressureAgent (topology lane groups)
     ev_priority  : max_pressure + agents.ev_preemption (rule-based A3, through
                    the arbiter/DirectiveLayer)
+    ped_priority : max_pressure + agents.ped_priority (rule-based pedestrian
+                   windows through the arbiter/DirectiveLayer; the H4 baseline)
     llm_team     : max_pressure + arbiter/DirectiveLayer + Supervisor (A4) with
-                   the Operator and Emergency agents. `--llm` selects the
-                   backend:
+                   the Operator, Emergency and (on pedestrian scenarios)
+                   Pedestrian agents. `--llm` selects the backend:
                      mock   : deterministic stand-in, empty directives
                               (a run is bit-identical to max_pressure)
                      openai : OpenAICompatClient from .env/LLM_* variables,
@@ -53,7 +55,9 @@ from agents.llm.agent import LLMAgent
 from agents.llm.client import CallLogger, LLMClient, MockLLM, OpenAICompatClient, ReplayLLM
 from agents.llm.emergency_agent import EmergencyAgent
 from agents.llm.env import load_repo_env
+from agents.llm.pedestrian_agent import PedestrianAgent
 from agents.max_pressure import MaxPressureAgent
+from agents.ped_priority import RuleBasedPedestrianPriority
 from agents.supervisor.arbiter import Arbiter
 from agents.supervisor.directive_layer import DirectiveLayer
 from agents.supervisor.supervisor import Supervisor, SupervisorConfig
@@ -62,12 +66,13 @@ from environment.detectors import QueueAlertDetector
 from environment.ev import get_active_evs
 from environment.incidents import IncidentInjector
 from environment.multi_agent_env import MultiAgentEnv
-from evaluation.metrics import parse_tripinfo, summarize_evs, summarize_step_csv
+from environment.pedestrians import crossing_axis_map, get_pedestrian_states
+from evaluation.metrics import parse_tripinfo, summarize_evs, summarize_pedestrians, summarize_step_csv
 from evaluation.scenarios import SCENARIOS
 import traci
 from traci.exceptions import FatalTraCIError
 
-ARMS = ("sumo_default", "fixed", "max_pressure", "ev_priority", "llm_team")
+ARMS = ("sumo_default", "fixed", "max_pressure", "ev_priority", "ped_priority", "llm_team")
 
 SUMMARY_COLUMNS = [
     "scenario", "arm", "seed", "steps",
@@ -75,7 +80,8 @@ SUMMARY_COLUMNS = [
     "mean_duration_s", "mean_tripinfo_waiting_s", "mean_time_loss_s",
     "ev_count", "ev_mean_duration_s", "ev_mean_waiting_s",
     "ev_mean_waiting_count", "ev_max_duration_s",
-    "llm_calls", "llm_operator_calls", "llm_emergency_calls",
+    "ped_count", "ped_mean_waiting_s", "ped_p95_waiting_s", "ped_mean_duration_s",
+    "llm_calls", "llm_operator_calls", "llm_emergency_calls", "llm_pedestrian_calls",
     "llm_fallbacks", "llm_retries", "detector_alerts",
 ]
 
@@ -83,13 +89,14 @@ AGG_METRICS = [
     "mean_step_waiting_time_s", "mean_speed_m_s",
     "arrived_vehicles", "mean_tripinfo_waiting_s",
     "ev_mean_duration_s", "ev_mean_waiting_s",
+    "ped_mean_waiting_s",
 ]
 
 
 def _build_policies(arm: str, tls_ids: List[str]) -> Dict[str, object]:
     if arm == "fixed":
         return {tls_id: FixedTimeAgent(tls_id) for tls_id in tls_ids}
-    if arm in ("max_pressure", "ev_priority", "llm_team"):
+    if arm in ("max_pressure", "ev_priority", "ped_priority", "llm_team"):
         return {tls_id: MaxPressureAgent(tls_id) for tls_id in tls_ids}
     return {}
 
@@ -129,16 +136,26 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     if policies:
         env.build_agents()
 
+    ped_topologies: Dict[str, object] = {}
+    ped_axis_map: Dict[str, tuple] = {}
+    if policies and spec.pedestrians and arm in ("ped_priority", "llm_team"):
+        ped_topologies = {tls_id: env.agents[tls_id].topology for tls_id in tls_ids}
+        ped_axis_map = crossing_axis_map(ped_topologies)
+
     arbiter = None
     layer = None
     ev_source = None
+    ped_source = None
     supervisor = None
     detector = None
-    if arm == "ev_priority":
+    if arm in ("ev_priority", "ped_priority"):
         topologies = {tls_id: env.agents[tls_id].topology for tls_id in tls_ids}
         arbiter = Arbiter(tls_ids)
         layer = DirectiveLayer()
-        ev_source = RuleBasedEVPreemption(topologies)
+        if arm == "ev_priority":
+            ev_source = RuleBasedEVPreemption(topologies)
+        else:
+            ped_source = RuleBasedPedestrianPriority()
     elif arm == "llm_team":
         arbiter = Arbiter(tls_ids)
         layer = DirectiveLayer()
@@ -154,18 +171,27 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
                 "operator": LLMAgent("operator", MockLLM()),
                 "emergency": LLMAgent("emergency", MockLLM()),
             }
+            if spec.pedestrians:
+                agents["pedestrian"] = LLMAgent("pedestrian", MockLLM())
         else:
             client = _build_llm_client(llm_backend, run_dir)
             agents = {
                 "operator": LLMAgent("operator", client),
                 # Real LLM corridor planning + reviewer + rule-based fallback.
-                "emergency": EmergencyAgent(client, topologies=topologies),
+                # Pedestrian nets have 6-phase programs (clearance + yellow =
+                # ~8 s of transition); give the emergency reviewer more lead.
+                "emergency": EmergencyAgent(
+                    client, topologies=topologies,
+                    lead_time_s=20.0 if spec.pedestrians else 15.0),
             }
+            if spec.pedestrians:
+                agents["pedestrian"] = PedestrianAgent(client)
         supervisor = Supervisor(
             agents=agents,
             arbiter=arbiter,
             logger=CallLogger(decisions_path),
             neighbors=env.neighbors,
+            pedestrian_trigger=spec.pedestrians,
             config=SupervisorConfig(max_calls=max_calls, base_effort=base_effort,
                                     escalate_effort=escalate_effort),
         )
@@ -189,18 +215,25 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
             if policies:
                 states = env.get_states()
                 evs = get_active_evs() if (ev_source is not None or supervisor is not None) else []
+                pedestrians = (get_pedestrian_states(ped_topologies, crossing_axis=ped_axis_map)
+                               if ped_topologies else [])
                 if ev_source is not None:
                     for envelope in ev_source.propose(evs, sim_time):
                         result = arbiter.submit("emergency", envelope, sim_time, states)
                         layer.install(result.accepted, sim_time)
+                if ped_source is not None:
+                    for envelope in ped_source.propose(pedestrians, sim_time):
+                        result = arbiter.submit("pedestrian", envelope, sim_time, states)
+                        layer.install(result.accepted, sim_time)
                 new_alerts = detector.update(states, sim_time) if detector is not None else []
                 if supervisor is not None:
-                    periodic = supervisor.should_run(sim_time, states, evs, new_alerts)
+                    periodic = supervisor.should_run(sim_time, states, evs, new_alerts,
+                                                     pedestrians)
                     if periodic or new_alerts:
                         active_alerts = [a.to_dict() for a in detector.active(sim_time)]
                         force_roles = ("operator",) if new_alerts else ()
                         for result in supervisor.run(sim_time, states, evs, active_alerts,
-                                                     force_roles):
+                                                     force_roles, pedestrians):
                             layer.install(result.accepted, sim_time)
                 actions = {}
                 for tls_id in tls_ids:
@@ -223,10 +256,12 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
     summary.update(summarize_step_csv(step_csv))
     summary.update(tripinfo_result["summary"])
     summary.update(summarize_evs(tripinfo_result["vehicles"]))
+    summary.update(summarize_pedestrians(tripinfo))
     if supervisor is not None:
         summary["llm_calls"] = supervisor.stats["calls"]
         summary["llm_operator_calls"] = supervisor.stats.get("operator_calls", 0)
         summary["llm_emergency_calls"] = supervisor.stats.get("emergency_calls", 0)
+        summary["llm_pedestrian_calls"] = supervisor.stats.get("pedestrian_calls", 0)
         summary["llm_fallbacks"] = supervisor.stats["fallbacks"]
         summary["llm_retries"] = supervisor.stats["retries"]
         summary["llm_escalated"] = supervisor.stats["escalated"]

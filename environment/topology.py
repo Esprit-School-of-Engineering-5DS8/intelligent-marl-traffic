@@ -57,6 +57,14 @@ class TLSTopology:
     ew_lanes: FrozenSet[str]
     ns_green_phase: int
     ew_green_phase: int
+    # All phases whose *vehicle* links are green. On pedestrian nets the
+    # program has six phases: e.g. NS green, NS green with pedestrian signals
+    # red (end-of-green grace), NS yellow, EW green, ... — so several phases
+    # share an axis's green movements. `ns/ew_green_phases` keep the full
+    # groups; `ns/ew_green_phase` are the canonical (first) indices used by
+    # `green_phase_for_action` and pinned by the controller.
+    ns_green_phases: FrozenSet[int] = frozenset()
+    ew_green_phases: FrozenSet[int] = frozenset()
 
     @property
     def controlled_lanes(self) -> FrozenSet[str]:
@@ -65,6 +73,22 @@ class TLSTopology:
     def green_phase_for_action(self, action: int) -> int:
         """Map the binary action space (0 = NS, 1 = EW) to a green phase index."""
         return self.ns_green_phase if action % 2 == 0 else self.ew_green_phase
+
+    def is_green_phase(self, index: int) -> bool:
+        """True when the phase runs green vehicle movements (either axis)."""
+        return index in self.ns_green_phases or index in self.ew_green_phases
+
+    def is_hold_phase(self, index: int) -> bool:
+        """Canonical green phases the controller pins with a long duration."""
+        return index == self.ns_green_phase or index == self.ew_green_phase
+
+    def axis_for_phase(self, index: int) -> Optional[str]:
+        """Axis whose vehicles are green in this phase, or None."""
+        if index in self.ns_green_phases:
+            return "NS"
+        if index in self.ew_green_phases:
+            return "EW"
+        return None
 
     def action_for_link(self, link_index: int) -> Optional[int]:
         """
@@ -82,9 +106,6 @@ class TLSTopology:
 
     def phase(self, index: int) -> Phase:
         return self.phases[index]
-
-    def is_green_phase(self, index: int) -> bool:
-        return self.phases[index].is_green
 
     def transition_path(self, from_phase: int, to_phase: int) -> Tuple[int, ...]:
         """
@@ -104,10 +125,16 @@ class TLSTopology:
         raise ValueError(f"{self.tls_id}: phase {to_phase} unreachable from {from_phase}")
 
 
-def _lanes_green_in(state: str, links: Sequence[Sequence[Tuple[str, ...]]]) -> FrozenSet[str]:
+def _is_vehicle_lane(lane: Any) -> bool:
+    """Internal lanes (walkingareas, crossings) are not vehicle approaches."""
+    return bool(lane) and not str(lane).startswith(":")
+
+
+def _vehicle_green_lanes(state: str, links: Sequence[Sequence[Tuple[str, ...]]]) -> FrozenSet[str]:
+    """Lanes with a green *vehicle* link in this phase (pedestrian links excluded)."""
     lanes = set()
     for i, link in enumerate(links):
-        if i < len(state) and state[i] in GREEN_CHARS and link:
+        if i < len(state) and state[i] in GREEN_CHARS and link and _is_vehicle_lane(link[0][0]):
             lanes.add(link[0][0])
     return frozenset(lanes)
 
@@ -119,22 +146,33 @@ def build_topology(
 ) -> TLSTopology:
     """Build a TLSTopology from raw program data (pure, no SUMO needed)."""
     parsed = tuple(Phase(i, float(duration), state) for i, (duration, state) in enumerate(phases))
-    green_phases = [p for p in parsed if p.is_green]
-    if len(green_phases) != 2:
+
+    # Group phases by the set of vehicle lanes they run green. Plain grids have
+    # two groups (NS, EW); pedestrian programs add extra phases that repeat a
+    # group's vehicle movements while the pedestrian signals change (e.g. the
+    # 5 s end-of-green grace where crossings turn red before the vehicle
+    # yellow). Legal unique vehicle-green sets are exactly two: NS and EW.
+    groups: dict = {}
+    for phase in parsed:
+        lanes = _vehicle_green_lanes(phase.state, links)
+        if lanes:
+            groups.setdefault(lanes, []).append(phase.index)
+    if len(groups) != 2:
         raise ValueError(
-            f"{tls_id}: expected exactly 2 green phases (NS, EW), found {len(green_phases)}"
+            f"{tls_id}: expected exactly 2 distinct vehicle green phases "
+            f"(NS, EW), found {len(groups)}"
         )
 
-    ns_green, ew_green = green_phases[0].index, green_phases[1].index
-    ns_lanes = _lanes_green_in(parsed[ns_green].state, links)
-    ew_lanes = _lanes_green_in(parsed[ew_green].state, links) - ns_lanes
+    (ns_lanes, ns_indices), (ew_lanes, ew_indices) = list(groups.items())
     return TLSTopology(
         tls_id=tls_id,
         phases=parsed,
         ns_lanes=ns_lanes,
-        ew_lanes=ew_lanes,
-        ns_green_phase=ns_green,
-        ew_green_phase=ew_green,
+        ew_lanes=ew_lanes - ns_lanes,
+        ns_green_phase=min(ns_indices),
+        ew_green_phase=min(ew_indices),
+        ns_green_phases=frozenset(ns_indices),
+        ew_green_phases=frozenset(ew_indices),
     )
 
 

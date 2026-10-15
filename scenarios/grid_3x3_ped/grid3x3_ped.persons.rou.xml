@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="pedestrian" vClass="pedestrian" speedDev="0.15" maxSpeed="1.5" />
+    <personFlow id="ped_b1_ew" type="pedestrian" begin="300.0" end="540.0" number="200">
+        <walk from="A1B1" to="B1C1" />
+    </personFlow>
+    <personFlow id="ped_b1_ns" type="pedestrian" begin="300.0" end="540.0" number="160">
+        <walk from="B0B1" to="B1B2" />
+    </personFlow>
+</routes>

@@ -20,6 +20,7 @@ class ScenarioSpec:
     cfg: str
     description: str = ""
     incident: Optional[IncidentSpec] = None
+    pedestrians: bool = False   # sense pedestrians and run the Pedestrian agent
 
 
 SCENARIOS: Dict[str, ScenarioSpec] = {
@@ -43,4 +44,13 @@ SCENARIOS: Dict[str, ScenarioSpec] = {
         "grid_3x3_incident", "grid_3x3", "grid3x3.incident.sumocfg",
         "S3: interior edge A1A0 blocked for 300 s (teleport disabled)",
         incident=IncidentSpec(edge_id="A1A0", start_s=1200.0, duration_s=300.0)),
+    "grid_3x3_ped": ScenarioSpec(
+        "grid_3x3_ped", "grid_3x3_ped", "grid3x3_ped.sumocfg",
+        "S4: normal demand + pedestrian burst at B1 (300-540 s), 1200 s horizon",
+        pedestrians=True),
+    "grid_3x3_ped_combo": ScenarioSpec(
+        "grid_3x3_ped_combo", "grid_3x3_ped", "grid3x3_ped_combo.sumocfg",
+        "S5: EV t=450 + pedestrian burst at B1 (300-540 s) + A1A0 blocked 400-640 s",
+        incident=IncidentSpec(edge_id="A1A0", start_s=400.0, duration_s=240.0),
+        pedestrians=True),
 }

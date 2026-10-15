@@ -1,11 +1,11 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: Phases 0–4 implemented and committed.
+> Branch: `feat/llm-agents`. Status: Phases 0–5 implemented and committed.
 
 ---
 
-## HANDOFF — session state (2026-10-11, session 4)
+## HANDOFF — session state (2026-10-11, session 5)
 
 **Progress**
 
@@ -16,6 +16,7 @@
 | 2 — LLM plumbing, DirectiveLayer, arbiter, snapshot | ✅ done | `27d9e25` |
 | 3 — Operator agent, real LLM + speed profile (S0/S1/S3) | ✅ done | `97a1246` |
 | 4 — Emergency agent (incl. the 4.5 conflict/robustness iteration) | ✅ done | `3036c25` |
+| 5 — Pedestrian agent (S4) + composed multi-agent scenario (S5) | ✅ done | this commit |
 
 **Phase 2 decisions (unchanged, for reference)**
 
@@ -74,25 +75,75 @@
 - S3 incident: **199.78 ± 33.45 vs 296.68 ± 47.19 s mean step wait (−32.7%, 3 seeds)**; per seed −35.8% / −32.0% / −30.2%.
 - LLM ops across those 9 runs: 589 calls, 0 fallbacks, 1 retry, median 2.21 s; strict replay bit-identical.
 
+**Phase 5 / 5.5 decisions (this session)**
+
+- Pedestrian net (`scenarios/grid_3x3_ped/`): netgenerate with `--sidewalks.guess --crossings.guess`; same geometry/edge ids as the baseline net, 6-phase/24-link TLS programs. Normal-demand vehicles (S0 rate), a pedestrian burst at B1 (200 walking east + 160 north over 300–540 s) in a dedicated time-sorted person file; 1200 s horizon (short horizons keep LLM cost ~half of a 3600 s run).
+- Topology: green phases are grouped by their **vehicle** lane set (ped nets have twin phases — a 5 s end-of-green where crossing signals turn red before the yellow); internal walkingarea/crossing lanes are excluded from NS/EW groups; `is_hold_phase` (canonical pinned greens) is separated from `is_green_phase` (all vehicle-green phases) so the twin phases run with program durations and transitions advance.
+- Sensing (`environment/pedestrians.py`): waiting persons stand on walkingareas with `getNextEdge` = the crossing edge; crossing → (TLS, axis) comes from the controlled links + `TLSTopology.action_for_link`; aggregated per crossing (count, max/mean wait). Snapshot gains a `pedestrians` key **only when non-empty** — all earlier caches stay byte-identical.
+- Pedestrian agent (`agents/llm/pedestrian_agent.py`, `prompts/pedestrian.md`): `serve_ped` windows; the reviewer drops crossings with nobody waiting, keeps one slot per TLS (longer wait wins) and floors windows at 15 s — measured: windows shorter than a crossing time make SUMO persons refuse to start and collapse throughput; rule fallback serves the longest waits; `ped_surge` blackboard messages for waits ≥ 20 s.
+- Rule arm `agents/ped_priority.py`: windowed `serve_ped` (trigger 15 s, 35 s windows, hysteresis) — the honest H4 baseline, deliberately not a strawman.
+- Supervisor: pedestrian triggers (new waiting group, max wait crossing 20 s) and per-role call stats (`llm_pedestrian_calls`).
+- Metrics: `<personinfo>` parsing (count, mean/p95 wait, duration); `ped_*` columns in the CSVs.
+- S5 composed scenario `grid_3x3_ped_combo`: EV at t=450 + pedestrian burst at B1 + **A1A0 blocked 400–640 s** (teleport disabled). The first design had the incident at B1B0 (under the pedestrian crossing) and produced a degenerate dynamic — the blocked NS queue kept NS green, serving one crossing for free — so the incident was moved to decouple the three challenges. Emergency reviewer lead is 20 s on 6-phase programs (clearance + yellow = 8 s + min-green).
+- Incident injector fix: sidewalk nets put a pedestrian-only lane at index 0 of every edge; the injector tried to add blockers there forever. `_lane_ids` now keeps passenger lanes only (no-op on the baseline net; it changes SUMO's RNG on ped nets, so S5 was re-recorded).
+
+**Verified numbers — Phase 5 (`results/` is gitignored, opencode-go `deepseek-v4.1-flash`)**
+
+- `pytest`: **166 passed**.
+- S4 (normal demand + ped burst at B1, **5 seeds**, 1200 steps; seconds, mean ± std):
+
+| Arm | Ped mean wait | Ped p95 wait | Civilian step-wait |
+|---|---|---|---|
+| A2 `max_pressure` | 35.70 ± 23.65 | 106.2 ± 119.8 | 31.18 ± 5.68 |
+| `ped_priority` (rule) | **25.29 ± 3.06** | **53.0 ± 7.0** | **28.11 ± 5.11** |
+| A4 `llm_team` | 29.20 ± 6.61 | 60.4 ± 10.8 | 31.03 ± 3.95 |
+
+- H4 verdict: **win** — pedestrian waits drop 18–29% with no vehicle penalty (the rule even improves vehicles). The LLM removes A2's starvation seeds (A2 up to 77.6 s mean ped wait on seed 2 → 24.0 s) and has the lowest variance of the three; the tuned rule is still more aggressive than the LLM on ped waits (25.3 vs 29.2).
+- Peak-demand variant (not canonical): honest null — with heavy vehicles, queue-driven cycling already serves crossings and forced windows cost transitions (A2 21.9 / rule 27.5 / LLM 22.5 s ped wait; vehicles 63.2 / 72.3 / 68.1). Table kept in this session's notes.
+- S5 composed scenario (**3 seeds**, 1200 steps):
+
+| Arm | EV duration | Ped mean wait | Ped p95 | Civilian step-wait |
+|---|---|---|---|---|
+| A2 `max_pressure` | 87.7 ± 2.1 | 29.9 ± 7.2 | 63.3 ± 15.9 | **126.3 ± 13.9** |
+| `ev_priority` | 58.0 ± 0.0 | 23.9 ± 5.4 | 50.0 ± 10.4 | 141.1 ± 36.0 |
+| `ped_priority` | 88.7 ± 1.5 | 28.6 ± 6.5 | 60.7 ± 10.2 | 144.8 ± 33.6 |
+| A4 `llm_team` | **58.0 ± 0.0** | **24.1 ± 2.9** | **47.3 ± 7.0** | 138.4 ± 9.9 |
+
+- Composition finding: each single-purpose rule sacrifices an objective (EV rule starves pedestrians; pedestrian rule ignores the EV); the LLM team matches the EV rule exactly (58.0 s, −34% vs A2) **and** achieves the best pedestrian waits with the lowest variance, at a civilian cost smaller than either rule. LLM ops: 231 calls (117 Operator, 36 Emergency, 78 Pedestrian), 0 fallbacks, 0 retries.
+- Strict `--llm replay` of S4 seed 1 and S5 seed 1 is bit-identical (modulo token counters).
+- Run protocol (lessons from wasted batches): dry-run the exact matrix with `--llm mock` first (free), then record one real seed, then the batch; validate scenario XMLs (persons/EVs/incidents) with SUMO-only arms before any LLM spend.
+
 **Known gaps / warnings for the next session**
 
 - EV-time ceiling: A3 already delivers ~0–7 s EV waiting on a single EV; A4 ties (measured). On 2 EVs the 4.5 scheduler removed the v1 thrash but A4 v2 is still ~1.7 s (3%) behind A3; the residual is release granularity (A3 reacts per second, the LLM layer per event/10 s tick).
 - Civilian flow: on ev2 A4 ≈ A3 (29.2 ± 1.0) but worse than A2 (27.9 ± 0.5); on ev_incident A4 (45.1 ± 1.6) beats A3 (45.6) but not A2 (44.5). v1's 43.7 was not reproduced — run 5 seeds before claiming civilian gains there.
 - Event triggers add ~35% emergency calls (13–17/run vs 6–8). Keep `LLM_TIMEOUT_S=90` (rare ~80 s gateway stalls) and `LLM_MAX_CALLS=400` (peak usage ≈ 90–160 calls/run).
-- EV caches are v2-canonical and replay bit-identically. S0/S1/S3 caches were recorded with the unchanged Operator prompt and still replay; re-record if the Operator prompt changes in Phase 5.
+- EV caches are v2-canonical and replay bit-identically. S0/S1/S3 caches were recorded with the unchanged Operator prompt and still replay. Pedestrian caches are v1-canonical (S4/S5).
 - `replay` mode still constructs `OpenAICompatClient` for the model string in the cache key, so it needs `LLM_BASE_URL`/`LLM_MODEL` env even though it never calls out.
-- Detector thresholds (15/20 s) and cadence tiers are global constants; consider per-scenario calibration when S4/pedestrian arrives.
+- Pedestrian tuning: the LLM uses 18–25 s windows while the tuned rule uses 35 s; the rule still wins S4 pedestrian waits (25.3 vs 29.2). Aligning the prompt to longer windows for heavy bursts is the obvious next tweak — it requires re-recording S4/S5.
+- Person KPIs count **completed** persons only; people still queued at the horizon are not in `<personinfo>` (ped_count 360/360 on S4, fine, but keep in mind for shorter runs).
+- Composed S5 is heavily congested (blocked edge + teleport disabled): every priority arm costs civilian throughput vs A2; report as the price of priority, and note that A2 wins raw throughput by ignoring priorities.
+- Detector thresholds (15/20 s) and cadence tiers are global constants; S4/S5 use the normal-demand profile (short horizons), so per-scenario calibration is still open.
 - `MultiAgentEnv.build_agents()` pins phases and disables SUMO's timer — never call it for `sumo_default`.
-- Run parallel experiments with distinct ports (`run_experiments` assigns them automatically).
+- Run parallel experiments with distinct ports (`run_experiments` assigns them automatically), and **dry-run long-recording matrices with `--llm mock` first** (see Verification).
 
 **Verification**
 
 ```bash
-~/.venvs/sumo/bin/python -m pytest tests/ -q     # 146 passed
-# free, strict, bit-identical replay of a recorded EV run (v2):
+~/.venvs/sumo/bin/python -m pytest tests/ -q     # 166 passed
+# dry-run the exact matrix for free (wiring + scenarios, no LLM calls):
+~/.venvs/sumo/bin/python evaluation/run_experiments.py \
+    --scenario grid_3x3_ped,grid_3x3_ped_combo \
+    --arms max_pressure,ev_priority,ped_priority,llm_team --llm mock \
+    --seeds 1 --steps 1200 --jobs 6
+# free, strict, bit-identical replays of recorded runs:
+~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_ped \
+    --arms llm_team --llm replay --seeds 1 --steps 1200 --jobs 1
+~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_ped_combo \
+    --arms llm_team --llm replay --seeds 1 --steps 1200 --jobs 1
 ~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_ev \
     --arms llm_team --llm replay --seeds 1 --steps 3600 --jobs 1
-# Phase 3 regression: S3 cache still replays (no EVs -> no emergency calls):
+# Phase 3 regression: S3 cache still replays (no EVs/pedestrians):
 ~/.venvs/sumo/bin/python evaluation/run_experiments.py --scenario grid_3x3_incident \
     --arms llm_team --llm replay --seeds 1 --steps 3600 --jobs 1
 # record the EV matrix (needs .env with LLM_* endpoint):
@@ -183,10 +234,10 @@ Summaries come from abstracts and search snippets. **Read the papers before citi
   └───────────────────────────┬──────────────────────────────────┘
                               │ proposed directives (JSON)
                               ▼
-                  ┌───────────────────────┐
-                  │  ARBITER  (plain code) │  validate, clip, resolve conflicts
-                  │  EV > ped > hold > bias│  starvation guard, role permissions
-                  └───────────┬───────────┘
+                  ┌────────────────────────┐
+                  │ ARBITER  (plain code)  │  validate, clip, resolve conflicts
+                  │ EV > ped > hold > bias │  starvation guard, role permissions
+                  └───────────┬────────────┘
                               │ active directives (with TTL)
                               ▼
                  FAST LAYER  (every 1 s)
@@ -440,15 +491,16 @@ Tasks: prompt with ETA table and lead-time rule; corridor plan to `preempt` dire
 Done when: H2 is measured (win, tie or loss is reported), and the corridor logs are readable.
 Result: H2 measured — win vs A2 everywhere (EV −21% to −42%); tie with A3 on 1 EV and EV+incident; −3% on the 2-EV conflict. The 4.5 iteration added corridor grace, FCFS conflict scheduling, queue-aware starts and EV event triggers; details and numbers in the HANDOFF.
 
-### Phase 5: Pedestrian agent (L, optional)
+### Phase 5: Pedestrian agent (L, optional) — ✅ done, plus the composed S5 scenario
 Tasks: build the separate crossing scenario (5.2-C); transition logic with pedestrian clearance; pedestrian metrics from tripinfo; agent + `serve_ped`.
 Done when: H4 is measured on S4.
+Result: H4 measured — pedestrian waits down 18–29% with no vehicle penalty (S4); on the composed S5 (EV + incident + pedestrian surge) the LLM team matches the EV rule and takes the best pedestrian waits at a lower civilian cost than either single-purpose rule. Details, numbers and the dry-run protocol in the HANDOFF.
 
 ### Phase 6: Evaluation, extras, report (M-L)
 Tasks: full grid (arms x scenarios x seeds) from the replay cache; plots in `evaluation/visualize_metrics.py`; optional A5 pure-LLM arm and A6 DQN integration; annotated decision-log excerpts for the demo; update README and the Ideate/Test docs.
 
-### MVP = Phases 0-4
-If time is short, stop after Phase 4. Phase 5 and the pure-LLM arm are bonus.
+### MVP = Phases 0-5
+Phases 0-4 are the core MVP; Phase 5 (pedestrians + S5) is now implemented, so the full three-agent system is available for the report.
 
 ---
 

@@ -34,6 +34,7 @@ class FakeVehicle:
 class FakeLane:
     def __init__(self):
         self.vehicles = {}
+        self.allowed = {}   # lane_id -> list, when present
 
     def getIDList(self):
         return ["B1B2_0", "B1B2_1", "B0B1_0"]
@@ -43,6 +44,12 @@ class FakeLane:
 
     def getLastStepVehicleIDs(self, lane_id):
         return list(self.vehicles.get(lane_id, []))
+
+    def getAllowed(self, lane_id):
+        return list(self.allowed.get(lane_id, []))
+
+    def getDisallowed(self, lane_id):
+        return []
 
 
 class FakeRoute:
@@ -101,6 +108,19 @@ def test_stops_existing_front_vehicle_instead_of_adding():
     assert "veh_front" in [s["veh_id"] for s in fake.vehicle.stops]
     assert "incident_B1B2_0" not in fake.vehicle.ids
     assert fake.vehicle.ids == ["incident_B1B2_1"]
+
+
+def test_pedestrian_lanes_are_not_blocked():
+    # Sidewalk nets: lane 0 is pedestrian-only (allowed=["pedestrian"]); the
+    # injector must block only the passenger lanes.
+    fake = FakeTraci()
+    fake.lane.allowed = {"B1B2_0": ["pedestrian"]}
+    injector = IncidentInjector(SPEC, traci_module=fake)
+
+    injector.apply(10.0)
+    assert fake.vehicle.ids == ["incident_B1B2_1"]
+    injector.apply(11.0)
+    assert [s["lane_index"] for s in fake.vehicle.stops] == [1]
 
 
 def test_stops_after_incident_end():

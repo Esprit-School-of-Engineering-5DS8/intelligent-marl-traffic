@@ -67,6 +67,25 @@ def summarize_evs(vehicles: Sequence[Dict[str, Any]], prefix: str = EV_PREFIX) -
     }
 
 
+def summarize_pedestrians(path: str) -> Dict[str, Any]:
+    """Aggregate `<personinfo>` records from the tripinfo file (S4 KPIs)."""
+    root = ET.parse(path).getroot()
+    waits = [float(info.get("waitingTime", 0.0)) for info in root.findall("personinfo")]
+    durations = [float(info.get("duration", 0.0)) for info in root.findall("personinfo")]
+    if waits:
+        ordered = sorted(waits)
+        index = min(len(ordered) - 1, int(round(0.95 * (len(ordered) - 1))))
+        p95 = ordered[index]
+    else:
+        p95 = 0.0
+    return {
+        "ped_count": len(waits),
+        "ped_mean_waiting_s": _mean(waits),
+        "ped_p95_waiting_s": p95,
+        "ped_mean_duration_s": _mean(durations),
+    }
+
+
 def summarize_step_csv(path: str) -> Dict[str, Any]:
     """Summarize the per-step metrics CSV written by MultiAgentEnv.close()."""
     with open(path, newline="", encoding="utf-8") as f:

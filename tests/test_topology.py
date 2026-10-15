@@ -76,6 +76,57 @@ def test_rejects_unexpected_green_count():
         build_topology("T0", [(42, "GGrr"), (3, "yyrr")], GRID_LINKS)
 
 
+# Pedestrian program: 4 vehicle links + 4 crossing links from walkingareas.
+# Phases come in pairs sharing vehicle greens: the 5 s "end-of-green" phase
+# keeps vehicles green while the crossing signals turn red before the yellow.
+PED_PHASES = [
+    (37, "GGrrrGrG"),
+    (5,  "GGrrrrrr"),
+    (3,  "yyrrrrrr"),
+    (37, "rrGGGrGr"),
+    (5,  "rrGGrrrr"),
+    (3,  "rryyrrrr"),
+]
+PED_LINKS = [
+    [("n_in_0", "out", "via")],
+    [("n_in_1", "out", "via")],
+    [("e_in_0", "out", "via")],
+    [("e_in_1", "out", "via")],
+    [(":T0_w0_0", ":T0_c0_0", "")],
+    [(":T0_w1_0", ":T0_c1_0", "")],
+    [(":T0_w2_0", ":T0_c2_0", "")],
+    [(":T0_w3_0", ":T0_c3_0", "")],
+]
+
+
+def test_pedestrian_program_groups_green_phases_by_vehicle_lanes():
+    topology = build_topology("T0", PED_PHASES, PED_LINKS)
+    assert topology.ns_lanes == frozenset({"n_in_0", "n_in_1"})
+    assert topology.ew_lanes == frozenset({"e_in_0", "e_in_1"})
+    assert topology.green_phase_for_action(0) == 0
+    assert topology.green_phase_for_action(1) == 3
+
+    # Twin phases keep the axis's vehicle green (with ped signals red).
+    assert topology.is_green_phase(1) and topology.axis_for_phase(1) == "NS"
+    assert topology.is_green_phase(4) and topology.axis_for_phase(4) == "EW"
+    assert not topology.is_hold_phase(1) and not topology.is_hold_phase(4)
+    assert topology.is_hold_phase(0) and topology.is_hold_phase(3)
+    assert topology.axis_for_phase(2) is None
+
+    # Transition keeps both the ped-red grace (1/4) and the yellow (2/5).
+    assert topology.transition_path(0, 3) == (1, 2, 3)
+    assert topology.transition_path(3, 0) == (4, 5, 0)
+
+
+def test_pedestrian_topology_excludes_internal_lanes():
+    topology = build_topology("T0", PED_PHASES, PED_LINKS)
+    assert topology.controlled_lanes == frozenset({"n_in_0", "n_in_1", "e_in_0", "e_in_1"})
+    # Crossing links resolve to the axis whose green serves their pedestrians:
+    # c0 (link 4) walks with EW, c1 (link 5) walks with NS.
+    assert topology.action_for_link(4) == 1
+    assert topology.action_for_link(5) == 0
+
+
 NET_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <net>
     <junction id="A0" x="0" y="0"/>

@@ -54,6 +54,10 @@ class SupervisorConfig:
     ev_event_min_gap_s: float = 3.0
     ev_eta_thresholds: Tuple[float, ...] = (25.0, 15.0, 5.0)
     ev_eta_min_speed_m_s: float = 1.0  # ETA floor, matches the snapshot
+    # Pedestrian triggers: run the Pedestrian agent off-cadence when a new
+    # waiting group appears or its max wait crosses `ped_trigger_wait_s`.
+    ped_trigger_wait_s: float = 20.0
+    ped_event_min_gap_s: float = 5.0
 
 
 class Supervisor:
@@ -74,6 +78,8 @@ class Supervisor:
         self._budget_logged = False
         self._ev_seen: Dict[str, Dict[str, Any]] = {}
         self._last_ev_event_t: float = float("-inf")
+        self._ped_seen: Dict[Tuple[str, str], float] = {}
+        self._last_ped_event_t: float = float("-inf")
         self.stats: Dict[str, int] = {
             "calls": 0, "fallbacks": 0, "retries": 0, "escalated": 0,
             "tokens_in": 0, "tokens_out": 0, "tokens_cached": 0,
@@ -99,9 +105,13 @@ class Supervisor:
         return max_queue
 
     def classify(self, t: float, states: Mapping[str, Mapping[str, Any]],
-                 evs: Sequence[Any] = (), alerts: Sequence[Mapping[str, Any]] = ()) -> str:
+                 evs: Sequence[Any] = (), alerts: Sequence[Mapping[str, Any]] = (),
+                 pedestrians: Sequence[Any] = ()) -> str:
         """quiet / normal / congested for cadence and effort selection."""
         if evs or alerts:
+            return COMPLEXITY_CONGESTED
+        if any(float(self._field(p, "max_wait_s", 0.0) or 0.0) >= self.config.ped_trigger_wait_s
+               for p in pedestrians):
             return COMPLEXITY_CONGESTED
         traffic_messages = [m for m in self.blackboard.active(t) if m.kind != "arbiter_result"]
         if traffic_messages:
@@ -136,30 +146,33 @@ class Supervisor:
         return last is None or (t - last) >= self._interval(role, complexity)
 
     def _agent_due(self, role: str, t: float, evs: Sequence[Any],
-                   complexity: str, ev_event: bool = False) -> bool:
+                   complexity: str, ev_event: bool = False,
+                   pedestrians: Sequence[Any] = (),
+                   ped_event: bool = False) -> bool:
         if role == "emergency":
             return bool(evs) and (ev_event or self._due(role, t, complexity))
         if role == "pedestrian":
-            return self.pedestrian_trigger and self._due(role, t, complexity)
+            return (self.pedestrian_trigger and bool(pedestrians)
+                    and (ped_event or self._due(role, t, complexity)))
         return self._due(role, t, complexity)
 
     # ── EV event triggers ────────────────────────────────────────────────────
 
     @staticmethod
-    def _ev_field(ev: Any, name: str, default: Any = None) -> Any:
-        if isinstance(ev, Mapping):
-            return ev.get(name, default)
-        return getattr(ev, name, default)
+    def _field(obj: Any, name: str, default: Any = None) -> Any:
+        if isinstance(obj, Mapping):
+            return obj.get(name, default)
+        return getattr(obj, name, default)
 
     def _ev_signature(self, evs: Sequence[Any]) -> Dict[str, Dict[str, Any]]:
         signature: Dict[str, Dict[str, Any]] = {}
         for ev in evs:
-            veh_id = str(self._ev_field(ev, "veh_id", "") or "")
-            speed = max(float(self._ev_field(ev, "speed_m_s", 0.0) or 0.0),
+            veh_id = str(self._field(ev, "veh_id", "") or "")
+            speed = max(float(self._field(ev, "speed_m_s", 0.0) or 0.0),
                         self.config.ev_eta_min_speed_m_s)
-            next_tls = tuple(self._ev_field(ev, "next_tls", ()) or ())
-            tls_ids = tuple(str(self._ev_field(nxt, "tls_id", "")) for nxt in next_tls)
-            etas = [float(self._ev_field(nxt, "distance_m", 0.0) or 0.0) / speed
+            next_tls = tuple(self._field(ev, "next_tls", ()) or ())
+            tls_ids = tuple(str(self._field(nxt, "tls_id", "")) for nxt in next_tls)
+            etas = [float(self._field(nxt, "distance_m", 0.0) or 0.0) / speed
                     for nxt in next_tls]
             signature[veh_id] = {"tls": tls_ids,
                                  "min_eta": min(etas) if etas else None}
@@ -184,23 +197,50 @@ class Supervisor:
                     return True    # ETA crossed 25 s / 15 s / 5 s
         return False
 
+    # ── pedestrian event triggers ───────────────────────────────────────────
+
+    def _ped_event(self, t: float, pedestrians: Sequence[Any]) -> bool:
+        """True when the Pedestrian agent should run off-cadence (non-mutating)."""
+        if not pedestrians or not self.pedestrian_trigger:
+            return False
+        if t - self._last_ped_event_t < self.config.ped_event_min_gap_s:
+            return False
+        for state in pedestrians:
+            key = (str(self._field(state, "tls_id", "")), str(self._field(state, "axis", "")))
+            wait = float(self._field(state, "max_wait_s", 0.0) or 0.0)
+            previous = self._ped_seen.get(key)
+            if previous is None:
+                return True      # a new waiting group appeared
+            if previous < self.config.ped_trigger_wait_s <= wait:
+                return True      # max wait crossed the trigger threshold
+        return False
+
+    def _ped_signature(self, pedestrians: Sequence[Any]) -> Dict[Tuple[str, str], float]:
+        return {(str(self._field(state, "tls_id", "")), str(self._field(state, "axis", ""))):
+                float(self._field(state, "max_wait_s", 0.0) or 0.0)
+                for state in pedestrians}
+
     # ── orchestration ───────────────────────────────────────────────────────
 
     def _budget_available(self) -> bool:
         return self.config.max_calls <= 0 or self.stats["calls"] < self.config.max_calls
 
     def should_run(self, t: float, states: Mapping[str, Mapping[str, Any]],
-                   evs: Sequence[Any] = (), alerts: Sequence[Mapping[str, Any]] = ()) -> bool:
+                   evs: Sequence[Any] = (), alerts: Sequence[Mapping[str, Any]] = (),
+                   pedestrians: Sequence[Any] = ()) -> bool:
         if not self._budget_available():
             return False
-        complexity = self.classify(t, states, evs, alerts)
+        complexity = self.classify(t, states, evs, alerts, pedestrians)
         if "emergency" in self.agents and self._ev_event(t, evs):
             return True
-        return any(self._agent_due(role, t, evs, complexity) for role in self.agents)
+        ped_event = "pedestrian" in self.agents and self._ped_event(t, pedestrians)
+        return any(self._agent_due(role, t, evs, complexity, False, pedestrians, ped_event)
+                   for role in self.agents)
 
     def run(self, t: float, states: Mapping[str, Mapping[str, Any]],
             evs: Sequence[Any] = (), alerts: Sequence[Mapping[str, Any]] = (),
-            force_roles: Sequence[str] = ()) -> List[ArbiterResult]:
+            force_roles: Sequence[str] = (),
+            pedestrians: Sequence[Any] = ()) -> List[ArbiterResult]:
         """
         Run every due agent once; returns successful arbiter results.
         `force_roles` bypasses the cadence for event-triggered runs (e.g. a
@@ -210,22 +250,27 @@ class Supervisor:
         if not self._budget_available():
             self._log_budget_once(t)
             return []
-        complexity = self.classify(t, states, evs, alerts)
+        complexity = self.classify(t, states, evs, alerts, pedestrians)
         ev_event = "emergency" in self.agents and self._ev_event(t, evs)
         self._ev_seen = self._ev_signature(evs)
         if ev_event:
             self._last_ev_event_t = t
+        ped_event = "pedestrian" in self.agents and self._ped_event(t, pedestrians)
+        self._ped_seen = self._ped_signature(pedestrians)
+        if ped_event:
+            self._last_ped_event_t = t
         effort = self._effort_for(complexity)
         messages = self.blackboard.active(t)
-        snapshot = build_snapshot(t, states, self.neighbors, evs, alerts, messages)
+        snapshot = build_snapshot(t, states, self.neighbors, evs, alerts, messages,
+                                  pedestrians)
         results: List[ArbiterResult] = []
 
         for role, agent in self.agents.items():
             if not self._budget_available():
                 self._log_budget_once(t)
                 break
-            if role not in force_roles and not self._agent_due(role, t, evs, complexity,
-                                                              ev_event):
+            if role not in force_roles and not self._agent_due(
+                    role, t, evs, complexity, ev_event, pedestrians, ped_event):
                 continue
             self._last_run[role] = t
             call = agent.ask(t, snapshot, messages, effort=effort)

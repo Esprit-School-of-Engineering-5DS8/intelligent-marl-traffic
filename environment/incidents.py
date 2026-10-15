@@ -63,8 +63,25 @@ class IncidentInjector:
     def _lane_ids(self) -> List[str]:
         traci = self.traci
         edge = self.spec.edge_id
-        return sorted(lane_id for lane_id in traci.lane.getIDList()
-                      if lane_id.rsplit("_", 1)[0] == edge)
+        lanes = []
+        for lane_id in sorted(lane_id for lane_id in traci.lane.getIDList()
+                              if lane_id.rsplit("_", 1)[0] == edge):
+            # Sidewalk nets put a pedestrian-only lane on every edge (index 0
+            # there); blocking it is invalid for passenger blockers and would
+            # also trap pedestrians. Keep vehicle lanes only.
+            if not self._allows_passenger(lane_id):
+                continue
+            lanes.append(lane_id)
+        return lanes
+
+    def _allows_passenger(self, lane_id: str) -> bool:
+        get_allowed = getattr(self.traci.lane, "getAllowed", None)
+        allowed = set(get_allowed(lane_id) or ()) if callable(get_allowed) else set()
+        if allowed and "passenger" not in allowed:
+            return False
+        get_disallowed = getattr(self.traci.lane, "getDisallowed", None)
+        disallowed = set(get_disallowed(lane_id) or ()) if callable(get_disallowed) else set()
+        return "passenger" not in disallowed
 
     def _block_pending_lanes(self, sim_time: float):
         traci = self.traci

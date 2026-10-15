@@ -67,7 +67,7 @@ class TrafficLightAgent:
 
         current_axis = None
         if self.topology.is_green_phase(self.current_phase):
-            current_axis = "NS" if self.current_phase == self.topology.ns_green_phase else "EW"
+            current_axis = self.topology.axis_for_phase(self.current_phase)
 
         return {
             "tls_id": self.tls_id,
@@ -113,6 +113,10 @@ class TrafficLightAgent:
         traci.trafficlight.setPhaseDuration(self.tls_id, self._phase_duration(phase_index))
 
     def _phase_duration(self, phase_index: int) -> float:
-        if self.topology.is_green_phase(phase_index):
+        # Only the canonical green phases are pinned with a long duration.
+        # Pedestrian programs have extra phases that keep vehicle greens while
+        # the crossing signals change (end-of-green grace); those must run with
+        # their programmed duration so transitions advance to yellow.
+        if self.topology.is_hold_phase(phase_index):
             return GREEN_HOLD_S
         return self.topology.phase(phase_index).duration
