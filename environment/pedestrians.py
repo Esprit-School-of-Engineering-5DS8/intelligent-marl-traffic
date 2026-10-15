@@ -19,9 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-# Binary action -> axis (same convention as the fast layer / directive schema).
-_AXIS_BY_ACTION = {0: "NS", 1: "EW"}
-
 
 @dataclass(frozen=True)
 class PedestrianWaiting:
@@ -98,10 +95,10 @@ def crossing_axis_map(topologies: Mapping[str, Any]) -> Dict[str, Tuple[str, str
             crossing_id = to_lane.rsplit("_", 1)[0]
             if not is_crossing_edge(crossing_id):
                 continue
-            action = topology.action_for_link(link_index)
-            if action is None:
+            axis = topology.axis_for_link(link_index)
+            if axis is None:
                 continue
-            mapping[crossing_id] = (tls_id, _AXIS_BY_ACTION[action])
+            mapping[crossing_id] = (tls_id, axis)
     return mapping
 
 

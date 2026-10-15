@@ -93,6 +93,11 @@ class Directive:
     ev: Optional[str] = None  # preempt
     eta_s: Optional[float] = None  # preempt (conflict resolution)
     min_green_s: Optional[float] = None  # serve_ped
+    # Exact green group within the directive's axis (N-phase programs only).
+    # Set by the code-side reviewer (never prompted): with 3+ green sets per
+    # junction, "NS"/"EW" alone cannot address the protected-turn phase an EV
+    # actually approaches.
+    phase_index: Optional[int] = None
     ttl_s: float = DEFAULT_TTL_S
     issued_at: float = 0.0
 
@@ -106,7 +111,8 @@ class Directive:
             axis = getattr(self, "axis")
             if axis is not None:
                 record[name] = axis
-        for name in ("ns", "ew", "extra_green_s", "start_in_s", "hold_s", "ev", "eta_s", "min_green_s"):
+        for name in ("ns", "ew", "extra_green_s", "start_in_s", "hold_s", "ev",
+                     "eta_s", "min_green_s", "phase_index"):
             value = getattr(self, name)
             if value is not None:
                 record[name] = value
@@ -201,6 +207,12 @@ def validate_directive(
 
     if dtype in ("hold", "preempt", "serve_ped"):
         kwargs["axis"] = _axis(raw.get("phase"))
+        if raw.get("phase_index") is not None:
+            value = raw["phase_index"]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise SchemaError(
+                    f"'phase_index' must be a non-negative integer, got {value!r}")
+            kwargs["phase_index"] = int(value)
 
     if dtype == "bias":
         kwargs["ns"] = _clip(_number(raw.get("ns", 1.0), "ns"), PARAM_RANGES["bias"]["ns"], "ns", notes)

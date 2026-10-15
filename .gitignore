@@ -20,6 +20,7 @@ tripinfo*.xml
 summary*.xml
 fcd*.xml
 emission*.xml
+*.log
 
 # Simulation metrics (auto-generated)
 simulation_metrics.csv

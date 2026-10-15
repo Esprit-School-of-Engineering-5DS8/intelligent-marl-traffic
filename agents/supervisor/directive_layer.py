@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-from agents.llm.schemas import ACTION_TO_AXIS, AXIS_TO_ACTION, Directive
+from agents.llm.schemas import ACTION_TO_AXIS, Directive
 from agents.supervisor.arbiter import select_winner
 
 
@@ -42,6 +42,19 @@ class DirectiveLayerConfig:
 
 def _key(directive: Directive) -> Tuple[str, Optional[str]]:
     return directive.key()
+
+
+def _axes_of(state: Mapping[str, Any]) -> Tuple[str, ...]:
+    """Axis label per action; grids default to the binary convention."""
+    return tuple(state.get("axis_by_action") or ("NS", "EW"))
+
+
+def _groups_of(state: Mapping[str, Any]) -> Tuple[Any, ...]:
+    """Lane set per action; grids/tests may only carry the NS/EW sets."""
+    groups = state.get("group_lanes")
+    if groups:
+        return tuple(groups)
+    return (state.get("ns_lanes") or frozenset(), state.get("ew_lanes") or frozenset())
 
 
 def active_window_end(directive: Directive) -> float:
@@ -106,14 +119,41 @@ class DirectiveLayer:
             action = self._bias_action(state, base_action, active)
 
         if action != base_action:
-            action = self._guard(tls_id, action, winner, base_action, t)
+            action = self._guard(tls_id, action, winner, base_action, t, state)
         else:
             self._forced.pop(tls_id, None)
         return action
 
+    def _action_for_axis(self, axis: str, state: Mapping[str, Any],
+                         phase_index: Optional[int] = None) -> Optional[int]:
+        """
+        Action index addressing `axis`. On 3+ green-set programs an axis can
+        own several groups; `phase_index` (pinned by the code-side reviewer,
+        never prompted) selects the exact one when consistent with the axis.
+        """
+        axes = _axes_of(state)
+        if phase_index is not None and 0 <= phase_index < len(axes) \
+                and axes[phase_index] == axis:
+            return phase_index
+        for index, label in enumerate(axes):
+            if label == axis:
+                return index
+        return None
+
+    def _current_group_action(self, state: Mapping[str, Any], axis: str) -> Optional[int]:
+        """Action whose group currently holds the green (for hold/serve_ped)."""
+        current_phase = state.get("current_phase")
+        axes = _axes_of(state)
+        for index, phases in enumerate(state.get("group_phases") or ()):
+            if current_phase in phases and index < len(axes) and axes[index] == axis:
+                return index
+        return None
+
     def _forced_action(self, directive: Directive, state: Mapping[str, Any],
                        t: float) -> Optional[int]:
-        action = AXIS_TO_ACTION[directive.axis]
+        action = self._action_for_axis(directive.axis, state, directive.phase_index)
+        if action is None:
+            return None
         if directive.type == "preempt":
             return action
 
@@ -125,7 +165,7 @@ class DirectiveLayer:
             elapsed = t - directive.issued_at
             if (elapsed < (directive.extra_green_s or 0.0)
                     and time_in_phase < self.config.green_cap_s):
-                return action
+                return self._current_group_action(state, directive.axis) or action
             return None
 
         # serve_ped: block switching while the window is owed, otherwise make
@@ -134,7 +174,7 @@ class DirectiveLayer:
             elapsed = t - directive.issued_at
             if (elapsed < (directive.min_green_s or 0.0)
                     and time_in_phase < self.config.green_cap_s):
-                return action
+                return self._current_group_action(state, directive.axis) or action
             return None
         return action
 
@@ -152,15 +192,24 @@ class DirectiveLayer:
         lo, hi = self.config.bias_product_range
         ns_factor = min(max(ns_factor, lo), hi)
         ew_factor = min(max(ew_factor, lo), hi)
+        factors = {"NS": ns_factor, "EW": ew_factor}
 
         lane_queues = state.get("lane_queues") or {}
-        ns_queue = sum(q for lane, q in lane_queues.items() if lane in (state.get("ns_lanes") or ()))
-        ew_queue = sum(q for lane, q in lane_queues.items() if lane in (state.get("ew_lanes") or ()))
-        return 0 if ns_queue * ns_factor >= ew_queue * ew_factor else 1
+        axes = _axes_of(state)
+        best_action = 0
+        best_score: Optional[float] = None
+        for index, lanes in enumerate(_groups_of(state)):
+            queue = sum(q for lane, q in lane_queues.items() if lane in lanes)
+            factor = factors.get(axes[index] if index < len(axes) else "NS", 1.0)
+            score = queue * factor
+            if best_score is None or score > best_score:
+                best_action, best_score = index, score
+        return best_action
 
     def _guard(self, tls_id: str, action: int, winner: Optional[Directive],
-               base_action: int, t: float) -> int:
-        axis = ACTION_TO_AXIS[action]
+               base_action: int, t: float, state: Mapping[str, Any]) -> int:
+        axes = _axes_of(state)
+        axis = axes[action] if 0 <= action < len(axes) else ACTION_TO_AXIS.get(action, "NS")
         previous = self._forced.get(tls_id)
         if previous is not None and previous[0] == axis:
             since, has_preempt = previous[1], previous[2]

@@ -175,14 +175,18 @@ def run_one(scenario: str, arm: str, seed: Optional[int], steps: int,
                 agents["pedestrian"] = LLMAgent("pedestrian", MockLLM())
         else:
             client = _build_llm_client(llm_backend, run_dir)
+            if spec.emergency_lead_s is not None:
+                emergency_lead = spec.emergency_lead_s
+            else:
+                # Pedestrian nets have 6-phase programs (clearance + yellow =
+                # ~8 s of transition); give the emergency reviewer more lead.
+                emergency_lead = 20.0 if spec.pedestrians else 15.0
             agents = {
                 "operator": LLMAgent("operator", client),
                 # Real LLM corridor planning + reviewer + rule-based fallback.
-                # Pedestrian nets have 6-phase programs (clearance + yellow =
-                # ~8 s of transition); give the emergency reviewer more lead.
                 "emergency": EmergencyAgent(
                     client, topologies=topologies,
-                    lead_time_s=20.0 if spec.pedestrians else 15.0),
+                    lead_time_s=emergency_lead),
             }
             if spec.pedestrians:
                 agents["pedestrian"] = PedestrianAgent(client)

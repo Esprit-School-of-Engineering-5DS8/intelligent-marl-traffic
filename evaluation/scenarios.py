@@ -21,6 +21,10 @@ class ScenarioSpec:
     description: str = ""
     incident: Optional[IncidentSpec] = None
     pedestrians: bool = False   # sense pedestrians and run the Pedestrian agent
+    # Emergency reviewer lead time (switch + discharge budget). Defaults to
+    # 20 s on pedestrian nets (6-phase programs) and 15 s elsewhere; N-phase
+    # real networks need more (longest Monaco transition path is ~18 s).
+    emergency_lead_s: Optional[float] = None
 
 
 SCENARIOS: Dict[str, ScenarioSpec] = {
@@ -53,4 +57,9 @@ SCENARIOS: Dict[str, ScenarioSpec] = {
         "S5: EV t=450 + pedestrian burst at B1 (300-540 s) + A1A0 blocked 400-640 s",
         incident=IncidentSpec(edge_id="A1A0", start_s=400.0, duration_s=240.0),
         pedestrians=True),
+    "monaco": ScenarioSpec(
+        "monaco", "monaco", "monaco.llm.sumocfg",
+        "MoST Monaco real network (12 TLS, 3 with protected-turn/one-way phases), "
+        "30-min morning peak 07:00-07:30, real specials (60% vClass=emergency)",
+        emergency_lead_s=25.0),
 }

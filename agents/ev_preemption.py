@@ -31,7 +31,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from agents.llm.schemas import ACTION_TO_AXIS
 from environment.ev import EVState
 from environment.topology import TLSTopology
 
@@ -53,6 +52,8 @@ class EVCandidate:
     veh_id: str
     tls_id: str
     action: int
+    axis: str
+    phase_index: Optional[int]
     eta_s: float
     distance_m: float
 
@@ -77,10 +78,14 @@ class RuleBasedEVPreemption:
                 action = topology.action_for_link(nxt.link_index)
                 if action is None:
                     continue
+                axis = topology.axis_by_action[action] if action < len(topology.axis_by_action) \
+                    else "NS"
+                multi_group = sum(1 for label in topology.axis_by_action if label == axis) > 1
                 eta = nxt.distance_m / max(ev.speed_m_s, self.config.min_speed_m_s)
                 if eta > self.config.eta_trigger_s and nxt.distance_m > self.config.reactive_distance_m:
                     continue
-                candidate = EVCandidate(ev.veh_id, nxt.tls_id, action, eta, nxt.distance_m)
+                candidate = EVCandidate(ev.veh_id, nxt.tls_id, action, axis,
+                                        action if multi_group else None, eta, nxt.distance_m)
                 current = best.get(nxt.tls_id)
                 if current is None or eta < current.eta_s:
                     best[nxt.tls_id] = candidate
@@ -94,9 +99,9 @@ class RuleBasedEVPreemption:
         observed = {ev.veh_id: ev for ev in evs}
 
         for (tls_id, veh_id), candidate in best_keys.items():
-            axis = ACTION_TO_AXIS[candidate.action]
-            directives.append(self._preempt(tls_id, veh_id, axis, candidate.eta_s))
-            self._issued[(tls_id, veh_id)] = (axis, 0)
+            directives.append(self._preempt(tls_id, veh_id, candidate.axis, candidate.eta_s,
+                                            phase_index=candidate.phase_index))
+            self._issued[(tls_id, veh_id)] = (candidate.axis, 0)
 
         for key, (axis, missing) in list(self._issued.items()):
             if key in best_keys:
@@ -129,10 +134,11 @@ class RuleBasedEVPreemption:
         }]
 
     def _preempt(self, tls_id: str, veh_id: str, axis: str, eta_s: float,
-                 hold_s: Optional[float] = None) -> Dict[str, Any]:
+                 hold_s: Optional[float] = None,
+                 phase_index: Optional[int] = None) -> Dict[str, Any]:
         if hold_s is None:
             hold_s = min(self.config.max_hold_s, eta_s + self.config.release_margin_s)
-        return {
+        directive = {
             "tls": tls_id,
             "type": "preempt",
             "phase": axis,
@@ -142,3 +148,6 @@ class RuleBasedEVPreemption:
             "eta_s": eta_s,
             "ttl_s": min(self.config.max_ttl_s, hold_s + 5.0),
         }
+        if phase_index is not None:
+            directive["phase_index"] = int(phase_index)
+        return directive

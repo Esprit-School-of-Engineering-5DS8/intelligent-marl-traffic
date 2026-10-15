@@ -26,3 +26,21 @@ def test_tie_goes_to_ns():
 def test_requires_topology_groups():
     with pytest.raises(KeyError):
         MaxPressureAgent("T0").select_action({"lane_queues": {}})
+
+
+THREE_GROUP_STATE = {
+    "lane_queues": {"n_in_0": 1, "e_in_0": 2, "s_in_0": 9},
+    "group_lanes": [frozenset({"n_in_0"}), frozenset({"e_in_0"}), frozenset({"s_in_0"})],
+    "axis_by_action": ("NS", "EW", "NS"),
+}
+
+
+def test_three_group_picks_the_busiest_group():
+    assert MaxPressureAgent("T0").select_action(THREE_GROUP_STATE) == 2
+    state = dict(THREE_GROUP_STATE, lane_queues={"n_in_0": 0, "e_in_0": 7, "s_in_0": 3})
+    assert MaxPressureAgent("T0").select_action(state) == 1
+
+
+def test_three_group_ties_prefer_the_lowest_action():
+    state = dict(THREE_GROUP_STATE, lane_queues={"n_in_0": 4, "e_in_0": 4, "s_in_0": 4})
+    assert MaxPressureAgent("T0").select_action(state) == 0

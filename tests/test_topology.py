@@ -192,3 +192,65 @@ def test_real_grid3x3_topology_regression():
         "B0A0_0", "B0A0_1", "left0A0_0", "left0A0_1",
     })
     assert len(topology.controlled_lanes) == 8
+
+
+# N-phase programs (real networks): three distinct vehicle-green lane sets.
+# Geometry vote: n_in_* head north, e_in_* east, s_in_0 south, w_in_0 west.
+THREE_SET_PHASES = [
+    (30, "GGrrrr"), (3, "yyrrrr"),
+    (30, "rrGGrr"), (3, "rryyrr"),
+    (30, "rrrrGG"), (3, "rrrryy"),
+]
+THREE_SET_LINKS = _links("n_in_0", "n_in_1", "e_in_0", "e_in_1", "s_in_0", "w_in_0")
+THREE_SET_HEADINGS = {
+    "n_in_0": (0.0, 1.0), "n_in_1": (0.0, 1.0),
+    "e_in_0": (1.0, 0.0), "e_in_1": (1.0, 0.0),
+    "s_in_0": (0.0, -1.0), "w_in_0": (-1.0, 0.0),
+}
+
+
+def test_three_set_program_groups_and_axes():
+    topology = build_topology("T3", THREE_SET_PHASES, THREE_SET_LINKS, THREE_SET_HEADINGS)
+    assert len(topology.groups) == 3
+    assert topology.group_lanes == (
+        frozenset({"n_in_0", "n_in_1"}),
+        frozenset({"e_in_0", "e_in_1"}),
+        frozenset({"s_in_0", "w_in_0"}),
+    )
+    # Mixed set (south + west) is a 1-1 vote tie -> NS; both axes stay filled.
+    assert topology.axis_by_action == ("NS", "EW", "NS")
+    assert topology.group_phase_for_action(0) == 0
+    assert topology.group_phase_for_action(1) == 2
+    assert topology.group_phase_for_action(2) == 4
+    assert topology.is_hold_phase(4) and not topology.is_hold_phase(5)
+    assert topology.is_green_phase(4) and topology.axis_for_phase(4) == "NS"
+    assert topology.axis_for_phase(5) is None  # yellow
+    assert topology.action_for_link(4) == 2 and topology.axis_for_link(4) == "NS"
+    assert topology.action_for_link(2) == 1 and topology.axis_for_link(2) == "EW"
+    assert topology.transition_path(0, 4) == (1, 2, 3, 4)
+    # Axis lane partitions cover every controlled lane exactly once.
+    assert topology.ns_lanes == frozenset({"n_in_0", "n_in_1", "s_in_0", "w_in_0"})
+    assert topology.ew_lanes == frozenset({"e_in_0", "e_in_1"})
+
+
+def test_three_set_program_without_headings_falls_back_to_phase_order():
+    topology = build_topology("T3", THREE_SET_PHASES, THREE_SET_LINKS)
+    assert topology.axis_by_action == ("NS", "EW", "EW")
+    assert topology.ns_green_phase == 0 and topology.ew_green_phase == 2
+
+
+def test_all_same_axis_moves_smallest_set_to_the_empty_axis():
+    # Every set heads east: the NS axis would be empty, so the latest
+    # smallest set (fewest lanes; tie -> latest program order) is moved.
+    headings = {lane: (1.0, 0.0) for lane in THREE_SET_HEADINGS}
+    topology = build_topology("T3", THREE_SET_PHASES, THREE_SET_LINKS, headings)
+    assert topology.axis_by_action == ("EW", "EW", "NS")
+    assert topology.axis_by_action.count("NS") == 1
+    assert topology.axis_by_action.count("EW") == 2
+
+
+def test_two_set_programs_ignore_geometry():
+    # Grid nets keep the historical labels even if a lane heading is odd.
+    headings = {lane: (1.0, 0.0) for lane in ("n_in_0", "n_in_1", "e_in_0", "e_in_1")}
+    topology = build_topology("T0", GRID_PHASES, GRID_LINKS, headings)
+    assert topology.axis_by_action == ("NS", "EW")

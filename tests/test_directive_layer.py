@@ -22,9 +22,11 @@ def hold(axis="NS", extra=10.0, ttl=30.0, issued=0.0):
                      ttl_s=ttl, issued_at=issued)
 
 
-def preempt(axis="NS", start=0.0, hold_s=20.0, ttl=30.0, issued=0.0, ev="ev0", eta=5.0):
+def preempt(axis="NS", start=0.0, hold_s=20.0, ttl=30.0, issued=0.0, ev="ev0", eta=5.0,
+            phase_index=None):
     return Directive(tls_id="A", type="preempt", axis=axis, start_in_s=start,
-                     hold_s=hold_s, ttl_s=ttl, issued_at=issued, ev=ev, eta_s=eta)
+                     hold_s=hold_s, ttl_s=ttl, issued_at=issued, ev=ev, eta_s=eta,
+                     phase_index=phase_index)
 
 
 def serve_ped(axis="NS", min_green=10.0, ttl=30.0, issued=0.0):
@@ -176,3 +178,60 @@ def test_guard_does_not_track_agreeing_base():
         layer.install([preempt(axis="NS", hold_s=20.0)], float(t))
         assert layer.apply("A", state(axis="NS"), 0, float(t)) == 0
     assert layer.drain_events() == []
+
+
+# ── N-phase programs: one axis can own several green groups ────────────────
+#
+# Actions: 0 = N set (NS), 1 = E set (EW), 2 = S set (NS). The base policy may
+# address any group; directives address axes, with an optional phase_index
+# (pinned by the code-side reviewer) for the exact group.
+
+def three_group_state(axis="NS", current_phase=0, time_in_phase=0.0,
+                      queues=(0, 5, 7)):
+    return {
+        "current_axis": axis,
+        "current_phase": current_phase,
+        "time_in_phase": time_in_phase,
+        "in_transition": False,
+        "ns_lanes": {"n_0", "s_0"},
+        "ew_lanes": {"e_0"},
+        "group_lanes": (frozenset({"n_0"}), frozenset({"e_0"}), frozenset({"s_0"})),
+        "group_phases": ((0,), (2,), (4,)),
+        "axis_by_action": ("NS", "EW", "NS"),
+        "lane_queues": {"n_0": queues[0], "e_0": queues[1], "s_0": queues[2]},
+    }
+
+
+def test_bias_scores_every_group_of_an_axis():
+    layer = DirectiveLayer()
+    layer.install([bias(ns=2.0, ew=1.0)], 0.0)
+    # Raw queues would pick action 2 (s_0: 7); the NS x2 bias makes it 14 vs
+    # 4 for EW, and 0 for the N group.
+    assert layer.apply("A", three_group_state(queues=(0, 4, 7)), 1, 0.0) == 2
+    # Neutral factor with the EW group leading still picks EW.
+    layer.install([bias()], 0.0)
+    assert layer.apply("A", three_group_state(queues=(1, 9, 2)), 0, 0.0) == 1
+
+
+def test_hold_on_axis_with_multiple_groups_keeps_the_current_group():
+    layer = DirectiveLayer()
+    layer.install([hold(axis="NS", extra=10.0)], 0.0)
+    # Current green is the S group (phase 4, action 2) of the NS axis: a hold
+    # must keep that group, not force a switch to the N canonical phase.
+    assert layer.apply("A", three_group_state(current_phase=4, time_in_phase=5), 1, 0.0) == 2
+    # After the window elapses the base action passes through.
+    assert layer.apply("A", three_group_state(current_phase=4, time_in_phase=15), 1, 10.0) == 1
+
+
+def test_preempt_phase_index_targets_the_exact_group():
+    layer = DirectiveLayer()
+    layer.install([preempt(axis="NS", phase_index=2, start=0.0, hold_s=20.0)], 0.0)
+    assert layer.apply("A", three_group_state(axis="EW"), 1, 0.0) == 2
+
+
+def test_preempt_phase_index_inconsistent_with_axis_is_ignored():
+    layer = DirectiveLayer()
+    # phase_index 1 belongs to EW, the directive claims NS: fall back to the
+    # first NS group (action 0), never the mismatching group.
+    layer.install([preempt(axis="NS", phase_index=1, start=0.0, hold_s=20.0)], 0.0)
+    assert layer.apply("A", three_group_state(axis="EW"), 1, 0.0) == 0

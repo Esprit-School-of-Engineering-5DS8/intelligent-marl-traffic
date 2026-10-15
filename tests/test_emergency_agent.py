@@ -328,3 +328,81 @@ def test_evstates_reconstruction_round_trips_snapshot():
     assert states[0].next_tls[0].tls_id == "T0"
     assert states[0].next_tls[0].link_index == 2
     assert states[0].next_tls[0].distance_m == 50.0
+
+
+# ── N-phase programs: exact group pinning and same-axis sequencing ─────────
+
+THREE_PHASES = [
+    (30, "GGrrrr"), (3, "yyrrrr"),
+    (30, "rrGGrr"), (3, "rryyrr"),
+    (30, "rrrrGG"), (3, "rrrryy"),
+]
+THREE_LINKS = [[("n_in_0", "", "")], [("n_in_1", "", "")],
+               [("e_in_0", "", "")], [("e_in_1", "", "")],
+               [("s_in_0", "", "")], [("w_in_0", "", "")]]
+THREE_HEADINGS = {
+    "n_in_0": (0.0, 1.0), "n_in_1": (0.0, 1.0),
+    "e_in_0": (1.0, 0.0), "e_in_1": (1.0, 0.0),
+    "s_in_0": (0.0, -1.0), "w_in_0": (-1.0, 0.0),
+}
+# groups: 0 = N set (NS), 1 = E set (EW), 2 = {S,W} set (NS)
+THREE_TOPOLOGY = build_topology("T0", THREE_PHASES, THREE_LINKS, THREE_HEADINGS)
+THREE_TOPOLOGIES = {"T0": THREE_TOPOLOGY}
+
+
+def _multi_group_state(current_phase=0):
+    return {
+        "current_axis": "NS" if current_phase in (0, 4) else None,
+        "current_phase": current_phase,
+        "time_in_phase": 5.0,
+        "in_transition": False,
+        "ns_lanes": {"n_in_0", "s_in_0"},
+        "ew_lanes": {"e_in_0"},
+        "group_lanes": (frozenset({"n_in_0"}), frozenset({"e_in_0"}), frozenset({"s_in_0", "w_in_0"})),
+        "group_phases": ((0,), (2,), (4,)),
+        "axis_by_action": ("NS", "EW", "NS"),
+        "lane_queues": {"n_in_0": 1, "e_in_0": 0, "s_in_0": 2, "w_in_0": 0},
+        "lane_waiting": {"n_in_0": 5.0, "e_in_0": 0.0, "s_in_0": 10.0, "w_in_0": 0.0},
+    }
+
+
+def test_reviewer_pins_phase_index_for_multi_group_axes():
+    def responder(system, user, schema):
+        return {"directives": [_preempt(phase="EW", start=0, hold=18)],
+                "alerts": [], "explanation": ""}
+
+    agent = EmergencyAgent(MockLLM(responder), topologies=THREE_TOPOLOGIES)
+    # link 4 is s_in_0: NS axis, group 2 of the program.
+    snapshot = _snapshot(evs=[_ev_entry(link_index=4, distance_m=80.0)])
+    call = agent.ask(100.0, snapshot)
+    directive = call.envelope["directives"][0]
+    assert directive["phase"] == "NS"
+    assert directive["phase_index"] == 2
+    assert any("phase" in note for note in call.review["notes"])
+    assert call.review["schedule"][0]["phase_index"] == 2
+
+    result, layer = _install(agent, call, 100.0,
+                             states={"T0": _multi_group_state()})
+    assert result.accepted and result.rejected == []
+    assert layer.apply("T0", _multi_group_state(), base_action=0, t=100.0) == 2
+
+
+def test_conflict_sequenced_across_groups_of_the_same_axis():
+    def responder(system, user, schema):
+        return {"directives": [
+            _preempt(phase="NS", ev="ev_0", start=0, hold=16),
+            _preempt(phase="NS", ev="ev_1", start=5, hold=23),
+        ], "alerts": [], "explanation": ""}
+
+    agent = EmergencyAgent(MockLLM(responder), topologies=THREE_TOPOLOGIES)
+    snapshot = _snapshot(evs=[_ev_entry("ev_0", 4, 80.0),   # S approach, group 2
+                              _ev_entry("ev_1", 0, 200.0)])  # N approach, group 0
+    call = agent.ask(100.0, snapshot)
+    by_ev = {d["ev"]: d for d in call.envelope["directives"]}
+    # Same axis name but different green groups -> the TLS can only run one,
+    # so the later EV is sequenced after the earlier window (16 s).
+    assert by_ev["ev_0"]["phase_index"] == 2
+    assert by_ev["ev_1"]["phase_index"] == 0
+    assert by_ev["ev_0"]["start_in_s"] == 0.0
+    assert by_ev["ev_1"]["start_in_s"] == 16.0
+    assert any("delayed" in note for note in call.review["notes"])

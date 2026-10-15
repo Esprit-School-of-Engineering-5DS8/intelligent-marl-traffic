@@ -31,7 +31,7 @@ except ImportError:
     raise ImportError(f"TraCI not found. SUMO_HOME='{sumo_home}'")
 
 from environment.topology import discover_topology, neighbor_map_from_net, net_file_from_sumocfg
-from environment.traffic_light import TrafficLightAgent
+from environment.traffic_light import TrafficLightAgent, ensure_static_program
 
 
 class MultiAgentEnv:
@@ -80,18 +80,25 @@ class MultiAgentEnv:
 
         Only call this for controlled arms: initializing agents fixes the
         phase and disables SUMO's built-in program timer, so `sumo_default`
-        runs must not call it.
+        runs must not call it. Non-static (actuated/delay_based/NEMA) programs
+        are converted to an equivalent static copy first — otherwise SUMO's
+        own controller would advance pinned phases at `maxDur`.
         """
+        converted = 0
         for tls_id in self.tls_ids:
+            if ensure_static_program(tls_id):
+                converted += 1
             topology = discover_topology(tls_id)
-            agent = TrafficLightAgent(tls_id, topology, min_green=self.min_green)
+            agent = TrafficLightAgent(tls_id, topology, min_green=self.min_green,
+                                      step_length=self.step_length)
             agent.initialize()
             self.agents[tls_id] = agent
 
         net_file = net_file_from_sumocfg(self.sumocfg_path)
         self.neighbors = neighbor_map_from_net(net_file, self.tls_ids)
         print(f"[Env] {len(self.agents)} agents initialized "
-              f"(min_green={self.min_green}s, phases pinned)")
+              f"(min_green={self.min_green}s, phases pinned"
+              f"{f', {converted} actuated program(s) -> static' if converted else ''})")
         return self.agents
 
     def get_states(self) -> Dict[str, Dict[str, Any]]:

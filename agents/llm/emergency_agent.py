@@ -39,7 +39,6 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from agents.ev_preemption import PreemptionConfig, RuleBasedEVPreemption
 from agents.llm.agent import AgentCall, LLMAgent
-from agents.llm.schemas import ACTION_TO_AXIS
 from environment.ev import EVState, UpcomingTLS
 from environment.topology import TLSTopology
 
@@ -96,8 +95,19 @@ class EmergencyAgent(LLMAgent):
         topology = self.topologies.get(tls_id)
         if topology is None or not isinstance(link_index, (int, float)) or link_index < 0:
             return None
-        action = topology.action_for_link(int(link_index))
-        return ACTION_TO_AXIS.get(action) if action is not None else None
+        return topology.axis_for_link(int(link_index))
+
+    def _group_for(self, tls_id: Any, link_index: Any) -> Optional[int]:
+        topology = self.topologies.get(tls_id)
+        if topology is None or not isinstance(link_index, (int, float)) or link_index < 0:
+            return None
+        return topology.action_for_link(int(link_index))
+
+    def _axis_is_multi_group(self, tls_id: Any, axis: Optional[str]) -> bool:
+        topology = self.topologies.get(tls_id)
+        if topology is None or axis is None:
+            return False
+        return sum(1 for label in topology.axis_by_action if label == axis) > 1
 
     def _ev_view(self, ev: Mapping[str, Any],
                  snapshot: Mapping[str, Any]) -> Dict[str, Any]:
@@ -155,6 +165,10 @@ class EmergencyAgent(LLMAgent):
                     "eta_s": _as_float(nxt.get("eta_s")),
                     "axis": axis,
                     "queue_needed": queue,
+                    # Exact green group of the EV's approach and whether its
+                    # axis owns several groups (N-phase programs only).
+                    "group": self._group_for(tls_id, nxt.get("link_index")),
+                    "multi_group": self._axis_is_multi_group(tls_id, axis),
                 }
         return index
 
@@ -187,6 +201,14 @@ class EmergencyAgent(LLMAgent):
         if axis and fixed.get("phase") != axis:
             notes.append(f"{tls_id}: phase {fixed.get('phase')!r} -> {axis} (EV approach)")
             fixed["phase"] = axis
+        if info.get("multi_group") and info.get("group") is not None:
+            # N-phase program: "NS"/"EW" alone does not address protected-turn
+            # or one-way phases; pin the exact group of the EV's approach so
+            # the DirectiveLayer serves the right set.
+            fixed["phase_index"] = int(info["group"])
+        else:
+            # Never let a hallucinated phase_index leak into 2-group runs.
+            fixed.pop("phase_index", None)
         fixed["eta_s"] = round(eta, 1)
 
         # Queue-aware lead: the preemption must not start later than the time
@@ -234,7 +256,9 @@ class EmergencyAgent(LLMAgent):
                 end_abs = start_abs + _as_float(request.get("hold_s"))
                 conflict_end = start_abs
                 for other in placed:
-                    if (other["phase"] != request["phase"]
+                    same_phase = (other["phase"] == request["phase"]
+                                  and other.get("phase_index") == request.get("phase_index"))
+                    if (not same_phase
                             and start_abs < other["end_abs"] and other["start_abs"] < end_abs):
                         conflict_end = max(conflict_end, other["end_abs"])
                 if conflict_end - start_abs > 1e-6:
@@ -264,6 +288,7 @@ class EmergencyAgent(LLMAgent):
                 })
                 placed.append({
                     "key": key, "tls": tls_id, "phase": request["phase"],
+                    "phase_index": request.get("phase_index"),
                     "eta_abs": eta_abs, "start_abs": start_abs, "end_abs": start_abs + hold,
                     "hold": hold, "directive": directive,
                 })
@@ -312,6 +337,7 @@ class EmergencyAgent(LLMAgent):
                           start_abs + MAX_HOLD_S)
             requests[key] = {
                 "tls": key[1], "type": "preempt", "phase": plan["phase"],
+                "phase_index": plan.get("phase_index"),
                 "ev": key[0], "eta_s": round(eta, 1),
                 "start_in_s": round(max(0.0, start_abs - t), 1),
                 "hold_s": round(max(0.0, end_abs - start_abs), 1),
@@ -354,6 +380,7 @@ class EmergencyAgent(LLMAgent):
         for entry in scheduled:
             new_plan[entry["key"]] = {
                 "phase": entry["phase"], "tls": entry["tls"],
+                "phase_index": entry.get("phase_index"),
                 "start_abs": entry["start_abs"], "end_abs": entry["end_abs"],
                 "hold": entry["hold"],
             }
@@ -391,12 +418,16 @@ class EmergencyAgent(LLMAgent):
                            "tls": sorted(set(corridors[ev_id]))})
         envelope["alerts"] = alerts
 
-        schedule_log = [
-            {"tls": entry["tls"], "ev": entry["key"][0], "phase": entry["phase"],
-             "start_s": round(max(0.0, entry["start_abs"] - t), 1),
-             "end_s": round(max(0.0, entry["end_abs"] - t), 1)}
-            for entry in sorted(scheduled, key=lambda e: e["key"])
-        ]
+        schedule_log = []
+        for entry in sorted(scheduled, key=lambda e: e["key"]):
+            log_entry = {
+                "tls": entry["tls"], "ev": entry["key"][0], "phase": entry["phase"],
+                "start_s": round(max(0.0, entry["start_abs"] - t), 1),
+                "end_s": round(max(0.0, entry["end_abs"] - t), 1),
+            }
+            if entry.get("phase_index") is not None:
+                log_entry["phase_index"] = entry["phase_index"]
+            schedule_log.append(log_entry)
         return AgentCall(
             role=call.role, envelope=envelope, response=call.response,
             error=call.error, prompt_hash=call.prompt_hash,
