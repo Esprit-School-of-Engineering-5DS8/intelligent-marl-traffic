@@ -69,6 +69,8 @@ EVENTS: Dict[str, List[Dict[str, Any]]] = {
         {"start": 400, "end": 640, "label": "incident A1A0", "color": "#ffcccc"},
         {"start": 450, "end": 450.001, "label": "EV depart", "color": "#ffd966"},
     ],
+    # MoST has continuous real emergency traffic; no fixed event window.
+    "monaco": [],
 }
 
 
@@ -180,12 +182,12 @@ def _bar_panel(ax, scenarios: Sequence[str], runs: Sequence[Dict[str, Any]],
 
 
 def plot_bars(runs: Sequence[Dict[str, Any]], out_dir: str) -> None:
-    ev_scenarios = ["grid_3x3_ev", "grid_3x3_ev2", "grid_3x3_ev_incident", "grid_3x3_ped_combo"]
+    ev_scenarios = ["grid_3x3_ev", "grid_3x3_ev2", "grid_3x3_ev_incident", "grid_3x3_ped_combo", "monaco"]
     ped_scenarios = ["grid_3x3_ped", "grid_3x3_ped_combo"]
-    civ_scenarios = ["grid_3x3", "grid_3x3_peak", "grid_3x3_incident"]
+    civ_scenarios = ["grid_3x3", "grid_3x3_peak", "grid_3x3_incident", "monaco"]
     all_scenarios = ["grid_3x3", "grid_3x3_peak", "grid_3x3_incident",
                      "grid_3x3_ev", "grid_3x3_ev2", "grid_3x3_ev_incident",
-                     "grid_3x3_ped", "grid_3x3_ped_combo"]
+                     "grid_3x3_ped", "grid_3x3_ped_combo", "monaco"]
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
     _bar_panel(axes[0], ev_scenarios, runs, "ev_mean_duration_s", "s", "EV travel time")
