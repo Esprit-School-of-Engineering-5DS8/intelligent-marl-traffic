@@ -396,6 +396,214 @@ def plot_headline_monaco(runs: Sequence[Dict[str, Any]], out_path: str) -> None:
     plt.close(fig)
 
 
+# ── architecture and call-flow diagrams (static, no run data needed) ───────
+
+SLOW_FACE, SLOW_EDGE = "#fdecec", "#c9302c"
+CODE_FACE, CODE_EDGE = "#e8eef7", "#2f5d9e"
+SIM_FACE, SIM_EDGE = "#efefef", "#555555"
+BB_FACE, BB_EDGE = "#fff7e6", "#c8930a"
+INK = "#222222"
+
+
+def _box(ax, x, y, w, h, text, face, edge, fontsize=9, weight="normal", zorder=2):
+    from matplotlib.patches import FancyBboxPatch
+
+    patch = FancyBboxPatch((x, y), w, h,
+                           boxstyle="round,pad=0.007,rounding_size=0.014",
+                           linewidth=1.3, edgecolor=edge, facecolor=face,
+                           zorder=zorder)
+    ax.add_patch(patch)
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
+            fontsize=fontsize, weight=weight, zorder=zorder + 1,
+            linespacing=1.4, color=INK)
+
+
+def _arrow(ax, start, end, label=None, color=INK, style="->", lw=1.4,
+           connectionstyle=None, label_offset=(0.0, 0.0), fontsize=8,
+           label_ha="center", label_va="center"):
+    props = {"arrowstyle": style, "lw": lw, "color": color,
+             "shrinkA": 2, "shrinkB": 2}
+    if connectionstyle:
+        props["connectionstyle"] = connectionstyle
+    ax.annotate("", xy=end, xytext=start, arrowprops=props, zorder=1)
+    if label:
+        mx = (start[0] + end[0]) / 2 + label_offset[0]
+        my = (start[1] + end[1]) / 2 + label_offset[1]
+        ax.text(mx, my, label, ha=label_ha, va=label_va, fontsize=fontsize,
+                color=INK, zorder=4, linespacing=1.3)
+
+
+def _badge(ax, x, y, number):
+    ax.text(x, y, str(number), ha="center", va="center", fontsize=8.5,
+            weight="bold", color="white", zorder=5,
+            bbox=dict(boxstyle="circle,pad=0.28", facecolor="#444444",
+                      edgecolor="none"))
+
+
+def plot_architecture(out_path: str) -> None:
+    """One picture of the two-speed system: agents, code layers, data flow."""
+    fig, ax = plt.subplots(figsize=(13, 8.2))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    # Slow layer: one LLM agent per role, all batched for the whole network.
+    _box(ax, 0.03, 0.79, 0.94, 0.205, "", SLOW_FACE, SLOW_EDGE, zorder=1)
+    ax.text(0.05, 0.988, "SLOW LAYER   LLM agents, one instance per role,"
+            " each call covers the whole network",
+            fontsize=9.5, weight="bold", color=SLOW_EDGE, va="top")
+    ax.text(0.05, 0.958, "called on cadence (60/30/15 s by congestion) or by "
+            "events: code alerts, EV events, pedestrian events",
+            fontsize=8, style="italic", color=INK, va="center")
+    _box(ax, 0.05, 0.845, 0.22, 0.098,
+         "Operator  x1\nbias, hold\nfor any junction", "white", SLOW_EDGE)
+    _box(ax, 0.29, 0.845, 0.30, 0.098,
+         "Emergency  x1\ncorridor plans for all active EVs\n"
+         "(reviewer + FCFS scheduler in code)", "white", SLOW_EDGE)
+    _box(ax, 0.61, 0.845, 0.16, 0.098,
+         "Pedestrian  x1\nwindows for all\nwaiting crossings", "white", SLOW_EDGE)
+    _box(ax, 0.79, 0.845, 0.16, 0.098,
+         "Blackboard\nev_corridor, ped_surge,\narbiter_result", BB_FACE, BB_EDGE,
+         fontsize=8)
+    ax.text(0.87, 0.822, "TTL messages, injected\ninto every later prompt",
+            fontsize=7.3, ha="center", va="center", color="#8a6d0b")
+
+    # Detector: the only thing that "notices" an incident, in plain code.
+    _box(ax, 0.02, 0.585, 0.20, 0.13,
+         "QueueAlertDetector  (code)\naxis stays above 15 halted\n"
+         "vehicles for 20 s\n-> queue_growth alert", "white", CODE_EDGE,
+         fontsize=8)
+    _arrow(ax, (0.115, 0.715), (0.115, 0.79),
+           label="triggers: alert -> immediate Operator run",
+           fontsize=7.5, label_offset=(0.02, 0.0), label_ha="left")
+    ax.text(0.05, 0.565, "the LLM never detects; it interprets\nalerts produced by code",
+            fontsize=7.3, style="italic", color="#555555", va="top")
+
+    # Arbiter and directive layer: the code-side chokepoint.
+    _box(ax, 0.28, 0.60, 0.69, 0.15,
+         "ARBITER  (code)\nvalidate schema, clip values, check role permissions\n"
+         "priority:  preempt  >  serve_ped  >  hold  >  bias",
+         CODE_FACE, CODE_EDGE, fontsize=9)
+    _box(ax, 0.28, 0.435, 0.69, 0.115,
+         "DIRECTIVE LAYER  (code)\none winner per junction, biases merged,"
+         " starvation guard (an axis cannot stay red > 90 s,\n150 s with an EV pre-emption)",
+         CODE_FACE, CODE_EDGE, fontsize=9)
+
+    # Fast layer.
+    _box(ax, 0.10, 0.27, 0.87, 0.115,
+         "FAST LAYER  (code, every 1 s)\n"
+         "max-pressure base action at every junction  ->  TrafficLightAgent:\n"
+         "min green, yellow and program transitions, phase pinning",
+         CODE_FACE, CODE_EDGE, fontsize=9)
+
+    # Simulation.
+    _box(ax, 0.20, 0.075, 0.68, 0.12,
+         "SIMULATION  (SUMO / TraCI)\njunctions, vehicles, pedestrians,"
+         " real emergency fleet", SIM_FACE, SIM_EDGE, fontsize=9)
+
+    # Slow layer -> arbiter: one envelope per agent call.
+    for x in (0.16, 0.44, 0.69):
+        _arrow(ax, (x, 0.855), (x, 0.802), color=SLOW_EDGE)
+    for x in (0.16, 0.44, 0.69):
+        _arrow(ax, (x, 0.795), (x, 0.778), color=SLOW_EDGE)
+    ax.plot([0.16, 0.69], [0.778, 0.778], color=SLOW_EDGE, lw=1.4, zorder=1)
+    _arrow(ax, (0.625, 0.778), (0.625, 0.75), color=SLOW_EDGE,
+           label="one JSON envelope per call, directives for any junction",
+           fontsize=8, label_offset=(-0.02, 0.0), label_ha="right")
+
+    _arrow(ax, (0.625, 0.60), (0.625, 0.55), color=CODE_EDGE,
+           label="accepted directives", fontsize=8, label_offset=(0.02, 0.0),
+           label_ha="left")
+    _arrow(ax, (0.625, 0.435), (0.625, 0.385), color=CODE_EDGE,
+           label="override the base action", fontsize=8, label_offset=(0.02, 0.0),
+           label_ha="left")
+    _arrow(ax, (0.535, 0.27), (0.535, 0.195), color=SIM_EDGE,
+           label="applied via TraCI, next 1 s steps", fontsize=8,
+           label_offset=(0.02, 0.0), label_ha="left")
+
+    # Feedback: the same sensor data feeds the fast layer and one snapshot.
+    _arrow(ax, (0.88, 0.135), (0.975, 0.80), color=INK, lw=1.3,
+           connectionstyle="angle3,angleA=0,angleB=90")
+    ax.text(0.992, 0.49, "sensors every second: queues, waits, alerts, EVs,"
+            " pedestrians\npacked into one shared snapshot for all agents",
+            fontsize=8, rotation=90, ha="center", va="center", color=INK)
+
+    for x, y, n in ((0.965, 0.60, 1), (0.115, 0.753, 2), (0.658, 0.778, 3),
+                    (0.305, 0.675, 4), (0.605, 0.4125, 5), (0.515, 0.235, 6)):
+        _badge(ax, x, y, n)
+    ax.text(0.02, 0.035, "1 sense   2 trigger   3 call   4 arbitrate"
+            "   5 install and override   6 enforce and apply",
+            fontsize=8.5, color=INK)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_incident_flow(out_path: str) -> None:
+    """Call flow when the scripted incident congests an axis."""
+    fig, ax = plt.subplots(figsize=(13, 6.4))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    columns = [
+        (0.10, "SIMULATION", "SUMO / TraCI"),
+        (0.315, "DETECTOR", "code, every step"),
+        (0.505, "SUPERVISOR", "code, decides who runs"),
+        (0.70, "OPERATOR", "LLM, one call"),
+        (0.895, "ARBITER + LAYER", "code, act on directives"),
+    ]
+    for x, title, subtitle in columns:
+        ax.plot([x, x], [0.10, 0.80], color="#bbbbbb", lw=1.0, ls=(0, (4, 4)),
+                zorder=0)
+        ax.text(x, 0.895, title, ha="center", va="center", fontsize=9.5,
+                weight="bold", color=INK)
+        ax.text(x, 0.855, subtitle, ha="center", va="center", fontsize=7.5,
+                color="#666666")
+        from matplotlib.patches import FancyBboxPatch
+        ax.add_patch(FancyBboxPatch((x - 0.075, 0.865), 0.15, 0.05,
+                                    boxstyle="round,pad=0.004,rounding_size=0.01",
+                                    linewidth=1.1, edgecolor="#999999",
+                                    facecolor="#f5f5f5", zorder=1))
+
+    steps = [
+        (0.775, 0.10, 0.315, "queues on the blocked axis grow every step",
+         "t=0: scripted incident, blockers stop on edge A1A0 (teleport off)"),
+        (0.665, 0.315, 0.505,
+         "axis stays above 15 halted vehicles for 20 s -> queue_growth alert",
+         None),
+        (0.555, 0.505, 0.70,
+         "immediate call, not waiting for the 15/30/60 s cadence:\n"
+         "one snapshot + the active alert", None),
+        (0.445, 0.70, 0.895,
+         "bias and hold directives + a written explanation", None),
+        (0.335, 0.895, 0.10,
+         "validated, clipped, priority resolved, then installed: each second\n"
+         "they override the max-pressure action, safety stays in code", None),
+    ]
+    for y, x1, x2, label, note in steps:
+        _arrow(ax, (x1, y), (x2, y), color="#2f5d9e", lw=1.6)
+        if label:
+            ax.text((x1 + x2) / 2, y + 0.03, label, ha="center", va="bottom",
+                    fontsize=8, color=INK, linespacing=1.35)
+        if note:
+            ax.text(min(x1, x2) - 0.005, y - 0.03, note, ha="left",
+                    va="top", fontsize=8, style="italic", color="#555555")
+
+    ax.text(0.10, 0.05,
+            "The incident itself is scripted by the experiment harness; the system"
+            " only sees its effect (queues).\nSame trigger path on EV events"
+            " (new EV, next light, ETA crossing) with the Emergency agent, whose"
+            " reviewer and\nFCFS scheduler run in code before the Arbiter, and on"
+            " pedestrian events with the Pedestrian agent.",
+            fontsize=8, va="bottom", ha="left", color=INK, linespacing=1.5)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 def plot_llm_ops(runs: Sequence[Dict[str, Any]], out_dir: str) -> None:
     llm_runs = [run for run in runs if str(run.get("arm")) == "llm_team"]
     scenarios = sorted({str(run.get("scenario")) for run in llm_runs})
@@ -483,6 +691,10 @@ def main() -> None:
     print(f"[fig] {out_dir}/headline_grid_3x3.png")
     plot_headline_monaco(runs, os.path.join(out_dir, "headline_monaco.png"))
     print(f"[fig] {out_dir}/headline_monaco.png")
+    plot_architecture(os.path.join(out_dir, "architecture.png"))
+    print(f"[fig] {out_dir}/architecture.png")
+    plot_incident_flow(os.path.join(out_dir, "incident_flow.png"))
+    print(f"[fig] {out_dir}/incident_flow.png")
     plot_llm_ops(runs, out_dir)
     print(f"[fig] {out_dir}/llm_ops.png")
 
