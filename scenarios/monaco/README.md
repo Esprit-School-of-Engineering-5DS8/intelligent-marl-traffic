@@ -35,8 +35,11 @@ keeps MoST's genuine actuated programs (the real baseline).
 
 ## Evaluation window (`monaco.llm.sumocfg`)
 
-- `begin=25200` (07:00), `end=28800`: a 30-minute morning peak, 1,800 steps.
-  Route entries departing before `begin` are discarded by SUMO, so the full
+- `begin=25200` (07:00): the start of a morning peak; the config supports up to
+  `end=28800` (30 minutes). The committed Phase 6 evaluation
+  (`docs/test/phase6/monaco.md`) used the **first 1000 steps (17 min)** for
+  LLM budget/runtime reasons — pass `--steps 1000` to reproduce it. Route
+  entries departing before `begin` are discarded by SUMO, so the full
   upstream route files are reused unchanged.
 - `step-length=1.0` (MoST recommends 0.25 for lateral fidelity). Approximation,
   documented in `docs/test/phase6/monaco.md`; the sublane model
@@ -53,7 +56,7 @@ sumo-gui -c scenarios/monaco/monaco.llm.sumocfg
 # Evaluation arms (one SUMO process per run, distinct TraCI ports)
 ~/.venvs/sumo/bin/python evaluation/run_experiments.py \
     --scenario monaco --arms sumo_default,max_pressure,llm_team \
-    --seeds 1,2,3 --steps 1800 --jobs 3          # add --llm openai to record
+    --seeds 1,2,3 --steps 1000 --jobs 3          # add --llm openai to record
 ```
 
 Results land in `results/monaco/<arm>/seed_<n>/`; the consolidated tables and

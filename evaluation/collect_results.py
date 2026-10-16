@@ -125,6 +125,7 @@ def _llm_ops(run: Dict[str, Any]) -> Dict[str, Any]:
         "recorded": int(recorded),
     }
     calls = {role: 0 for role in ROLES}
+    fresh_calls = 0
     latencies: List[float] = []
     tokens_in = tokens_out = tokens_cached = 0.0
     decisions_path = os.path.join(str(run.get("_dir", "")), "decisions.jsonl")
@@ -144,14 +145,20 @@ def _llm_ops(run: Dict[str, Any]) -> Dict[str, Any]:
                 calls[role] += 1
                 if recorded:
                     latency = _to_float(record.get("latency_s"))
-                    if latency is not None:
+                    # Replayed cache hits carry latency 0.0 and no usage; only
+                    # fresh endpoint calls feed the latency/token statistics
+                    # (a run may mix a replayed checkpoint prefix with fresh
+                    # calls after a resume).
+                    if latency is not None and latency > 0.5:
+                        fresh_calls += 1
                         latencies.append(latency)
-                    tokens_in += _to_float(record.get("tokens_in")) or 0.0
-                    tokens_out += _to_float(record.get("tokens_out")) or 0.0
-                    tokens_cached += _to_float(record.get("tokens_cached")) or 0.0
+                        tokens_in += _to_float(record.get("tokens_in")) or 0.0
+                        tokens_out += _to_float(record.get("tokens_out")) or 0.0
+                        tokens_cached += _to_float(record.get("tokens_cached")) or 0.0
     for role in ROLES:
         ops[f"calls_{role}"] = calls[role]
     ops["calls_total"] = sum(calls.values())
+    ops["calls_fresh"] = fresh_calls
     ops["latency_mean_s"] = round(_mean(latencies), 3)
     ops["latency_median_s"] = round(statistics.median(latencies), 3) if latencies else ""
     ops["latency_p90_s"] = round(_percentile(latencies, 0.90), 3) if latencies else ""
@@ -226,7 +233,7 @@ def write_llm_ops(runs: Sequence[Dict[str, Any]], out_path: str) -> None:
     llm_runs = [run for run in runs if str(run.get("arm")) == "llm_team"]
     columns = [
         "scenario", "arm", "seed", "recorded",
-        "calls_operator", "calls_emergency", "calls_pedestrian", "calls_total",
+        "calls_operator", "calls_emergency", "calls_pedestrian", "calls_total", "calls_fresh",
         "latency_mean_s", "latency_median_s", "latency_p90_s", "latency_max_s",
         "tokens_in", "tokens_out", "tokens_cached",
     ]

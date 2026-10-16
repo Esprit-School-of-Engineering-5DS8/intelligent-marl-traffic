@@ -5,7 +5,9 @@
 
     Derived from most.sumocfg (MoST, L. Codeca & J. Harri, VNC 2017; GPL).
     Differences, all documented approximations for the LLM/MARL runs:
-    - 30-minute morning peak window: begin=25200 (07:00), end=28800.
+    - Morning-peak start: begin=25200 (07:00); the config supports 30 minutes
+      (end=28800). The committed Phase 6 evaluation ran the first 1000 steps
+      (17 min) for LLM budget reasons - see docs/test/phase6/monaco.md.
       Route entries departing before `begin` are discarded by SUMO, so the
       full upstream route files are reused unchanged.
     - step-length 1.0 (MoST recommends 0.25 for sublane fidelity); the
