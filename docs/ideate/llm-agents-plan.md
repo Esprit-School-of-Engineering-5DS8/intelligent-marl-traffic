@@ -1,11 +1,11 @@
 # LLM Agents for Intelligent MARL Traffic: Approach & Implementation Plan
 
 > Suggested location in the repo: `docs/ideate/llm-agents-plan.md` (fits the *Ideate: approach shortlist, chosen direction* deliverable).
-> Branch: `feat/llm-agents`. Status: Phases 0–5 implemented, pushed and committed. Phase 6 planned below (start in a fresh session).
+> Branch: `feat/llm-agents`. Status: **Phases 0–6 implemented, pushed and committed** (Phase 6 = consolidated evaluation package + MoST Monaco real scenario). Optional future arms (A5 pure-LLM, A6 DQN) remain; the Phase 6 notes and results live in `docs/test/phase6/`.
 
 ---
 
-## HANDOFF — session state (2026-10-11, session 5)
+## HANDOFF — session state (2026-10-16, session 6 — Phases 0–6 complete)
 
 **Progress**
 
@@ -17,11 +17,60 @@
 | 3 — Operator agent, real LLM + speed profile (S0/S1/S3) | ✅ done | `97a1246` |
 | 4 — Emergency agent (incl. the 4.5 conflict/robustness iteration) | ✅ done | `3036c25` |
 | 5 — Pedestrian agent (S4) + composed multi-agent scenario (S5) | ✅ done | `d0a111f` |
-| 6 — full-grid evaluation + plots/report + Monaco MoST real scenario | ⏭ next | — |
+| 6 — evaluation package (A) + MoST Monaco real scenario (B) | ✅ done | `c2f2f43` + `9a60766` + `8adaded` |
 
 ---
 
-## NEXT SESSION — Phase 6 plan (start here, fresh context)
+## PHASE 6 — executed (2026-10-15/16). Deliverables in `docs/test/phase6/`
+
+**A. 3x3 full-grid package** (`grid_3x3.md`, `tables/`, `figures/`; commits
+`c2f2f43`, `bd70c8a`): `evaluation/collect_results.py` consolidates every
+recorded run into committed CSVs (`all_results.csv`, per-scenario
+arms-seeds tables, `llm_ops.csv` with per-role calls/latency/tokens);
+`evaluation/report_plots.py` produces the step-wait curves with event windows
+and the EV/ped/civilian/LLM-ops panels (does not touch Member 5's
+`visualize_metrics.py`). S0/S1/S3 A0/A1 were topped up to 3 seeds (SUMO-only).
+All H1–H5 numbers reproduce the Phase 3–5 results exactly (strict replay
+regressions still pass).
+
+**B. MoST Monaco** (`monaco.md`; commits `9a60766`, `551c8d5`, `8adaded`):
+- Integrated the real network from `origin/feature/monaco-real-scenario`
+  (`6d84e4a`), dropping its unrelated hunks; GPL-3.0 noted in the scenario
+  README. All 12 TLS run; 8 junctions have 2 vehicle-green sets, 4 have 3.
+- **Control generalization** (`environment/topology.py`): `TLSTopology` gains
+  `GreenGroup`s (one per distinct vehicle-green set); groups are clustered
+  into NS/EW axes by lane heading (geometry consulted only for 3+ sets, so
+  grid behavior is byte-identical); `action_for_link` resolves the exact
+  group, `axis_for_link` the axis. `MultiAgentEnv.build_agents()` converts
+  MoST's actuated programs to **static copies** (`ensure_static_program`;
+  on actuated logic SUMO caps pinned phases at `maxDur` — a 400-step drift
+  check shows zero SUMO-initiated phase changes). `TrafficLightAgent`
+  counters became time-based (`step_length`).
+- The base policy is **k-group** (`MaxPressureAgent` over `group_lanes`);
+  the LLM/directive layer stays binary NS/EW (`axis_by_action` in the state)
+  with an optional `phase_index` (set by the code-side reviewer, never
+  prompted) that pins the exact group for EV pre-emption. Prompts untouched.
+- Recorded `sumo_default`/`max_pressure`/`llm_team` × 3 seeds on the
+  **17-min window (1000 steps)** — shortened from 30 min for LLM
+  budget/runtime; per-seed caches served as deterministic checkpoints across
+  an explicit stop/resume, and strict `--llm replay` of all 3 seeds is
+  bit-identical on every summary metric.
+- Results: MoST's actuated baseline wins car KPIs (575 vs 532–535 arrivals);
+  the LLM team improves the real emergency fleet over its base policy
+  (EV duration −2.5% on all seeds, EV waiting −39%, −10% vs A0) with 0
+  fallbacks across 1035 calls, and takes the best pedestrian p95. Prompts
+  reach ~30k input tokens under ~20 concurrent EVs (provider caching barely
+  helps) — pruning the per-EV `next_tls` list is the future-work lever.
+
+**Known gaps after Phase 6:** Monaco controlled arms lose to MoST actuated on
+car metrics (phase-pinned queue-greedy is the simplification, uniform across
+A2/A4); no Pedestrian-agent arm on Monaco; the 17-min window is a documented
+budget compromise; prompt size under dense EV traffic; optional A5/A6 arms
+still unbuilt.
+
+---
+
+## Phase 6 plan (executed 2026-10-15/16; kept for reference — deviations noted in the PHASE 6 section above)
 
 **Scope agreed with the user (session 5):** skip DQN/RL (A6) and the optional pure-LLM arm (A5) for now; compare against the existing baselines only. Two deliverables, both ending in committed tables/plots:
 
@@ -154,7 +203,7 @@ Source: `origin/feature/monaco-real-scenario` commit `6d84e4a` — a real OSM Mo
 - Strict `--llm replay` of S4 seed 1 and S5 seed 1 is bit-identical (modulo token counters).
 - Run protocol (lessons from wasted batches): dry-run the exact matrix with `--llm mock` first (free), then record one real seed, then the batch; validate scenario XMLs (persons/EVs/incidents) with SUMO-only arms before any LLM spend.
 
-**Known gaps / warnings for the next session**
+**Known gaps (Phases 4–5; superseded by the PHASE 6 section above)**
 
 - EV-time ceiling: A3 already delivers ~0–7 s EV waiting on a single EV; A4 ties (measured). On 2 EVs the 4.5 scheduler removed the v1 thrash but A4 v2 is still ~1.7 s (3%) behind A3; the residual is release granularity (A3 reacts per second, the LLM layer per event/10 s tick).
 - Civilian flow: on ev2 A4 ≈ A3 (29.2 ± 1.0) but worse than A2 (27.9 ± 0.5); on ev_incident A4 (45.1 ± 1.6) beats A3 (45.6) but not A2 (44.5). v1's 43.7 was not reproduced — run 5 seeds before claiming civilian gains there.
@@ -537,8 +586,8 @@ Tasks: build the separate crossing scenario (5.2-C); transition logic with pedes
 Done when: H4 is measured on S4.
 Result: H4 measured — pedestrian waits down 18–29% with no vehicle penalty (S4); on the composed S5 (EV + incident + pedestrian surge) the LLM team matches the EV rule and takes the best pedestrian waits at a lower civilian cost than either single-purpose rule. Details, numbers and the dry-run protocol in the HANDOFF.
 
-### Phase 6: Evaluation, plots, report + Monaco real scenario (M-L) — ⏭ next session
-Scoped with the user in session 5: skip DQN/RL (A6) and the optional A5 pure-LLM arm; compare against existing baselines only. Deliverables: (A) consolidated full-grid results + plots + report for the 3x3 system (all scenarios already recorded; no new LLM spend), and (B) the Monaco MoST real scenario with the same tables/plots/report (cherry-pick `6d84e4a`, N-phase topology generalization, 30-min window × 3 seeds). The complete step-by-step plan, data inventory, budgets and the mandatory run-review protocol live in the HANDOFF's "NEXT SESSION — Phase 6 plan" section above.
+### Phase 6: Evaluation, plots, report + Monaco real scenario (M-L) — ✅ done
+Scoped with the user in session 5: skip DQN/RL (A6) and the optional A5 pure-LLM arm; compare against existing baselines only. Deliverables: (A) consolidated full-grid results + plots + report for the 3x3 system, and (B) the Monaco MoST real scenario with the same tables/plots/report. Executed as planned with two documented deviations: the Monaco evaluation window is 17 min (1000 steps) instead of 30 min for LLM budget/runtime, and the four 3-set junctions are served by a k-group base policy (the axis-clustering plus `phase_index` reviewer pin keeps the LLM contract binary). Results and limitations: `docs/test/phase6/grid_3x3.md` and `docs/test/phase6/monaco.md`.
 
 ### MVP = Phases 0-5
 Phases 0-4 are the core MVP; Phase 5 (pedestrians + S5) is now implemented, so the full three-agent system is available for the report.
