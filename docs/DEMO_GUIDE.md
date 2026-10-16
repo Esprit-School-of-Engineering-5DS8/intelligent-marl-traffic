@@ -138,3 +138,88 @@ m/s).
 | 3D lente ou WebGL absent | Montrer la carte 2D, qui contient la même information |
 | Replay manquant | Le choisir dans un autre scénario, ou l'enregistrer la veille (`scripts/record_replay.py`) |
 | Écran trop petit | Menu réduit (bouton en bas à gauche), vue d'un seul contrôleur au lieu du côte à côte |
+
+## Démo rapide en commandes (PowerShell)
+
+À lancer depuis `G:\pi5eme\cotraffic`, l'environnement Python activé
+(`.venv\Scripts\activate`). Durées mesurées sur notre portable.
+
+### 1. Scénario complet dans SUMO : piétons, ambulances, bus, accident (environ 3 min)
+
+```powershell
+python scripts/demo_side_by_side.py --net grid4x4 --scenarios pedestrians emergency buses --follow-incident --quick
+```
+
+Deux fenêtres SUMO côte à côte (FT à gauche, COOP-FULL à droite) sur exactement le même
+trafic, plus une troisième fenêtre avec le graphique de comparaison en direct. La
+simulation avance jusqu'à 1 min avant l'accident et la caméra se place sur la rue
+bloquée (véhicule magenta, zone rouge clignotante). Ambulances blanches à croix verte,
+bus orange, piétons bleus. Molette pour zoomer, glisser pour se déplacer.
+
+Variante sur le vrai quartier de Tunis (avec trottoirs ajoutés pour la démonstration) :
+
+```powershell
+python scripts/demo_side_by_side.py --net real_district_ped --follow-incident --quick
+```
+
+### 2. Comparaison avec graphique (environ 3 min)
+
+```powershell
+# ambulances : la meilleure règle classique contre l'agent, la caméra suit chaque ambulance
+python scripts/demo_side_by_side.py --net grid4x4 --scenarios emergency --left ev_rule_mp --follow-ev --quick
+
+# les mêmes comparaisons, chiffrées sur les 5 graines de test
+python -m cotraffic ask "Compare COOP-FULL et MP sur la grille à la pointe" --no-llm --table
+
+# puis le tableau de bord : Vue d'ensemble, puis Analyse comparative (forest plot, carte des gains)
+cd frontend
+npm run dev
+```
+
+### 3. Tests du front : chaque page vérifiée avec les vrais chiffres (environ 4 min)
+
+```powershell
+cd frontend
+npm test                                              # 26 tests unitaires (Vitest)
+$env:SLOWMO = "300"
+npx playwright test tests/e2e/pages.spec.ts --headed   # le navigateur visite chaque page sous vos yeux
+Remove-Item Env:SLOWMO
+npx playwright test                                   # toute la suite : pages, assistant, accessibilité WCAG
+npx playwright show-report                            # rapport HTML des tests
+```
+
+`pages.spec.ts` lit les fichiers de résultats et vérifie que chaque page affiche les
+mêmes nombres (attente de COOP-FULL et de FT, gain apparié, significativité, attente des
+piétons, retard des ambulances), que le replay avance, que la 3D s'affiche et que les
+minutes s'appliquent partout.
+
+### 4. Assistant en détail (environ 5 min)
+
+```powershell
+# a) côté Python : lecture de la question, recherche dans les résultats, rédaction
+python -m cotraffic llm-status
+python -m cotraffic ask "Quel est le meilleur contrôleur à la pointe sur la grille ?" --no-llm
+python -m cotraffic ask "Compare COOP et MP sur le quartier à la pointe"          # rédigé par le modèle local
+python -m cotraffic demo-plan "montre une ambulance et un accident sur la grille avec des piétons et des bus, MP contre COOP-FULL" --no-llm
+python scripts/check_assistant.py --no-write    # précision de lecture : mots-clés, modèle, combinaison
+
+# b) côté tableau de bord : tests du moteur sans backend, puis scénario complet dans le navigateur
+cd frontend
+npx vitest run src/features/assistant
+$env:SLOWMO = "300"
+npx playwright test tests/e2e/assistant.spec.ts --headed
+Remove-Item Env:SLOWMO
+
+# c) le backend en streaming (deuxième terminal : uvicorn api.main:app --port 8000)
+'{"question": "COOP-FULL est-il meilleur que FT sur l attente en pointe sur la grille ?"}' | Out-File -Encoding ascii q.json
+curl.exe -N -X POST http://localhost:8000/api/assistant/chat -H "Content-Type: application/json" --data "@q.json"
+```
+
+`assistant.spec.ts` pose sept questions dans l'interface et vérifie :
+- la comparaison COOP-FULL / FT avec les chiffres exacts, l'IC, le p de Holm et les fichiers sources ;
+- qu'il dit « moins bien » quand l'agent est moins bon (ambulances contre EV-RULE-MP) ;
+- le meilleur contrôleur, recalculé à partir des résultats ;
+- un graphique dans la conversation ;
+- l'ouverture d'un carrefour sur la carte, seulement après un clic ;
+- qu'aucune simulation ne démarre sans backend ni confirmation ;
+- la réponse en anglais quand l'interface est en anglais.

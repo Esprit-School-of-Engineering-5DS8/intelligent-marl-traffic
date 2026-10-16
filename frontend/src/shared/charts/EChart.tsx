@@ -58,12 +58,16 @@ export function EChart({
       {
         animation: !reducedMotion(),
         textStyle: { fontFamily: tokens.font, color: tokens.text2 },
-        aria: { enabled: true },
         ...option,
       },
       { notMerge: true },
     );
   }, [build, theme]);
 
-  return <div ref={box} role="img" aria-label={label} style={{ height }} className="w-full" />;
+  // our label on an outer box: ECharts writes its own aria-label on the box it draws in
+  return (
+    <div role="img" aria-label={label} className="w-full">
+      <div ref={box} style={{ height }} className="w-full" />
+    </div>
+  );
 }
