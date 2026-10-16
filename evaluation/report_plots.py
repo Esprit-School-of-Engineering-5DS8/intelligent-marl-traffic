@@ -219,6 +219,183 @@ def plot_bars(runs: Sequence[Dict[str, Any]], out_dir: str) -> None:
     plt.close(fig)
 
 
+def _grouped_bars(ax, cluster_labels, arms, values_by, title, ylabel,
+                  colors=None, annotate=None):
+    """
+    Grouped bar helper for headline panels.
+
+    `values_by[(arm, cluster_label)] = (mean, std)`; clusters on the x axis,
+    one bar per arm inside a cluster. `annotate` optionally maps an arm to a
+    short label drawn above its bars.
+    """
+    colors = colors or ARM_COLORS
+    cluster_count = len(cluster_labels)
+    width = 0.8 / max(1, len(arms))
+    for index, arm in enumerate(arms):
+        xs, means, stds = [], [], []
+        for cluster_index, label in enumerate(cluster_labels):
+            value = values_by.get((arm, label))
+            if value is None:
+                continue
+            xs.append(cluster_index + (index - (len(arms) - 1) / 2) * width)
+            means.append(value[0])
+            stds.append(value[1])
+        ax.bar(xs, means, width=width, yerr=stds, capsize=2,
+               color=colors.get(arm, "#888888"), label=arm)
+    ax.set_xticks(range(cluster_count))
+    ax.set_xticklabels(cluster_labels, fontsize=8)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, fontsize=10)
+    ax.grid(alpha=0.25, axis="y")
+    ax.legend(fontsize=8)
+    if annotate:
+        for arm, note in annotate.items():
+            if any((arm, label) in values_by for label in cluster_labels):
+                ax.text(0.99, 0.02, note, transform=ax.transAxes, ha="right",
+                        fontsize=7, color=colors.get(arm, "#888888"))
+
+
+def _scenario_metric_values(runs, scenarios, arms, metric,
+                            scenario_labels=None):
+    values = {}
+    labels = scenario_labels or scenarios
+    for scenario, label in zip(scenarios, labels):
+        by_arm = _group_by_arm(runs, scenario)
+        for arm in arms:
+            group = by_arm.get(arm)
+            if group:
+                values[(arm, label)] = _mean_std(group, metric)
+    return values
+
+
+def plot_headline_grid(runs: Sequence[Dict[str, Any]], out_path: str) -> None:
+    """One figure with the four decisive 3x3 results."""
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 8))
+
+    # (a) S3 incident: step-wait curves (A3 is bit-identical to A2 here).
+    ax = axes[0][0]
+    for arm in ("sumo_default", "max_pressure", "llm_team"):
+        group = _group_by_arm(runs, "grid_3x3_incident").get(arm)
+        if not group:
+            continue
+        curves = [_load_step_waits(run["_dir"]) for run in group]
+        curves = [curve for curve in curves if curve]
+        if not curves:
+            continue
+        curve = _mean_curve(curves)
+        ax.plot(range(1, len(curve) + 1), curve, color=ARM_COLORS.get(arm),
+                linewidth=1.5, label=arm)
+    _mark_events(ax, "grid_3x3_incident")
+    ax.set_title("S3 incident: step waiting time  (A3 = A2)", fontsize=10)
+    ax.set_xlabel("sim time (s)")
+    ax.set_ylabel("total wait (s)")
+    ax.grid(alpha=0.25)
+    ax.legend(fontsize=8)
+
+    # (b) EV travel time across the EV scenarios.
+    ax = axes[0][1]
+    scenarios = ["grid_3x3_ev", "grid_3x3_ev2", "grid_3x3_ev_incident",
+                 "grid_3x3_ped_combo"]
+    values = _scenario_metric_values(runs, scenarios,
+                                     ["max_pressure", "ev_priority", "llm_team"],
+                                     "ev_mean_duration_s",
+                                     ["1 EV", "2 EVs", "EV+incident", "combo S5"])
+    _grouped_bars(ax, ["1 EV", "2 EVs", "EV+incident", "combo S5"],
+                  ["max_pressure", "ev_priority", "llm_team"], values,
+                  "EV travel time (lower is better)", "s")
+
+    # (c) S4 pedestrian waits.
+    ax = axes[1][0]
+    group_by_arm = _group_by_arm(runs, "grid_3x3_ped")
+    values = {}
+    for arm in ("max_pressure", "ped_priority", "llm_team"):
+        group = group_by_arm.get(arm)
+        if not group:
+            continue
+        values[(arm, "mean")] = _mean_std(group, "ped_mean_waiting_s")
+        values[(arm, "p95")] = _mean_std(group, "ped_p95_waiting_s")
+    _grouped_bars(ax, ["mean", "p95"], ["max_pressure", "ped_priority", "llm_team"],
+                  values, "S4 pedestrian wait, 5 seeds", "s")
+
+    # (d) Civilian step wait: the LLM team never costs more than its base.
+    ax = axes[1][1]
+    scenarios = ["grid_3x3", "grid_3x3_peak", "grid_3x3_incident",
+                 "grid_3x3_ped_combo"]
+    values = _scenario_metric_values(runs, scenarios,
+                                     ["max_pressure", "llm_team"],
+                                     "mean_step_waiting_time_s",
+                                     ["S0", "S1", "S3", "S5"])
+    _grouped_bars(ax, ["S0", "S1", "S3", "S5"], ["max_pressure", "llm_team"],
+                  values, "Civilian step wait: LLM team vs base policy", "s")
+
+    fig.suptitle("3x3 grid: headline results", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_headline_monaco(runs: Sequence[Dict[str, Any]], out_path: str) -> None:
+    """One figure with the four decisive MoST Monaco results."""
+    fig, axes = plt.subplots(2, 2, figsize=(11.5, 7.5))
+    arms = ["sumo_default", "max_pressure", "llm_team"]
+
+    # (a) step-wait curves
+    ax = axes[0][0]
+    for arm in arms:
+        group = _group_by_arm(runs, "monaco").get(arm)
+        if not group:
+            continue
+        curves = [_load_step_waits(run["_dir"]) for run in group]
+        curves = [curve for curve in curves if curve]
+        if not curves:
+            continue
+        curve = _mean_curve(curves)
+        ax.plot(range(1, len(curve) + 1), curve, color=ARM_COLORS.get(arm),
+                linewidth=1.5, label=arm)
+    ax.set_xlabel("sim time (s, 07:00 start)")
+    ax.set_ylabel("total wait (s)")
+    ax.set_title("MoST Monaco: step waiting time", fontsize=10)
+    ax.grid(alpha=0.25)
+    ax.legend(fontsize=8)
+
+    # (b) emergency-vehicle travel and waiting time
+    ax = axes[0][1]
+    group_by_arm = _group_by_arm(runs, "monaco")
+    values = {}
+    for arm in arms:
+        group = group_by_arm.get(arm)
+        if not group:
+            continue
+        values[(arm, "duration")] = _mean_std(group, "ev_mean_duration_s")
+        values[(arm, "waiting")] = _mean_std(group, "ev_mean_waiting_s")
+    _grouped_bars(ax, ["duration", "waiting"], arms, values,
+                  "Real emergency fleet (vClass=emergency)", "s")
+
+    # (c) arrivals
+    ax = axes[1][0]
+    values = _scenario_metric_values(runs, ["monaco"], arms, "arrived_vehicles",
+                                     ["arrived"])
+    _grouped_bars(ax, ["arrived"], arms, values,
+                  "Completed civilian vehicles", "vehicles")
+
+    # (d) pedestrian waits
+    ax = axes[1][1]
+    values = {}
+    for arm in arms:
+        group = group_by_arm.get(arm)
+        if not group:
+            continue
+        values[(arm, "mean")] = _mean_std(group, "ped_mean_waiting_s")
+        values[(arm, "p95")] = _mean_std(group, "ped_p95_waiting_s")
+    _grouped_bars(ax, ["mean", "p95"], arms, values,
+                  "Pedestrian wait (<personinfo>)", "s")
+
+    fig.suptitle("MoST Monaco: headline results", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 def plot_llm_ops(runs: Sequence[Dict[str, Any]], out_dir: str) -> None:
     llm_runs = [run for run in runs if str(run.get("arm")) == "llm_team"]
     scenarios = sorted({str(run.get("scenario")) for run in llm_runs})
@@ -302,6 +479,10 @@ def main() -> None:
         print(f"[fig] {path}")
     plot_bars(runs, out_dir)
     print(f"[fig] {out_dir}/bars_*.png")
+    plot_headline_grid(runs, os.path.join(out_dir, "headline_grid_3x3.png"))
+    print(f"[fig] {out_dir}/headline_grid_3x3.png")
+    plot_headline_monaco(runs, os.path.join(out_dir, "headline_monaco.png"))
+    print(f"[fig] {out_dir}/headline_monaco.png")
     plot_llm_ops(runs, out_dir)
     print(f"[fig] {out_dir}/llm_ops.png")
 
