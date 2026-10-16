@@ -16,7 +16,7 @@ car or EV. The LLM only proposes typed directives; code decides and enforces.
 
 | Agent | One call covers | Runs when | Emits | On failure |
 |---|---|---|---|---|
-| Operator | the whole network | cadence 60/30/15 s by congestion, plus any code alert | `bias`, `hold`, explanation | nothing, fast layer continues |
+| Operator | the whole network | reruns every 60/30/15 s (quiet to congested), or immediately on any code alert | `bias`, `hold`, explanation | nothing, fast layer continues |
 | Emergency | all active EVs, corridor view per EV | every 10 s while EVs run, plus EV events | `preempt` windows, corridor message | rule-based pre-emption |
 | Pedestrian | all waiting crossings | 30 s, plus wait events | `serve_ped` windows, surge message | rule-based windows |
 
