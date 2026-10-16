@@ -22,9 +22,20 @@ Regenerate everything from the recorded runs in `results/`:
 | | 3x3 grid | MoST Monaco |
 |---|---|---|
 | Network | 9 TLS, fixed 4-state signal programs, synthetic demand | 12 TLS, actuated programs with 2 or 3 vehicle-green sets, real multimodal demand |
-| Scenarios | normal, peak, 1-2 EVs, incident, pedestrian burst, composed EV+incident+pedestrians | 07:00 morning-peak slice, 17 min (1000 steps, 1 s step length) |
+| Scenarios | S0 to S5 (legend below) | 07:00 morning-peak slice, 17 min (1000 steps, 1 s step length) |
 | Arms | `sumo_default`, `fixed`, `max_pressure`, `ev_priority`, `ped_priority`, `llm_team` | `sumo_default` (MoST actuated), `max_pressure`, `llm_team` |
 | Seeds | 3 (5 for the pedestrian scenario) | 3 |
+
+The grid scenarios are referenced by ID in the tables and figures:
+
+| ID | Scenario | Content |
+|---|---|---|
+| S0 | Normal demand | 1,200 vehicles over 1 h. Regression check: the LLM layer must not harm the base policy |
+| S1 | Peak demand | 2x demand (2,400 vehicles) |
+| S2 | EV runs | `ev` (1 EV at t=600), `ev2` (2 overlapping EVs), `ev_incident` (EV plus an edge blocked 620 to 860 s) |
+| S3 | Incident | Interior edge A1A0 blocked from 1200 to 1500 s, teleport off |
+| S4 | Pedestrian surge | 360 pedestrians burst at B1 between 300 and 540 s, 1200 s horizon |
+| S5 | Composed | All three at once: EV at t=450, pedestrian burst 300 to 540 s, incident (A1A0 blocked 400 to 640 s) |
 
 ## Grid results
 
