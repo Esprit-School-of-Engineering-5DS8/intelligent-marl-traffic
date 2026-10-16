@@ -1,0 +1,6 @@
+run_id,id,planned_depart,eta_s,stops_at_red,trip_time_s,delay_s,stops,eta_error_s,eta_error_pct
+ev_rule_mp__real_district__emergency__peak__s1,ev_0,1820.42,28.921375900695608,1,33.0,11.52,1.0,4.078624099304392,14.102455268064526
+ev_rule_mp__real_district__emergency__peak__s1,ev_1,1876.17,170.15351524401396,0,190.0,58.53,1.0,19.84648475598604,11.663869963264977
+ev_rule_mp__real_district__emergency__peak__s1,ev_2,1935.26,39.62909571968003,0,55.0,20.049999999999997,0.0,15.37090428031997,38.78691653487993
+ev_rule_mp__real_district__emergency__peak__s1,ev_3,3001.77,212.61633035086066,0,158.0,80.23,1.0,-54.616330350860665,-25.68774010008191
+ev_rule_mp__real_district__emergency__peak__s1,ev_4,3038.57,658.6320916313834,0,436.0,611.1,14.0,-222.63209163138345,-33.802193130301326

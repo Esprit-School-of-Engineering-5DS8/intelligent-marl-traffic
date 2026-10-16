@@ -43,6 +43,7 @@ grid4x4,incident,peak,mp,5
 grid4x4,normal,low,act,5
 grid4x4,normal,low,coop,15
 grid4x4,normal,low,coop_full,15
+grid4x4,normal,low,dqn,15
 grid4x4,normal,low,ft,5
 grid4x4,normal,low,ind,15
 grid4x4,normal,low,mp,5
@@ -52,6 +53,7 @@ grid4x4,normal,medium,coop_eco,15
 grid4x4,normal,medium,coop_eco05,15
 grid4x4,normal,medium,coop_forecast,15
 grid4x4,normal,medium,coop_full,15
+grid4x4,normal,medium,dqn,15
 grid4x4,normal,medium,ft,5
 grid4x4,normal,medium,ind,15
 grid4x4,normal,medium,mp,5
@@ -61,6 +63,7 @@ grid4x4,normal,peak,coop_eco,15
 grid4x4,normal,peak,coop_eco05,15
 grid4x4,normal,peak,coop_forecast,15
 grid4x4,normal,peak,coop_full,15
+grid4x4,normal,peak,dqn,15
 grid4x4,normal,peak,ft,5
 grid4x4,normal,peak,ind,15
 grid4x4,normal,peak,mp,5
@@ -68,6 +71,7 @@ grid4x4,normal,rush_profile,act,5
 grid4x4,normal,rush_profile,coop,15
 grid4x4,normal,rush_profile,coop_forecast,15
 grid4x4,normal,rush_profile,coop_full,15
+grid4x4,normal,rush_profile,dqn,15
 grid4x4,normal,rush_profile,ft,5
 grid4x4,normal,rush_profile,ind,15
 grid4x4,normal,rush_profile,mp,5
@@ -91,6 +95,7 @@ grid8x8,normal,medium,ft,5
 grid8x8,normal,medium,ind,15
 grid8x8,normal,medium,mp,5
 grid8x8,normal,peak,coop,15
+grid8x8,normal,peak,dqn,15
 grid8x8,normal,peak,ft,5
 grid8x8,normal,peak,ind,15
 grid8x8,normal,peak,mp,5
@@ -116,12 +121,14 @@ real_district,normal,low,mp,5
 real_district,normal,medium,act,5
 real_district,normal,medium,coop,15
 real_district,normal,medium,coop_full,15
+real_district,normal,medium,dqn,15
 real_district,normal,medium,ft,5
 real_district,normal,medium,ind,15
 real_district,normal,medium,mp,5
 real_district,normal,peak,act,5
 real_district,normal,peak,coop,15
 real_district,normal,peak,coop_full,15
+real_district,normal,peak,dqn,15
 real_district,normal,peak,ft,5
 real_district,normal,peak,ind,15
 real_district,normal,peak,mp,5

@@ -1,0 +1,125 @@
+{
+  "agent": "dqn",
+  "network": "real_district",
+  "training_seed": 2,
+  "selected_checkpoint": "model_499940_steps.zip",
+  "selected_steps": 499940,
+  "validation": {
+    "seeds": [
+      1000
+    ],
+    "demands": [
+      "medium",
+      "peak"
+    ],
+    "metric": "mean_travel_time",
+    "episode": "protocol.validation"
+  },
+  "scores": {
+    "399952": {
+      "mean_travel_time": 131.83648626729854,
+      "runs": [
+        110.74651795429816,
+        152.92645458029895
+      ]
+    },
+    "449946": {
+      "mean_travel_time": 142.59303835472005,
+      "runs": [
+        110.65402611534277,
+        174.53205059409734
+      ]
+    },
+    "499940": {
+      "mean_travel_time": 128.8951261932934,
+      "runs": [
+        111.24325353645267,
+        146.54699885013414
+      ]
+    },
+    "500003": {
+      "mean_travel_time": 130.55023921755736,
+      "runs": [
+        110.63933623503809,
+        150.46114220007667
+      ]
+    }
+  },
+  "train_wall_time_s": 4474.4,
+  "total_timesteps": 500000,
+  "config": {
+    "name": "dqn",
+    "observation": {
+      "neighbours": false,
+      "emergency": false,
+      "pedestrians": false,
+      "buses": false,
+      "forecast": false
+    },
+    "reward": {
+      "person_weighted": false,
+      "co2": 0.0,
+      "ev": 0.0,
+      "ped": 0.0,
+      "clip": 5.0
+    },
+    "ppo": {
+      "learning_rate": 0.0003,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.0,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "training": {
+      "total_timesteps": 500000,
+      "checkpoint_every": 50000,
+      "demand_levels": [
+        "low",
+        "medium",
+        "peak",
+        "rush_profile"
+      ],
+      "scenarios": [],
+      "quick_timesteps": 3000
+    },
+    "validation": {
+      "seeds": [
+        1000
+      ],
+      "demands": [
+        "medium",
+        "peak"
+      ],
+      "last_checkpoints": 4
+    },
+    "description": "Independent agents (IND's local observation and reward) learned with DQN instead of PPO, to compare the learning algorithm alone. Hyperparameters fixed before any run, not tuned: replay buffer of 100 000 agent steps, epsilon-greedy exploration falling from 1 to 0.05 over the first 20 % of training, target network replaced every 10 000 agent steps, one gradient step per transition collected (all intersections share the network, as with PPO).\n",
+    "algorithm": "dqn",
+    "dqn": {
+      "learning_rate": 0.0005,
+      "buffer_size": 100000,
+      "learning_starts": 5000,
+      "batch_size": 64,
+      "tau": 1.0,
+      "gamma": 0.99,
+      "train_freq": 1,
+      "gradient_steps": -1,
+      "target_update_interval": 10000,
+      "exploration_fraction": 0.2,
+      "exploration_initial_eps": 1.0,
+      "exploration_final_eps": 0.05,
+      "net_arch": [
+        64,
+        64
+      ]
+    }
+  }
+}

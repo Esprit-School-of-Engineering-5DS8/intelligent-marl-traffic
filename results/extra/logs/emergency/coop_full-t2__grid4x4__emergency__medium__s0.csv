@@ -1,0 +1,5 @@
+run_id,id,planned_depart,eta_s,stops_at_red,trip_time_s,delay_s,stops,eta_error_s,eta_error_pct
+coop_full-t2__grid4x4__emergency__medium__s0,ev_0,1928.96,141.75691526139266,2,132.0,41.66,3.0,-9.756915261392663,-6.88284959037194
+coop_full-t2__grid4x4__emergency__medium__s0,ev_1,2469.3,126.0450183070194,2,146.0,55.82,4.0,19.954981692980596,15.831630603896155
+coop_full-t2__grid4x4__emergency__medium__s0,ev_2,3035.29,133.92608035670895,0,79.0,4.94,0.0,-54.92608035670895,-41.012236160734815
+coop_full-t2__grid4x4__emergency__medium__s0,ev_3,3670.48,134.57011613342945,2,142.0,52.03,3.0,7.429883866570549,5.5211989705081645
