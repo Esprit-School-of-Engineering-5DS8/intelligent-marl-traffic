@@ -85,8 +85,6 @@
   },
   "common": {
     "loading": "Loading…",
-    "comingSoon": "Under construction",
-    "comingSoonText": "This page arrives at step {{step}} of the development plan.",
     "errorTitle": "This part of the screen ran into an error",
     "errorText": "The other pages still work. Try again; if the error persists, reload the application.",
     "retry": "Try again",
@@ -127,8 +125,7 @@
   },
   "assistant": {
     "title": "Assistant",
-    "description": "Ask about the results; the numbers come from the result files.",
-    "placeholder": "The assistant arrives at step 6: streamed answers, tools and confirmation before any action."
+    "description": "Ask about the results; the numbers come from the result files."
   },
   "metrics": {
     "mean_travel_time": "Mean travel time",

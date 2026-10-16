@@ -85,8 +85,6 @@
   },
   "common": {
     "loading": "Chargement…",
-    "comingSoon": "En construction",
-    "comingSoonText": "Cette page arrive à l'étape {{step}} du plan de développement.",
     "errorTitle": "Cette partie de l'écran a rencontré une erreur",
     "errorText": "Les autres pages restent utilisables. Réessayez ; si l'erreur persiste, rechargez l'application.",
     "retry": "Réessayer",
@@ -127,8 +125,7 @@
   },
   "assistant": {
     "title": "Assistant",
-    "description": "Posez une question sur les résultats ; les chiffres viennent des fichiers de résultats.",
-    "placeholder": "L'assistant arrive à l'étape 6 : réponses en streaming, outils et confirmation avant toute action."
+    "description": "Posez une question sur les résultats ; les chiffres viennent des fichiers de résultats."
   },
   "metrics": {
     "mean_travel_time": "Temps de trajet moyen",
