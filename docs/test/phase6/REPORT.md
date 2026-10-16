@@ -23,12 +23,9 @@ car or EV. The LLM only proposes typed directives; code decides and enforces.
 Safety chain: directives go to the Arbiter (validate, clip, priority), then the
 DirectiveLayer (one winner per junction, starvation guard), then
 TrafficLightAgent (min green, yellow, TraCI). Agents share state through a TTL
-blackboard: `ev_corridor`, `ped_surge`, `arbiter_result`.
-
-Incidents are scripted in the experiment; code detects the effect
-(`queue_growth` alert) and forces an immediate Operator call:
-
-![Incident call flow](figures/incident_flow.png)
+blackboard: `ev_corridor`, `ped_surge`, `arbiter_result`. Incidents are
+scripted in the experiment; the code detector turns their effect into a
+`queue_growth` alert that runs the Operator immediately.
 
 ## Setup
 
@@ -142,4 +139,5 @@ Regenerate everything from the recorded runs in `results/`:
 - `monaco.md`: scenario setup, static-program conversion and k-group control
   notes, full results and limitations.
 - `tables/`: `all_results.csv`, `llm_ops.csv`, per-scenario arms x seeds tables.
-- `figures/`: all step-wait curves, bar panels and the two headline figures.
+- `figures/`: step-wait curves, bar panels, headline figures and the
+  architecture diagram.
