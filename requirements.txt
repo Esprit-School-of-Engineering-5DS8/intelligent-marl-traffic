@@ -1,0 +1,9 @@
+traci
+numpy
+pandas
+matplotlib
+torch
+scikit-learn
+jupyter
+gymnasium
+pettingzoo

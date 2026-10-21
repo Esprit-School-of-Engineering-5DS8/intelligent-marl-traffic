@@ -1,0 +1,5 @@
+/* Full-viewport shell override: removes the reference shell's outer gutters. */
+html, body { width: 100%; min-height: 100%; margin: 0; background: #fff; }
+body { overflow-x: hidden; }
+.workspace { width: 100%; max-width: none; min-height: 100vh; margin: 0; background: #fff; overflow-x: hidden; }
+.dashboard { min-height: 100vh; }
