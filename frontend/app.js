@@ -1058,6 +1058,14 @@ const LIVE_VIEW = { center: LIVE_FOCUS, zoom: 16.05, pitch: 58, bearing: -26 };
 let liveMap = null;
 let liveMap3dOn = true;
 let liveSceneMarkers = [];
+let activeMapStyle = 'light';
+
+const MAP_STYLES = {
+  light: { url: 'mapbox://styles/mapbox/light-v11', sky: '#dce9f2', horizon: '#f5eadf' },
+  dark: { url: 'mapbox://styles/mapbox/dark-v11', sky: '#111827', horizon: '#374151' },
+  sunset: { url: 'mapbox://styles/mapbox/light-v11', sky: '#e89a78', horizon: '#f7cf91' },
+  dawn: { url: 'mapbox://styles/mapbox/light-v11', sky: '#b8d7e6', horizon: '#f4dfc5' }
+};
 
 function getLiveScenarioView() {
   const scenario = getScenario();
@@ -1296,7 +1304,7 @@ function initLiveMap() {
     ...getLiveScenarioView(),
     antialias: true,
     attributionControl: false,
-    style: 'mapbox://styles/mapbox/light-v11',
+    style: MAP_STYLES[activeMapStyle].url,
     maxPitch: 72
   });
 
@@ -1310,6 +1318,25 @@ function initLiveMap() {
   });
 
   window.setTimeout(() => liveMap?.resize(), 80);
+}
+
+function applyLiveMapStyle(styleName) {
+  const style = MAP_STYLES[styleName];
+  if (!style || !liveMap || styleName === activeMapStyle) return;
+  activeMapStyle = styleName;
+  liveMap.once('style.load', () => {
+    buildLiveMapScene();
+    if (styleName === 'sunset' || styleName === 'dawn') {
+      liveMap.setFog({ color: style.sky, 'high-color': style.horizon, 'horizon-blend': 0.18, 'space-color': style.sky, 'star-intensity': 0.05 });
+    }
+    document.querySelectorAll('[data-map-style]').forEach((option) => {
+      const selected = option.dataset.mapStyle === styleName;
+      option.classList.toggle('is-selected', selected);
+      option.setAttribute('aria-checked', String(selected));
+    });
+    showToast(`${styleName[0].toUpperCase()}${styleName.slice(1)} map style applied.`);
+  });
+  liveMap.setStyle(style.url);
 }
 
 function resetLiveMapView() {
@@ -1343,6 +1370,10 @@ document.querySelectorAll('[data-queue-close]').forEach((button) => {
   });
 });
 
+document.querySelector('[data-zone-close]')?.addEventListener('click', () => {
+  document.querySelector('.zone-panel')?.setAttribute('hidden', '');
+});
+
 const LIVE_ACTION_MESSAGES = {
   accelerate: 'Acceleration plan applied to the active corridor.',
   reroute: 'Reroute advisory published to connected vehicles.',
@@ -1365,12 +1396,10 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
     }
 
     if (action === 'layers') {
-      liveMap3dOn = !liveMap3dOn;
-      if (liveMap?.getLayer('live-3d-buildings')) {
-        liveMap.setPaintProperty('live-3d-buildings', 'fill-extrusion-opacity', liveMap3dOn ? 0.94 : 0);
-      }
-      button.classList.toggle('is-active', liveMap3dOn);
-      showToast(liveMap3dOn ? '3D buildings shown.' : '3D buildings hidden.');
+      const menu = button.parentElement?.querySelector('.live-style-menu');
+      const open = menu?.hidden;
+      if (menu) menu.hidden = !open;
+      button.setAttribute('aria-expanded', String(Boolean(open)));
       return;
     }
 
@@ -1409,6 +1438,23 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
       document.querySelectorAll('.live-action').forEach((tile) => tile.classList.remove('is-active'));
       if (action !== 'deactivate') button.classList.add('is-active');
       showToast(LIVE_ACTION_MESSAGES[action] || 'Corridor action applied.');
+    }
+  });
+});
+
+document.querySelectorAll('[data-map-style]').forEach((option) => {
+  option.addEventListener('click', () => {
+    applyLiveMapStyle(option.dataset.mapStyle);
+    option.closest('.live-style-menu')?.setAttribute('hidden', '');
+    option.closest('.live-style-picker')?.querySelector('[data-live-action="layers"]')?.setAttribute('aria-expanded', 'false');
+  });
+});
+
+document.addEventListener('click', (event) => {
+  document.querySelectorAll('.live-style-picker').forEach((picker) => {
+    if (!picker.contains(event.target)) {
+      picker.querySelector('.live-style-menu')?.setAttribute('hidden', '');
+      picker.querySelector('[data-live-action="layers"]')?.setAttribute('aria-expanded', 'false');
     }
   });
 });
