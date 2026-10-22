@@ -1,15 +1,2128 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SUMO Network Operations</title><link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./viewport.css"><link rel="stylesheet" href="./material3.css"></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ffffff">
+  <title>SUMO · Simulation of Urban Mobility</title>
+  <link rel="icon" type="image/svg+xml" href="/sumo-icon.svg">
+  <script>
+    try {
+      if (localStorage.getItem('sumo.sidebarCollapsed') === 'true') {
+        document.documentElement.classList.add('is-sidebar-collapsed');
+      }
+    } catch {}
+  </script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
 <body>
-<div class="workspace">
-  <aside class="sidebar"><div class="wordmark"><span>‹</span>SUMO</div><nav aria-label="Workspace navigation">
-    <button class="nav-link active" data-tab="Overview"><span class="nav-icon">▦</span>Dashboard</button><button class="nav-link" data-tab="Live Map"><span class="nav-icon">◎</span>Live Map</button><button class="nav-link" data-tab="Events"><span class="nav-icon">△</span>Events</button><button class="nav-link" data-tab="Optimize"><span class="nav-icon">♧</span>Optimize</button><button class="nav-link" data-tab="Predict"><span class="nav-icon">⌁</span>Predict</button><button class="nav-link" data-tab="Message"><span class="nav-icon">▣</span>Message</button><button class="nav-link" data-tab="Rules Engine"><span class="nav-icon">▤</span>Rules Engine</button><button class="nav-link" data-tab="Permissions"><span class="nav-icon">⊛</span>Permissions</button><button class="nav-link" data-tab="Settings"><span class="nav-icon">⚙</span>Settings</button></nav><div class="sidebar-bottom"><button class="nav-link"><span class="nav-icon">▧</span>Store</button><button class="nav-link"><span class="nav-icon">?</span>Get Help</button></div></aside>
-  <main class="dashboard"><header class="context-bar"><section class="location-card"><button class="collapse-button" aria-label="Collapse context panel">⌄</button><div><h1>SUMO Network</h1><div class="location-meta"><span class="online-dot"></span>Monaco / MoST <span>·</span><small>Updated <span id="updatedAt">20:32</span></small></div></div><button class="star-button" aria-label="Favorite network">☆</button><button class="chevron-button" aria-label="Choose network">⌄</button></section><div class="top-right"><div class="tabs" role="tablist"><button class="tab active" role="tab" aria-selected="true" data-tab="Overview">Overview</button><button class="tab" role="tab" aria-selected="false" data-tab="Device log">Device log</button><button class="tab" role="tab" aria-selected="false" data-tab="Settings">Settings</button></div><button class="notification" aria-label="Notifications">♧<b>2</b></button><div class="profile"><span class="profile-avatar">HM</span><div><strong>Operator</strong><small>TraCI bridge</small></div><span>⌄</span></div></div></header>
-    <div class="body-grid"><section class="map-column"><div class="location-row"><div><small>Location</small><strong><span class="blue-dot"></span> Monaco / MoST</strong></div><div><small>Substation</small><strong>SUMO Network <span>⌄</span></strong></div></div><div class="map-panel" aria-label="Mapbox GL 3D city view of Monaco with SUMO traffic overlay"><div id="sumoMap"></div><div class="map-hud"><div class="hud-group"><button class="hud-btn" data-map-mode="3d">3D</button><button class="hud-btn" data-map-mode="2d">2D</button></div><div class="hud-legend"><b>SUMO congestion</b><span class="ldot" style="background:#2dd4bf"></span><span class="ldot" style="background:#facc15"></span><span class="ldot" style="background:#ef4444"></span></div></div><div class="map-token" id="tokenPanel" hidden><div class="token-message">A Mapbox access token is required for the 3D city view.</div><input type="password" id="tokenInput" placeholder="pk.eyJ1…" autocomplete="off"><div class="token-actions"><button id="tokenSave">Connect</button><button id="tokenSkip">Skip for now</button></div></div><div class="map-caption">12 active junctions · Monaco · Mapbox GL 3D · SUMO MoST overlay</div></div><div class="connection-strip"><span class="online-dot"></span><strong>TraCI connected</strong><span>localhost:8813</span><button id="refreshBtn">Refresh state</button></div></section>
-      <section class="content-column"><div class="content-heading"><div><small>SUMO CONTROL ROOM</small><h2>Overview</h2></div><div class="heading-actions"><label>Scenario <select id="scenario"><option>Monaco / MoST</option><option>Grid 2 × 2</option><option>Grid 3 × 3</option></select></label><label>Controller <select id="controller"><option>Max Pressure RL</option><option>Fixed-time baseline</option><option>Actuated</option></select></label></div></div>
-        <section class="metrics-section"><div class="section-title"><h3>Key Metrics</h3><span>Last 24 Hours⌄</span></div><div class="metrics-grid"><article class="metric"><span class="metric-icon purple">▣</span><div><small>Average speed</small><strong>31.8 <em>km/h</em></strong></div></article><article class="metric"><span class="metric-icon pink">♧</span><div><small>Waiting time</small><strong id="waitMetric">1,284 <em>sec</em></strong></div></article><article class="metric"><span class="metric-icon cyan">✳</span><div><small>Throughput</small><strong>742 <em>veh/h</em></strong></div></article><article class="metric"><span class="metric-icon orange">▤</span><div><small>CO₂ emissions</small><strong>18.4 <em>kg/h</em></strong></div></article><article class="metric"><span class="metric-icon green">▰</span><div><small>Traffic lights</small><strong>12 <em>active</em></strong></div></article><article class="metric"><span class="metric-icon red">◒</span><div><small>Simulation time</small><strong id="timeMetric">00:00:00</strong></div></article></div></section>
-        <section class="insights-section"><div class="section-title"><h3>Traffic Insights</h3><div class="filters"><span>Last 3 Hours⌄</span><span>Northbound⌄</span><button id="changeRange">↻ Reset Change</button></div></div><div class="chart-grid"><article class="chart-card"><div class="chart-top"><div><h4>↻ &nbsp;Vehicle Count <small>VEH</small></h4><span>Last update: 20:32</span></div><span class="chart-tools">⚙ ✦</span></div><div class="chart-number">137 <small>VEH</small></div><div class="chart-legend"><span>⌁ Average</span><span class="orange-line">→ Max</span><span class="blue-line">→ Min</span></div><div class="chart-box orange-chart"><svg viewBox="0 0 500 150" preserveAspectRatio="none"><path class="area-orange" d="M0 62 L75 75 110 115 185 112 220 77 270 77 300 62 360 77 405 77 500 77 L500 150 0 150Z"></path><path class="line-orange" d="M0 62 L75 75 110 115 185 112 220 77 270 77 300 62 360 77 405 77 500 77"></path></svg><div class="chart-axis"><span>00:00</span><span>01:00</span><span>02:00</span><span>03:00</span><span>04:00</span><span>05:00</span><span>06:00</span><span>07:00</span></div></div></article><article class="chart-card"><div class="chart-top"><div><h4>↻ &nbsp;Vehicle Count <small>MPH</small></h4><span>Last update: 20:32</span></div><span class="chart-tools">⚙ ✦</span></div><div class="chart-number">35 <small>MPH</small></div><div class="chart-legend"><span>⌁ Normal</span><span class="orange-line">→ Max</span><span class="blue-line">→ Min</span></div><div class="chart-box blue-chart"><svg viewBox="0 0 500 150" preserveAspectRatio="none"><path class="area-blue" d="M0 62 L75 75 110 115 185 112 220 77 270 77 300 62 360 77 405 77 500 77 L500 150 0 150Z"></path><path class="line-blue" d="M0 62 L75 75 110 115 185 112 220 77 270 77 300 62 360 77 405 77 500 77"></path></svg><div class="chart-axis"><span>00:00</span><span>01:00</span><span>02:00</span><span>03:00</span><span>04:00</span><span>05:00</span><span>06:00</span><span>07:00</span></div></div></article></div></section>
-        <section class="bottom-grid"><article class="detail-card"><div class="detail-heading"><h3>△ &nbsp;Events</h3><span>⚙ ✦</span></div><small>Last update: 20:32</small><h4>Accident Detected <span class="warning-mark">△</span></h4><div class="severity"><b>▮▮▮▮▮</b><span>Emergency Level</span></div><p>Two vehicles collided in the northbound lane. No VRS were involved. Lane blockage is causing moderate congestion.</p><div class="event-facts"><span>Accident Occurred: <b>Yes</b></span><span>Weather: <b>Sunny</b></span><span>Vehicle Types: <b>Car vs. Car</b></span></div></article><article class="detail-card"><div class="detail-heading"><h3>♧ &nbsp;CTECC</h3><span>⚙ ✦</span></div><small>Last update: 20:32</small><div class="response-row"><span>Medical Department</span><b class="status yellow">In Progress</b></div><div class="response-row"><span>Police Department</span><b class="status green">Dispatched</b></div><div class="response-row"><span>Fire Department</span><b class="status green">Dispatched</b></div><div class="response-row"><span>Water Department</span><b class="status pink-bg">Notified</b></div><div class="response-row"><span>Transport Department</span><b class="status pink-bg">Notified</b></div><div class="response-row"><span>V2X Broadcast System</span><b class="status gray">Triggered</b></div></article></section>
-        <section class="control-bar"><div><strong>Simulation control</strong><span id="runStatus">Standby · local demo state</span></div><button class="primary" id="runBtn">▶ Run</button><button id="pauseBtn" disabled>Ⅱ Pause</button><button id="stepBtn">Step</button><button id="stopBtn" disabled>■ Stop</button><button id="apiBtn">API notes</button></section><div class="api-notes" id="apiNotes" hidden>TraCI adapter endpoints: <code>GET /api/simulation/state</code> · <code>POST /api/simulation/start</code> · <code>POST /api/simulation/step</code> · <code>POST /api/simulation/stop</code></div>
-      </section></div></main></div><div class="toast" id="toast" role="status"></div><script type="module" src="./app.js"></script></body></html>
+  <svg class="svg-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10.5c0 5.2-8 11-8 11s-8-5.8-8-11a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10.5" r="2.8"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M8.5 14.5A6 6 0 1 1 15.5 14.5c-.8.7-1.2 1.5-1.3 2.5h-4.4c-.1-1-.5-1.8-1.3-2.5Z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.7-3.7"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 2 1.2-4.2A8 8 0 1 1 21 12Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 3H20v18H6.5A2.5 2.5 0 0 1 4 18.5v-13A2.5 2.5 0 0 1 6.5 3Z"/><path d="M13 7 9 12l4 5"/></symbol>
+    <symbol id="i-user-check" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.2"/><path d="M3 20a6 6 0 0 1 11.2-3"/><path d="m16 17 2 2 4-4"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-2.6v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.6v-2.6h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4 8.4l1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h2.6v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v2.6h-.2a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
+    <symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9h16l-1-4H5L4 9Z"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8v.4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.4l6.1-.9L12 3Z"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.7-4L3 10"/><path d="M3 5v5h5"/><path d="M4 13a8 8 0 0 0 14.7 4L21 14"/><path d="M21 19v-5h-5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3c.7 5.1 3.2 7.6 8 8.3-4.8.7-7.3 3.2-8 8.3-.7-5.1-3.2-7.6-8-8.3C8.8 10.6 11.3 8.1 12 3Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 3.7 2.5 17.2A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.8L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9.5a15 15 0 0 1 19 0"/><path d="M5.5 13a10.5 10.5 0 0 1 13 0"/><path d="M8.5 16.5a6 6 0 0 1 7 0"/><circle cx="12" cy="20" r="1"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24"><path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><circle cx="12" cy="7" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="17" r="1.6"/></symbol>
+    <symbol id="i-conflict" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/><circle cx="12" cy="12" r="9"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="m5 16-1 4M19 16l1 4"/><path d="M3 16v-4l2-5h14l2 5v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><path d="M5 12h14"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></symbol>
+    <symbol id="i-flood" viewBox="0 0 24 24"><path d="M3 15c2.2 0 2.2 2 4.4 2s2.2-2 4.4-2 2.2 2 4.4 2 2.2-2 4.4-2"/><path d="M3 19c2.2 0 2.2 2 4.4 2s2.2-2 4.4-2 2.2 2 4.4 2 2.2-2 4.4-2"/><path d="M6 12V6a2 2 0 0 1 4 0v6M14 12V6a2 2 0 0 1 4 0v6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></symbol>
+    <symbol id="i-drag" viewBox="0 0 24 24"><circle cx="9" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16M13 5l7 7-7 7"/></symbol>
+    <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+    <symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742"/><path d="m2 2 20 20"/><path d="M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 13v8"/><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="m8 17 4-4 4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M10 11v6M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.1 12.3a1 1 0 0 1 0-.7 10.8 10.8 0 0 1 19.8 0 1 1 0 0 1 0 .7 10.8 10.8 0 0 1-19.8 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><path d="m22 7-9 5.7a2 2 0 0 1-2 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m11 12 9-9"/><path d="m15 8 3 3"/><path d="m18 5 2 2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></symbol>
+    <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 19a4.5 4.5 0 0 1-.3-9A6.5 6.5 0 0 1 18.6 11 4 4 0 0 1 18 19H6.5Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h4.5a3.5 3.5 0 0 0 0-7h-3a3.5 3.5 0 0 1 0-7H15"/></symbol>
+    <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l2.2-6 4.2 12 2.4-6H21"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="appSidebar">
+      <div class="brand">
+        <img class="brand-logo" src="/sumo-logo.svg" alt="SUMO — Simulation of Urban Mobility">
+        <img class="brand-icon" src="/sumo-icon.svg" alt="SUMO">
+      </div>
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <button class="nav-item is-active" data-nav="Dashboard"><svg class="ico"><use href="#i-grid"/></svg><span>Dashboard</span></button>
+        <div class="nav-group" data-nav-group="live">
+          <button class="nav-item nav-parent" data-nav="Live Map" aria-expanded="false" aria-controls="liveSubnav"><svg class="ico"><use href="#i-pin"/></svg><span>Live Map</span><svg class="ico nav-caret"><use href="#i-chevron"/></svg></button>
+          <div class="nav-submenu" id="liveSubnav" aria-hidden="true">
+            <button type="button" class="nav-subitem" data-live-tab="events">Events</button>
+            <button type="button" class="nav-subitem" data-live-tab="optimize">Optimize</button>
+            <button type="button" class="nav-subitem" data-live-tab="predict">Predict</button>
+          </div>
+        </div>
+        <button class="nav-item" data-nav="Message"><svg class="ico"><use href="#i-chat"/></svg><span>Message</span></button>
+        <button class="nav-item" data-nav="Rules Engine"><svg class="ico"><use href="#i-book"/></svg><span>Rules Engine</span></button>
+        <div class="nav-group" data-nav-group="access">
+          <button class="nav-item nav-parent" data-nav="Roles &amp; Permissions" aria-expanded="false" aria-controls="accessSubnav"><svg class="ico"><use href="#i-user-check"/></svg><span>Roles &amp; Permissions</span><svg class="ico nav-caret"><use href="#i-chevron"/></svg></button>
+          <div class="nav-submenu" id="accessSubnav" aria-hidden="true">
+            <button type="button" class="nav-subitem" data-access-link="roles">Roles</button>
+            <button type="button" class="nav-subitem" data-access-link="permissions">Permissions</button>
+          </div>
+        </div>
+        <button class="nav-item" data-nav="Settings"><svg class="ico"><use href="#i-gear"/></svg><span>Settings</span></button>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item"><svg class="ico"><use href="#i-store"/></svg><span>Store</span></button>
+        <button class="nav-item"><svg class="ico"><use href="#i-help"/></svg><span>Get Help</span></button>
+        <button type="button" class="nav-item sidebar-collapse" id="sidebarToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+          <svg class="ico sidebar-collapse-icon"><use href="#i-chevron"/></svg>
+          <span>Collapse sidebar</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="notification-scrim" id="notificationScrim" aria-hidden="true" hidden></div>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="site-card" id="scenarioCard">
+          <button class="ghost-btn site-caret" aria-label="Collapse location"><svg class="ico"><use href="#i-chevron"/></svg></button>
+          <button type="button" class="site-copy scenario-trigger" data-scenario-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="scenarioMenu">
+            <span class="site-title" id="siteTitle">Central Austin · 2×2</span>
+            <span class="site-status"><span class="online-dot"></span>Online <span class="meta-sep">Update 20-32</span></span>
+          </button>
+          <button class="ghost-btn star-btn" aria-label="Favorite location"><svg class="ico"><use href="#i-star"/></svg></button>
+          <button class="ghost-btn scenario-toggle" data-scenario-trigger aria-label="Change scenario" aria-haspopup="listbox" aria-expanded="false" aria-controls="scenarioMenu"><svg class="ico"><use href="#i-chevron"/></svg></button>
+          <div class="scenario-menu" id="scenarioMenu" data-scenario-menu role="listbox" aria-label="Scenario" hidden></div>
+        </div>
+
+        <div class="topbar-right">
+          <nav class="view-tabs" aria-label="Views">
+            <button class="view-tab is-active" data-view="Dashboard">Overview</button>
+            <button class="view-tab" data-view="Activity log">Activity log</button>
+            <button class="view-tab" data-view="Settings">Settings</button>
+          </nav>
+          <div class="notification-wrap">
+            <button type="button" class="ghost-btn bell-btn" id="notificationToggle" aria-label="Notifications" aria-haspopup="dialog" aria-expanded="false" aria-controls="notificationPanel">
+              <svg class="ico"><use href="#i-bell"/></svg>
+              <span class="bell-badge" id="notificationBadge"></span>
+            </button>
+            <section class="notification-panel" id="notificationPanel" role="dialog" aria-modal="false" aria-labelledby="notificationTitle" hidden>
+              <div class="notification-head">
+                <h2 id="notificationTitle">Notifications <span id="notificationCount">(4)</span></h2>
+                <button type="button" class="notification-close" id="notificationClose" aria-label="Close notifications"><svg class="ico"><use href="#i-x"/></svg></button>
+              </div>
+              <div class="notification-scroll">
+                <div class="notification-section-head">
+                  <span>Today</span>
+                  <button type="button" class="notification-view-all" id="notificationViewAll" aria-expanded="false" aria-controls="notificationEarlier">View all</button>
+                </div>
+                <ul class="notification-list">
+                  <li>
+                    <button type="button" class="notification-item is-unread" data-notification>
+                      <span class="notification-avatar tone-sage">MC<i class="notification-presence is-online"></i></span>
+                      <span class="notification-copy"><strong><b>Maya Chen</b> acknowledged the East 7th incident</strong><small>Traffic Operator</small></span>
+                      <span class="notification-time">8m</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" class="notification-item is-unread" data-notification>
+                      <span class="notification-avatar tone-amber">OH<i class="notification-presence is-away"></i></span>
+                      <span class="notification-copy"><strong><b>Omar Haddad</b> joined your response team</strong><small>Dispatch Lead</small></span>
+                      <span class="notification-time">32m</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" class="notification-item is-unread" data-notification>
+                      <span class="notification-avatar tone-slate">LF<i class="notification-presence is-online"></i></span>
+                      <span class="notification-copy"><strong><b>Lena Fischer</b> updated the signal plan</strong><small>Network Engineer</small></span>
+                      <span class="notification-time">2h</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" class="notification-item is-unread" data-notification>
+                      <span class="notification-avatar tone-rose">YK<i class="notification-presence is-online"></i></span>
+                      <span class="notification-copy"><strong><b>Youssef Karim</b> cleared the queue backlog</strong><small>Field Supervisor</small></span>
+                      <span class="notification-time">4h</span>
+                    </button>
+                  </li>
+                </ul>
+                <div class="notification-earlier" id="notificationEarlier" hidden>
+                  <div class="notification-section-head"><span>Earlier</span></div>
+                  <ul class="notification-list">
+                    <li>
+                      <button type="button" class="notification-item" data-notification>
+                        <span class="notification-avatar tone-violet">AS</span>
+                        <span class="notification-copy"><strong><b>Amira Saleh</b> shared the weekly traffic report</strong><small>Analytics Lead</small></span>
+                        <span class="notification-time">Yesterday</span>
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" class="notification-item" data-notification>
+                        <span class="notification-avatar tone-teal">TN</span>
+                        <span class="notification-copy"><strong><b>Tomas Novak</b> completed the signal audit</strong><small>Systems Engineer</small></span>
+                        <span class="notification-time">Mon</span>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div class="account" id="account">
+            <button type="button" class="account-trigger" id="accountToggle" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu">
+              <span class="avatar" aria-hidden="true">
+                <svg viewBox="0 0 40 40">
+                  <defs><clipPath id="avatarClip"><circle cx="20" cy="20" r="20"/></clipPath></defs>
+                  <g clip-path="url(#avatarClip)">
+                    <rect width="40" height="40" fill="#e9e2da"/>
+                    <path d="M5 40c1.4-8.4 6.8-13 15-13s13.6 4.6 15 13" fill="#3f4b5c"/>
+                    <circle cx="20" cy="19" r="8.6" fill="#d8a67e"/>
+                    <path d="M10.4 19c-.6-9 4-14.6 9.6-14.6S30.2 10 29.6 19c-.2 2.4-1.1 3.7-1.6 3.2-.2-6-3.2-8.6-8-8.6s-7.8 2.6-8 8.6c-.5.5-1.4-.8-1.6-3.2Z" fill="#3a2a24"/>
+                    <path d="M13 18.5c.3 5 2.7 8.4 7 8.4s6.7-3.4 7-8.4" fill="none" stroke="#c9936d" stroke-width=".8"/>
+                    <circle cx="16.6" cy="18.7" r=".8" fill="#3a2a24"/><circle cx="23.4" cy="18.7" r=".8" fill="#3a2a24"/>
+                    <path d="M18 23.4c1.2.8 2.8.8 4 0" fill="none" stroke="#a9675b" stroke-width=".9" stroke-linecap="round"/>
+                    <path d="M12 40c2-6 4.5-9 8-9s6 3 8 9" fill="#d8d2c8"/>
+                  </g>
+                </svg>
+              </span>
+              <span class="account-copy">
+                <strong>Jane Cooper</strong>
+                <small>AT4ATG <svg class="ico drag-ico"><use href="#i-drag"/></svg></small>
+              </span>
+              <span class="account-menu-icon" aria-hidden="true"><svg class="ico"><use href="#i-dots"/></svg></span>
+            </button>
+
+            <div class="account-menu" id="accountMenu" role="menu" aria-label="Account menu" hidden>
+              <div class="account-menu-profile">
+                <span class="account-menu-avatar" aria-hidden="true">
+                  <svg viewBox="0 0 40 40">
+                    <defs><clipPath id="accountMenuAvatarClip"><circle cx="20" cy="20" r="20"/></clipPath></defs>
+                    <g clip-path="url(#accountMenuAvatarClip)">
+                      <rect width="40" height="40" fill="#e9e2da"/>
+                      <path d="M5 40c1.4-8.4 6.8-13 15-13s13.6 4.6 15 13" fill="#3f4b5c"/>
+                      <circle cx="20" cy="19" r="8.6" fill="#d8a67e"/>
+                      <path d="M10.4 19c-.6-9 4-14.6 9.6-14.6S30.2 10 29.6 19c-.2 2.4-1.1 3.7-1.6 3.2-.2-6-3.2-8.6-8-8.6s-7.8 2.6-8 8.6c-.5.5-1.4-.8-1.6-3.2Z" fill="#3a2a24"/>
+                      <path d="M13 18.5c.3 5 2.7 8.4 7 8.4s6.7-3.4 7-8.4" fill="none" stroke="#c9936d" stroke-width=".8"/>
+                      <circle cx="16.6" cy="18.7" r=".8" fill="#3a2a24"/><circle cx="23.4" cy="18.7" r=".8" fill="#3a2a24"/>
+                      <path d="M18 23.4c1.2.8 2.8.8 4 0" fill="none" stroke="#a9675b" stroke-width=".9" stroke-linecap="round"/>
+                      <path d="M12 40c2-6 4.5-9 8-9s6 3 8 9" fill="#d8d2c8"/>
+                    </g>
+                  </svg>
+                  <i class="account-menu-presence"></i>
+                </span>
+                <span class="account-menu-identity">
+                  <strong>Jane Cooper</strong>
+                  <small>jane.cooper@sumo.io</small>
+                </span>
+              </div>
+
+              <div class="account-menu-sep"></div>
+
+              <button type="button" class="account-menu-item" role="menuitem" data-account-action="account">
+                <span class="account-menu-item-icon"><svg class="ico"><use href="#i-user"/></svg></span>
+                My Account
+              </button>
+              <button type="button" class="account-menu-item" role="menuitem" data-account-action="settings">
+                <span class="account-menu-item-icon"><svg class="ico"><use href="#i-gear"/></svg></span>
+                Settings
+              </button>
+              <button type="button" class="account-menu-item" role="menuitem" data-account-action="pricing">
+                <span class="account-menu-item-icon"><svg class="ico"><use href="#i-store"/></svg></span>
+                Pricing
+              </button>
+              <button type="button" class="account-menu-item" role="menuitem" data-account-action="faq">
+                <span class="account-menu-item-icon"><svg class="ico"><use href="#i-help"/></svg></span>
+                FAQ
+              </button>
+
+              <div class="account-menu-sep"></div>
+
+              <button type="button" class="account-menu-item is-danger" role="menuitem" data-account-action="signout">
+                <span class="account-menu-item-icon"><svg class="ico"><use href="#i-arrow"/></svg></span>
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="content" id="dashboardView">
+        <section class="map-column">
+          <div class="map-meta">
+            <div>
+              <span>Location</span>
+              <strong><i class="tiny-dot"></i><span id="mapLocationName">East 7th</span></strong>
+            </div>
+            <div>
+              <span>Substation</span>
+              <strong>7th &amp; Comal (Segment ID:7C2) <svg class="ico meta-caret"><use href="#i-chevron"/></svg></strong>
+            </div>
+          </div>
+          <div class="map-frame">
+            <div id="map" aria-label="Map of Central Austin"></div>
+            <div class="map-controls">
+              <button data-map-action="zoom-in" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+              <button data-map-action="zoom-out" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+              <button data-map-action="reset" aria-label="Reset map view"><svg class="ico"><use href="#i-expand"/></svg></button>
+            </div>
+            <div class="map-token" id="tokenPanel" hidden>
+              <p class="token-message">Mapbox access token required for the live map.</p>
+              <input type="password" id="tokenInput" placeholder="pk.eyJ1…" autocomplete="off">
+              <div class="token-actions">
+                <button id="tokenSave">Connect</button>
+                <button id="tokenSkip">Skip for now</button>
+              </div>
+            </div>
+            <div class="map-offline" id="mapOffline" hidden>
+              <strong>Live map offline</strong>
+              <span>Add a Mapbox token to enable the street view.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="insights-column">
+          <div class="section-bar">
+            <h2>Traffic Insights</h2>
+            <div class="filter-row">
+              <button class="filter-chip">Last 3 Hours <svg class="ico"><use href="#i-chevron"/></svg></button>
+              <button class="filter-chip">Northbound <svg class="ico"><use href="#i-chevron"/></svg></button>
+              <button class="reset-btn" id="resetChange">Reset Change</button>
+            </div>
+          </div>
+
+          <div class="chart-grid">
+            <article class="card chart-card">
+              <div class="card-head">
+                <div class="card-title"><svg class="ico"><use href="#i-refresh"/></svg><h3>Vehicle Count</h3></div>
+                <div class="card-tools"><svg class="ico"><use href="#i-gear"/></svg><svg class="ico sparkle"><use href="#i-sparkle"/></svg></div>
+              </div>
+              <p class="card-updated">Last update: 20-32</p>
+              <div class="chart-summary">
+                <div class="chart-value">137 <span>VEH</span></div>
+                <div class="chart-legend">
+                  <span class="legend-item"><i class="legend-line"></i>Average</span>
+                  <span class="legend-item"><i class="legend-line orange"></i>Max</span>
+                  <span class="legend-item"><i class="legend-line blue"></i>Min</span>
+                </div>
+              </div>
+              <div class="chart-wrap">
+                <svg viewBox="0 0 400 108" preserveAspectRatio="none" aria-hidden="true">
+                  <path class="area-orange" d="M0 61 L42 69 L72 94 L112 92 L142 76 L186 76 L216 62 L256 62 L288 55 L332 62 L362 62 L400 62 L400 108 L0 108 Z"/>
+                  <path class="line-gray" d="M0 58 L52 58 L86 55 L128 55 L164 58 L210 58 L248 54 L300 54 L350 57 L400 56"/>
+                  <path class="line-orange" d="M0 61 L42 69 L72 94 L112 92 L142 76 L186 76 L216 62 L256 62 L288 55 L332 62 L362 62 L400 62"/>
+                  <path class="line-blue" d="M0 79 L58 83 L102 99 L154 97 L196 84 L246 84 L292 80 L342 80 L400 80"/>
+                </svg>
+                <div class="chart-axis"><span>00:00</span><span>01:00</span><span>02:00</span><span>03:00</span><span>04:00</span><span>05:00</span><span>06:00</span><span>07:00</span></div>
+              </div>
+            </article>
+
+            <article class="card chart-card">
+              <div class="card-head">
+                <div class="card-title"><svg class="ico"><use href="#i-refresh"/></svg><h3>Vehicle Count</h3></div>
+                <div class="card-tools"><svg class="ico"><use href="#i-gear"/></svg><svg class="ico sparkle"><use href="#i-sparkle"/></svg></div>
+              </div>
+              <p class="card-updated">Last update: 20-32</p>
+              <div class="chart-summary">
+                <div class="chart-value">35 <span>MPH</span></div>
+                <div class="chart-legend">
+                  <span class="legend-item"><i class="legend-line teal"></i>Normal</span>
+                  <span class="legend-item"><i class="legend-line orange"></i>Max</span>
+                  <span class="legend-item"><i class="legend-line blue"></i>Min</span>
+                </div>
+              </div>
+              <div class="chart-wrap">
+                <svg viewBox="0 0 400 108" preserveAspectRatio="none" aria-hidden="true">
+                  <path class="area-green" d="M0 63 L46 72 L82 94 L128 92 L166 78 L214 78 L252 65 L298 65 L336 76 L372 76 L400 76 L400 108 L0 108 Z"/>
+                  <path class="line-gray" d="M0 62 L64 62 L108 58 L158 58 L204 61 L258 61 L306 57 L360 57 L400 60"/>
+                  <path class="line-green" d="M0 63 L46 72 L82 94 L128 92 L166 78 L214 78 L252 65 L298 65 L336 76 L372 76 L400 76"/>
+                  <path class="line-orange dashed" d="M0 55 L58 55 L104 54 L152 54 L202 55 L256 55 L310 54 L360 54 L400 54"/>
+                  <path class="line-blue" d="M0 86 L62 90 L110 102 L162 100 L214 88 L266 88 L318 85 L368 85 L400 85"/>
+                </svg>
+                <div class="chart-axis"><span>00:00</span><span>01:00</span><span>02:00</span><span>03:00</span><span>04:00</span><span>05:00</span><span>06:00</span><span>07:00</span></div>
+              </div>
+            </article>
+          </div>
+
+          <div class="detail-grid">
+            <article class="card events-card">
+              <div class="card-head">
+                <div class="card-title"><svg class="ico"><use href="#i-calendar"/></svg><h3>Events</h3></div>
+                <div class="card-tools"><svg class="ico"><use href="#i-gear"/></svg><svg class="ico sparkle"><use href="#i-sparkle"/></svg></div>
+              </div>
+              <div class="card-meta"><span>Last update: 20-32</span><span>Event ID: 7C2-21</span></div>
+              <div class="event-title">
+                <h4>Accident Detected</h4>
+                <span class="warn"><svg class="ico"><use href="#i-warning"/></svg></span>
+              </div>
+              <div class="event-body">
+                <div class="event-left">
+                  <div class="severity">
+                    <span class="severity-bars"><i></i><i></i><i></i><i></i><i></i></span>
+                    <span>Emergency Level</span>
+                  </div>
+                  <p class="event-copy">Two vehicles collided in the northbound lane. No VRU were involved. Lane blockage is causing moderate congestion. Traffic mode was switched to FLASH. V2X alert was broadcast to nearby connected vehicles of the obstruction.</p>
+                </div>
+                <ul class="event-facts">
+                  <li>Accident Occurred: <b>Yes</b></li>
+                  <li>Weather Condition: <b>Sunny</b></li>
+                  <li>Vehicle Types: <b>Car vs. Car</b></li>
+                  <li>Accident Type: <b>Collision</b></li>
+                  <li>VRU Involved: <b>No</b></li>
+                  <li>Affected Lanes: <b>1 Lane</b></li>
+                  <li>Traffic Mode: <b>switched to FLASH. V2X alert was broadcast to nearby connected vehicles of the obstruction.</b></li>
+                  <li>Police on Scene: <b>No</b></li>
+                  <li>Fire on Scene: <b>No</b></li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="card ctecc-card">
+              <div class="card-head">
+                <div class="card-title"><svg class="ico"><use href="#i-bell"/></svg><h3>CTECC</h3></div>
+                <div class="card-tools"><svg class="ico"><use href="#i-gear"/></svg><svg class="ico sparkle"><use href="#i-sparkle"/></svg></div>
+              </div>
+              <div class="card-meta"><span>Last update: 20-32</span><span>Event ID: 7C2-21</span></div>
+              <ul class="ctecc-list">
+                <li><span>Medical Department</span><b class="status progress">In Progress</b></li>
+                <li><span>Police Department</span><b class="status dispatched">Dispatched</b></li>
+                <li><span>Fire Department</span><b class="status dispatched">Dispatched</b></li>
+                <li><span>Water Department</span><b class="status notified">Notified</b></li>
+                <li><span>Transport Department</span><b class="status notified">Notified</b></li>
+                <li><span>V2X Broadcast System</span><b class="status triggered">Triggered</b></li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="section-bar metrics-bar">
+            <h2>Key Metrics</h2>
+            <button class="filter-chip">Last 24 Hours <svg class="ico"><use href="#i-chevron"/></svg></button>
+          </div>
+          <div class="metrics-grid">
+            <article class="metric-card">
+              <span class="metric-ico blue"><svg class="ico"><use href="#i-camera"/></svg></span>
+              <div class="metric-copy"><span>Camera Connect</span><strong>351 <em>/ 351</em></strong></div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-ico pink"><svg class="ico"><use href="#i-wifi"/></svg></span>
+              <div class="metric-copy"><span>V2X Connect</span><strong>43 <em>/ 43</em></strong></div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-ico blue"><svg class="ico"><use href="#i-signal"/></svg></span>
+              <div class="metric-copy"><span>Signal Flash</span><strong>5 <em>/ 24</em></strong></div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-ico orange"><svg class="ico"><use href="#i-conflict"/></svg></span>
+              <div class="metric-copy"><span>Conflict Event</span><strong>21 <em>/ 21</em></strong></div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-ico green"><svg class="ico"><use href="#i-car"/></svg></span>
+              <div class="metric-copy"><span>Accident Events</span><strong>2 <em>/ 24</em></strong></div>
+            </article>
+            <article class="metric-card">
+              <span class="metric-ico red"><svg class="ico"><use href="#i-flood"/></svg></span>
+              <div class="metric-copy"><span>Flood Events</span><strong>0 <em>/ 0</em></strong></div>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <main class="activity-log-view" id="activityLogView" hidden>
+        <div class="activity-shell">
+          <header class="activity-head">
+            <div>
+              <span class="activity-eyebrow"><span class="activity-eyebrow-icon"><svg class="ico"><use href="#i-activity"/></svg></span>Operations history</span>
+              <h1>Activity Log</h1>
+              <p>Review every incident, signal change, and access update across your network.</p>
+            </div>
+            <div class="activity-head-actions">
+              <button type="button" class="activity-btn" data-toast="Activity log export started."><svg class="ico"><use href="#i-download"/></svg>Export log</button>
+              <button type="button" class="activity-btn is-primary" data-toast="Activity stream is live."><span class="activity-live-dot"></span>Live activity</button>
+            </div>
+          </header>
+
+          <section class="activity-toolbar" aria-label="Activity filters">
+            <label class="activity-search">
+              <svg class="ico"><use href="#i-search"/></svg>
+              <input type="search" id="activitySearch" placeholder="Search activity, people, or entities" autocomplete="off">
+            </label>
+            <label class="activity-date"><span>From</span><input type="date" id="activityFrom"></label>
+            <label class="activity-date"><span>To</span><input type="date" id="activityTo"></label>
+            <div class="activity-filters" role="group" aria-label="Activity category">
+              <button type="button" class="activity-filter is-active" data-activity-filter="all">All</button>
+              <button type="button" class="activity-filter" data-activity-filter="incident">Incidents</button>
+              <button type="button" class="activity-filter" data-activity-filter="signal">Signals</button>
+              <button type="button" class="activity-filter" data-activity-filter="access">Access</button>
+              <button type="button" class="activity-filter" data-activity-filter="system">System</button>
+            </div>
+          </section>
+
+          <div class="activity-results-bar">
+            <span id="activityResultCount">8 results</span>
+            <span class="activity-sort"><svg class="ico"><use href="#i-clock"/></svg>Newest first</span>
+          </div>
+
+          <div class="activity-timeline" id="activityTimeline"></div>
+          <div class="activity-empty" id="activityEmpty" hidden>
+            <span class="activity-empty-icon"><svg class="ico"><use href="#i-search"/></svg></span>
+            <strong>No activity matches these filters</strong>
+            <p>Try a broader date range or clear the search query.</p>
+          </div>
+        </div>
+      </main>
+
+      <main class="live-map-view" id="liveMapView" hidden>
+        <div class="live-map-canvas" id="liveMap" aria-label="3D live traffic map of East 7th, Austin"></div>
+        <div class="live-map-vignette" aria-hidden="true"></div>
+
+        <div class="live-map-overlay">
+          <div class="live-map-top">
+            <div class="live-top-left">
+              <button type="button" class="live-exit-btn" data-live-exit aria-label="Exit live map" title="Exit live map"><svg class="ico"><use href="#i-chevron-left"/></svg></button>
+              <div class="live-place-card">
+                <span class="live-place-icon"><svg class="ico"><use href="#i-pin"/></svg></span>
+                <div>
+                  <strong id="livePlaceName">East 7th, Austin</strong>
+                  <span>Thursday, 22 October · 20:32</span>
+                </div>
+                <span class="live-status"><i></i>Live</span>
+              </div>
+            </div>
+
+            <div class="live-mode-tabs" role="tablist" aria-label="Live map mode">
+              <button type="button" class="live-mode-tab" data-live-mode="events" role="tab" aria-selected="false">Events</button>
+              <button type="button" class="live-mode-tab" data-live-mode="optimize" role="tab" aria-selected="false">Optimize</button>
+              <button type="button" class="live-mode-tab" data-live-mode="predict" role="tab" aria-selected="false">Predict</button>
+            </div>
+
+            <div class="live-top-actions">
+              <button type="button" class="live-traffic-pill" data-live-action="traffic">
+                <svg class="ico"><use href="#i-car"/></svg>
+                <span>Traffic</span>
+                <b>12</b>
+              </button>
+              <div class="live-tool-group">
+                <button type="button" class="live-tool is-active" data-live-action="perspective" aria-label="Toggle 3D perspective">3D</button>
+                <button type="button" class="live-tool is-active" data-live-action="layers" aria-label="Toggle map layers"><svg class="ico"><use href="#i-layers"/></svg></button>
+                <button type="button" class="live-tool" data-live-action="weather" aria-label="Weather conditions"><svg class="ico"><use href="#i-cloud"/></svg></button>
+                <button type="button" class="live-tool" data-live-action="locate" aria-label="Recenter map"><svg class="ico"><use href="#i-crosshair"/></svg></button>
+                <button type="button" class="live-tool" data-live-action="fullscreen" aria-label="Toggle fullscreen"><svg class="ico"><use href="#i-expand"/></svg></button>
+              </div>
+              <div class="live-scenario-wrap">
+                <button type="button" class="live-sector-card live-scenario-card" data-scenario-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="liveScenarioMenu">
+                  <span>
+                    <small>Scenario</small>
+                    <strong id="liveScenarioName">Central Austin · 2×2</strong>
+                  </span>
+                  <svg class="ico"><use href="#i-chevron"/></svg>
+                </button>
+                <div class="scenario-menu live-scenario-menu" id="liveScenarioMenu" data-scenario-menu role="listbox" aria-label="Live map scenario" hidden></div>
+              </div>
+              <button type="button" class="live-round-btn" data-toast="Map options opened." aria-label="Map options"><svg class="ico"><use href="#i-dots"/></svg></button>
+            </div>
+          </div>
+
+          <aside class="live-panel zone-panel" aria-label="Zone monitoring">
+            <div class="zone-topline">
+              <span class="live-eyebrow">Live analysis</span>
+              <button type="button" class="zone-system" data-toast="Zone system menu opened.">System <svg class="ico"><use href="#i-chevron"/></svg></button>
+            </div>
+            <h2>Zone Monitoring</h2>
+            <div class="zone-status">
+              <span>Current status</span>
+              <strong><i></i>Congested</strong>
+              <small>for 18 min</small>
+            </div>
+            <div class="zone-data-grid">
+              <div><span>Current sector</span><strong id="liveZoneSector">East 7th</strong><small>Segment 7C2</small></div>
+              <div><span>Manual override</span><strong>Off</strong><small>Adaptive mode</small></div>
+              <div><span>Traffic incidents</span><strong>1 Detected</strong><small>Northbound lane</small></div>
+              <div><span>Average speed</span><strong>12 km/h</strong><small class="is-warning">42% below limit</small></div>
+            </div>
+            <div class="zone-kpi-row">
+              <div><span>Queue length</span><strong>2.4 <small>km</small></strong></div>
+              <div><span>Est. delay</span><strong>+18 <small>min</small></strong></div>
+              <span class="zone-kpi-icon"><svg class="ico"><use href="#i-zap"/></svg></span>
+            </div>
+            <div class="zone-volume">
+              <div><span>Total volume</span><strong>1,608 <small>veh/h</small></strong></div>
+              <span class="volume-change"><svg class="ico"><use href="#i-arrow-up-right"/></svg>12%</span>
+            </div>
+            <div class="zone-sparkline">
+              <div class="zone-spark-meta"><span>Volume trend</span><span>Last 12 hours</span></div>
+              <div class="spark-bars" aria-hidden="true">
+                <i style="height:28%"></i><i style="height:40%"></i><i style="height:34%"></i><i style="height:52%"></i>
+                <i style="height:48%"></i><i style="height:63%"></i><i style="height:55%"></i><i style="height:76%"></i>
+                <i style="height:69%"></i><i style="height:84%"></i><i style="height:92%"></i><i class="is-current" style="height:74%"></i>
+              </div>
+              <div class="spark-axis"><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span></div>
+            </div>
+          </aside>
+
+          <section class="live-panel queue-panel" aria-label="Queue backlog prediction">
+            <div class="queue-head">
+              <div><span class="live-eyebrow">Prediction</span><h2>Queue Backlog</h2></div>
+              <span class="queue-badge"><i></i>24 min</span>
+            </div>
+            <div class="queue-scene">
+              <div class="queue-road">
+                <i class="queue-lane"></i>
+                <span class="queue-car car-one"><svg class="ico"><use href="#i-car"/></svg></span>
+                <span class="queue-car car-two"><svg class="ico"><use href="#i-car"/></svg></span>
+                <span class="queue-car car-three"><svg class="ico"><use href="#i-car"/></svg></span>
+                <span class="queue-signal"></span>
+              </div>
+              <div class="queue-scene-meta"><span id="liveQueuedRoad">East 7th · Westbound</span><strong>Slow</strong></div>
+            </div>
+            <div class="queue-metrics">
+              <div><span>Queue length</span><strong>1.2 <small>km</small></strong><em>-0.4</em></div>
+              <div><span>Current delay</span><strong>+9 <small>min</small></strong><em>-2</em></div>
+            </div>
+            <div class="queue-footer">
+              <span><svg class="ico"><use href="#i-clock"/></svg>Reassess in 04:32</span>
+              <button type="button" class="queue-dispatch" data-live-action="dispatch">Dispatch <svg class="ico"><use href="#i-arrow"/></svg></button>
+            </div>
+          </section>
+
+          <div class="live-map-tools" aria-label="Map controls">
+            <button type="button" data-live-map-action="zoom-in" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+            <button type="button" data-live-map-action="zoom-out" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+            <button type="button" data-live-map-action="reset" aria-label="Reset 3D view"><svg class="ico"><use href="#i-crosshair"/></svg></button>
+          </div>
+
+          <div class="live-bottom-dock">
+            <article class="live-dock-card live-actions-card">
+              <header class="live-dock-head">
+                <div><span class="live-eyebrow">Adaptive corridor</span><h3>Control actions</h3></div>
+                <span class="auto-badge"><i></i>Auto</span>
+              </header>
+              <div class="live-action-grid">
+                <button type="button" class="live-action is-active" data-live-action="accelerate"><span class="live-action-icon"><svg class="ico"><use href="#i-arrow-up-right"/></svg></span>Accelerate</button>
+                <button type="button" class="live-action" data-live-action="reroute"><span class="live-action-icon"><svg class="ico"><use href="#i-route"/></svg></span>Rerouting</button>
+                <button type="button" class="live-action" data-live-action="restrict"><span class="live-action-icon"><svg class="ico"><use href="#i-warning"/></svg></span>Restriction</button>
+                <button type="button" class="live-action" data-live-action="deviation"><span class="live-action-icon"><svg class="ico"><use href="#i-conflict"/></svg></span>Deviation</button>
+                <button type="button" class="live-action" data-live-action="monitor"><span class="live-action-icon"><svg class="ico"><use href="#i-eye"/></svg></span>Monitoring</button>
+                <button type="button" class="live-action" data-live-action="deactivate"><span class="live-action-icon"><svg class="ico"><use href="#i-x"/></svg></span>Deactivate</button>
+              </div>
+            </article>
+
+            <article class="live-dock-card live-load-card">
+              <header class="live-dock-head"><div><span class="live-eyebrow">Corridor</span><h3>Traffic Load</h3></div><span class="load-chip">High</span></header>
+              <div class="live-load-value">52<span>%</span></div>
+              <div class="live-load-bars" aria-hidden="true"><i style="height:36%"></i><i style="height:48%"></i><i style="height:42%"></i><i style="height:63%"></i><i style="height:57%"></i><i style="height:78%"></i><i class="is-current" style="height:52%"></i></div>
+              <small>Approaching capacity</small>
+            </article>
+
+            <article class="live-dock-card live-efficiency-card">
+              <header class="live-dock-head"><div><span class="live-eyebrow">Signals</span><h3>Efficiency</h3></div><span class="eff-chip">Stable</span></header>
+              <div class="live-efficiency-body">
+                <div class="live-efficiency-ring" style="--value:46"><span>46<small>%</small></span></div>
+                <div class="live-efficiency-copy"><strong>+4.2</strong><span>vs. last hour</span></div>
+              </div>
+            </article>
+
+            <article class="live-dock-card live-event-card">
+              <header class="live-dock-head">
+                <div><span class="live-eyebrow">Activity</span><h3>Event Log</h3></div>
+                <button type="button" class="live-event-more" data-toast="Full event log opened." aria-label="Open full event log"><svg class="ico"><use href="#i-dots"/></svg></button>
+              </header>
+              <ul class="live-event-list">
+                <li><time>10:45</time><i class="event-dot is-green"></i><div><strong>Lights synced</strong><small>Segment 7C2</small></div></li>
+                <li><time>10:44</time><i class="event-dot is-amber"></i><div><strong>Police dispatched</strong><small>E 7th &amp; Red River</small></div></li>
+                <li><time>10:42</time><i class="event-dot is-red"></i><div><strong>Accident detected</strong><small>Sector 4 · 2 vehicles</small></div></li>
+              </ul>
+            </article>
+          </div>
+        </div>
+
+        <div class="live-map-fallback" id="liveMapFallback" hidden>
+          <span class="live-map-fallback-icon"><svg class="ico"><use href="#i-layers"/></svg></span>
+          <strong>3D map unavailable</strong>
+          <span id="liveMapFallbackMessage">Add a Mapbox token to enable the live environment.</span>
+        </div>
+      </main>
+
+      <main class="messages-view" id="messagesView" hidden>
+        <div class="messages-shell">
+          <aside class="chat-list-pane">
+            <div class="chat-list-head">
+              <div class="chat-list-title">
+                <span class="chat-avatar tone-sage">JC<i class="presence online"></i></span>
+                <h2>Chats</h2>
+              </div>
+              <button class="ghost-btn chat-invite" id="inviteBtn" aria-label="Invite to chat"><svg class="ico"><use href="#i-user-plus"/></svg></button>
+            </div>
+            <div class="chat-divider"></div>
+            <label class="chat-search">
+              <svg class="ico"><use href="#i-search"/></svg>
+              <input id="chatSearch" type="search" placeholder="Search conversations..." autocomplete="off">
+            </label>
+            <div class="chat-tabs" role="tablist" aria-label="Conversation filters">
+              <button class="chat-tab is-active" data-chat-tab="all" role="tab" aria-selected="true">All <span>16</span></button>
+              <button class="chat-tab" data-chat-tab="unread" role="tab" aria-selected="false">Unread <span>7</span></button>
+              <button class="chat-tab" data-chat-tab="groups" role="tab" aria-selected="false">Groups <span>5</span></button>
+              <button class="chat-tab" data-chat-tab="favourites" role="tab" aria-selected="false">Favourites <span>6</span></button>
+            </div>
+            <div class="chat-scroll" id="chatList"></div>
+          </aside>
+
+          <section class="chat-pane">
+            <div class="chat-empty" id="chatEmpty">
+              <svg class="ico"><use href="#i-chat"/></svg>
+              <p>Select a conversation</p>
+              <span>Choose from your existing conversations</span>
+            </div>
+            <div class="chat-thread" id="chatThread" hidden>
+              <header class="chat-thread-head">
+                <div class="chat-thread-person">
+                  <span class="chat-avatar" id="threadAvatar"></span>
+                  <div>
+                    <strong id="threadName"></strong>
+                    <small id="threadStatus"></small>
+                  </div>
+                </div>
+                <div class="chat-thread-actions">
+                  <button class="ghost-btn" aria-label="Search conversation"><svg class="ico"><use href="#i-search"/></svg></button>
+                  <button class="ghost-btn" aria-label="Voice call"><svg class="ico"><use href="#i-phone"/></svg></button>
+                  <button class="ghost-btn" aria-label="Video call"><svg class="ico"><use href="#i-video"/></svg></button>
+                  <button class="ghost-btn" aria-label="More options"><svg class="ico"><use href="#i-dots"/></svg></button>
+                </div>
+              </header>
+              <div class="chat-messages" id="chatMessages"></div>
+              <form class="chat-composer" id="chatForm">
+                <button type="button" class="ghost-btn" aria-label="Attach file"><svg class="ico"><use href="#i-paperclip"/></svg></button>
+                <input id="chatInput" placeholder="Type a message..." autocomplete="off">
+                <button type="submit" class="chat-send" aria-label="Send message"><svg class="ico"><use href="#i-send"/></svg></button>
+              </form>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <main class="settings-view" id="settingsView" hidden>
+        <div class="settings-shell">
+          <header class="settings-heading">
+            <h1>Account &amp; User Management</h1>
+            <p>Manage your account settings and user preferences.</p>
+          </header>
+
+          <div class="settings-tabs" role="tablist" aria-label="Account settings">
+            <button class="settings-tab is-active" data-settings-tab="general" role="tab" aria-selected="true">General</button>
+            <button class="settings-tab" data-settings-tab="notifications" role="tab" aria-selected="false">Notifications</button>
+            <button class="settings-tab" data-settings-tab="workspace" role="tab" aria-selected="false">Workspace</button>
+            <button class="settings-tab" data-settings-tab="integrations" role="tab" aria-selected="false">Integrations</button>
+            <button class="settings-tab" data-settings-tab="members" role="tab" aria-selected="false">Members</button>
+            <button class="settings-tab" data-settings-tab="security" role="tab" aria-selected="false">Security</button>
+            <button class="settings-tab" data-settings-tab="billing" role="tab" aria-selected="false">Billing &amp; Usage</button>
+          </div>
+
+          <div class="settings-panels">
+            <section class="settings-panel" data-settings-panel="general" role="tabpanel">
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Personal Information</h2>
+                  <p>Manage your personal information and role.</p>
+                </div>
+                <div class="settings-group-body">
+                  <form class="settings-form" id="personalForm">
+                    <div class="form-field avatar-field">
+                      <label>Your Avatar</label>
+                      <div class="avatar-row">
+                        <label class="avatar-drop" for="avatarInput" aria-label="Upload your avatar">
+                          <span class="avatar-placeholder" id="avatarPlaceholder"><svg class="ico"><use href="#i-image"/></svg></span>
+                          <img id="avatarImage" alt="Your avatar" hidden>
+                        </label>
+                        <input type="file" id="avatarInput" class="visually-hidden" accept="image/*">
+                        <div class="avatar-actions">
+                          <button type="button" class="settings-btn" id="avatarUploadBtn"><svg class="ico"><use href="#i-upload"/></svg>Upload avatar</button>
+                          <button type="button" class="settings-icon-btn is-danger" id="avatarRemoveBtn" aria-label="Remove avatar" disabled><svg class="ico"><use href="#i-trash"/></svg></button>
+                        </div>
+                      </div>
+                      <p class="field-hint">Pick a photo up to 1MB.</p>
+                    </div>
+
+                    <div class="form-grid">
+                      <label class="form-field">
+                        <span>First Name</span>
+                        <input type="text" id="settingsFirstName" placeholder="John" value="Jane" autocomplete="given-name">
+                      </label>
+                      <label class="form-field">
+                        <span>Last Name</span>
+                        <input type="text" id="settingsLastName" placeholder="Doe" value="Cooper" autocomplete="family-name">
+                      </label>
+                      <label class="form-field">
+                        <span>Mobile</span>
+                        <input type="tel" id="settingsMobile" placeholder="+1 (555) 123-4567" value="+1 (512) 555-0142" autocomplete="tel">
+                      </label>
+                      <label class="form-field">
+                        <span>Country</span>
+                        <select class="settings-select">
+                          <option>United States</option>
+                          <option>United Kingdom</option>
+                          <option>Canada</option>
+                          <option>Germany</option>
+                          <option>Australia</option>
+                        </select>
+                      </label>
+                      <label class="form-field">
+                        <span>Gender</span>
+                        <select class="settings-select">
+                          <option value="">Select a gender</option>
+                          <option>Female</option>
+                          <option>Male</option>
+                          <option>Non-binary</option>
+                          <option>Prefer not to say</option>
+                        </select>
+                      </label>
+                      <label class="form-field">
+                        <span>Role</span>
+                        <select class="settings-select">
+                          <option value="">Select a role</option>
+                          <option selected>Traffic Operator</option>
+                          <option>Traffic Engineer</option>
+                          <option>Administrator</option>
+                          <option>Viewer</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div class="settings-actions"><button type="submit" class="settings-primary">Save Changes</button></div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Email &amp; Password</h2>
+                  <p>Manage your email and password settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <form class="settings-form" id="passwordForm">
+                    <label class="form-field">
+                      <span>Email <b>*</b></span>
+                      <div class="input-group">
+                        <input type="email" id="settingsEmail" placeholder="Email address" value="jane.cooper@sumo.io" required autocomplete="email">
+                        <svg class="ico"><use href="#i-mail"/></svg>
+                      </div>
+                    </label>
+                    <label class="form-field">
+                      <span>Current Password <b>*</b></span>
+                      <div class="input-group">
+                        <input type="password" id="currentPassword" placeholder="Password" required autocomplete="current-password">
+                        <button type="button" class="password-toggle" data-toggle-password="currentPassword" aria-label="Show password"><svg class="ico"><use href="#i-eye"/></svg></button>
+                      </div>
+                    </label>
+                    <label class="form-field">
+                      <span>New Password <b>*</b></span>
+                      <div class="input-group">
+                        <input type="password" id="newPassword" placeholder="Password" required autocomplete="new-password">
+                        <button type="button" class="password-toggle" data-toggle-password="newPassword" aria-label="Show password"><svg class="ico"><use href="#i-eye"/></svg></button>
+                      </div>
+                    </label>
+
+                    <div class="password-strength" id="passwordStrength" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <p class="password-lead">Enter a password. Must contain:</p>
+                    <ul class="password-rules" id="passwordRules">
+                      <li data-rule="length"><svg class="ico"><use href="#i-x"/></svg><span>At least 12 characters</span></li>
+                      <li data-rule="lower"><svg class="ico"><use href="#i-x"/></svg><span>At least 1 lowercase letter</span></li>
+                      <li data-rule="upper"><svg class="ico"><use href="#i-x"/></svg><span>At least 1 uppercase letter</span></li>
+                      <li data-rule="number"><svg class="ico"><use href="#i-x"/></svg><span>At least 1 number</span></li>
+                      <li data-rule="special"><svg class="ico"><use href="#i-x"/></svg><span>At least 1 special character</span></li>
+                    </ul>
+
+                    <div class="settings-actions"><button type="submit" class="settings-primary">Save Changes</button></div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Connect Accounts</h2>
+                  <p>Manage your connected accounts.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="connected-accounts">
+                    <div class="connected-chip">
+                      <span class="brand-mark brand-google">G</span>
+                      <span>Google</span>
+                      <button type="button" class="connected-remove" aria-label="Remove Google"><svg class="ico"><use href="#i-x"/></svg></button>
+                    </div>
+                    <div class="connected-chip">
+                      <span class="brand-mark brand-slack">#</span>
+                      <span>Slack</span>
+                      <button type="button" class="connected-remove" aria-label="Remove Slack"><svg class="ico"><use href="#i-x"/></svg></button>
+                    </div>
+                    <button type="button" class="settings-btn" id="addAppBtn"><svg class="ico"><use href="#i-plus"/></svg>Add App</button>
+                  </div>
+                  <p class="field-hint">Connected accounts allow you to integrate with third-party services for enhanced functionality.</p>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Social URLs</h2>
+                  <p>Manage your social URLs.</p>
+                </div>
+                <div class="settings-group-body">
+                  <form class="settings-form" data-settings-form="Social URLs saved.">
+                    <div class="social-fields" id="socialFields">
+                      <input type="url" placeholder="Link to social profile" aria-label="Social profile URL">
+                      <input type="url" placeholder="Link to social profile" aria-label="Social profile URL">
+                      <input type="url" placeholder="Link to social profile" aria-label="Social profile URL">
+                    </div>
+                    <div class="settings-actions settings-actions-split">
+                      <button type="button" class="settings-btn" id="addSocialBtn"><svg class="ico"><use href="#i-plus"/></svg>Add URL</button>
+                      <button type="submit" class="settings-primary">Save Changes</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Danger Zone</h2>
+                  <p>Delete your account permanently. This action will remove all your data and cannot be undone. <a href="#" class="settings-link">Learn more</a></p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="danger-card">
+                    <div>
+                      <strong>Delete account</strong>
+                      <p>Delete your account permanently. This action will remove all your data and cannot be undone.</p>
+                    </div>
+                    <button type="button" class="settings-btn is-danger" id="deleteAccountBtn"><svg class="ico"><use href="#i-trash"/></svg>Delete</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
+              <form data-settings-form="Notification preferences saved.">
+                <div class="settings-section">
+                  <div class="settings-section-head">
+                    <h2>Notifications</h2>
+                    <p>Manage your notification settings and preferences.</p>
+                  </div>
+
+                  <div class="notify-table-scroll">
+                    <table class="notify-table">
+                      <thead>
+                        <tr>
+                          <th scope="col" class="notify-about">Notify Me About</th>
+                          <th scope="col">
+                            <div class="notify-channel">
+                              <svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg>
+                              <span>Email</span>
+                              <button type="button" class="notify-toggle-all" data-notify-toggle="email" aria-pressed="false">Toggle All</button>
+                            </div>
+                          </th>
+                          <th scope="col">
+                            <div class="notify-channel">
+                              <svg class="ico" aria-hidden="true"><use href="#i-monitor"/></svg>
+                              <span>Desktop</span>
+                              <button type="button" class="notify-toggle-all" data-notify-toggle="desktop" aria-pressed="false">Toggle All</button>
+                            </div>
+                          </th>
+                          <th scope="col">
+                            <div class="notify-channel">
+                              <svg class="ico" aria-hidden="true"><use href="#i-smartphone"/></svg>
+                              <span>App</span>
+                              <button type="button" class="notify-toggle-all" data-notify-toggle="app" aria-pressed="false">Toggle All</button>
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr class="notify-group"><th scope="colgroup" colspan="4">Users &amp; Team</th></tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">New User Registrations</span><span class="notify-desc">Be informed when a new user signs up.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="New User Registrations · Email" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="New User Registrations · Desktop"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="New User Registrations · App" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">Role &amp; Permission Changes</span><span class="notify-desc">Receive notifications when user roles or access levels are modified.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="Role &amp; Permission Changes · Email" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="Role &amp; Permission Changes · Desktop" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="Role &amp; Permission Changes · App" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                        <tr class="notify-group"><th scope="colgroup" colspan="4">API &amp; Integrations</th></tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">API Usage Limit</span><span class="notify-desc">Get notified when API usage approaches your quota.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="API Usage Limit · Email"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="API Usage Limit · Desktop" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="API Usage Limit · App"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">Integration Failures</span><span class="notify-desc">Receive alerts when third-party integrations fail.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="Integration Failures · Email" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="Integration Failures · Desktop"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="Integration Failures · App"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                        <tr class="notify-group"><th scope="colgroup" colspan="4">Projects</th></tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">Project Status Updates</span><span class="notify-desc">Be notified when project stages or statuses are updated.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="Project Status Updates · Email"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="Project Status Updates · Desktop" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="Project Status Updates · App" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">Deadline Reminders</span><span class="notify-desc">Receive reminders before project or milestone deadlines.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="Deadline Reminders · Email" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="Deadline Reminders · Desktop" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="Deadline Reminders · App" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><span class="notify-title">Project Comments</span><span class="notify-desc">Get notified when someone comments on a project you're part of.</span></th>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="email" aria-label="Project Comments · Email" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="desktop" aria-label="Project Comments · Desktop" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                          <td><label class="notify-check"><input class="check-input" type="checkbox" data-notify-channel="app" aria-label="Project Comments · App" checked><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-group">
+                  <div class="settings-group-copy">
+                    <h2>Inbox Preferences</h2>
+                    <p>Manage your inbox settings and notification preferences.</p>
+                  </div>
+                  <div class="settings-group-body notify-stack">
+                    <label class="switch-row"><input class="switch-input" type="checkbox" role="switch" aria-label="Daily Summary" aria-describedby="inbox-daily-desc"><i class="switch" aria-hidden="true"></i><span class="switch-copy" id="inbox-daily-desc"><strong>Daily Summary</strong><small>Receive a daily summary of your inbox activity.</small></span></label>
+                    <label class="switch-row"><input class="switch-input" type="checkbox" role="switch" aria-label="Product Updates" aria-describedby="inbox-product-desc"><i class="switch" aria-hidden="true"></i><span class="switch-copy" id="inbox-product-desc"><strong>Product Updates</strong><small>Receive notifications about product updates and new features.</small></span></label>
+                    <label class="switch-row"><input class="switch-input" type="checkbox" role="switch" aria-label="Exclusive Offers" aria-describedby="inbox-offers-desc"><i class="switch" aria-hidden="true"></i><span class="switch-copy" id="inbox-offers-desc"><strong>Exclusive Offers</strong><small>Receive promotional offers, partner deals, and event invitations.</small></span></label>
+                    <label class="switch-row"><input class="switch-input" type="checkbox" role="switch" aria-label="Surveys &amp; Feedback" aria-describedby="inbox-surveys-desc"><i class="switch" aria-hidden="true"></i><span class="switch-copy" id="inbox-surveys-desc"><strong>Surveys &amp; Feedback</strong><small>Participate in surveys and help us improve the platform.</small></span></label>
+                  </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-group">
+                  <div class="settings-group-copy">
+                    <h2>Browser Notifications</h2>
+                    <p>Manage your browser notification settings and preferences.</p>
+                  </div>
+                  <div class="settings-group-body notify-stack">
+                    <div class="check-line"><label class="check-line-item"><input class="check-input" type="checkbox" id="notifyAssigned"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span><span>Assigned to You</span></label></div>
+                    <div class="check-line"><label class="check-line-item"><input class="check-input" type="checkbox" id="notifyUnassigned"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span><span>Unassigned</span></label></div>
+                    <div class="check-line"><label class="check-line-item"><input class="check-input" type="checkbox" id="notifyTeams"><span class="check-box" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span><span>Assigned to any of your teams</span></label></div>
+                    <div class="switch-line">
+                      <p class="switch-line-copy">Play sound when your tab blinks<svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></p>
+                      <label class="switch-inline"><input class="switch-input" type="checkbox" role="switch" aria-label="Play sound when your tab blinks"><i class="switch" aria-hidden="true"></i></label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-group">
+                  <div class="settings-group-copy">
+                    <h2>Do Not Disturb</h2>
+                    <p>Adjust your Do Not Disturb settings and preferences.</p>
+                  </div>
+                  <div class="settings-group-body">
+                    <div class="dnd-card">
+                      <div class="dnd-head">
+                        <div class="dnd-enable">
+                          <span class="dnd-label">Notifications</span>
+                          <button type="button" class="settings-btn" id="enableNotificationsBtn"><svg class="ico" aria-hidden="true"><use href="#i-bell"/></svg>Enable Notifications</button>
+                        </div>
+                        <div class="dnd-times">
+                          <label class="form-field"><span>From</span><input type="time" id="dndFrom" value="01:30"></label>
+                          <label class="form-field"><span>To</span><input type="time" id="dndTo" value="02:30"></label>
+                        </div>
+                      </div>
+                      <div class="dnd-sep"></div>
+                      <div class="dnd-days">
+                        <span class="dnd-label">Do not disturb me on my days off</span>
+                        <div class="day-toggle" role="group" aria-label="Days off">
+                          <button type="button" data-day="Monday" aria-pressed="false" aria-label="Monday">S</button>
+                          <button type="button" data-day="Tuesday" aria-pressed="false" aria-label="Tuesday">M</button>
+                          <button type="button" data-day="Wednesday" aria-pressed="false" aria-label="Wednesday">T</button>
+                          <button type="button" data-day="Thursday" aria-pressed="false" aria-label="Thursday">W</button>
+                          <button type="button" data-day="Friday" aria-pressed="false" aria-label="Friday">T</button>
+                          <button type="button" data-day="Saturday" aria-pressed="false" aria-label="Saturday">F</button>
+                          <button type="button" data-day="Sunday" aria-pressed="true" aria-label="Sunday">S</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-actions notify-submit"><button type="submit" class="settings-primary">Save Changes</button></div>
+              </form>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="workspace" role="tabpanel" hidden>
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Workspace Name &amp; TimeZone</h2>
+                  <p>Manage your workspace name and time zone settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <form class="settings-form" data-settings-form="Workspace settings saved.">
+                    <label class="form-field"><span>Workspace Name</span><input type="text" id="workspaceName" placeholder="Central Austin Operations" value="Central Austin Operations"></label>
+                    <label class="form-field"><span>App ID</span><input type="text" id="workspaceAppId" value="kem-0b1c2d3e" readonly></label>
+                    <label class="form-field">
+                      <span>Timezone</span>
+                      <select class="settings-select" id="workspaceTimezone">
+                        <option>(GMT-6:00) America/Chicago</option>
+                        <option>(GMT-5:00) America/New_York</option>
+                        <option>(GMT-7:00) America/Denver</option>
+                        <option>(GMT-8:00) America/Los_Angeles</option>
+                      </select>
+                    </label>
+                    <div class="settings-actions"><button type="submit" class="settings-primary">Save Changes</button></div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Workspace Detail</h2>
+                  <p>Manage your workspace details and settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <form class="settings-form" data-settings-form="Workspace details saved.">
+                    <div class="form-field avatar-field">
+                      <label>Workspace Logo</label>
+                      <div class="avatar-row">
+                        <label class="avatar-drop" for="workspaceLogoInput" aria-label="Upload workspace logo">
+                          <span class="avatar-placeholder" id="workspaceLogoPlaceholder"><svg class="ico"><use href="#i-image"/></svg></span>
+                          <img id="workspaceLogoImage" alt="Workspace logo" hidden>
+                        </label>
+                        <input type="file" id="workspaceLogoInput" class="visually-hidden" accept="image/*">
+                        <div class="avatar-actions">
+                          <button type="button" class="settings-btn" id="workspaceLogoUploadBtn"><svg class="ico"><use href="#i-upload"/></svg>Upload logo</button>
+                          <button type="button" class="settings-icon-btn is-danger" id="workspaceLogoRemoveBtn" aria-label="Remove workspace logo" disabled><svg class="ico"><use href="#i-trash"/></svg></button>
+                        </div>
+                      </div>
+                      <p class="field-hint">Pick a photo up to 1MB.</p>
+                    </div>
+
+                    <div class="form-field">
+                      <label for="workspaceUrl">Workspace URL</label>
+                      <div class="affix-input">
+                        <span class="affix">https://</span>
+                        <input type="text" id="workspaceUrl" placeholder="central-austin" value="central-austin">
+                        <span class="affix">.sumo.app</span>
+                      </div>
+                    </div>
+
+                    <div class="form-field">
+                      <label for="workspaceSlug">Workspace Slug</label>
+                      <input type="text" id="workspaceSlug" placeholder="central-austin" value="central-austin">
+                      <p class="field-hint">Only lowercase letters, numbers, and hyphens. Max 48 characters</p>
+                    </div>
+
+                    <div class="form-field">
+                      <label for="workspaceDescription">Workspace Description</label>
+                      <textarea id="workspaceDescription" placeholder="Describe your workspace">Traffic operations workspace for the Central Austin corridor.</textarea>
+                    </div>
+
+                    <div class="settings-actions"><button type="submit" class="settings-primary">Save Changes</button></div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Organizations</h2>
+                  <p>Manage your workspace organizations and settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="org-card">
+                    <div class="org-row">
+                      <div class="org-main">
+                        <span class="brand-mark brand-sumo">M</span>
+                        <p><a class="org-link" href="#">Mapbox</a> basemap, geocoding and live traffic tiles</p>
+                      </div>
+                      <button type="button" class="settings-btn is-danger" data-toast="Leave request sent to the workspace admin."><svg class="ico"><use href="#i-trash"/></svg>Leave</button>
+                    </div>
+                    <div class="org-row">
+                      <div class="org-main">
+                        <span class="brand-mark brand-ctecc">C</span>
+                        <p><a class="org-link" href="#">CTECC</a> incident and dispatch coordination feed</p>
+                      </div>
+                      <button type="button" class="settings-btn is-danger" data-toast="Leave request sent to the workspace admin."><svg class="ico"><use href="#i-trash"/></svg>Leave</button>
+                    </div>
+                    <div class="org-row">
+                      <div class="org-main">
+                        <span class="brand-mark brand-v2x">V</span>
+                        <p><a class="org-link" href="#">V2X Broadcast</a> roadside alert channel for connected vehicles</p>
+                      </div>
+                      <button type="button" class="settings-btn is-danger" data-toast="Leave request sent to the workspace admin."><svg class="ico"><use href="#i-trash"/></svg>Leave</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Export Workspace data</h2>
+                  <p>Export your workspace data for backup or migration purposes.</p>
+                </div>
+                <div class="settings-group-body settings-stack">
+                  <button type="button" class="settings-btn" data-toast="Export options opened."><svg class="ico"><use href="#i-download"/></svg>Get started</button>
+
+                  <div class="export-table-wrap">
+                    <table class="export-table">
+                      <thead>
+                        <tr><th scope="col">Type</th><th scope="col">Date</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Download</span></th></tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="export-type">CSV Export</td>
+                          <td>Oct 14, 2026</td>
+                          <td>
+                            <div class="export-progress">
+                              <span class="export-meta">Progress 25%</span>
+                              <i class="export-track"><span style="width:25%"></span></i>
+                            </div>
+                          </td>
+                          <td class="export-action"><button type="button" class="settings-icon-btn" aria-label="Download CSV export from Oct 14, 2026" data-toast="Download started."><svg class="ico"><use href="#i-download"/></svg></button></td>
+                        </tr>
+                        <tr>
+                          <td class="export-type">CSV Export</td>
+                          <td>Sep 30, 2026</td>
+                          <td><span class="export-done">Completed<svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span></td>
+                          <td class="export-action"><button type="button" class="settings-icon-btn" aria-label="Download CSV export from Sep 30, 2026" data-toast="Download started."><svg class="ico"><use href="#i-download"/></svg></button></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Danger zone</h2>
+                  <p>Manage general workspace. Contact system admin for more information <a href="#" class="settings-link">Learn more</a></p>
+                </div>
+                <div class="settings-group-body settings-stack">
+                  <div class="danger-card">
+                    <div>
+                      <strong>Leave workspace</strong>
+                      <p>Revoke your access to this team. Other people you have added to the workspace will remain.</p>
+                    </div>
+                    <button type="button" class="settings-btn is-danger" data-toast="Leave request sent to the workspace admin."><svg class="ico"><use href="#i-trash"/></svg>Leave</button>
+                  </div>
+                  <div class="danger-card is-disabled">
+                    <div>
+                      <strong>Delete workspace</strong>
+                      <p>Delete your workspace permanently. This action will remove all data and cannot be undone.</p>
+                      <p class="danger-note">You cannot delete the workspace because you are not the system admin.</p>
+                    </div>
+                    <button type="button" class="settings-btn is-danger" disabled><svg class="ico"><use href="#i-trash"/></svg>Delete workspace</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="integrations" role="tabpanel" hidden>
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Communications</h2>
+                  <p>Manage your communication integrations and settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="integration-grid">
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-ctecc">C</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="CTECC" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>CTECC</h3>
+                        <p>Regional incident and dispatch coordination feed.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="CTECC integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card is-connected">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-v2x">V</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="V2X Broadcast" aria-pressed="true"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span>Connected</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>V2X Broadcast</h3>
+                        <p>Roadside alerts for connected vehicles and infrastructure.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="V2X Broadcast integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-google">P</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="Operator Paging" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>Operator Paging</h3>
+                        <p>SMS and pager alerts for on-call traffic staff.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="Operator Paging integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Planning &amp; Productivity</h2>
+                  <p>Manage your planning and productivity integrations and settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="integration-grid">
+                    <article class="integration-card is-connected">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-google">M</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="Mapbox" aria-pressed="true"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span>Connected</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>Mapbox</h3>
+                        <p>Live basemap and geocoding for Central Austin.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="Mapbox integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card is-connected">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-sumo">S</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="SUMO" aria-pressed="true"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span>Connected</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>SUMO</h3>
+                        <p>Simulation runner and corridor scenario data.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="SUMO integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-v2x">R</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="Reports" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>Reports</h3>
+                        <p>Scheduled corridor performance exports and digests.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="Reports integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-ctecc">W</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="Weather Service" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>Weather Service</h3>
+                        <p>Forecasts and flood advisories for the corridor.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="Weather Service integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Tools</h2>
+                  <p>Manage your tool integrations and settings.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="integration-grid">
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-sumo">A</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="Signal Control" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>Signal Control</h3>
+                        <p>Signal plans, phases and timing updates from ATMS.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="Signal Control integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-ctecc">C</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="Camera Registry" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>Camera Registry</h3>
+                        <p>Streams and health for corridor CCTV cameras.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="Camera Registry integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                    <article class="integration-card">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-google">API</span>
+                        <button type="button" class="settings-btn integration-connect" data-integration-connect data-label="API Access" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Connect</span></button>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>API Access</h3>
+                        <p>Tokens and endpoints for downstream systems.</p>
+                      </div>
+                      <button type="button" class="integration-view" data-toast="API Access integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="members" role="tabpanel" hidden>
+              <div class="settings-section">
+                <div class="members-head">
+                  <div>
+                    <h2>Members</h2>
+                    <p>Manage your team members and their permissions.</p>
+                  </div>
+                  <button type="button" class="settings-primary" id="inviteMemberBtn"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Invite Member</button>
+                </div>
+
+                <div class="member-list">
+                  <div class="member-row is-self">
+                    <div class="member-id">
+                      <span class="member-avatar-wrap">
+                        <span class="member-avatar tone-sage">JC</span>
+                        <span class="member-verified" aria-label="Verified"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span>
+                      </span>
+                      <span class="member-copy">
+                        <span class="member-name">Jane Cooper</span>
+                        <span class="member-email">jane.cooper@sumo.io</span>
+                      </span>
+                    </div>
+                    <div class="member-controls">
+                      <select class="settings-select" aria-label="Role for Jane Cooper" disabled>
+                        <option selected>Administrator</option><option>Traffic Engineer</option><option>Traffic Operator</option><option>Viewer</option><option>No Access</option>
+                      </select>
+                      <button type="button" class="member-menu" aria-label="Member actions for Jane Cooper" disabled><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                    </div>
+                  </div>
+                  <div class="member-row">
+                    <div class="member-id">
+                      <span class="member-avatar-wrap"><span class="member-avatar tone-blue">MT</span></span>
+                      <span class="member-copy">
+                        <span class="member-name">Marcus Thompson</span>
+                        <span class="member-email">marcus.thompson@sumo.io</span>
+                      </span>
+                    </div>
+                    <div class="member-controls">
+                      <select class="settings-select" aria-label="Role for Marcus Thompson">
+                        <option selected>Traffic Operator</option><option>Traffic Engineer</option><option>Administrator</option><option>Viewer</option><option>No Access</option>
+                      </select>
+                      <button type="button" class="member-menu" aria-label="Member actions for Marcus Thompson" data-toast="Member actions for Marcus Thompson opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                    </div>
+                  </div>
+                  <div class="member-row">
+                    <div class="member-id">
+                      <span class="member-avatar-wrap"><span class="member-avatar tone-mustard">LN</span></span>
+                      <span class="member-copy">
+                        <span class="member-name">Lisa Nguyen</span>
+                        <span class="member-email">lisa.nguyen@sumo.io</span>
+                      </span>
+                    </div>
+                    <div class="member-controls">
+                      <select class="settings-select" aria-label="Role for Lisa Nguyen">
+                        <option selected>Traffic Engineer</option><option>Traffic Operator</option><option>Administrator</option><option>Viewer</option><option>No Access</option>
+                      </select>
+                      <button type="button" class="member-menu" aria-label="Member actions for Lisa Nguyen" data-toast="Member actions for Lisa Nguyen opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                    </div>
+                  </div>
+                  <div class="member-row">
+                    <div class="member-id">
+                      <span class="member-avatar-wrap"><span class="member-avatar tone-sage">DW</span></span>
+                      <span class="member-copy">
+                        <span class="member-name">Dana Whitfield</span>
+                        <span class="member-email">dana.whitfield@sumo.io</span>
+                      </span>
+                    </div>
+                    <div class="member-controls">
+                      <select class="settings-select" aria-label="Role for Dana Whitfield">
+                        <option selected>Viewer</option><option>Traffic Operator</option><option>Traffic Engineer</option><option>Administrator</option><option>No Access</option>
+                      </select>
+                      <button type="button" class="member-menu" aria-label="Member actions for Dana Whitfield" data-toast="Member actions for Dana Whitfield opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                    </div>
+                  </div>
+                  <div class="member-row">
+                    <div class="member-id">
+                      <span class="member-avatar-wrap"><span class="member-avatar tone-blue">SO</span></span>
+                      <span class="member-copy">
+                        <span class="member-name">Sam Okafor</span>
+                        <span class="member-email">sam.okafor@sumo.io</span>
+                      </span>
+                    </div>
+                    <div class="member-controls">
+                      <select class="settings-select" aria-label="Role for Sam Okafor">
+                        <option selected>No Access</option><option>Viewer</option><option>Traffic Operator</option><option>Traffic Engineer</option><option>Administrator</option>
+                      </select>
+                      <button type="button" class="member-menu" aria-label="Member actions for Sam Okafor" data-toast="Member actions for Sam Okafor opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="member-pending">
+                  <h3>Pending invitations</h3>
+                  <div class="member-list">
+                    <div class="member-row">
+                      <div class="member-id">
+                        <span class="member-avatar-wrap"><span class="member-avatar is-pending tone-blue">CF</span></span>
+                        <span class="member-copy">
+                          <span class="member-name">Chris Ford</span>
+                          <span class="member-email">chris.ford@sumo.io</span>
+                        </span>
+                      </div>
+                      <div class="member-controls">
+                        <select class="settings-select" aria-label="Role for Chris Ford">
+                          <option selected>Viewer</option><option>Traffic Operator</option><option>Traffic Engineer</option><option>Administrator</option><option>No Access</option>
+                        </select>
+                        <button type="button" class="member-menu" aria-label="Invitation actions for Chris Ford" data-toast="Invitation options for Chris Ford opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                      </div>
+                    </div>
+                    <div class="member-row">
+                      <div class="member-id">
+                        <span class="member-avatar-wrap"><span class="member-avatar is-pending tone-mustard">AK</span></span>
+                        <span class="member-copy">
+                          <span class="member-name">Alex Kim</span>
+                          <span class="member-email">alex.kim@sumo.io</span>
+                        </span>
+                      </div>
+                      <div class="member-controls">
+                        <select class="settings-select" aria-label="Role for Alex Kim">
+                          <option selected>Viewer</option><option>Traffic Operator</option><option>Traffic Engineer</option><option>Administrator</option><option>No Access</option>
+                        </select>
+                        <button type="button" class="member-menu" aria-label="Invitation actions for Alex Kim" data-toast="Invitation options for Alex Kim opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="security" role="tabpanel" hidden>
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Security</h2>
+                  <p>Protect your account and review active sessions.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="security-card">
+                    <div class="security-icon"><svg class="ico"><use href="#i-shield"/></svg></div>
+                    <div><strong>Two-factor authentication</strong><p>Add an extra layer of security to your account with an authenticator app.</p></div>
+                    <button type="button" class="settings-btn" data-toast="Two-factor setup started.">Enable</button>
+                  </div>
+                  <h3 class="subhead">Active sessions</h3>
+                  <div class="session-list">
+                    <div class="session-row"><div><strong>Chrome on Windows</strong><small>Austin, TX · Current session</small></div><span class="connection-status is-online"><i></i>Active</span></div>
+                    <div class="session-row"><div><strong>SUMO Mobile</strong><small>Austin, TX · Last active 2 hours ago</small></div><button type="button" class="settings-btn" data-toast="Session revoked.">Revoke</button></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="billing" role="tabpanel" hidden>
+              <div class="bill-alert">
+                <svg class="ico" aria-hidden="true"><use href="#i-alert-circle"/></svg>
+                <div>
+                  <strong>This workspace is currently on the Traffic Operations plan</strong>
+                  <p>Upgrade to Enterprise for unlimited connected assets, multi-city corridors, and 24/7 dispatch support.</p>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Billing</h2>
+                  <p>Overview of the current billing cycle based on fixed and on-demand charges.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="bill-list">
+                    <div class="bill-row">
+                      <div>
+                        <h3>Traffic Operations plan</h3>
+                        <p>Base plan for Central Austin operations</p>
+                      </div>
+                      <span class="bill-amount">$249</span>
+                    </div>
+                    <div class="bill-row">
+                      <div>
+                        <h3>Connected cameras</h3>
+                        <span class="bill-progress"><i style="width:70%"></i></span>
+                        <div class="bill-legend"><span>351 of 500 cameras online</span><span>500 included</span></div>
+                      </div>
+                      <span class="bill-amount">$60</span>
+                    </div>
+                    <div class="bill-row">
+                      <div>
+                        <h3>V2X endpoints</h3>
+                        <span class="bill-progress"><i style="width:43%"></i></span>
+                        <div class="bill-legend"><span>43 of 100 endpoints active</span><span>100 included</span></div>
+                      </div>
+                      <span class="bill-amount">$40</span>
+                    </div>
+                    <div class="bill-row">
+                      <div>
+                        <h3>Event storage</h3>
+                        <span class="bill-progress"><i style="width:36%"></i></span>
+                        <div class="bill-legend"><span>18 GB of 50 GB used</span><span>50 GB included</span></div>
+                      </div>
+                      <span class="bill-amount">$25</span>
+                    </div>
+                    <div class="bill-row">
+                      <div>
+                        <h3>SUMO simulation runs</h3>
+                        <span class="bill-progress"><i style="width:60%"></i></span>
+                        <div class="bill-legend"><span>120 of 200 runs consumed</span><span>200 included</span></div>
+                      </div>
+                      <span class="bill-amount">$30</span>
+                    </div>
+                    <div class="bill-row bill-row-total">
+                      <h3>Total for October 2026</h3>
+                      <span class="bill-amount">$404</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Spend Management</h2>
+                  <p>Manage your spend and subscription options.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="spend-row">
+                    <div class="spend-meter">
+                      <span class="spend-ring">
+                        <svg viewBox="0 0 52 52" aria-hidden="true">
+                          <circle class="spend-ring-track" cx="26" cy="26" r="23.5"/>
+                          <circle class="spend-ring-value" cx="26" cy="26" r="23.5" stroke-dasharray="147.65" stroke-dashoffset="28.05"/>
+                        </svg>
+                        <b>81%</b>
+                      </span>
+                      <span class="spend-copy">
+                        <strong>$404 / $500 (81%)</strong>
+                        <p>Spend management enabled</p>
+                      </span>
+                    </div>
+                    <label class="switch-inline">
+                      <input class="switch-input" type="checkbox" role="switch" id="spendToggle" aria-label="Spend management" checked>
+                      <i class="switch" aria-hidden="true"></i>
+                    </label>
+                  </div>
+
+                  <div class="spend-panel" id="spendPanel">
+                    <form class="spend-grid" data-settings-form="Spend management settings saved.">
+                      <div class="form-field">
+                        <span>Set amount ($)</span>
+                        <input type="tel" inputmode="numeric" placeholder="500" aria-label="Set amount in dollars">
+                      </div>
+                      <div class="form-field">
+                        <span>Provide email for notifications</span>
+                        <input type="email" placeholder="operations@kemetra.app" aria-label="Email for spend notifications">
+                      </div>
+                      <div class="spend-actions">
+                        <button type="submit" class="settings-primary">Update</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Payment Method</h2>
+                  <p>Manage your payment method and billing information.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="pay-list">
+                    <div class="pay-row">
+                      <div class="pay-brand">
+                        <span class="pay-icon brand-visa" aria-hidden="true">V</span>
+                        <strong>Visa Debit **** 1234</strong>
+                      </div>
+                      <div class="pay-meta">
+                        <span class="pay-valid">Valid until 11/2028</span>
+                        <button type="button" class="member-menu" aria-label="Visa card actions" data-toast="Visa card options opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                      </div>
+                    </div>
+                    <div class="pay-row">
+                      <div class="pay-brand">
+                        <span class="pay-icon brand-mc" aria-hidden="true">M</span>
+                        <strong>Mastercard **** 5678</strong>
+                      </div>
+                      <div class="pay-meta">
+                        <span class="pay-valid">Valid until 10/2028</span>
+                        <button type="button" class="member-menu" aria-label="Mastercard actions" data-toast="Mastercard options opened."><svg class="ico" aria-hidden="true"><use href="#i-dots"/></svg></button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pay-add">
+                    <button type="button" class="settings-primary" data-toast="Add payment method opened."><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Add</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Simulation Credit</h2>
+                  <p>Purchase credit for SUMO corridor simulations. These are separate from the runs included in your plan.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="credit-card">
+                    <div class="credit-head">
+                      <div class="credit-brand">
+                        <span class="credit-ico" aria-hidden="true"><svg class="ico"><use href="#i-zap"/></svg></span>
+                        <span class="credit-copy">
+                          <small>Current Balance</small>
+                          <strong>$0.00</strong>
+                        </span>
+                      </div>
+                      <button type="button" class="settings-primary" data-toast="Simulation credit purchase opened.">Buy Credit</button>
+                    </div>
+                    <div class="credit-sep"></div>
+                    <button type="button" class="credit-toggle" id="creditToggle" aria-expanded="false" aria-controls="creditPanel">
+                      <span>Auto Reload</span>
+                      <svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </button>
+                    <div class="credit-panel" id="creditPanel" hidden>
+                      <p>Top up the simulation credit automatically whenever the balance drops below the threshold.</p>
+                      <div class="form-field">
+                        <span>Reload when balance is below ($)</span>
+                        <input type="tel" inputmode="numeric" placeholder="25" aria-label="Auto reload threshold in dollars">
+                      </div>
+                      <div class="settings-actions">
+                        <button type="button" class="settings-primary" data-toast="Auto reload settings saved.">Save Auto Reload</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Add-Ons</h2>
+                  <p>Manage your add-ons and subscription options.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="addon-list">
+                    <article class="addon-card">
+                      <div class="addon-body">
+                        <p class="addon-price">$10 / month per project</p>
+                        <div class="addon-title"><h3>Signal Insights</h3><span class="addon-badge">Pro</span></div>
+                        <p>Detailed timing, delay, and throughput metrics for every corridor, so operators can tune signals with confidence.</p>
+                      </div>
+                      <div class="addon-sep"></div>
+                      <div class="addon-foot">
+                        <label class="switch-inline">
+                          <input class="switch-input addon-toggle" type="checkbox" role="switch" aria-label="Activate Signal Insights" data-addon-name="Signal Insights">
+                          <i class="switch" aria-hidden="true"></i>
+                          <span class="addon-activate-label">Activate</span>
+                        </label>
+                        <button type="button" class="addon-link" data-toast="Signal Insights details opened.">Learn more<svg class="ico" aria-hidden="true"><use href="#i-arrow-up-right"/></svg></button>
+                      </div>
+                    </article>
+                    <article class="addon-card">
+                      <div class="addon-body">
+                        <p class="addon-price">$20 / month</p>
+                        <div class="addon-title"><h3>Corridor Replay</h3><span class="addon-badge">Pro</span></div>
+                        <p>Full incident replay with synchronized camera, V2X, and signal state for after-action review.</p>
+                      </div>
+                      <div class="addon-sep"></div>
+                      <div class="addon-foot">
+                        <label class="switch-inline">
+                          <input class="switch-input addon-toggle" type="checkbox" role="switch" aria-label="Activate Corridor Replay" data-addon-name="Corridor Replay">
+                          <i class="switch" aria-hidden="true"></i>
+                          <span class="addon-activate-label">Activate</span>
+                        </label>
+                        <button type="button" class="addon-link" data-toast="Corridor Replay details opened.">Learn more<svg class="ico" aria-hidden="true"><use href="#i-arrow-up-right"/></svg></button>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+
+      <main class="settings-view access-view" id="accessView" hidden>
+        <div class="settings-shell access-shell">
+          <header class="settings-heading access-heading">
+            <div>
+              <h1>Roles &amp; Permissions</h1>
+              <p>Define who can access each part of SUMO and what they can do.</p>
+            </div>
+            <button type="button" class="access-primary" data-toast="New role form opened.">
+              <svg class="ico"><use href="#i-plus"/></svg>Create role
+            </button>
+          </header>
+
+          <div class="settings-tabs" role="tablist" aria-label="Roles and permissions">
+            <button class="settings-tab is-active" data-access-tab="roles" role="tab" aria-selected="true">Roles</button>
+            <button class="settings-tab" data-access-tab="permissions" role="tab" aria-selected="false">Permissions</button>
+          </div>
+
+          <div class="access-panels">
+            <section class="access-panel" data-access-panel="roles" role="tabpanel">
+              <div class="role-grid">
+                <article class="role-card role-card-admin">
+                  <div class="role-card-head">
+                    <span class="role-icon"><svg class="ico"><use href="#i-shield"/></svg></span>
+                    <button type="button" class="role-more" data-toast="Admin role actions opened." aria-label="Admin role actions"><svg class="ico"><use href="#i-dots"/></svg></button>
+                  </div>
+                  <h2>Admin</h2>
+                  <p>Full access to every workspace setting, member, and control.</p>
+                  <div class="role-stats">
+                    <span><b>9</b><small>Read</small></span>
+                    <span><b>9</b><small>Write</small></span>
+                    <span><b>9</b><small>Create</small></span>
+                    <span><b>9</b><small>Delete</small></span>
+                    <span><b>9</b><small>Total</small></span>
+                  </div>
+                  <div class="role-foot">
+                    <div class="role-users"><span class="mini-avatars"><i>AM</i><i>DR</i><i>+3</i></span><span>5 users</span></div>
+                    <button type="button" class="role-edit" data-toast="Editing Admin role.">Edit role <svg class="ico"><use href="#i-arrow"/></svg></button>
+                  </div>
+                </article>
+
+                <article class="role-card role-card-editor">
+                  <div class="role-card-head">
+                    <span class="role-icon"><svg class="ico"><use href="#i-edit"/></svg></span>
+                    <button type="button" class="role-more" data-toast="Editor role actions opened." aria-label="Editor role actions"><svg class="ico"><use href="#i-dots"/></svg></button>
+                  </div>
+                  <h2>Editor</h2>
+                  <p>Create and manage traffic events, messages, and shared content.</p>
+                  <div class="role-stats">
+                    <span><b>9</b><small>Read</small></span>
+                    <span><b>3</b><small>Write</small></span>
+                    <span><b>2</b><small>Create</small></span>
+                    <span><b>0</b><small>Delete</small></span>
+                    <span><b>9</b><small>Total</small></span>
+                  </div>
+                  <div class="role-foot">
+                    <div class="role-users"><span class="mini-avatars"><i>JR</i><i>NW</i><i>+6</i></span><span>8 users</span></div>
+                    <button type="button" class="role-edit" data-toast="Editing Editor role.">Edit role <svg class="ico"><use href="#i-arrow"/></svg></button>
+                  </div>
+                </article>
+
+                <article class="role-card role-card-maintainer">
+                  <div class="role-card-head">
+                    <span class="role-icon"><svg class="ico"><use href="#i-key"/></svg></span>
+                    <button type="button" class="role-more" data-toast="Maintainer role actions opened." aria-label="Maintainer role actions"><svg class="ico"><use href="#i-dots"/></svg></button>
+                  </div>
+                  <h2>Maintainer</h2>
+                  <p>Operate signal plans, automation rules, and live traffic systems.</p>
+                  <div class="role-stats">
+                    <span><b>7</b><small>Read</small></span>
+                    <span><b>8</b><small>Write</small></span>
+                    <span><b>4</b><small>Create</small></span>
+                    <span><b>3</b><small>Delete</small></span>
+                    <span><b>8</b><small>Total</small></span>
+                  </div>
+                  <div class="role-foot">
+                    <div class="role-users"><span class="mini-avatars"><i>PN</i><i>LH</i><i>+8</i></span><span>10 users</span></div>
+                    <button type="button" class="role-edit" data-toast="Editing Maintainer role.">Edit role <svg class="ico"><use href="#i-arrow"/></svg></button>
+                  </div>
+                </article>
+
+                <article class="role-card role-card-subscriber">
+                  <div class="role-card-head">
+                    <span class="role-icon"><svg class="ico"><use href="#i-user"/></svg></span>
+                    <button type="button" class="role-more" data-toast="Subscriber role actions opened." aria-label="Subscriber role actions"><svg class="ico"><use href="#i-dots"/></svg></button>
+                  </div>
+                  <h2>Subscriber</h2>
+                  <p>View operations and collaborate through secure messages.</p>
+                  <div class="role-stats">
+                    <span><b>6</b><small>Read</small></span>
+                    <span><b>2</b><small>Write</small></span>
+                    <span><b>0</b><small>Create</small></span>
+                    <span><b>0</b><small>Delete</small></span>
+                    <span><b>3</b><small>Total</small></span>
+                  </div>
+                  <div class="role-foot">
+                    <div class="role-users"><span class="mini-avatars"><i>MC</i><i>EB</i><i>+8</i></span><span>10 users</span></div>
+                    <button type="button" class="role-edit" data-toast="Editing Subscriber role.">Edit role <svg class="ico"><use href="#i-arrow"/></svg></button>
+                  </div>
+                </article>
+
+                <article class="role-card role-card-guest">
+                  <div class="role-card-head">
+                    <span class="role-icon"><svg class="ico"><use href="#i-eye"/></svg></span>
+                    <button type="button" class="role-more" data-toast="Guest role actions opened." aria-label="Guest role actions"><svg class="ico"><use href="#i-dots"/></svg></button>
+                  </div>
+                  <h2>Guest</h2>
+                  <p>Read-only access to the dashboard and live map.</p>
+                  <div class="role-stats">
+                    <span><b>4</b><small>Read</small></span>
+                    <span><b>1</b><small>Write</small></span>
+                    <span><b>0</b><small>Create</small></span>
+                    <span><b>0</b><small>Delete</small></span>
+                    <span><b>1</b><small>Total</small></span>
+                  </div>
+                  <div class="role-foot">
+                    <div class="role-users"><span class="mini-avatars"><i>SA</i><i>MT</i><i>+5</i></span><span>7 users</span></div>
+                    <button type="button" class="role-edit" data-toast="Editing Guest role.">Edit role <svg class="ico"><use href="#i-arrow"/></svg></button>
+                  </div>
+                </article>
+
+                <button type="button" class="role-card role-card-add" data-toast="New role form opened.">
+                  <span class="role-add-icon"><svg class="ico"><use href="#i-plus"/></svg></span>
+                  <strong>Add New Role</strong>
+                  <span>Create a custom role with exactly the access your team needs.</span>
+                </button>
+              </div>
+
+              <section class="access-table-card">
+                <div class="access-table-head">
+                  <div>
+                    <h2>Total users with their roles</h2>
+                    <p>Manage assignments and access for every workspace member.</p>
+                  </div>
+                  <div class="access-table-actions">
+                    <button type="button" class="access-btn" id="exportUsersBtn"><svg class="ico"><use href="#i-download"/></svg>Export</button>
+                    <button type="button" class="access-btn" data-toast="User import ready. Choose a CSV to continue."><svg class="ico"><use href="#i-upload"/></svg>Import</button>
+                    <button type="button" class="access-primary" data-toast="Add user form opened."><svg class="ico"><use href="#i-user-plus"/></svg>Add user</button>
+                  </div>
+                </div>
+
+                <div class="access-toolbar">
+                  <div class="access-filters">
+                    <label class="access-select"><span class="visually-hidden">Filter by role</span><select id="accessRoleFilter"><option value="">All Roles</option><option>Admin</option><option>Editor</option><option>Maintainer</option><option>Subscriber</option><option>Guest</option></select><svg class="ico"><use href="#i-chevron"/></svg></label>
+                    <label class="access-select"><span class="visually-hidden">Filter by plan</span><select id="accessPlanFilter"><option value="">All Plans</option><option>Basic</option><option>Pro</option><option>Enterprise</option></select><svg class="ico"><use href="#i-chevron"/></svg></label>
+                    <label class="access-select"><span class="visually-hidden">Filter by status</span><select id="accessStatusFilter"><option value="">All Status</option><option>Active</option><option>Pending</option><option>Suspended</option></select><svg class="ico"><use href="#i-chevron"/></svg></label>
+                  </div>
+                  <label class="access-search">
+                    <svg class="ico"><use href="#i-search"/></svg>
+                    <span class="visually-hidden">Search users</span>
+                    <input id="accessUserSearch" type="search" placeholder="Search users...">
+                  </label>
+                </div>
+
+                <div class="access-table-scroll">
+                  <table class="access-table">
+                    <thead>
+                      <tr>
+                        <th class="check-cell"><input type="checkbox" id="selectAllUsers" aria-label="Select all users"></th>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Plan</th>
+                        <th>Billing</th>
+                        <th>Status</th>
+                        <th>Joined Date</th>
+                        <th class="actions-cell">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="accessUserRows">
+                      <tr data-role="Admin" data-plan="Enterprise" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Ava Morgan"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-1">AM</span><span><strong>Ava Morgan</strong><small>ava.morgan@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-admin"><svg class="ico"><use href="#i-shield"/></svg>Admin</span></td>
+                        <td><span class="plan-text">Enterprise</span></td>
+                        <td>Auto debit</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Jan 18, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Ava Morgan." aria-label="View Ava Morgan"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Ava Morgan." aria-label="Edit Ava Morgan"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Ava Morgan"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Editor" data-plan="Pro" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Julian Reyes"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-2">JR</span><span><strong>Julian Reyes</strong><small>julian.reyes@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-editor"><svg class="ico"><use href="#i-edit"/></svg>Editor</span></td>
+                        <td><span class="plan-text">Pro</span></td>
+                        <td>Auto debit</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Feb 04, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Julian Reyes." aria-label="View Julian Reyes"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Julian Reyes." aria-label="Edit Julian Reyes"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Julian Reyes"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Maintainer" data-plan="Enterprise" data-status="Pending">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Priya Nair"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-3">PN</span><span><strong>Priya Nair</strong><small>priya.nair@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-maintainer"><svg class="ico"><use href="#i-key"/></svg>Maintainer</span></td>
+                        <td><span class="plan-text">Enterprise</span></td>
+                        <td>Invoice</td>
+                        <td><span class="access-status is-pending"><i></i>Pending</span></td>
+                        <td>Feb 22, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Priya Nair." aria-label="View Priya Nair"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Priya Nair." aria-label="Edit Priya Nair"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Priya Nair"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Subscriber" data-plan="Basic" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Marcus Chen"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-4">MC</span><span><strong>Marcus Chen</strong><small>marcus.chen@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-subscriber"><svg class="ico"><use href="#i-user"/></svg>Subscriber</span></td>
+                        <td><span class="plan-text">Basic</span></td>
+                        <td>Auto debit</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Mar 09, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Marcus Chen." aria-label="View Marcus Chen"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Marcus Chen." aria-label="Edit Marcus Chen"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Marcus Chen"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Guest" data-plan="Basic" data-status="Suspended">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Sofia Alvarez"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-5">SA</span><span><strong>Sofia Alvarez</strong><small>sofia.alvarez@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-guest"><svg class="ico"><use href="#i-eye"/></svg>Guest</span></td>
+                        <td><span class="plan-text">Basic</span></td>
+                        <td>Manual</td>
+                        <td><span class="access-status is-suspended"><i></i>Suspended</span></td>
+                        <td>Mar 17, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Sofia Alvarez." aria-label="View Sofia Alvarez"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Sofia Alvarez." aria-label="Edit Sofia Alvarez"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Sofia Alvarez"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Editor" data-plan="Pro" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Noah Williams"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-1">NW</span><span><strong>Noah Williams</strong><small>noah.williams@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-editor"><svg class="ico"><use href="#i-edit"/></svg>Editor</span></td>
+                        <td><span class="plan-text">Pro</span></td>
+                        <td>Auto debit</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Apr 02, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Noah Williams." aria-label="View Noah Williams"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Noah Williams." aria-label="Edit Noah Williams"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Noah Williams"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Maintainer" data-plan="Enterprise" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Leila Haddad"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-2">LH</span><span><strong>Leila Haddad</strong><small>leila.haddad@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-maintainer"><svg class="ico"><use href="#i-key"/></svg>Maintainer</span></td>
+                        <td><span class="plan-text">Enterprise</span></td>
+                        <td>Invoice</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Apr 28, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Leila Haddad." aria-label="View Leila Haddad"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Leila Haddad." aria-label="Edit Leila Haddad"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Leila Haddad"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Subscriber" data-plan="Pro" data-status="Pending">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Ethan Brooks"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-3">EB</span><span><strong>Ethan Brooks</strong><small>ethan.brooks@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-subscriber"><svg class="ico"><use href="#i-user"/></svg>Subscriber</span></td>
+                        <td><span class="plan-text">Pro</span></td>
+                        <td>Auto debit</td>
+                        <td><span class="access-status is-pending"><i></i>Pending</span></td>
+                        <td>May 11, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Ethan Brooks." aria-label="View Ethan Brooks"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Ethan Brooks." aria-label="Edit Ethan Brooks"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Ethan Brooks"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Guest" data-plan="Basic" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Mei Tanaka"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-4">MT</span><span><strong>Mei Tanaka</strong><small>mei.tanaka@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-guest"><svg class="ico"><use href="#i-eye"/></svg>Guest</span></td>
+                        <td><span class="plan-text">Basic</span></td>
+                        <td>Manual</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Jun 03, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Mei Tanaka." aria-label="View Mei Tanaka"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Mei Tanaka." aria-label="Edit Mei Tanaka"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Mei Tanaka"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr data-role="Admin" data-plan="Enterprise" data-status="Active">
+                        <td class="check-cell"><input type="checkbox" class="row-check" aria-label="Select Diego Rossi"></td>
+                        <td><div class="access-user"><span class="user-avatar avatar-tone-5">DR</span><span><strong>Diego Rossi</strong><small>diego.rossi@sumo.io</small></span></div></td>
+                        <td><span class="access-role role-admin"><svg class="ico"><use href="#i-shield"/></svg>Admin</span></td>
+                        <td><span class="plan-text">Enterprise</span></td>
+                        <td>Auto debit</td>
+                        <td><span class="access-status is-active"><i></i>Active</span></td>
+                        <td>Jun 19, 2026</td>
+                        <td class="actions-cell"><div class="row-actions"><button type="button" class="row-action" data-toast="Opening Diego Rossi." aria-label="View Diego Rossi"><svg class="ico"><use href="#i-eye"/></svg></button><button type="button" class="row-action" data-toast="Editing Diego Rossi." aria-label="Edit Diego Rossi"><svg class="ico"><use href="#i-edit"/></svg></button><button type="button" class="row-action is-danger" data-toast="Remove user requires confirmation." aria-label="Remove Diego Rossi"><svg class="ico"><use href="#i-trash"/></svg></button></div></td>
+                      </tr>
+                      <tr id="accessEmpty" hidden><td colspan="8" class="access-empty">No users match those filters.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="access-table-foot">
+                  <span id="accessUserCount">Showing <strong>1 to 10</strong> of <strong>48</strong> users</span>
+                  <div class="access-pagination" aria-label="User table pages">
+                    <button type="button" class="page-btn" data-toast="Already on the first page." aria-label="Previous page"><svg class="ico"><use href="#i-chevron-left"/></svg></button>
+                    <button type="button" class="page-btn is-active" aria-current="page">1</button>
+                    <button type="button" class="page-btn" data-toast="Page 2 loaded.">2</button>
+                    <button type="button" class="page-btn" data-toast="Page 3 loaded.">3</button>
+                    <button type="button" class="page-btn" data-toast="Page 2 loaded." aria-label="Next page"><svg class="ico"><use href="#i-chevron-right"/></svg></button>
+                  </div>
+                </div>
+              </section>
+            </section>
+
+            <section class="access-panel" data-access-panel="permissions" role="tabpanel" hidden>
+              <div class="perm-stats">
+                <article class="perm-stat"><strong id="permissionRoleCount">5</strong><span>Roles</span></article>
+                <article class="perm-stat"><strong id="permissionResourceCount">9</strong><span>Resources</span></article>
+                <article class="perm-stat"><strong id="permissionActiveCount" aria-live="polite">70</strong><span>Active Permissions</span></article>
+              </div>
+
+              <div class="perm-card">
+                <div class="perm-table-scroll">
+                  <table class="perm-table">
+                    <thead>
+                      <tr>
+                        <th>Resource</th>
+                        <th><span>Admin</span><small>5 users</small></th>
+                        <th><span>Editor</span><small>8 users</small></th>
+                        <th><span>Maintainer</span><small>10 users</small></th>
+                        <th><span>Subscriber</span><small>10 users</small></th>
+                        <th><span>Guest</span><small>7 users</small></th>
+                      </tr>
+                    </thead>
+                    <tbody id="permissionRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
