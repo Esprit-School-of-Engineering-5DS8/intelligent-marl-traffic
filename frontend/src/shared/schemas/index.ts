@@ -97,7 +97,8 @@ export const DistributionCell = z.object({
   cell: Cell,
   methods: z.record(
     z.string(),
-    z.object({ from: z.array(num), to: z.array(num), vehicles: z.array(num) }),
+    // the last bin is open-ended ("300 s and more"): its upper bound is exported as null
+    z.object({ from: z.array(num), to: z.array(maybe), vehicles: z.array(num) }),
   ),
 });
 

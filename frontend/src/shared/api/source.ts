@@ -6,6 +6,8 @@ export class DataError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /** network: no answer at all (the only case where "start the backend" is the advice) */
+    readonly kind: "network" | "http" | "invalid" = "http",
   ) {
     super(message);
     this.name = "DataError";
@@ -35,6 +37,8 @@ export async function fetchData<T>(
     if (signal?.aborted) throw err;
     throw new DataError(
       source === "live" ? `backend unreachable (${path})` : `cannot load ${path}`,
+      undefined,
+      "network",
     );
   }
   // a static server answers unknown paths with the app's index.html
@@ -43,11 +47,19 @@ export async function fetchData<T>(
     if (optional) return null;
     throw new DataError(`${path} not found`, 404);
   }
-  if (!response.ok) throw new DataError(`${path}: HTTP ${response.status}`, response.status);
+  if (!response.ok) {
+    // the development proxy answers 5xx in plain text when the backend is down
+    const kind = response.status >= 500 && !isJson ? "network" : "http";
+    throw new DataError(`${path}: HTTP ${response.status}`, response.status, kind);
+  }
   const parsed = schema.safeParse(await response.json());
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new DataError(`${path}: unexpected data at ${issue?.path.join(".")} (${issue?.message})`);
+    throw new DataError(
+      `${path}: unexpected data at ${issue?.path.join(".")} (${issue?.message})`,
+      undefined,
+      "invalid",
+    );
   }
   return parsed.data;
 }

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { usePedestrianGreens } from "@/shared/api/queries";
@@ -73,8 +73,11 @@ function GreensChart({ greens, cell }: { greens: PedestrianGreens; cell: Cell })
   const f = useFormat();
   const rtl = useRtl();
   const data = greens.cells[cellKey(cell)];
-  const methods = data ? sortMethods(Object.keys(data)) : [];
-  const crowd = [...new Set(methods.flatMap((m) => data?.[m]?.crowd ?? []))].sort((a, b) => a - b);
+  const methods = useMemo(() => (data ? sortMethods(Object.keys(data)) : []), [data]);
+  const crowd = useMemo(
+    () => [...new Set(methods.flatMap((m) => data?.[m]?.crowd ?? []))].sort((a, b) => a - b),
+    [methods, data],
+  );
   const build = useCallback(
     (tk: ChartTokens) =>
       lines(tk, {

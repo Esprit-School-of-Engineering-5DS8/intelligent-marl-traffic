@@ -104,6 +104,9 @@ test.describe("pages", () => {
     const table = main(page).getByRole("region", { name: "Tests statistiques" });
     await expect(table.getByRole("row").nth(1)).toBeVisible();
     expect(await table.getByRole("row").count()).toBeGreaterThan(10);
+    // waiting-time distribution (its open-ended last bin once made every file fail validation)
+    await expect(main(page).getByRole("img", { name: "Distribution des attentes" })).toBeVisible();
+    await expect(main(page).getByText("Impossible de charger les données")).toHaveCount(0);
   });
 
   test("scenarios: replays listed, launching needs the backend", async ({ page }) => {

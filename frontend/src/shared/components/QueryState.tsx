@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSettings } from "@/features/settings/store";
+import { DataError } from "@/shared/api/source";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 
@@ -41,7 +42,9 @@ export function QueryState<T>({
           {t("data.loadError")}
         </p>
         <p className="text-xs text-text-2">
-          {source === "live" ? t("data.loadErrorLive") : query.error.message}
+          {source === "live" && query.error instanceof DataError && query.error.kind === "network"
+            ? t("data.loadErrorLive")
+            : query.error.message}
         </p>
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
           {t("common.retry")}
