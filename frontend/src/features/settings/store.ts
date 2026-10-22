@@ -44,7 +44,7 @@ export const useSettings = create<SettingsStore>()(
     }),
     {
       name: "cotraffic-settings",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => safeStorage),
     },
   ),
