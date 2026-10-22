@@ -1,0 +1,36 @@
+name: sensitivity
+description: >
+  Design checks outside the main comparison: the forecast observation block (RQ6, Tier 3;
+  compared with COOP in core.yaml), the weight of the emergency-vehicle reward term
+  (lambda_ev = 1 and 4, one training seed each; COOP-FULL uses lambda_ev = 2), and
+  EV-RULE-MP, the preemption rule on top of Max-Pressure, on the emergency cells of
+  core.yaml (EV-RULE runs on actuated control, which breaks down at peak), and
+  PED-RULE-MP, a pedestrian rule on Max-Pressure, on the pedestrian cell of core.yaml.
+  The CO2 weight is checked by COOP-ECO lambda 0.5 vs 1.0 in core.yaml.
+seeds: [0, 1, 2, 3, 4]
+cells:
+  - network: grid4x4
+    methods: [coop_forecast]
+    demands: [medium, peak, rush_profile]
+    scenarios: [normal]
+    ssm: false
+  - network: grid4x4
+    methods: [coop_full_ev1, coop_full_ev4]
+    demands: [peak]
+    scenarios: [emergency]
+    ssm: false
+  - network: grid4x4
+    methods: [ev_rule_mp]
+    demands: [peak]
+    scenarios: [emergency]
+    ssm: false
+  - network: real_district
+    methods: [ev_rule_mp]
+    demands: [peak]
+    scenarios: [emergency]
+    ssm: false
+  - network: grid4x4
+    methods: [ped_rule_mp]
+    demands: [medium]
+    scenarios: [pedestrians]
+    ssm: false

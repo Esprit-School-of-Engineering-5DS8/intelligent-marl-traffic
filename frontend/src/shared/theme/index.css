@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* Themes are switched with data-theme on <html> (dark by default, a control-room look). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Design tokens. Surfaces step up in lightness; traffic colours are reserved for traffic
+   states (never for decoration) and always come with an icon or a label. */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-2: #f0f3f6;
+  --surface-3: #e5eaef;
+  --border: #d3dbe3;
+  --border-strong: #b5c1cd;
+  --text: #0e1621;
+  --text-2: #445566;
+  --muted: #5e6d7c;
+  --accent: #5b4bd6;
+  --accent-soft: #ebe8fd;
+  --accent-ink: #ffffff;
+  --focus: #5b4bd6;
+  /* traffic states */
+  --flow: #126b3f;
+  --dense: #8a5208;
+  --jam: #a8262a;
+  --emergency: #1e4fae;
+  --flow-soft: #e3f5ec;
+  --dense-soft: #fbefdc;
+  --jam-soft: #fbe5e5;
+  --emergency-soft: #e2ecfc;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0f14;
+  --surface: #111921;
+  --surface-2: #17212b;
+  --surface-3: #1f2b37;
+  --border: #26323f;
+  --border-strong: #3a4a5a;
+  --text: #e6edf3;
+  --text-2: #a7b6c4;
+  --muted: #8193a4;
+  --accent: #9a8cff;
+  --accent-soft: #241f45;
+  --accent-ink: #0a0f14;
+  --focus: #b3a8ff;
+  --flow: #38c980;
+  --dense: #f2a33a;
+  --jam: #f06063;
+  --emergency: #5b97ff;
+  --flow-soft: #12291d;
+  --dense-soft: #2e2210;
+  --jam-soft: #321617;
+  --emergency-soft: #142440;
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-focus: var(--focus);
+  --color-flow: var(--flow);
+  --color-dense: var(--dense);
+  --color-jam: var(--jam);
+  --color-emergency: var(--emergency);
+  --color-flow-soft: var(--flow-soft);
+  --color-dense-soft: var(--dense-soft);
+  --color-jam-soft: var(--jam-soft);
+  --color-emergency-soft: var(--emergency-soft);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    min-height: 100dvh;
+    background: var(--bg);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

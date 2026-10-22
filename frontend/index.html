@@ -75,6 +75,7 @@
     <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="2"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 19a4.5 4.5 0 0 1-.3-9A6.5 6.5 0 0 1 18.6 11 4 4 0 0 1 18 19H6.5Z"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
     <symbol id="i-cloud-sun" viewBox="0 0 24 24"><path d="M12 2v2M4.9 4.9l1.4 1.4M20 12h2M19.1 4.9l-1.4 1.4"/><path d="M15.9 12.6a4 4 0 0 0-5.9-4.1"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></symbol>
     <symbol id="i-rain" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6M8 14v6M12 16v6"/></symbol>
     <symbol id="i-storm" viewBox="0 0 24 24"><path d="M6 16.3A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 .5 9"/><path d="m13 12-3 5h4l-3 5"/></symbol>
@@ -95,6 +96,15 @@
       </div>
       <nav class="primary-nav" aria-label="Primary navigation">
         <button class="nav-item is-active" data-nav="Dashboard"><svg class="ico"><use href="#i-grid"/></svg><span>Dashboard</span></button>
+        <div class="nav-group" data-nav-group="benchmark">
+          <button class="nav-item nav-parent" data-nav="Benchmark" aria-expanded="false" aria-controls="benchmarkSubnav"><svg class="ico"><use href="#i-activity"/></svg><span>Benchmark</span><svg class="ico nav-caret"><use href="#i-chevron"/></svg></button>
+          <div class="nav-submenu" id="benchmarkSubnav" aria-hidden="true">
+            <button type="button" class="nav-subitem" data-benchmark-tab="agents">Agents RL</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="live">Carte en direct</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="compare">Analyse comparative</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="overview">Vue d’ensemble</button>
+          </div>
+        </div>
         <div class="nav-group" data-nav-group="live">
           <button class="nav-item nav-parent" data-nav="Live Map" aria-expanded="false" aria-controls="liveSubnav"><svg class="ico"><use href="#i-pin"/></svg><span>Live Map</span><svg class="ico nav-caret"><use href="#i-chevron"/></svg></button>
           <div class="nav-submenu" id="liveSubnav" aria-hidden="true">
@@ -470,6 +480,18 @@
         </section>
       </main>
 
+      <main class="benchmark-view" id="benchmarkView" hidden>
+        <section class="benchmark-shell">
+          <nav class="benchmark-tabs" aria-label="Benchmark sections"><button type="button" class="benchmark-tab is-active" data-benchmark-tab="overview">Vue d’ensemble</button><button type="button" class="benchmark-tab" data-benchmark-tab="agents">Agents RL</button><button type="button" class="benchmark-tab" data-benchmark-tab="live">Carte en direct</button><button type="button" class="benchmark-tab" data-benchmark-tab="compare">Analyse comparative</button></nav>
+          <header class="benchmark-head"><div><span class="benchmark-eyebrow">Rami / CoTraffic evaluation</span><h1>Benchmark</h1><p>Compare SUMO controllers, replay runs, and reinforcement-learning environments from one workspace.</p></div><div class="benchmark-actions"><select aria-label="Benchmark network"><option>East Austin · 3×3</option><option>East Austin · 2×2</option><option>Grid 4×4 replay</option></select><button type="button" class="benchmark-primary" data-toast="Benchmark run queued.">Run benchmark</button></div></header>
+          <div class="benchmark-grid"><article class="benchmark-card benchmark-card-wide"><div class="benchmark-card-head"><div><span class="benchmark-label">Controller comparison</span><h2>Average travel time</h2></div><span class="benchmark-status">Latest run · 20:32</span></div><div class="benchmark-bars"><div><span>SUMO baseline</span><i style="--value:72%"></i><b>184 s</b></div><div><span>CoTraffic rule policy</span><i style="--value:54%"></i><b>139 s</b></div><div><span>RL policy</span><i class="is-accent" style="--value:41%"></i><b>108 s</b></div></div></article><article class="benchmark-card"><span class="benchmark-label">RL environment</span><h2>Training status</h2><strong class="benchmark-big">Episode 248</strong><p class="benchmark-muted">Grid 3×3 · 12 agents · 96% complete</p><div class="benchmark-progress"><i style="width:96%"></i></div><span class="benchmark-chip">Stable</span></article><article class="benchmark-card"><span class="benchmark-label">Replay matrix</span><h2>Scenarios evaluated</h2><div class="benchmark-stat-row"><strong>18</strong><span>runs<br><small>6 networks · 3 policies</small></span></div><button type="button" class="benchmark-link" data-toast="Replay matrix opened.">Open replay matrix <svg class="ico"><use href="#i-arrow-up-right"/></svg></button></article></div>
+          <section class="benchmark-card benchmark-table-card"><div class="benchmark-card-head"><div><span class="benchmark-label">Evaluation matrix</span><h2>Recent comparisons</h2></div><span class="benchmark-muted">Source: CoTraffic / Rami replay data</span></div><div class="benchmark-table"><div class="benchmark-row benchmark-row-head"><span>Scenario</span><span>Policy</span><span>Travel time</span><span>Throughput</span><span>Reward</span></div><div class="benchmark-row"><span>Grid 3×3</span><span>RL policy</span><b>108 s</b><b>1,608 veh/h</b><em>+18.4%</em></div><div class="benchmark-row"><span>Grid 3×3</span><span>SUMO baseline</span><b>184 s</b><b>1,204 veh/h</b><em>+0.0%</em></div><div class="benchmark-row"><span>Grid 2×2</span><span>CoTraffic rules</span><b>139 s</b><b>1,376 veh/h</b><em>+9.7%</em></div></div></section>
+          <section class="benchmark-subpanel" data-benchmark-panel="agents" hidden><div class="benchmark-card"><span class="benchmark-label">Rami RL environment</span><h2>Live agent telemetry</h2><div class="benchmark-live-grid"><strong id="benchmarkEpisode">Episode —</strong><span id="benchmarkAgentStatus">Waiting for SUMO</span><strong id="benchmarkReward">Reward —</strong><span id="benchmarkAgentCount">0 active agents</span></div><div class="benchmark-progress"><i id="benchmarkTrainingProgress" style="width:0%"></i></div><p class="benchmark-muted">Connected to the active simulation session. Training metrics update from the backend state.</p></div></section>
+          <section class="benchmark-subpanel" data-benchmark-panel="live" hidden><div class="benchmark-card"><span class="benchmark-label">Carte en direct · SUMO</span><h2>Live simulation stream</h2><div class="benchmark-live-grid"><strong id="benchmarkLiveClock">00:00:00</strong><span id="benchmarkLiveStatus">Idle</span><strong id="benchmarkLiveVehicles">0</strong><span>vehicles currently in SUMO</span></div><p class="benchmark-muted" id="benchmarkLiveMessage">Start a grid simulation from the Live Map timeline to see the real-time state here.</p></div></section>
+          <section class="benchmark-subpanel" data-benchmark-panel="compare" hidden><div class="benchmark-card"><span class="benchmark-label">Analyse comparative</span><h2>Live controller comparison</h2><div class="benchmark-comparison-list"><div><span>SUMO baseline</span><b id="benchmarkBaseline">Waiting</b></div><div><span>CoTraffic policy</span><b id="benchmarkCotraffic">Waiting</b></div><div><span>RL agent</span><b id="benchmarkRlPolicy">Waiting</b></div></div><p class="benchmark-muted">Comparison updates from the current SUMO run; historical replay exports are not used.</p></div></section>
+        </section>
+      </main>
+
       <main class="activity-log-view" id="activityLogView" hidden>
         <div class="activity-shell">
           <header class="activity-head">
@@ -516,6 +538,7 @@
 
       <main class="live-map-view" id="liveMapView" hidden>
         <div class="live-map-canvas" id="liveMap" aria-label="3D live traffic map of East 7th, Austin"></div>
+        <div class="sumo-3d-canvas-wrap" id="sumo3dScene" aria-label="3D SUMO simulation environment" hidden></div>
         <div class="live-map-vignette" aria-hidden="true"></div>
 
         <div class="live-map-overlay">
@@ -540,6 +563,7 @@
               <button type="button" class="live-mode-tab" data-live-mode="events" role="tab" aria-selected="false">Events</button>
               <button type="button" class="live-mode-tab" data-live-mode="optimize" role="tab" aria-selected="false">Optimize</button>
               <button type="button" class="live-mode-tab" data-live-mode="predict" role="tab" aria-selected="false">Predict</button>
+              <button type="button" class="live-mode-tab live-roam-tab" data-live-mode="roam" role="tab" aria-selected="false">Roam</button>
             </div>
 
             <div class="live-top-actions">
@@ -550,7 +574,16 @@
               </button>
               <div class="live-tool-group">
                 <button type="button" class="live-tool is-active" data-live-action="perspective" aria-label="Toggle 3D perspective">3D</button>
-                <button type="button" class="live-tool" data-live-action="layers" aria-label="Map geographic layers" title="Geographic layers"><svg class="ico"><use href="#i-layers"/></svg></button>
+                <div class="live-layer-picker">
+                  <button type="button" class="live-tool" data-live-action="layers" aria-label="Map geographic layers" title="Geographic layers" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-layers"/></svg></button>
+                  <div class="live-style-menu live-layer-menu" role="menu" aria-label="Geographic layers" hidden>
+                    <span class="live-style-menu-title">Map layers</span>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Buildings, labels and streets</small></span></button>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="mapbox-layout" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Strict 2×2 / 3×3 grid</strong><small>Only the selected simulation grid</small></span></button>
+                    <button type="button" class="live-layer-option" data-map-layer="sumo-road" role="menuitemcheckbox" aria-checked="false"><span class="layer-toggle"></span><span><strong>SUMO road layout</strong><small>Projected onto the selected Mapbox streets</small></span></button>
+                    <button type="button" class="live-layer-option" data-map-layer="fog" role="menuitemcheckbox" aria-checked="false"><span class="layer-toggle"></span><span><strong>Fog of war</strong><small>Hide context outside the network</small></span></button>
+                  </div>
+                </div>
                 <div class="live-style-picker">
                   <button type="button" class="live-tool" data-live-action="style" aria-label="Choose map mode" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-sun"/></svg></button>
                   <div class="live-style-menu" role="menu" aria-label="Map styles" hidden>
@@ -561,12 +594,21 @@
                     <button type="button" class="live-style-option" data-map-style="dawn" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dawn"></span><span><strong>Dawn</strong><small>Soft morning tones</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                   </div>
                 </div>
+                <button type="button" class="live-tool panel-theme-tool" data-panel-theme-toggle aria-label="Switch panel theme" title="Panels: Dark"><svg class="ico"><use href="#i-contrast"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="weather" aria-label="Weather conditions"><svg class="ico"><use href="#i-cloud"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="locate" aria-label="Recenter map"><svg class="ico"><use href="#i-crosshair"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="fullscreen" aria-label="Toggle fullscreen"><svg class="ico"><use href="#i-expand"/></svg></button>
               </div>
               <button type="button" class="live-round-btn" data-toast="Map options opened." aria-label="Map options"><svg class="ico"><use href="#i-dots"/></svg></button>
+              <button type="button" class="live-round-btn" data-live-panels-toggle aria-label="Collapse panels" title="Collapse panels"><svg class="ico"><use href="#i-minus"/></svg></button>
             </div>
+          </div>
+
+          <div class="simulation-timeline" id="simulationTimeline" aria-label="SUMO simulation timeline">
+            <div class="simulation-timeline-head"><strong id="simulationClock">00:00:00</strong><span id="simulationStatus">Idle</span><span id="simulationMetrics">0 vehicles</span></div>
+            <div class="simulation-scrubber"><button type="button" id="simulationPlay" class="simulation-play" aria-label="Play simulation"><svg class="ico"><use href="#i-play"></use></svg></button><input id="simulationTime" type="range" min="0" max="86400" value="0" step="1" aria-label="Simulation time"><div class="simulation-scrubber-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="simulation-timeline-axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:59</span></div>
+            <div class="simulation-timeline-controls"><button type="button" id="simulationStart">Start 2×2</button><button type="button" id="simulationPause">Pause</button><button type="button" id="simulationSpeed">1×</button><button type="button" id="simulationResetView">Center</button><button type="button" data-live-panels-toggle aria-label="Collapse panels" title="Collapse panels">Collapse</button></div>
           </div>
 
           <aside class="live-panel zone-panel" aria-label="Zone monitoring">
@@ -606,7 +648,7 @@
             </div>
           </aside>
 
-          <section class="live-panel queue-panel" aria-label="Queue backlog prediction">
+          <section class="live-panel queue-panel" aria-label="Queue backlog prediction" hidden>
             <button type="button" class="queue-close" data-queue-close aria-label="Close queue backlog panel" title="Close"><svg class="ico"><use href="#i-x"/></svg></button>
             <header class="queue-head">
               <h2>Queue Backlog</h2>

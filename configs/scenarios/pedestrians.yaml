@@ -1,0 +1,4 @@
+name: pedestrians
+description: Pedestrian flows crossing at the signalised intersections; pedestrian waiting time is measured.
+pedestrians:
+  persons_per_hour: 900

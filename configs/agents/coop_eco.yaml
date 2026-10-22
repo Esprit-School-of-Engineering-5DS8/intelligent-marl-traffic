@@ -1,0 +1,5 @@
+name: coop_eco
+extends: coop
+description: COOP with a CO2 penalty in the reward (lambda_co2 = 1.0).
+reward:
+  co2: 1.0

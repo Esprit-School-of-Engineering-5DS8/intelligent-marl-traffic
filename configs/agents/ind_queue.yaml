@@ -1,0 +1,7 @@
+name: ind_queue
+extends: ind
+description: Reward exploration - IND with the queue-length base reward (validation study, not a final variant).
+reward:
+  base: queue
+training:
+  total_timesteps: 300000

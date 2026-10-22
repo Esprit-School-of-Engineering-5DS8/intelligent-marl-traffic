@@ -1,0 +1,7 @@
+name: ind_ent
+extends: ind
+description: Hyperparameter exploration - IND with an entropy bonus of 0.01 (validation study).
+ppo:
+  ent_coef: 0.01
+training:
+  total_timesteps: 300000

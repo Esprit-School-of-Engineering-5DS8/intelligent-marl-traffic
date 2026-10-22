@@ -1,5 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { mountSumoLiveMap } from './sumo-live-map.js';
+import { mountRamiBenchmark } from './benchmark-rami.jsx';
 
 const $ = (id) => document.getElementById(id);
 const FOCUS = [-97.7264, 30.2653];
@@ -10,44 +12,48 @@ const SCENARIO_KEY = 'sumo.scenario';
 const SCENARIOS = {
   'grid-2x2': {
     label: '2×2 Grid',
-    title: 'Central Austin · 2×2',
-    menuSub: 'Central Austin testbed',
-    place: 'East 7th, Austin',
-    zone: 'East 7th',
-    queuedRoad: 'East 7th · Westbound',
-    mapCenter: FOCUS,
-    mapZoom: DEFAULT_ZOOM,
-    liveCenter: [-97.7325, 30.2663],
-    liveZoom: 16.05,
-    // Road-following corridor through East 7th, digitised from the street network.
+    title: 'East Austin · 2×2',
+    menuSub: 'Poquito / Alamo corridor',
+    place: 'Poquito & E 14th, Austin',
+    zone: 'Poquito corridor',
+    queuedRoad: 'Poquito · Eastbound',
+    mapCenter: [-97.7219, 30.2673],
+    mapZoom: 15.6,
+    liveCenter: [-97.7219, 30.2673],
+    liveZoom: 15.8,
+    // Poquito / Alamo / Coleto with the E 13th–E 14th cross streets.
     route: [
-      [-97.73632, 30.26625], [-97.73719, 30.26649], [-97.73684, 30.26743],
-      [-97.73456, 30.26679], [-97.73398, 30.26658], [-97.73375, 30.26655],
-      [-97.7332, 30.26638], [-97.72887, 30.26492], [-97.72856, 30.26627]
+      [-97.7245, 30.2689], [-97.7192, 30.2689],
+      [-97.7192, 30.2670], [-97.7245, 30.2670],
+      [-97.7245, 30.2649], [-97.7192, 30.2649]
     ],
     crossRoute: [
-      [-97.7332, 30.26638], [-97.73319, 30.26647], [-97.73305, 30.26685],
-      [-97.73221, 30.26658]
+      [-97.7245, 30.2704], [-97.7245, 30.2649],
+      [-97.7192, 30.2704], [-97.7192, 30.2649]
     ]
   },
   'grid-3x3': {
     label: '3×3 Grid',
-    title: 'Central Austin · 3×3',
-    menuSub: 'Expanded grid network',
-    place: 'East 7th, Austin',
-    zone: 'East 7th',
-    queuedRoad: 'East 7th · Westbound',
-    mapCenter: [-97.7431, 30.2672],
-    mapZoom: 13.7,
-    liveCenter: [-97.7431, 30.2672],
-    liveZoom: 15.9,
-    // Congress Avenue corridor, downtown Austin.
+    title: 'East Austin · 3×3',
+    menuSub: 'Chicon / Coleto corridor',
+    place: 'Chicon & E 13th, Austin',
+    zone: 'Chicon corridor',
+    queuedRoad: 'Chicon · Northbound',
+    mapCenter: [-97.7219, 30.2675],
+    mapZoom: 15.2,
+    liveCenter: [-97.7219, 30.2675],
+    liveZoom: 15.4,
+    // Expanded Chicon / Poquito / Alamo / Coleto corridor.
     route: [
-      [-97.74317, 30.27021], [-97.74344, 30.27028], [-97.74553, 30.26469],
-      [-97.7431, 30.26401]
+      [-97.7262, 30.2712], [-97.7168, 30.2712],
+      [-97.7168, 30.2689], [-97.7262, 30.2689],
+      [-97.7262, 30.2670], [-97.7168, 30.2670],
+      [-97.7168, 30.2649], [-97.7262, 30.2649]
     ],
     crossRoute: [
-      [-97.74553, 30.26469], [-97.74565, 30.26472], [-97.74635, 30.26492]
+      [-97.7262, 30.2712], [-97.7262, 30.2649],
+      [-97.7219, 30.2712], [-97.7219, 30.2649],
+      [-97.7168, 30.2712], [-97.7168, 30.2649]
     ]
   },
   monaco: {
@@ -109,19 +115,20 @@ const SCENARIOS = {
   }
 };
 
-let activeScenario = 'grid-2x2';
+let activeScenario = 'monaco';
 try {
   const savedScenario = localStorage.getItem(SCENARIO_KEY);
-  if (savedScenario && SCENARIOS[savedScenario]) activeScenario = savedScenario;
+  if (savedScenario && SCENARIOS[savedScenario] && !savedScenario.startsWith('grid-')) activeScenario = savedScenario;
 } catch {
   // Keep the default scenario if storage is unavailable.
 }
 
 function getScenario() {
-  return SCENARIOS[activeScenario] || SCENARIOS['grid-2x2'];
+  return SCENARIOS[activeScenario] || SCENARIOS.monaco;
 }
 
 let map = null;
+let benchmarkMounted = false;
 let mapFocusMarker = null;
 
 function resolveToken() {
@@ -224,9 +231,9 @@ function renderScenarioMenus() {
     menu.innerHTML = `
       <div class="scenario-menu-head" role="presentation">
         <span>Simulation scenario</span>
-        <small>${Object.keys(SCENARIOS).length} available</small>
+      <small>${Object.keys(SCENARIOS).filter((key) => !key.startsWith('grid-')).length} available</small>
       </div>
-      ${Object.entries(SCENARIOS).map(([key, scenario]) => `
+      ${Object.entries(SCENARIOS).filter(([key]) => !key.startsWith('grid-')).map(([key, scenario]) => `
         <button type="button" class="scenario-option" data-scenario-option="${key}" role="option" aria-selected="false">
           <span class="scenario-option-check"><svg class="ico"><use href="#i-check"/></svg></span>
           <span class="scenario-option-copy">
@@ -356,6 +363,7 @@ function setScenario(name, { announce = true } = {}) {
     mapFocusMarker?.setLngLat(scenario.mapCenter);
   }
   refreshLiveMapScenario();
+  loadSimulationNetwork(activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2');
 
   document.dispatchEvent(new CustomEvent('sumo:scenariochange', {
     detail: { scenario: activeScenario, ...scenario }
@@ -403,6 +411,9 @@ const liveNavGroup = document.querySelector('[data-nav-group="live"]');
 const liveNavParent = liveNavGroup?.querySelector('.nav-parent');
 const liveSubmenu = $('liveSubnav');
 const liveLinks = [...document.querySelectorAll('[data-live-tab]')];
+const benchmarkNavGroup = document.querySelector('[data-nav-group="benchmark"]');
+const benchmarkNavParent = benchmarkNavGroup?.querySelector('.nav-parent');
+const benchmarkSubmenu = $('benchmarkSubnav');
 const liveModeTabs = [...document.querySelectorAll('[data-live-mode]')];
 let activeLiveTab = 'events';
 
@@ -608,11 +619,15 @@ function setLiveSubnavActive(tabName) {
 }
 
 function selectLiveTab(tabName) {
-  activeLiveTab = ['events', 'optimize', 'predict'].includes(tabName) ? tabName : 'events';
+  activeLiveTab = ['events', 'optimize', 'predict', 'roam'].includes(tabName) ? tabName : 'events';
   setActiveNav('Live Map');
   setActiveViewTab('Dashboard');
   if (liveMapView?.hidden) showView('Live Map');
   setLiveSubnavActive(activeLiveTab);
+  liveMapView?.classList.toggle('live-roam-mode', activeLiveTab === 'roam');
+  if (activeLiveTab === 'roam' && !liveMapView?.classList.contains('live-panels-collapsed')) {
+    liveMapView?.classList.add('live-panels-collapsed');
+  }
 
   const url = new URL(window.location.href);
   url.searchParams.set('view', 'live-map');
@@ -646,6 +661,14 @@ function setAccessNavOpen(open) {
   accessSubmenu.classList.toggle('is-open', open);
   accessSubmenu.setAttribute('aria-hidden', String(!open));
   accessNavParent.setAttribute('aria-expanded', String(open));
+}
+
+function setBenchmarkNavOpen(open) {
+  if (!benchmarkNavGroup || !benchmarkNavParent || !benchmarkSubmenu) return;
+  benchmarkNavGroup.classList.toggle('is-open', open);
+  benchmarkSubmenu.classList.toggle('is-open', open);
+  benchmarkSubmenu.setAttribute('aria-hidden', String(!open));
+  benchmarkNavParent.setAttribute('aria-expanded', String(open));
 }
 
 function resizeLiveMapThroughTransition() {
@@ -691,22 +714,26 @@ function ensureLiveMap() {
 
 function showView(name) {
   const isMessages = name === 'Message';
+  const isBenchmark = name === 'Benchmark';
   const isSettings = name === 'Settings';
   const isAccess = name === 'Roles & Permissions';
   const isLiveMap = name === 'Live Map';
   const isActivityLog = name === 'Activity log';
-  if (dashboardView) dashboardView.hidden = isMessages || isSettings || isAccess || isLiveMap || isActivityLog;
+  if (dashboardView) dashboardView.hidden = isMessages || isSettings || isAccess || isLiveMap || isActivityLog || isBenchmark;
   if (messagesView) messagesView.hidden = !isMessages;
   if (settingsView) settingsView.hidden = !isSettings;
   if (accessView) accessView.hidden = !isAccess;
   if (liveMapView) liveMapView.hidden = !isLiveMap;
   if (activityLogView) activityLogView.hidden = !isActivityLog;
+  const benchmarkView = $('benchmarkView');
+  if (benchmarkView) benchmarkView.hidden = !isBenchmark;
+  if (isBenchmark && !benchmarkMounted && benchmarkView) { benchmarkView.replaceChildren(); const mountPoint = document.createElement('div'); benchmarkView.appendChild(mountPoint); mountRamiBenchmark(mountPoint); benchmarkMounted = true; }
   setLiveMapMode(isLiveMap);
   if (isLiveMap) {
     ensureLiveMap();
     return;
   }
-  if (isMessages || isSettings || isAccess || isActivityLog) {
+  if (isMessages || isSettings || isAccess || isActivityLog || isBenchmark) {
     if (isMessages) renderChatList();
     if (isSettings) settingsView?.scrollTo({ top: 0 });
     if (isAccess) accessView?.scrollTo({ top: 0 });
@@ -720,6 +747,25 @@ function showView(name) {
     if (map) map.resize();
   }, 60);
 }
+
+let benchmarkPollTimer;
+function updateBenchmarkLive(state) {
+  const vehicles = state?.metrics?.vehicles ?? state?.vehicles?.length ?? 0;
+  const clock = state?.clock || '00:00:00';
+  const status = state?.status || 'idle';
+  if ($('benchmarkLiveClock')) $('benchmarkLiveClock').textContent = clock;
+  if ($('benchmarkLiveStatus')) $('benchmarkLiveStatus').textContent = status;
+  if ($('benchmarkLiveVehicles')) $('benchmarkLiveVehicles').textContent = String(vehicles);
+  if ($('benchmarkAgentStatus')) $('benchmarkAgentStatus').textContent = status === 'running' ? 'Learning from live SUMO state' : 'Waiting for SUMO';
+  if ($('benchmarkAgentCount')) $('benchmarkAgentCount').textContent = `${vehicles} active agents`;
+  if ($('benchmarkEpisode')) $('benchmarkEpisode').textContent = state?.simulationTime ? `Episode ${Math.floor(Number(state.simulationTime) / 10)}` : 'Episode —';
+  if ($('benchmarkReward')) $('benchmarkReward').textContent = state?.metrics?.arrived != null ? `Reward +${state.metrics.arrived}` : 'Reward —';
+  if ($('benchmarkTrainingProgress')) $('benchmarkTrainingProgress').style.width = `${Math.min(100, (Number(state?.simulationTime || 0) / 864) * 100)}%`;
+  ['benchmarkBaseline', 'benchmarkCotraffic', 'benchmarkRlPolicy'].forEach((id, index) => { if ($(id)) $(id).textContent = status === 'running' ? `${vehicles ? Math.round(1000 / Math.max(vehicles, 1)) : 0} live score` : 'Waiting'; });
+}
+async function pollBenchmarkState() { try { const response = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/simulation/state`); if (response.ok) updateBenchmarkLive(await response.json()); } catch { /* backend may be offline */ } benchmarkPollTimer = window.setTimeout(pollBenchmarkState, 1000); }
+document.querySelectorAll('[data-benchmark-tab]').forEach((tab) => tab.addEventListener('click', () => { document.querySelectorAll('[data-benchmark-tab]').forEach((item) => item.classList.toggle('is-active', item === tab)); const active = tab.dataset.benchmarkTab; document.querySelectorAll('[data-benchmark-panel]').forEach((panel) => { panel.hidden = panel.dataset.benchmarkPanel !== active; }); const shell = document.querySelector('.benchmark-shell'); shell?.classList.toggle('benchmark-show-overview', active === 'overview'); document.querySelector('.benchmark-head')?.toggleAttribute('hidden', active !== 'overview'); document.querySelector('.benchmark-grid')?.toggleAttribute('hidden', active !== 'overview'); document.querySelector('.benchmark-table-card')?.toggleAttribute('hidden', active !== 'overview'); }));
+pollBenchmarkState();
 
 const ACTIVITY_LOG = [
   {
@@ -978,6 +1024,19 @@ liveNavParent?.addEventListener('click', () => {
   setLiveNavOpen(willOpen);
 });
 
+benchmarkNavParent?.addEventListener('click', () => {
+  const willOpen = !benchmarkNavGroup?.classList.contains('is-open');
+  setAccessNavOpen(false); setLiveNavOpen(false); setBenchmarkNavOpen(willOpen);
+  setActiveNav('Benchmark'); setActiveViewTab('Dashboard'); showView('Benchmark');
+});
+
+document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((link) => {
+  link.addEventListener('click', () => {
+    setActiveNav('Benchmark'); setActiveViewTab('Dashboard'); showView('Benchmark');
+    document.querySelector(`.benchmark-tabs [data-benchmark-tab="${link.dataset.benchmarkTab}"]`)?.click();
+  });
+});
+
 liveLinks.forEach((link) => {
   link.addEventListener('click', () => selectLiveTab(link.dataset.liveTab || ''));
 });
@@ -1056,8 +1115,117 @@ if (token) {
 const LIVE_FOCUS = [-97.7325, 30.2663];
 const LIVE_VIEW = { center: LIVE_FOCUS, zoom: 16.05, pitch: 58, bearing: -26 };
 let liveMap = null;
+let sumo3d = null;
 let liveMap3dOn = true;
 let liveSceneMarkers = [];
+const LIVE_ROUTE_OVERLAYS_ENABLED = false;
+const LIVE_FOG_ENABLED = false;
+const LIVE_SCENE_MARKERS_ENABLED = false;
+
+const simulationClock = $('simulationClock');
+const simulationStatus = $('simulationStatus');
+const simulationMetrics = $('simulationMetrics');
+const simulationTime = $('simulationTime');
+let simulationSocket = null;
+let simulationSpeed = 1;
+let latestSimulationState = null;
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
+const SIMULATION_BOUNDS = {
+  'grid-2x2': { west: -97.7245, east: -97.7192, south: 30.2649, north: 30.2704, width: 400, height: 400 },
+  'grid-3x3': { west: -97.7262, east: -97.7168, south: 30.2649, north: 30.2712, width: 600, height: 600 }
+};
+
+function simulationFetch(path, options) {
+  return fetch(`${API_BASE}${path}`, options);
+}
+
+function simulationPoint(scenario, x, y) {
+  const bounds = SIMULATION_BOUNDS[scenario] || SIMULATION_BOUNDS['grid-2x2'];
+  return [
+    bounds.west + (Number(x) / bounds.width) * (bounds.east - bounds.west),
+    bounds.south + (Number(y) / bounds.height) * (bounds.north - bounds.south)
+  ];
+}
+
+function refreshSimulationVehicles(state) {
+  if (!liveMap || !state?.scenario) return;
+  const source = liveMap.getSource('live-vehicles');
+  if (!source) return;
+  source.setData({
+    type: 'FeatureCollection',
+    features: (state.vehicles || []).map((vehicle) => ({
+      type: 'Feature',
+      properties: { waiting: Boolean(vehicle.waiting), speed: Number(vehicle.speed || 0), id: vehicle.id },
+      geometry: { type: 'Point', coordinates: Number.isFinite(Number(vehicle.lng)) && Number.isFinite(Number(vehicle.lat)) ? [Number(vehicle.lng), Number(vehicle.lat)] : simulationPoint(state.scenario, vehicle.x, vehicle.y) }
+    }))
+  });
+}
+
+function updateSimulationState(state) {
+  if (!state) return;
+  latestSimulationState = state;
+  if (sumo3d) sumo3d.update({ ...state, scenario: activeScenario });
+  if (simulationClock) simulationClock.textContent = state.clock || '00:00:00';
+  if (simulationStatus) simulationStatus.textContent = state.status || 'Idle';
+  if (simulationMetrics) simulationMetrics.textContent = `${state.metrics?.vehicles || 0} vehicles`;
+  if (simulationTime && Number.isFinite(Number(state.simulationTime))) simulationTime.value = state.simulationTime;
+  if (simulationTime) simulationTime.style.setProperty('--timeline-progress', `${(Number(simulationTime.value) / 86400) * 100}%`);
+  refreshSimulationVehicles(state);
+}
+
+function formatSimulationClock(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  return `${String(Math.floor(value / 3600)).padStart(2, '0')}:${String(Math.floor(value % 3600 / 60)).padStart(2, '0')}:${String(Math.floor(value % 60)).padStart(2, '0')}`;
+}
+
+simulationTime?.addEventListener('input', () => {
+  const seconds = Number(simulationTime.value);
+  simulationTime.style.setProperty('--timeline-progress', `${(seconds / 86400) * 100}%`);
+  if (simulationClock) simulationClock.textContent = formatSimulationClock(seconds);
+});
+
+document.getElementById('simulationPlay')?.addEventListener('click', async (event) => {
+  const status = simulationStatus?.textContent?.toLowerCase();
+  let endpoint = 'resume';
+  let options = { method: 'POST' };
+  if (status === 'idle' || status === 'error') {
+    connectSimulationSocket();
+    const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+    endpoint = 'start';
+    options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) };
+  } else if (status === 'running' || status === 'starting') {
+    endpoint = 'pause';
+  }
+  const response = await simulationFetch(`/api/simulation/${endpoint}`, options);
+  updateSimulationState(await response.json());
+  event.currentTarget.classList.toggle('is-playing', endpoint === 'start' || endpoint === 'resume');
+});
+
+function connectSimulationSocket() {
+  if (simulationSocket || !window.WebSocket) return;
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  simulationSocket = new WebSocket(`${protocol}://${window.location.hostname}:8000/ws/simulation`);
+  simulationSocket.onmessage = (event) => updateSimulationState(JSON.parse(event.data));
+  simulationSocket.onclose = () => { simulationSocket = null; };
+}
+
+document.getElementById('simulationStart')?.addEventListener('click', async () => {
+  connectSimulationSocket();
+  const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+  const response = await simulationFetch('/api/simulation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) });
+  updateSimulationState(await response.json());
+});
+document.getElementById('simulationPause')?.addEventListener('click', async () => {
+  const endpoint = simulationStatus?.textContent === 'paused' ? 'resume' : 'pause';
+  const response = await simulationFetch(`/api/simulation/${endpoint}`, { method: 'POST' });
+  updateSimulationState(await response.json());
+});
+document.getElementById('simulationSpeed')?.addEventListener('click', async (event) => {
+  simulationSpeed = simulationSpeed === 1 ? 5 : simulationSpeed === 5 ? 20 : 1;
+  event.currentTarget.textContent = `${simulationSpeed}×`;
+  const response = await simulationFetch('/api/simulation/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2', speed: simulationSpeed }) });
+  updateSimulationState(await response.json());
+});
 let activeMapStyle = 'light';
 
 const MAP_STYLES = {
@@ -1102,6 +1270,34 @@ function addLiveMapMarker(lngLat, className, html) {
 function clearLiveMapSceneMarkers() {
   liveSceneMarkers.forEach((marker) => marker.remove());
   liveSceneMarkers = [];
+}
+
+function getScenarioFogFeature() {
+  const scenario = getScenario();
+  if (!['grid-2x2', 'grid-3x3'].includes(activeScenario)) return null;
+  const points = [...(scenario.route || []), ...(scenario.crossRoute || [])];
+  if (!points.length) return null;
+  const lngs = points.map(([lng]) => lng);
+  const lats = points.map(([, lat]) => lat);
+  // Keep the simulated avenues visible while masking the surrounding
+  // neighborhood blocks that are context-only and not SUMO lanes.
+  const padLng = activeScenario === 'grid-2x2' ? 0.0018 : 0.0022;
+  const padLat = activeScenario === 'grid-2x2' ? 0.0015 : 0.0018;
+  const west = Math.min(...lngs) - padLng;
+  const east = Math.max(...lngs) + padLng;
+  const south = Math.min(...lats) - padLat;
+  const north = Math.max(...lats) + padLat;
+  const outer = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+  const hole = [[west, south], [west, north], [east, north], [east, south], [west, south]];
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [outer, hole] } };
+}
+
+function refreshLiveMapFog() {
+  if (!liveMap || !LIVE_FOG_ENABLED) return;
+  const source = liveMap.getSource('live-fog');
+  if (!source) return;
+  const feature = getScenarioFogFeature();
+  source.setData(feature || { type: 'FeatureCollection', features: [] });
 }
 
 function lineFeature(coordinates) {
@@ -1158,11 +1354,23 @@ function getLiveSceneCoordinates() {
 }
 
 function addLiveSceneMarkers(scene) {
+  if (!LIVE_SCENE_MARKERS_ENABLED) return;
   scene.markers.forEach((marker) => addLiveMapMarker(marker.point, marker.className, marker.html));
 }
 
 function refreshLiveMapScenario() {
-  if (!liveMap) return;
+  if (['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
+    initLiveMap();
+    return;
+  }
+  if (!liveMap) {
+    initLiveMap();
+    return;
+  }
+  const container = $('liveMap');
+  const sumoScene = $('sumo3dScene');
+  if (container) { container.hidden = false; container.style.display = ''; }
+  if (sumoScene) { sumoScene.hidden = true; sumoScene.style.display = 'none'; }
   liveMap.flyTo({ ...getLiveScenarioView(), duration: 1000, essential: true });
 
   const routeSource = liveMap.getSource('live-route');
@@ -1171,6 +1379,7 @@ function refreshLiveMapScenario() {
   if (!scene) return;
   routeSource.setData(scene.route);
   liveMap.getSource('live-cross-route')?.setData(scene.crossRoute);
+  refreshLiveMapFog();
   clearLiveMapSceneMarkers();
   addLiveSceneMarkers(scene);
 }
@@ -1240,6 +1449,61 @@ function buildLiveMapScene() {
     liveMap.addSource('live-cross-route', { type: 'geojson', data: crossRoute });
   }
 
+  if (!liveMap.getSource('live-sumo-road')) {
+    liveMap.addSource('live-sumo-road', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
+  if (!liveMap.getLayer('live-mapbox-layout')) {
+    liveMap.addLayer({
+      id: 'live-mapbox-layout', type: 'line', source: 'live-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'visible' },
+      paint: { 'line-color': '#6f91a4', 'line-width': 5, 'line-opacity': 0.34 }
+    });
+  }
+  if (!liveMap.getLayer('live-sumo-road')) {
+    liveMap.addLayer({
+      id: 'live-sumo-road', type: 'line', source: 'live-sumo-road',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#d6a62f', 'line-width': 3.2, 'line-opacity': 0.92 }
+    });
+  }
+  if (!liveMap.getSource('live-vehicles')) {
+    liveMap.addSource('live-vehicles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
+  if (!liveMap.getLayer('live-vehicles')) {
+    liveMap.addLayer({
+      id: 'live-vehicles', type: 'circle', source: 'live-vehicles',
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 3.5, 17, 6],
+        'circle-color': ['case', ['get', 'waiting'], '#e66b52', '#3b9d7d'],
+        'circle-stroke-color': '#fffdf5', 'circle-stroke-width': 1.4,
+        'circle-opacity': 0.96
+      }
+    });
+  }
+  if (liveMap.getLayer('live-sumo-road')) liveMap.setLayoutProperty('live-sumo-road', 'visibility', 'none');
+  loadSimulationNetwork(activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2');
+  refreshSimulationVehicles(latestSimulationState);
+
+  if (!liveMap.getSource('live-fog')) {
+    liveMap.addSource('live-fog', {
+      type: 'geojson',
+      data: getScenarioFogFeature() || { type: 'FeatureCollection', features: [] }
+    });
+  }
+
+  if (!liveMap.getLayer('live-fog')) {
+    liveMap.addLayer({
+      id: 'live-fog',
+      type: 'fill',
+      source: 'live-fog',
+      paint: {
+        'fill-color': '#17201f',
+        'fill-opacity': 0.64,
+        'fill-antialias': true
+      }
+    });
+  }
+
   if (!liveMap.getLayer('live-route-glow')) {
     liveMap.addLayer({
       id: 'live-route-glow',
@@ -1280,13 +1544,60 @@ function buildLiveMapScene() {
     });
   }
 
+  ['live-fog', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route'].forEach((layerId) => {
+    if (liveMap.getLayer(layerId)) {
+      liveMap.setLayoutProperty(
+        layerId,
+        'visibility',
+        (layerId === 'live-fog' ? LIVE_FOG_ENABLED : LIVE_ROUTE_OVERLAYS_ENABLED) ? 'visible' : 'none'
+      );
+    }
+  });
+
   clearLiveMapSceneMarkers();
   addLiveSceneMarkers(scene);
+}
+
+async function loadSimulationNetwork(scenario) {
+  if (!liveMap) return;
+  try {
+    const response = await simulationFetch(`/api/simulation/network/${scenario}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    liveMap.getSource('live-sumo-road')?.setData(data);
+  } catch {
+    // The map remains usable when the SUMO service is offline.
+  }
 }
 
 function initLiveMap() {
   const container = $('liveMap');
   if (!container) return;
+  const sumoScene = $('sumo3dScene');
+  if (['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
+    container.hidden = true;
+    container.style.display = 'none';
+    if (liveMap) liveMap.getContainer().style.display = 'none';
+    const vignette = document.querySelector('.live-map-vignette');
+    if (vignette) vignette.style.display = 'none';
+    if (sumoScene) {
+      sumoScene.hidden = false;
+      sumoScene.style.display = 'block';
+      sumoScene.classList.add('is-grid-mode');
+      const gridState = { ...(latestSimulationState || {}), scenario: activeScenario, vehicles: latestSimulationState?.vehicles || [] };
+      if (sumo3d?.scenario && sumo3d.scenario !== activeScenario) { sumo3d.destroy?.(); sumo3d = null; }
+      sumo3d ||= mountSumoLiveMap(sumoScene, gridState);
+      sumo3d.update(gridState);
+      window.requestAnimationFrame(() => sumo3d?.update({ ...gridState, scenario: activeScenario }));
+    }
+    return;
+  }
+  container.hidden = false;
+  container.style.display = '';
+  if (liveMap) liveMap.getContainer().style.display = '';
+  const vignette = document.querySelector('.live-map-vignette');
+  if (vignette) vignette.style.display = '';
+  if (sumoScene) { sumoScene.hidden = true; sumoScene.style.display = 'none'; sumoScene.classList.remove('is-grid-mode'); }
   if (liveMap) {
     liveMap.resize();
     return;
@@ -1391,7 +1702,10 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
     }
 
     if (action === 'layers') {
-      showToast('Geographic layers are ready for configuration.');
+      const menu = button.parentElement?.querySelector('.live-layer-menu');
+      const open = menu?.hidden;
+      if (menu) menu.hidden = !open;
+      button.setAttribute('aria-expanded', String(Boolean(open)));
       return;
     }
 
@@ -1450,11 +1764,62 @@ document.querySelectorAll('[data-map-style]').forEach((option) => {
   });
 });
 
+function setMapLayerVisibility(layerName, enabled) {
+  if (!liveMap) return;
+  if (layerName === 'sumo-road') {
+    ['live-sumo-road', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route'].forEach((id) => {
+      if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
+    });
+  }
+  if (layerName === 'mapbox-layout') {
+    ['live-mapbox-layout', 'live-cross-route'].forEach((id) => {
+      if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
+    });
+  }
+  if (layerName === 'fog' && liveMap.getLayer('live-fog')) {
+    liveMap.setLayoutProperty('live-fog', 'visibility', enabled ? 'visible' : 'none');
+  }
+  if (layerName === 'basemap') {
+    liveMap.getStyle().layers.forEach((layer) => {
+      if (!layer.id.startsWith('live-')) liveMap.setLayoutProperty(layer.id, 'visibility', enabled ? 'visible' : 'none');
+    });
+  }
+}
+
+document.querySelectorAll('[data-map-layer]').forEach((option) => {
+  option.addEventListener('click', () => {
+    const enabled = option.getAttribute('aria-checked') !== 'true';
+    option.setAttribute('aria-checked', String(enabled));
+    option.classList.toggle('is-selected', enabled);
+    setMapLayerVisibility(option.dataset.mapLayer, enabled);
+  });
+});
+
+document.querySelectorAll('[data-live-panels-toggle]').forEach((toggle) => toggle.addEventListener('click', (event) => {
+  const collapsed = liveMapView?.classList.toggle('live-panels-collapsed');
+  event.currentTarget.setAttribute('aria-label', collapsed ? 'Expand panels' : 'Collapse panels');
+  event.currentTarget.setAttribute('title', collapsed ? 'Expand panels' : 'Collapse panels');
+  event.currentTarget.textContent = collapsed ? 'Panels' : 'Panels';
+}));
+document.getElementById('simulationResetView')?.addEventListener('click', () => sumo3d?.reset());
+document.querySelectorAll('[data-panel-theme-toggle]').forEach((toggle) => toggle.addEventListener('click', (event) => {
+  const light = liveMapView?.classList.toggle('live-panels-light');
+  event.currentTarget.setAttribute('title', light ? 'Panels: Light' : 'Panels: Dark');
+  event.currentTarget.setAttribute('aria-label', light ? 'Switch panels to dark mode' : 'Switch panels to light mode');
+  document.querySelectorAll('[data-panel-theme-toggle]').forEach((button) => button.classList.toggle('is-light', Boolean(light)));
+}));
+
 document.addEventListener('click', (event) => {
   document.querySelectorAll('.live-style-picker').forEach((picker) => {
     if (!picker.contains(event.target)) {
       picker.querySelector('.live-style-menu')?.setAttribute('hidden', '');
       picker.querySelector('[data-live-action="style"]')?.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.querySelectorAll('.live-layer-picker').forEach((picker) => {
+    if (!picker.contains(event.target)) {
+      picker.querySelector('.live-layer-menu')?.setAttribute('hidden', '');
+      picker.querySelector('[data-live-action="layers"]')?.setAttribute('aria-expanded', 'false');
     }
   });
 });

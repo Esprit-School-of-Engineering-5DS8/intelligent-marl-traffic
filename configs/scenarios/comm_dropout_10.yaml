@@ -1,0 +1,5 @@
+name: comm_dropout_10
+description: Each neighbour message is lost with probability 0.10; the last received value is used (evaluation only).
+comm_dropout:
+  p: 0.10
+  mode: stale      # stale = keep the last received message, zero = replace by zeros

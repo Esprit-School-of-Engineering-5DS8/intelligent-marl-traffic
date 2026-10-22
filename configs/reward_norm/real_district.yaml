@@ -1,0 +1,25 @@
+# Written by `python -m cotraffic calibrate`; do not edit by hand.
+norm:
+  wait: 31.1926
+  queue: 1.4948
+  pressure: 6.7566
+  co2: 94245.1552
+  ev: 4.0
+  ped: 1.0
+estimated_with:
+  controller: mp
+  runs:
+  - demand: medium
+    seed: 100000
+    scenarios:
+    - emergency
+    - buses
+  - demand: peak
+    seed: 100001
+    scenarios:
+    - emergency
+    - buses
+  agent_decisions: 10080
+  nonzero_ev_decisions: 5
+  nonzero_ped_decisions: 0
+  date: '2026-09-25'

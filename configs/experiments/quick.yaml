@@ -1,0 +1,9 @@
+name: quick
+description: Smoke version of the pipeline - short episodes, one seed, a few cells.
+quick: true
+seeds: [0]
+cells:
+  - network: grid2x2
+    methods: [ft, act, mp]
+    demands: [medium]
+    scenarios: [normal, emergency]

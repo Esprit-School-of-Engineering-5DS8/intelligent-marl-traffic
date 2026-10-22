@@ -1,0 +1,4 @@
+name: medium
+description: Typical daytime traffic, 70% of the network's calibrated peak rate.
+level: 0.7
+profile: constant

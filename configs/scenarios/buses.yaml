@@ -1,0 +1,4 @@
+name: buses
+description: Bus lines of the network config are active; person-based delay is measured.
+buses:
+  period_s: 300      # one bus every 5 min per line and direction

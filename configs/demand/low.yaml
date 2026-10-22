@@ -1,0 +1,4 @@
+name: low
+description: Off-peak traffic, 45% of the network's calibrated peak rate.
+level: 0.45
+profile: constant
