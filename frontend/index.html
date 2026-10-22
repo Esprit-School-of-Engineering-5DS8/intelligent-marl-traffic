@@ -550,13 +550,14 @@
               </button>
               <div class="live-tool-group">
                 <button type="button" class="live-tool is-active" data-live-action="perspective" aria-label="Toggle 3D perspective">3D</button>
+                <button type="button" class="live-tool" data-live-action="layers" aria-label="Map geographic layers" title="Geographic layers"><svg class="ico"><use href="#i-layers"/></svg></button>
                 <div class="live-style-picker">
-                  <button type="button" class="live-tool is-active" data-live-action="layers" aria-label="Choose map style" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-layers"/></svg></button>
+                  <button type="button" class="live-tool" data-live-action="style" aria-label="Choose map mode" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-sun"/></svg></button>
                   <div class="live-style-menu" role="menu" aria-label="Map styles" hidden>
                     <span class="live-style-menu-title">Map style</span>
-                    <button type="button" class="live-style-option is-selected" data-map-style="light" role="menuitemradio" aria-checked="true"><span class="style-swatch style-swatch-light"></span><span><strong>Light</strong><small>Clean daytime map</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
-                    <button type="button" class="live-style-option" data-map-style="dark" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dark"></span><span><strong>Dark</strong><small>Low-glare night map</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
-                    <button type="button" class="live-style-option" data-map-style="sunset" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-sunset"></span><span><strong>Sunset</strong><small>Warm evening tones</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
+                    <button type="button" class="live-style-option is-selected" data-map-style="light" role="menuitemradio" aria-checked="true"><span class="style-swatch style-swatch-light"></span><span><strong>Day</strong><small>Mapbox Standard · day</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
+                    <button type="button" class="live-style-option" data-map-style="dark" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dark"></span><span><strong>Night</strong><small>Mapbox Standard · night</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
+                    <button type="button" class="live-style-option" data-map-style="sunset" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-sunset"></span><span><strong>Dusk</strong><small>Mapbox Standard · dusk</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                     <button type="button" class="live-style-option" data-map-style="dawn" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dawn"></span><span><strong>Dawn</strong><small>Soft morning tones</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                   </div>
                 </div>

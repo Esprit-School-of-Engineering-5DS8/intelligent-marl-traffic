@@ -1061,10 +1061,10 @@ let liveSceneMarkers = [];
 let activeMapStyle = 'light';
 
 const MAP_STYLES = {
-  light: { url: 'mapbox://styles/mapbox/light-v11', sky: '#dce9f2', horizon: '#f5eadf' },
-  dark: { url: 'mapbox://styles/mapbox/dark-v11', sky: '#111827', horizon: '#374151' },
-  sunset: { url: 'mapbox://styles/mapbox/light-v11', sky: '#e89a78', horizon: '#f7cf91' },
-  dawn: { url: 'mapbox://styles/mapbox/light-v11', sky: '#b8d7e6', horizon: '#f4dfc5' }
+  light: { preset: 'day', label: 'Day' },
+  dark: { preset: 'night', label: 'Night' },
+  sunset: { preset: 'dusk', label: 'Dusk' },
+  dawn: { preset: 'dawn', label: 'Dawn' }
 };
 
 function getLiveScenarioView() {
@@ -1304,7 +1304,8 @@ function initLiveMap() {
     ...getLiveScenarioView(),
     antialias: true,
     attributionControl: false,
-    style: MAP_STYLES[activeMapStyle].url,
+    style: 'mapbox://styles/mapbox/standard',
+    config: { basemap: { lightPreset: MAP_STYLES[activeMapStyle].preset } },
     maxPitch: 72
   });
 
@@ -1324,19 +1325,13 @@ function applyLiveMapStyle(styleName) {
   const style = MAP_STYLES[styleName];
   if (!style || !liveMap || styleName === activeMapStyle) return;
   activeMapStyle = styleName;
-  liveMap.once('style.load', () => {
-    buildLiveMapScene();
-    if (styleName === 'sunset' || styleName === 'dawn') {
-      liveMap.setFog({ color: style.sky, 'high-color': style.horizon, 'horizon-blend': 0.18, 'space-color': style.sky, 'star-intensity': 0.05 });
-    }
-    document.querySelectorAll('[data-map-style]').forEach((option) => {
-      const selected = option.dataset.mapStyle === styleName;
-      option.classList.toggle('is-selected', selected);
-      option.setAttribute('aria-checked', String(selected));
-    });
-    showToast(`${styleName[0].toUpperCase()}${styleName.slice(1)} map style applied.`);
+  liveMap.setConfigProperty('basemap', 'lightPreset', style.preset);
+  document.querySelectorAll('[data-map-style]').forEach((option) => {
+    const selected = option.dataset.mapStyle === styleName;
+    option.classList.toggle('is-selected', selected);
+    option.setAttribute('aria-checked', String(selected));
   });
-  liveMap.setStyle(style.url);
+  showToast(`${style.label} map mode applied.`);
 }
 
 function resetLiveMapView() {
@@ -1396,6 +1391,11 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
     }
 
     if (action === 'layers') {
+      showToast('Geographic layers are ready for configuration.');
+      return;
+    }
+
+    if (action === 'style') {
       const menu = button.parentElement?.querySelector('.live-style-menu');
       const open = menu?.hidden;
       if (menu) menu.hidden = !open;
@@ -1446,7 +1446,7 @@ document.querySelectorAll('[data-map-style]').forEach((option) => {
   option.addEventListener('click', () => {
     applyLiveMapStyle(option.dataset.mapStyle);
     option.closest('.live-style-menu')?.setAttribute('hidden', '');
-    option.closest('.live-style-picker')?.querySelector('[data-live-action="layers"]')?.setAttribute('aria-expanded', 'false');
+    option.closest('.live-style-picker')?.querySelector('[data-live-action="style"]')?.setAttribute('aria-expanded', 'false');
   });
 });
 
@@ -1454,7 +1454,7 @@ document.addEventListener('click', (event) => {
   document.querySelectorAll('.live-style-picker').forEach((picker) => {
     if (!picker.contains(event.target)) {
       picker.querySelector('.live-style-menu')?.setAttribute('hidden', '');
-      picker.querySelector('[data-live-action="layers"]')?.setAttribute('aria-expanded', 'false');
+      picker.querySelector('[data-live-action="style"]')?.setAttribute('aria-expanded', 'false');
     }
   });
 });
