@@ -61,6 +61,18 @@ test.describe("pages", () => {
       .poll(async () => Number(await slider.inputValue()), { timeout: 10_000 })
       .toBeGreaterThan(before);
     await main(page).getByRole("button", { name: "Pause" }).click();
+    // layout changes used to send deck.gl and React into an update loop (error panel)
+    const errors: string[] = [];
+    page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+    await main(page).getByRole("button", { name: "Suivre le véhicule d'urgence" }).click();
+    await main(page)
+      .getByRole("button", { name: label(replay.right), exact: true })
+      .click();
+    await main(page).getByRole("button", { name: "Côte à côte" }).click();
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.waitForTimeout(1500);
+    await expect(page.getByText("Cette partie de l'écran a rencontré une erreur")).toHaveCount(0);
+    expect(errors.filter((e) => e.includes("Maximum update depth"))).toEqual([]);
   });
 
   test("3D simulation: scene renders", async ({ page }) => {

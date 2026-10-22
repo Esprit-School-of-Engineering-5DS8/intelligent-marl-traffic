@@ -21,7 +21,7 @@ import { Events } from "./Events";
 import { JunctionPanel } from "./JunctionPanel";
 import { Legend } from "./Legend";
 import { NetworkMap } from "./NetworkMap";
-import { fitView, type MapViewState } from "./view";
+import { fitView, sameView, type MapViewState } from "./view";
 
 export default function LiveMapPage() {
   const { t } = useTranslation();
@@ -154,7 +154,11 @@ function FollowEmergency({
   const time = usePlayback((s) => s.time);
   useEffect(() => {
     const ev = sceneAt(replay, side, time).vehicles.find((v) => v.kind === "emergency");
-    if (ev) onView((v) => ({ target: [ev.x, ev.y, 0], zoom: Math.max(v?.zoom ?? 2, 2) }));
+    if (!ev) return;
+    onView((v) => {
+      const next: MapViewState = { target: [ev.x, ev.y, 0], zoom: Math.max(v?.zoom ?? 2, 2) };
+      return sameView(next, v) ? v : next; // unchanged camera: no re-render
+    });
   }, [replay, side, time, onView]);
   return null;
 }

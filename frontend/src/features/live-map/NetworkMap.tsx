@@ -16,9 +16,12 @@ import { usePlayback } from "@/features/replay/store";
 import { readTokens } from "@/shared/charts/tokens";
 import type { NetworkGeometry, Replay } from "@/shared/schemas";
 
-import type { MapViewState } from "./view";
+import { sameView, type MapViewState } from "./view";
 
 type RGBA = [number, number, number, number];
+
+// one view object for the life of the page: a new one on every render resets deck.gl
+const MAP_VIEW = new OrthographicView({ id: "map", flipY: false, controller: true });
 
 function rgb(hex: string, alpha = 255): RGBA {
   const h = hex.replace("#", "");
@@ -204,9 +207,14 @@ export function NetworkMap({
   return (
     <div role="img" aria-label={label} className="relative h-full w-full">
       <DeckGL
-        views={new OrthographicView({ id: "map", flipY: false, controller: true })}
+        views={MAP_VIEW}
         viewState={viewState}
-        onViewStateChange={({ viewState: v }) => onViewState(v as MapViewState)}
+        onViewStateChange={({ viewState: v }) => {
+          // only the camera matters; deck.gl also reports sizes and transitions, and passing
+          // those back as a new object on every report would re-render in a loop
+          const next = v as MapViewState;
+          if (!sameView(next, viewState)) onViewState({ target: next.target, zoom: next.zoom });
+        }}
         controller={{ dragRotate: false, keyboard: true, doubleClickZoom: true }}
         layers={layers}
         getCursor={({ isHovering }) => (isHovering ? "pointer" : "grab")}
