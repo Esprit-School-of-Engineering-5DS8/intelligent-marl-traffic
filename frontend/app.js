@@ -18,7 +18,17 @@ const SCENARIOS = {
     mapCenter: FOCUS,
     mapZoom: DEFAULT_ZOOM,
     liveCenter: [-97.7325, 30.2663],
-    liveZoom: 16.05
+    liveZoom: 16.05,
+    // Road-following corridor through East 7th, digitised from the street network.
+    route: [
+      [-97.73632, 30.26625], [-97.73719, 30.26649], [-97.73684, 30.26743],
+      [-97.73456, 30.26679], [-97.73398, 30.26658], [-97.73375, 30.26655],
+      [-97.7332, 30.26638], [-97.72887, 30.26492], [-97.72856, 30.26627]
+    ],
+    crossRoute: [
+      [-97.7332, 30.26638], [-97.73319, 30.26647], [-97.73305, 30.26685],
+      [-97.73221, 30.26658]
+    ]
   },
   'grid-3x3': {
     label: '3×3 Grid',
@@ -30,7 +40,15 @@ const SCENARIOS = {
     mapCenter: [-97.7431, 30.2672],
     mapZoom: 13.7,
     liveCenter: [-97.7431, 30.2672],
-    liveZoom: 15.9
+    liveZoom: 15.9,
+    // Congress Avenue corridor, downtown Austin.
+    route: [
+      [-97.74317, 30.27021], [-97.74344, 30.27028], [-97.74553, 30.26469],
+      [-97.7431, 30.26401]
+    ],
+    crossRoute: [
+      [-97.74553, 30.26469], [-97.74565, 30.26472], [-97.74635, 30.26492]
+    ]
   },
   monaco: {
     label: 'Monaco',
@@ -42,7 +60,27 @@ const SCENARIOS = {
     mapCenter: [7.4246, 43.7384],
     mapZoom: 14,
     liveCenter: [7.4246, 43.7384],
-    liveZoom: 15.6
+    liveZoom: 15.6,
+    // Monte-Carlo circuit streets.
+    route: [
+      [7.4208, 43.73831], [7.42312, 43.73848], [7.42316, 43.73852], [7.42315, 43.73855],
+      [7.42312, 43.73858], [7.42305, 43.73859], [7.42301, 43.73866], [7.42294, 43.73893],
+      [7.42285, 43.73909], [7.42242, 43.73943], [7.42373, 43.73985], [7.42404, 43.73996],
+      [7.42438, 43.74012], [7.42443, 43.74015], [7.42485, 43.74061], [7.42493, 43.74067],
+      [7.42501, 43.74068], [7.4252, 43.74066], [7.4256, 43.74045], [7.42551, 43.7403],
+      [7.42706, 43.73947], [7.42718, 43.73949], [7.42721, 43.73959], [7.4273, 43.73971],
+      [7.42806, 43.74047], [7.42816, 43.74041], [7.42827, 43.74039], [7.4287, 43.74043],
+      [7.42885, 43.74042], [7.429, 43.74036], [7.42917, 43.74024], [7.42927, 43.74013],
+      [7.42937, 43.73985], [7.42931, 43.73952], [7.42943, 43.7394], [7.42942, 43.73931],
+      [7.42931, 43.73916], [7.42912, 43.73896], [7.42896, 43.7388], [7.42884, 43.73877],
+      [7.42875, 43.73868], [7.42872, 43.73858], [7.42845, 43.73835]
+    ],
+    crossRoute: [
+      [7.42438, 43.74012], [7.42443, 43.74015], [7.4246, 43.74033], [7.42485, 43.74061],
+      [7.42493, 43.74067], [7.42501, 43.74068], [7.42504, 43.74068], [7.42512, 43.74068],
+      [7.4252, 43.74066], [7.42548, 43.7405], [7.4255, 43.74049], [7.4256, 43.74045],
+      [7.42551, 43.7403], [7.42547, 43.74025], [7.42545, 43.74021], [7.42537, 43.74009]
+    ]
   },
   tunis: {
     label: 'Tunis',
@@ -54,7 +92,20 @@ const SCENARIOS = {
     mapCenter: [10.1815, 36.8065],
     mapZoom: 12.8,
     liveCenter: [10.1815, 36.8065],
-    liveZoom: 15.1
+    liveZoom: 15.1,
+    // Avenue Jean Jaurès corridor, Tunis.
+    route: [
+      [10.17761, 36.80653], [10.17751, 36.80637], [10.17745, 36.80618], [10.17748, 36.80584],
+      [10.177, 36.80579], [10.17693, 36.80572], [10.17694, 36.80566], [10.17698, 36.80562],
+      [10.17707, 36.80559], [10.17773, 36.80552], [10.17857, 36.8055], [10.17994, 36.80563],
+      [10.18062, 36.80572], [10.1809, 36.80613], [10.18113, 36.80619], [10.18522, 36.80663],
+      [10.18524, 36.80649]
+    ],
+    crossRoute: [
+      [10.18062, 36.80572], [10.18086, 36.80609], [10.1809, 36.80613], [10.18094, 36.80616],
+      [10.18113, 36.80619], [10.18141, 36.80622], [10.18148, 36.80585], [10.18149, 36.80578],
+      [10.18149, 36.80572]
+    ]
   }
 };
 
@@ -242,6 +293,52 @@ function applyScenarioChrome() {
   document.title = `SUMO · ${scenario.title}`;
 }
 
+const WEATHER_CODES = [
+  { match: (c) => c === 0, icon: 'i-sun', label: 'Clear sky' },
+  { match: (c) => c === 1, icon: 'i-sun', label: 'Mainly clear' },
+  { match: (c) => c === 2, icon: 'i-cloud-sun', label: 'Partly cloudy' },
+  { match: (c) => c === 3, icon: 'i-cloud', label: 'Overcast' },
+  { match: (c) => c === 45 || c === 48, icon: 'i-fog', label: 'Fog' },
+  { match: (c) => c >= 51 && c <= 57, icon: 'i-rain', label: 'Drizzle' },
+  { match: (c) => c >= 80 && c <= 82, icon: 'i-rain', label: 'Rain showers' },
+  { match: (c) => c >= 61 && c <= 67, icon: 'i-rain', label: 'Rain' },
+  { match: (c) => (c >= 71 && c <= 77) || c === 85 || c === 86, icon: 'i-snow', label: 'Snow' },
+  { match: (c) => c >= 95, icon: 'i-storm', label: 'Thunderstorm' }
+];
+
+let weatherToken = 0;
+
+function describeWeather(code) {
+  return WEATHER_CODES.find((entry) => entry.match(code)) || { icon: 'i-cloud', label: 'Unknown conditions' };
+}
+
+function setLiveWeather(icon, label) {
+  const box = $('liveWeatherIcon');
+  if (!box) return;
+  box.querySelector('use')?.setAttribute('href', `#${icon}`);
+  box.dataset.weather = icon.replace(/^i-/, '');
+  box.setAttribute('aria-label', label);
+  box.setAttribute('title', label);
+}
+
+async function loadLiveWeather() {
+  const scenarioKey = activeScenario;
+  const [longitude, latitude] = getScenario().liveCenter;
+  const token = ++weatherToken;
+  try {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`);
+    if (!response.ok) throw new Error(`Weather request failed (${response.status})`);
+    const data = await response.json();
+    if (token !== weatherToken || scenarioKey !== activeScenario) return;
+    const weather = describeWeather(Number(data?.current?.weather_code));
+    const temperature = Math.round(Number(data?.current?.temperature_2m));
+    setLiveWeather(weather.icon, Number.isFinite(temperature) ? `${weather.label} · ${temperature}°C` : weather.label);
+  } catch {
+    if (token !== weatherToken) return;
+    setLiveWeather('i-cloud', 'Weather unavailable');
+  }
+}
+
 function setScenario(name, { announce = true } = {}) {
   if (!SCENARIOS[name]) return;
   activeScenario = name;
@@ -251,6 +348,7 @@ function setScenario(name, { announce = true } = {}) {
     // Scenario still applies for the current session.
   }
   applyScenarioChrome();
+  loadLiveWeather();
 
   const scenario = getScenario();
   if (map) {
@@ -282,6 +380,7 @@ document.addEventListener('keydown', (event) => {
 
 renderScenarioMenus();
 applyScenarioChrome();
+loadLiveWeather();
 
 const dashboardView = $('dashboardView');
 const activityLogView = $('activityLogView');
@@ -997,44 +1096,55 @@ function clearLiveMapSceneMarkers() {
   liveSceneMarkers = [];
 }
 
-function getLiveSceneCoordinates() {
-  const [lng, lat] = getScenario().liveCenter;
+function lineFeature(coordinates) {
   return {
-    route: {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [lng - 0.0073, lat - 0.0005],
-          [lng - 0.0047, lat - 0.0003],
-          [lng - 0.0020, lat - 0.0001],
-          [lng + 0.0007, lat + 0.0001],
-          [lng + 0.0035, lat + 0.0002],
-          [lng + 0.0065, lat + 0.0004],
-          [lng + 0.0093, lat + 0.0006]
-        ]
-      }
-    },
-    crossRoute: {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [lng + 0.0007, lat + 0.0035],
-          [lng + 0.0007, lat + 0.0014],
-          [lng + 0.0007, lat - 0.0006],
-          [lng + 0.0006, lat - 0.0029]
-        ]
-      }
-    },
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'LineString', coordinates }
+  };
+}
+
+function pointAlongRoute(coordinates, fraction) {
+  if (!coordinates || coordinates.length < 2) return coordinates?.[0] || [0, 0];
+  const segments = [];
+  let total = 0;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const [startLng, startLat] = coordinates[index - 1];
+    const [endLng, endLat] = coordinates[index];
+    const length = Math.hypot(
+      (endLng - startLng) * Math.cos((startLat * Math.PI) / 180),
+      endLat - startLat
+    );
+    segments.push({ startLng, startLat, endLng, endLat, length });
+    total += length;
+  }
+  let remaining = total * Math.min(Math.max(fraction, 0), 1);
+  for (const segment of segments) {
+    if (remaining <= segment.length) {
+      const ratio = segment.length ? remaining / segment.length : 0;
+      return [
+        segment.startLng + (segment.endLng - segment.startLng) * ratio,
+        segment.startLat + (segment.endLat - segment.startLat) * ratio
+      ];
+    }
+    remaining -= segment.length;
+  }
+  return coordinates[coordinates.length - 1];
+}
+
+function getLiveSceneCoordinates() {
+  const scenario = getScenario();
+  if (!scenario.route || !scenario.crossRoute) return null;
+  const at = (fraction) => pointAlongRoute(scenario.route, fraction);
+  return {
+    route: lineFeature(scenario.route),
+    crossRoute: lineFeature(scenario.crossRoute),
     markers: [
-      { point: [lng - 0.0020, lat - 0.0001], className: 'is-zone', html: '<span class="live-zone-ring"></span><span class="live-zone-dot"></span>' },
-      { point: [lng + 0.0007, lat + 0.0001], className: 'is-incident', html: '<span class="live-marker-halo"></span><span class="live-marker-core"></span><div class="live-marker-label"><strong>Accident</strong><small>1 lane blocked</small></div>' },
-      { point: [lng + 0.0065, lat + 0.0004], className: 'is-queue', html: '<span class="live-marker-halo"></span><span class="live-marker-core"></span><div class="live-marker-label"><strong>Queue backlog</strong><small>+9 min delay</small></div>' },
-      { point: [lng - 0.0047, lat - 0.0003], className: 'is-camera', html: '<span class="live-camera-dot"></span><span class="live-camera-label">CAM 04</span>' },
-      { point: [lng + 0.0035, lat + 0.0002], className: 'is-camera', html: '<span class="live-camera-dot"></span>' }
+      { point: at(0.16), className: 'is-zone', html: '<span class="live-zone-ring"></span><span class="live-zone-dot"></span>' },
+      { point: at(0.46), className: 'is-incident', html: '<span class="live-marker-halo"></span><span class="live-marker-core"></span><div class="live-marker-label"><strong>Accident</strong><small>1 lane blocked</small></div>' },
+      { point: at(0.82), className: 'is-queue', html: '<span class="live-marker-halo"></span><span class="live-marker-core"></span><div class="live-marker-label"><strong>Queue backlog</strong><small>+9 min delay</small></div>' },
+      { point: at(0.07), className: 'is-camera', html: '<span class="live-camera-dot"></span><span class="live-camera-label">CAM 04</span>' },
+      { point: at(0.64), className: 'is-camera', html: '<span class="live-camera-dot"></span>' }
     ]
   };
 }
@@ -1050,6 +1160,7 @@ function refreshLiveMapScenario() {
   const routeSource = liveMap.getSource('live-route');
   if (!routeSource) return;
   const scene = getLiveSceneCoordinates();
+  if (!scene) return;
   routeSource.setData(scene.route);
   liveMap.getSource('live-cross-route')?.setData(scene.crossRoute);
   clearLiveMapSceneMarkers();
@@ -1113,6 +1224,7 @@ function buildLiveMapScene() {
   }
 
   const scene = getLiveSceneCoordinates();
+  if (!scene) return;
   const { route, crossRoute } = scene;
 
   if (!liveMap.getSource('live-route')) {
@@ -1125,6 +1237,7 @@ function buildLiveMapScene() {
       id: 'live-route-glow',
       type: 'line',
       source: 'live-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': '#f2c95b', 'line-width': 16, 'line-blur': 12, 'line-opacity': 0.3 }
     });
   }
@@ -1134,6 +1247,7 @@ function buildLiveMapScene() {
       id: 'live-cross-route',
       type: 'line',
       source: 'live-cross-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': '#d9bb68', 'line-width': 2.4, 'line-opacity': 0.54, 'line-dasharray': [1.1, 1.4] }
     });
   }
@@ -1143,6 +1257,7 @@ function buildLiveMapScene() {
       id: 'live-route-casing',
       type: 'line',
       source: 'live-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.72 }
     });
   }
@@ -1152,6 +1267,7 @@ function buildLiveMapScene() {
       id: 'live-route',
       type: 'line',
       source: 'live-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': '#e6b23d', 'line-width': 3.5, 'line-opacity': 0.98 }
     });
   }
@@ -1212,6 +1328,18 @@ document.querySelectorAll('[data-live-map-action]').forEach((button) => {
     if (action === 'zoom-in') liveMap.zoomIn({ duration: 420 });
     if (action === 'zoom-out') liveMap.zoomOut({ duration: 420 });
     if (action === 'reset') resetLiveMapView();
+  });
+});
+
+document.querySelectorAll('[data-queue-close]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const panel = button.closest('.queue-panel');
+    if (!panel) return;
+    panel.classList.add('is-closing');
+    window.setTimeout(() => {
+      panel.hidden = true;
+      panel.classList.remove('is-closing');
+    }, 180);
   });
 });
 

@@ -74,6 +74,12 @@
     <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></symbol>
     <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="2"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 19a4.5 4.5 0 0 1-.3-9A6.5 6.5 0 0 1 18.6 11 4 4 0 0 1 18 19H6.5Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></symbol>
+    <symbol id="i-cloud-sun" viewBox="0 0 24 24"><path d="M12 2v2M4.9 4.9l1.4 1.4M20 12h2M19.1 4.9l-1.4 1.4"/><path d="M15.9 12.6a4 4 0 0 0-5.9-4.1"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></symbol>
+    <symbol id="i-rain" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6M8 14v6M12 16v6"/></symbol>
+    <symbol id="i-storm" viewBox="0 0 24 24"><path d="M6 16.3A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 .5 9"/><path d="m13 12-3 5h4l-3 5"/></symbol>
+    <symbol id="i-snow" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/></symbol>
+    <symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 17H7M17 21H9"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
     <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></symbol>
     <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h4.5a3.5 3.5 0 0 0 0-7h-3a3.5 3.5 0 0 1 0-7H15"/></symbol>
@@ -516,13 +522,17 @@
           <div class="live-map-top">
             <div class="live-top-left">
               <button type="button" class="live-exit-btn" data-live-exit aria-label="Exit live map" title="Exit live map"><svg class="ico"><use href="#i-chevron-left"/></svg></button>
-              <div class="live-place-card">
-                <span class="live-place-icon"><svg class="ico"><use href="#i-pin"/></svg></span>
-                <div>
-                  <strong id="livePlaceName">East 7th, Austin</strong>
-                  <span>Thursday, 22 October · 20:32</span>
-                </div>
-                <span class="live-status"><i></i>Live</span>
+              <div class="live-place-wrap">
+                <button type="button" class="live-place-card" data-scenario-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="livePlaceMenu">
+                  <span class="live-place-icon" id="liveWeatherIcon" role="img" aria-label="Current weather" title="Current weather"><svg class="ico"><use href="#i-cloud-sun"/></svg></span>
+                  <div>
+                    <strong id="livePlaceName">East 7th, Austin</strong>
+                    <span>Thursday, 22 October · 20:32</span>
+                  </div>
+                  <span class="live-status"><i></i>Live</span>
+                  <svg class="ico live-place-caret"><use href="#i-chevron"/></svg>
+                </button>
+                <div class="scenario-menu live-place-menu" id="livePlaceMenu" data-scenario-menu role="listbox" aria-label="Live map scenario" hidden></div>
               </div>
             </div>
 
@@ -544,16 +554,6 @@
                 <button type="button" class="live-tool" data-live-action="weather" aria-label="Weather conditions"><svg class="ico"><use href="#i-cloud"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="locate" aria-label="Recenter map"><svg class="ico"><use href="#i-crosshair"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="fullscreen" aria-label="Toggle fullscreen"><svg class="ico"><use href="#i-expand"/></svg></button>
-              </div>
-              <div class="live-scenario-wrap">
-                <button type="button" class="live-sector-card live-scenario-card" data-scenario-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="liveScenarioMenu">
-                  <span>
-                    <small>Scenario</small>
-                    <strong id="liveScenarioName">Central Austin · 2×2</strong>
-                  </span>
-                  <svg class="ico"><use href="#i-chevron"/></svg>
-                </button>
-                <div class="scenario-menu live-scenario-menu" id="liveScenarioMenu" data-scenario-menu role="listbox" aria-label="Live map scenario" hidden></div>
               </div>
               <button type="button" class="live-round-btn" data-toast="Map options opened." aria-label="Map options"><svg class="ico"><use href="#i-dots"/></svg></button>
             </div>
@@ -597,27 +597,85 @@
           </aside>
 
           <section class="live-panel queue-panel" aria-label="Queue backlog prediction">
-            <div class="queue-head">
-              <div><span class="live-eyebrow">Prediction</span><h2>Queue Backlog</h2></div>
-              <span class="queue-badge"><i></i>24 min</span>
+            <button type="button" class="queue-close" data-queue-close aria-label="Close queue backlog panel" title="Close"><svg class="ico"><use href="#i-x"/></svg></button>
+            <header class="queue-head">
+              <h2>Queue Backlog</h2>
+              <p>Impacted Sector Reach</p>
+            </header>
+
+            <div class="queue-illustration" aria-hidden="true">
+              <span class="queue-lane-mark is-one"></span>
+              <span class="queue-lane-mark is-two"></span>
+              <span class="queue-lane-mark is-three"></span>
+              <svg class="queue-crash" viewBox="0 0 280 176" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="queueCarBody" x1="0" y1="0" x2="0.4" y2="1">
+                    <stop offset="0" stop-color="#ffffff"/>
+                    <stop offset="1" stop-color="#e8eaec"/>
+                  </linearGradient>
+                  <linearGradient id="queueCarRoof" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#ffffff"/>
+                    <stop offset="1" stop-color="#dfe2e4"/>
+                  </linearGradient>
+                  <radialGradient id="queueGlow" cx="0.5" cy="0.5" r="0.5">
+                    <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+                    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+                  </radialGradient>
+                </defs>
+
+                <ellipse cx="140" cy="96" rx="126" ry="66" fill="url(#queueGlow)"/>
+
+                <g stroke="#b9bfc4" stroke-width="0.9" stroke-linejoin="round" stroke-linecap="round">
+                  <!-- tipped vehicle -->
+                  <g transform="translate(205 92) rotate(-64) scale(0.66) translate(-108.5 -64.5)">
+                    <path d="M12 74c0-8 6-12 14-13l40-6 26-27c4-4 9-6 16-6h38c7 0 12 2 16 7l24 25 10 3c6 2 9 6 9 12v15c0 5-4 8-10 8H22c-6 0-10-4-10-10Z" fill="url(#queueCarBody)"/>
+                    <path d="M92 28 108 22h38l16 7-12 7H100Z" fill="url(#queueCarRoof)"/>
+                    <path d="M100 32h42l18 20H92Z" fill="#d3d8db"/>
+                    <path d="M104 18h42m-40 3h36" stroke-width="1.1"/>
+                    <circle cx="56" cy="96" r="15" fill="#f2f4f5"/>
+                    <circle cx="56" cy="96" r="5.5" fill="#cbd1d5"/>
+                    <path d="M56 81v30M41 96h30M45 85l22 22M67 85 45 107" stroke-width="0.7"/>
+                    <circle cx="168" cy="96" r="15" fill="#f2f4f5"/>
+                    <circle cx="168" cy="96" r="5.5" fill="#cbd1d5"/>
+                    <path d="M168 81v30M153 96h30M157 85l22 22M179 85l-22 22" stroke-width="0.7"/>
+                  </g>
+
+                  <!-- upright vehicle -->
+                  <g transform="translate(-2 26)">
+                    <path d="M12 74c0-8 6-12 14-13l40-6 26-27c4-4 9-6 16-6h38c7 0 12 2 16 7l24 25 10 3c6 2 9 6 9 12v15c0 5-4 8-10 8H22c-6 0-10-4-10-10Z" fill="url(#queueCarBody)"/>
+                    <path d="M92 28 108 22h38l16 7-12 7H100Z" fill="url(#queueCarRoof)"/>
+                    <path d="M100 32h42l18 20H92Z" fill="#d3d8db"/>
+                    <path d="M104 18h42m-40 3h36" stroke-width="1.1"/>
+                    <circle cx="56" cy="96" r="15" fill="#f2f4f5"/>
+                    <circle cx="56" cy="96" r="5.5" fill="#cbd1d5"/>
+                    <path d="M56 81v30M41 96h30M45 85l22 22M67 85 45 107" stroke-width="0.7"/>
+                    <circle cx="168" cy="96" r="15" fill="#f2f4f5"/>
+                    <circle cx="168" cy="96" r="5.5" fill="#cbd1d5"/>
+                    <path d="M168 81v30M153 96h30M157 85l22 22M179 85l-22 22" stroke-width="0.7"/>
+                  </g>
+
+                  <!-- debris -->
+                  <g fill="#ffffff">
+                    <rect x="132" y="120" width="9" height="7" rx="1" transform="rotate(-18 136 123)"/>
+                    <rect x="150" y="132" width="6" height="5" rx="1" transform="rotate(24 153 134)"/>
+                    <rect x="118" y="134" width="7" height="6" rx="1" transform="rotate(12 121 137)"/>
+                    <rect x="166" y="116" width="5" height="4" rx="1" transform="rotate(-30 168 118)"/>
+                    <rect x="104" y="118" width="5" height="4" rx="1" transform="rotate(40 106 120)"/>
+                    <rect x="142" y="112" width="4" height="3" rx="1" transform="rotate(-10 144 113)"/>
+                  </g>
+                </g>
+              </svg>
             </div>
-            <div class="queue-scene">
-              <div class="queue-road">
-                <i class="queue-lane"></i>
-                <span class="queue-car car-one"><svg class="ico"><use href="#i-car"/></svg></span>
-                <span class="queue-car car-two"><svg class="ico"><use href="#i-car"/></svg></span>
-                <span class="queue-car car-three"><svg class="ico"><use href="#i-car"/></svg></span>
-                <span class="queue-signal"></span>
-              </div>
-              <div class="queue-scene-meta"><span id="liveQueuedRoad">East 7th · Westbound</span><strong>Slow</strong></div>
-            </div>
+
             <div class="queue-metrics">
-              <div><span>Queue length</span><strong>1.2 <small>km</small></strong><em>-0.4</em></div>
-              <div><span>Current delay</span><strong>+9 <small>min</small></strong><em>-2</em></div>
-            </div>
-            <div class="queue-footer">
-              <span><svg class="ico"><use href="#i-clock"/></svg>Reassess in 04:32</span>
-              <button type="button" class="queue-dispatch" data-live-action="dispatch">Dispatch <svg class="ico"><use href="#i-arrow"/></svg></button>
+              <div class="queue-metric">
+                <span>Queue Length</span>
+                <strong>1.2<small>mi</small><em class="queue-delta">+12%</em></strong>
+              </div>
+              <div class="queue-metric">
+                <span>Current Delay</span>
+                <strong>+9<small>min</small><em class="queue-delta">-2min</em></strong>
+              </div>
             </div>
           </section>
 
