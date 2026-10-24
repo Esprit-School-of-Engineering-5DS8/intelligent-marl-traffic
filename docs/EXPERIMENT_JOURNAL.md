@@ -647,3 +647,33 @@ same question was answered by the model and accepted: outputs are not strictly i
 between runs on this CPU despite temperature 0 and a fixed seed, which the guard and the
 fallback absorb. Wording remains imperfect at times (Max-Pressure called an "agent"), never
 with a number outside the facts.
+
+## 2026-10-22 - PPO + DQN ensemble and a spillback guard (validation only, not adopted)
+
+Two attempts to improve the scores without retraining, both judged on validation seeds
+only (`scripts/try_ensemble.py`, `scripts/validate_methods.py`, results in
+`results/exploration/`). Neither was evaluated on the test seeds.
+
+**Ensemble** (`src/cotraffic/controllers/ensemble.py`): IND (PPO) and DQN share the
+observation and the reward, so their decisions were combined at each step: PPO's phase
+probabilities and a softmax of DQN's Q-values (temperature = mean spread of the Q-values
+over all junctions at that step), weighted vote, then the shield. Grid 4x4, seeds 1000 and
+1001, 3 training runs each, 60 runs:
+
+| demand | IND (PPO) | DQN | ensemble 30 % PPO | 50 % | 70 % |
+|---|---|---|---|---|---|
+| peak, mean travel time (s) | **211.3** | 212.0 | 214.6 | 212.5 | 212.9 |
+| peak, worst run (s) | 217.5 | 229.1 | 229.7 | 216.1 | 218.1 |
+| peak, unfinished vehicles (worst run) | 7 | 98 | 114 | 4 | 5 |
+| medium, mean travel time (s) | 162.3 | 162.4 | 162.1 | 162.9 | 162.7 |
+
+With at least half of the vote to PPO the ensemble removes DQN's near-gridlocks, but it
+only reaches PPO alone, never better: the two agents see the same observation and the same
+reward and mostly agree. Not adopted.
+
+**Spillback guard and detector recall** (optional shield rules, `<method>_guard`
+controllers, off by default; FAILURES F-015): 106 validation runs (pedestrians at peak,
+normal peak, sensor faults at peak). The guard never acted (0 interventions) and every
+guarded controller gave the same results as its unguarded version (COOP-FULL with
+pedestrians 242.5 s both; DQN 208.0 s both; Max-Pressure with sensor faults 270.2 s
+against 272.6 s, 2 of 3 runs gridlocked in both). Not adopted; the diagnosis is in F-015.

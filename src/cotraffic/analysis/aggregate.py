@@ -59,7 +59,11 @@ def other_families() -> dict[str, set[tuple[str, str, str, str]]]:
     """Families of experiments added after the report (one family each)."""
     from cotraffic import config
 
-    return {name: core_cells(name) for name in ("dqn",) if name in config.available("experiments")}
+    return {
+        name: core_cells(name)
+        for name in ("dqn", "guard")
+        if name in config.available("experiments")
+    }
 
 
 def assign_families(

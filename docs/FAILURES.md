@@ -212,3 +212,27 @@ entries at the bottom. Negative results that belong in the report are marked **[
   deployment would need a spillback guard in the shield and training weighted toward
   saturated conditions. A mean over 15 runs hides such tails: look at the worst runs
   and at unfinished vehicles, not only at the mean.
+
+## F-015 - A spillback guard that never acted (2026-10-22)
+
+- **Tried:** two optional shield rules for F-012 and F-014, off by default: a spillback
+  guard (a phase whose waiting vehicles can only enter exit lanes above 80 % of their
+  capacity is not served while another phase can move traffic) and detector recall
+  (movements whose detector failed count as having demand). Validation seeds 1000-1004,
+  106 runs, `scripts/validate_methods.py`.
+- **Evidence:** 0 guard interventions in 106 runs, results identical with and without the
+  guard. In a gridlocking run (Max-Pressure, sensor faults, seed 1001) exit lanes were
+  blocked 407 times, with densities up to 1.14, but never all exits of a phase at once:
+  with two lanes per approach one exit of the phase is almost always free. In normal runs
+  exit density never exceeded 0.66, so 0.8 was also an arbitrary threshold. Under sensor
+  faults, 28 of the 32 failed detectors were on exit lanes: they read 0 vehicles, so
+  Max-Pressure sees those exits as empty and sends traffic into them; recall of approach
+  detectors cannot prevent that, and the anti-starvation rule never triggered.
+- **Diagnosis:** the rule required a fully blocked phase, a state the network reaches only
+  after it has locked; and the sensor-fault gridlock comes from failed exit detectors
+  read as empty lanes, not from starved movements.
+- **Fix / lesson:** kept in the code, off by default, as a documented negative result. A
+  useful guard would act on partially blocked phases with a threshold set from measured
+  densities, and a failed detector should be treated as unknown (imputed from neighbouring
+  lanes) rather than as zero. Check that a new safety rule actually fires before
+  evaluating its effect.

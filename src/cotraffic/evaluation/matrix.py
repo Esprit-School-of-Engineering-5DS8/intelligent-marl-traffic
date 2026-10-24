@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from cotraffic import config
-from cotraffic.controllers.registry import BASELINES
+from cotraffic.controllers.registry import BASELINES, base_method
 from cotraffic.paths import CHECKPOINTS_DIR, EXTRA_DIR, LOGS_DIR, RAW_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS, check_seeds
 
@@ -41,7 +41,7 @@ class RunSpec:
 
 def find_checkpoints(method: str, network: str) -> list[tuple[int, Path]]:
     """Selected checkpoints of a learned method, one per training seed."""
-    folder = CHECKPOINTS_DIR / method / network
+    folder = CHECKPOINTS_DIR / base_method(method) / network
     found = []
     for path in sorted(folder.glob("seed*.zip")):
         try:
@@ -61,7 +61,7 @@ def expand(exp: dict[str, Any]) -> tuple[list[RunSpec], list[str]]:
         network = cell["network"]
         trained_on = cell.get("checkpoint_network", network)
         for method in cell["methods"]:
-            if method in BASELINES or method == "random":
+            if base_method(method) in BASELINES or method == "random":
                 variants = [("", "")]
             else:
                 ckpts = find_checkpoints(method, trained_on)

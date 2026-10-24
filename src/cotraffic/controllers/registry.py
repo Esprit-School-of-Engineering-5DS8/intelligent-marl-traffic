@@ -9,8 +9,24 @@ from cotraffic.controllers.base import Controller
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
 LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
 
+# "<method>_guard": the same controller behind the shield with the spillback guard and
+# detector recall (FAILURES F-012, F-014), evaluated as a family of its own.
+GUARD_SUFFIX = "_guard"
+GUARD_OPTIONS = {"spillback": 0.8, "recall_failed": True}
+
+
+def base_method(method: str) -> str:
+    return method.removesuffix(GUARD_SUFFIX)
+
 
 def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Controller:
+    if method.endswith(GUARD_SUFFIX):
+        controller = make_controller(base_method(method), checkpoint, **kwargs)
+        if not controller.controlled:
+            raise ValueError(f"{method}: SUMO signal programs do not use the shield")
+        controller.agent_cfg = {**controller.agent_cfg, "shield": dict(GUARD_OPTIONS)}
+        controller.name = method
+        return controller
     if method == "ft":
         from cotraffic.controllers.classical import FixedTime
 

@@ -8,7 +8,13 @@ returns the phase that is actually executed. It enforces, in this order:
 3. anti-starvation: a movement with demand that has been red for more than
    ``max_red`` seconds is served next;
 4. maximum green: a phase is not extended beyond ``max_green`` seconds while
-   another phase has demand.
+   another phase has demand;
+5. spillback guard (optional, ``spillback`` > 0): a phase whose waiting vehicles can only
+   enter blocked exit lanes is not served while another phase can move traffic, since
+   such a green moves nobody and lets the queues grow back to the upstream junctions
+   (FAILURES F-014). Failed detectors can be placed on recall (``recall_failed``): their
+   movements count as having demand, so rules 3 and 4 still protect them (F-012).
+   Both options are off unless an agent configuration asks for them.
 
 Yellow transitions are produced by the intersection model, never by the policy, so
 no sequence of actions can produce an unsafe signal sequence. The shield is pure
@@ -24,7 +30,8 @@ INVALID = "invalid"
 MIN_GREEN = "min_green"
 MAX_GREEN = "max_green"
 STARVATION = "starvation"
-REASONS = (INVALID, MIN_GREEN, MAX_GREEN, STARVATION)
+SPILLBACK = "spillback"
+REASONS = (INVALID, MIN_GREEN, MAX_GREEN, STARVATION, SPILLBACK)
 
 
 @dataclass(frozen=True)
@@ -32,10 +39,21 @@ class ShieldConfig:
     min_green: float
     max_green: float
     max_red: float
+    spillback: float = 0.0  # exit-lane density from which a link is blocked; 0 = off
+    recall_failed: bool = False
 
     @classmethod
-    def from_timing(cls, timing: Mapping[str, float]) -> ShieldConfig:
-        return cls(float(timing["min_green"]), float(timing["max_green"]), float(timing["max_red"]))
+    def from_timing(
+        cls, timing: Mapping[str, float], options: Mapping[str, float] | None = None
+    ) -> ShieldConfig:
+        options = options or {}
+        return cls(
+            float(timing["min_green"]),
+            float(timing["max_green"]),
+            float(timing["max_red"]),
+            float(options.get("spillback", 0.0)),
+            bool(options.get("recall_failed", False)),
+        )
 
 
 @dataclass(frozen=True)
@@ -46,6 +64,7 @@ class ShieldState:
     link_red_time: Mapping[int, float]
     links_with_demand: frozenset[int]
     phase_demand: Sequence[float]
+    blocked_links: frozenset[int] = frozenset()
 
     @property
     def n_phases(self) -> int:
@@ -103,5 +122,17 @@ def apply_shield(requested: int, state: ShieldState, cfg: ShieldConfig) -> Shiel
         if others:
             target = max(others, key=lambda p: (state.phase_demand[p], -p))
             return ShieldDecision(target, MAX_GREEN)
+
+    if cfg.spillback > 0 and state.blocked_links:
+        served = state.phase_links[requested] & state.links_with_demand
+        if served and served <= state.blocked_links:
+
+            def moves(p: int) -> bool:
+                return bool((state.phase_links[p] & state.links_with_demand) - state.blocked_links)
+
+            others = [p for p in range(state.n_phases) if p != requested and moves(p)]
+            if others:
+                target = max(others, key=lambda p: (state.phase_demand[p], -p))
+                return ShieldDecision(target, SPILLBACK)
 
     return ShieldDecision(requested, reason)

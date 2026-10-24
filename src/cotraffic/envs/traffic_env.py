@@ -76,7 +76,7 @@ class CoTrafficEnv(ParallelEnv):
         self.timing = self.protocol["timing"]
         self.delta = float(self.timing["delta_time"])
         self.step_length = float(self.protocol["sumo"]["step_length"])
-        self.shield_cfg = ShieldConfig.from_timing(self.timing)
+        self.shield_cfg = ShieldConfig.from_timing(self.timing, agent_cfg.get("shield"))
         self.builder = ObservationBuilder(
             self.obs_cfg, self.pad, self.timing, self.protocol["observation"]
         )
@@ -390,17 +390,29 @@ class CoTrafficEnv(ParallelEnv):
 
     def _shield_state(self, inter: Intersection, now: float) -> ShieldState:
         halting = self.meas.halting
+        noise = self.runtime.get("sensor_noise")
+        failed = noise.failed if (noise is not None and self.shield_cfg.recall_failed) else set()
         demand = set()
         for link in inter.links:
             if link.crossing:
                 if self.ped_waiting.get(link.crossing, 0.0) > 0:
                     demand.add(link.index)
-            elif halting.get(link.in_lane, 0.0) > 0:
+            elif halting.get(link.in_lane, 0.0) > 0 or link.in_lane in failed:
                 demand.add(link.index)
         served = inter.phase_lanes[inter.phase]
+        # a failed detector on recall counts as one waiting vehicle
         phase_demand = [
-            sum(halting[ln] for ln in lanes if ln not in served) for lanes in inter.phase_lanes
+            sum(max(halting[ln], float(ln in failed)) for ln in lanes if ln not in served)
+            for lanes in inter.phase_lanes
         ]
+        blocked = set()
+        if self.shield_cfg.spillback > 0:
+            for link in inter.links:
+                if (
+                    not link.crossing
+                    and self._exit_density(link.out_lane) >= self.shield_cfg.spillback
+                ):
+                    blocked.add(link.index)
         return ShieldState(
             inter.phase,
             inter.green_elapsed(now),
@@ -408,7 +420,15 @@ class CoTrafficEnv(ParallelEnv):
             inter.link_red_time(now),
             frozenset(demand),
             phase_demand,
+            frozenset(blocked),
         )
+
+    def _exit_density(self, lane: str) -> float:
+        """Vehicles over capacity on an exit lane (its detector when it has one)."""
+        meas = self.meas
+        if lane in meas.capacity:
+            return meas.count[lane] / meas.capacity[lane]
+        return float(self.conn.lane.getLastStepOccupancy(lane)) / 100.0
 
     # ------------------------------------------------------------------ reporting
     def episode_summary(self) -> dict[str, Any]:
