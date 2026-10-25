@@ -477,6 +477,29 @@ html.is-sidebar-collapsed .sidebar-collapse {
   font-weight: 500;
 }
 
+.scenario-menu-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 9px 9px 5px;
+  border-top: 1px solid #f1f1ee;
+}
+
+.scenario-menu-group span {
+  color: #777772;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.scenario-menu-group small {
+  color: #a3a39d;
+  font-size: 8px;
+  font-weight: 500;
+}
+
 .scenario-option {
   display: flex;
   width: 100%;

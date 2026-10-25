@@ -20,7 +20,7 @@ export function SelectField({
         id={id}
         aria-describedby={help ? `${id}-help` : undefined}
         className={cn(
-          "h-9 rounded-md border border-border-strong bg-surface-2 px-3 text-sm text-text",
+          "h-9 rounded-none border border-border-strong bg-surface-2 px-3 text-sm text-text",
           className,
         )}
         {...props}

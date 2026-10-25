@@ -34,7 +34,7 @@ export function Sheet({
             </div>
             <Dialog.Close
               aria-label={closeLabel}
-              className="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-text"
+              className="rounded-none p-1 text-muted hover:bg-surface-2 hover:text-text"
             >
               <X aria-hidden="true" className="size-4" />
             </Dialog.Close>

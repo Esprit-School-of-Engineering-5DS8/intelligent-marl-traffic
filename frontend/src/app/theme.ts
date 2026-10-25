@@ -31,6 +31,7 @@ export function useDocumentSettings(): void {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.setAttribute("data-astryx-theme", "astryx");
   }, [theme]);
 
   useEffect(() => {

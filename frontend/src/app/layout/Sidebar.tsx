@@ -47,7 +47,7 @@ export function Sidebar() {
                     title={collapsed ? t(`nav.${key}`) : undefined}
                     className={({ isActive }) =>
                       cn(
-                        "flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors",
+                        "flex h-9 items-center gap-3 rounded-none px-3 text-sm transition-colors",
                         isActive
                           ? "bg-accent-soft font-medium text-accent"
                           : "text-text-2 hover:bg-surface-2 hover:text-text",

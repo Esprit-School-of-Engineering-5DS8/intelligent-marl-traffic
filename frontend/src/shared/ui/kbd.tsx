@@ -6,7 +6,7 @@ export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
   return (
     <kbd
       className={cn(
-        "rounded-sm border border-border-strong bg-surface-2 px-1.5 font-mono text-[11px] text-muted",
+        "rounded-none border border-border-strong bg-surface-2 px-1.5 font-mono text-[11px] text-muted",
         className,
       )}
       {...props}

@@ -120,7 +120,7 @@ const SCENARIOS = {
 let activeScenario = 'monaco';
 try {
   const savedScenario = localStorage.getItem(SCENARIO_KEY);
-  if (savedScenario && SCENARIOS[savedScenario] && !savedScenario.startsWith('grid-')) activeScenario = savedScenario;
+  if (savedScenario && SCENARIOS[savedScenario]) activeScenario = savedScenario;
 } catch {
   // Keep the default scenario if storage is unavailable.
 }
@@ -228,22 +228,36 @@ document.querySelectorAll('[data-map-action]').forEach((button) => {
 const scenarioTriggers = [...document.querySelectorAll('[data-scenario-trigger]')];
 const scenarioMenus = [...document.querySelectorAll('[data-scenario-menu]')];
 
-function renderScenarioMenus() {
-  scenarioMenus.forEach((menu) => {
-    menu.innerHTML = `
-      <div class="scenario-menu-head" role="presentation">
-        <span>Simulation scenario</span>
-      <small>${Object.keys(SCENARIOS).filter((key) => !key.startsWith('grid-')).length} available</small>
-      </div>
-      ${Object.entries(SCENARIOS).filter(([key]) => !key.startsWith('grid-')).map(([key, scenario]) => `
+function scenarioOptionMarkup(key, scenario) {
+  return `
         <button type="button" class="scenario-option" data-scenario-option="${key}" role="option" aria-selected="false">
           <span class="scenario-option-check"><svg class="ico"><use href="#i-check"/></svg></span>
           <span class="scenario-option-copy">
             <strong>${scenario.label}</strong>
             <small>${scenario.menuSub}</small>
           </span>
-        </button>
-      `).join('')}
+        </button>`;
+}
+
+/* The live map menu also offers the two headless SUMO grids: they draw the
+   TraCI network on the canvas scene instead of the Mapbox basemap. */
+function renderScenarioMenus() {
+  scenarioMenus.forEach((menu) => {
+    const isLiveMenu = menu.id === 'livePlaceMenu';
+    const places = Object.entries(SCENARIOS).filter(([key]) => !key.startsWith('grid-'));
+    const grids = isLiveMenu ? Object.entries(SCENARIOS).filter(([key]) => key.startsWith('grid-')) : [];
+    menu.innerHTML = `
+      <div class="scenario-menu-head" role="presentation">
+        <span>Simulation scenario</span>
+      <small>${places.length + grids.length} available</small>
+      </div>
+      ${places.map(([key, scenario]) => scenarioOptionMarkup(key, scenario)).join('')}
+      ${
+        grids.length
+          ? `<div class="scenario-menu-group" role="presentation"><span>SUMO grids</span><small>Live TraCI</small></div>
+      ${grids.map(([key, scenario]) => scenarioOptionMarkup(key, scenario)).join('')}`
+          : ''
+      }
     `;
   });
 
@@ -294,6 +308,11 @@ function applyScenarioChrome() {
   if (queuedRoad) queuedRoad.textContent = scenario.queuedRoad;
   const liveCanvas = $('liveMap');
   if (liveCanvas) liveCanvas.setAttribute('aria-label', `3D live traffic map of ${scenario.place}`);
+  const simStart = $('simulationStart');
+  if (simStart) {
+    const gridLabel = activeScenario === 'grid-3x3' ? '3×3' : '2×2';
+    simStart.innerHTML = `<svg class="ico"><use href="#i-refresh"/></svg>Start ${gridLabel}`;
+  }
   document.querySelectorAll('[data-scenario-option]').forEach((option) => {
     const selected = option.dataset.scenarioOption === activeScenario;
     option.classList.toggle('is-selected', selected);

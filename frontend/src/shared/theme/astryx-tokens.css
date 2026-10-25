@@ -8,11 +8,15 @@
  * Scope: Dashboard / Overview / Assistant — NOT live-map or events tab.
  */
 
+:root,
+html,
+body,
+[data-theme="dark"],
 [data-astryx-theme="astryx"],
 [data-astryx-theme="kemetra"] {
   color-scheme: dark;
 
-  /* ── Radius — hard 0 to match KEMETRA's design language ──────────── */
+  /* ── Radius — hard 0 system-wide to match Events tab reference ──── */
   --radius-none:      0px;
   --radius-xs:        0px;
   --radius-sm:        0px;
@@ -20,7 +24,7 @@
   --radius-lg:        0px;
   --radius-xl:        0px;
   --radius-2xl:       0px;
-  --radius-full:      4px; /* tiny exception for pill badges only */
+  --radius-full:      0px;
   --radius-container: 0px;
 
   /* ── Core Surfaces ────────────────────────────────────────────────── */

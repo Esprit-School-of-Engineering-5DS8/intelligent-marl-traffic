@@ -253,7 +253,7 @@ export function Chat({ compact = false }: { compact?: boolean }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
           placeholder={t("assistantChat.inputPlaceholder")}
-          className="min-h-[44px] flex-1 resize-none rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-text placeholder:text-muted"
+          className="min-h-[44px] flex-1 resize-none rounded-none border border-border-strong bg-surface-2 px-3 py-2 text-sm text-text placeholder:text-muted"
         />
         {busy ? (
           <Button
