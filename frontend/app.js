@@ -2,6 +2,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { mountSumoLiveMap } from './sumo-live-map.js';
 import { mountRamiBenchmark } from './benchmark-rami.jsx';
+import { mountGauges } from './gauge.js';
+import { initModes } from './modes/index.js';
 
 const $ = (id) => document.getElementById(id);
 const FOCUS = [-97.7264, 30.2653];
@@ -396,6 +398,35 @@ const messagesView = $('messagesView');
 const settingsView = $('settingsView');
 const accessView = $('accessView');
 const liveMapView = $('liveMapView');
+const liveTopLeft = document.querySelector('.live-top-left');
+
+function syncZonePanelWidth() {
+  if (!liveMapView || !liveTopLeft) return;
+  const width = liveTopLeft.getBoundingClientRect().width;
+  if (width > 0) liveMapView.style.setProperty('--zone-panel-width', `${Math.round(width)}px`);
+}
+
+/* The tool rail stacks exactly one gutter above the timeline, so it needs the
+   timeline's real height rather than a guessed one. The timeline's own offset
+   never reads --timeline-h, so this cannot feed back into itself. */
+function syncTimelineHeight() {
+  if (!liveMapView) return;
+  const height = liveMapView.querySelector('.simulation-timeline')?.getBoundingClientRect().height || 0;
+  if (height > 0) liveMapView.style.setProperty('--timeline-h', `${Math.round(height)}px`);
+}
+
+syncZonePanelWidth();
+syncTimelineHeight();
+window.addEventListener('resize', syncZonePanelWidth);
+window.addEventListener('resize', syncTimelineHeight);
+if ('ResizeObserver' in window && liveTopLeft) {
+  new ResizeObserver(syncZonePanelWidth).observe(liveTopLeft);
+}
+if ('ResizeObserver' in window && liveMapView) {
+  const timeline = liveMapView.querySelector('.simulation-timeline');
+  if (timeline) new ResizeObserver(syncTimelineHeight).observe(timeline);
+}
+
 const appShell = document.querySelector('.app-shell');
 const appSidebar = document.querySelector('.sidebar');
 const appTopbar = document.querySelector('.topbar');
@@ -416,6 +447,9 @@ const benchmarkNavParent = benchmarkNavGroup?.querySelector('.nav-parent');
 const benchmarkSubmenu = $('benchmarkSubnav');
 const liveModeTabs = [...document.querySelectorAll('[data-live-mode]')];
 let activeLiveTab = 'events';
+// Remember whether the operator had panels collapsed before Roam auto-collapsed
+// them, so leaving Roam restores that choice instead of forcing panels back.
+let roamRestoreCollapsed = null;
 
 function isSidebarCollapsed() {
   return document.documentElement.classList.contains('is-sidebar-collapsed');
@@ -625,8 +659,14 @@ function selectLiveTab(tabName) {
   if (liveMapView?.hidden) showView('Live Map');
   setLiveSubnavActive(activeLiveTab);
   liveMapView?.classList.toggle('live-roam-mode', activeLiveTab === 'roam');
-  if (activeLiveTab === 'roam' && !liveMapView?.classList.contains('live-panels-collapsed')) {
+  if (activeLiveTab === 'roam') {
+    if (roamRestoreCollapsed === null) {
+      roamRestoreCollapsed = liveMapView?.classList.contains('live-panels-collapsed') ? 1 : 0;
+    }
     liveMapView?.classList.add('live-panels-collapsed');
+  } else if (roamRestoreCollapsed !== null) {
+    liveMapView?.classList.toggle('live-panels-collapsed', roamRestoreCollapsed === 1);
+    roamRestoreCollapsed = null;
   }
 
   const url = new URL(window.location.href);
@@ -1126,6 +1166,74 @@ const simulationClock = $('simulationClock');
 const simulationStatus = $('simulationStatus');
 const simulationMetrics = $('simulationMetrics');
 const simulationTime = $('simulationTime');
+const simulationTimeline = $('simulationTimeline');
+const simulationTrack = $('simulationTrack');
+const simulationProfile = $('simulationProfile');
+const simulationBubble = $('simulationBubble');
+const simulationHoverLabel = $('simulationHoverLabel');
+const simulationStatusText = $('simulationStatusText');
+const simulationPlayButton = $('simulationPlay');
+
+/* Shape of a normal weekday in the corridor: a morning ramp, a midday dip and
+   an evening peak. Drawn behind the scrub track so the day's rhythm is visible
+   while dragging the playhead. */
+const SIMULATION_DAY_PROFILE = [
+  14, 10, 8, 9, 18, 34, 58, 82, 96, 72, 54, 49,
+  52, 50, 47, 55, 74, 92, 100, 84, 62, 46, 32, 21
+];
+
+function buildSimulationProfile() {
+  if (!simulationProfile || simulationProfile.childElementCount) return;
+  SIMULATION_DAY_PROFILE.forEach((height) => {
+    const bar = document.createElement('i');
+    bar.style.setProperty('--h', `${height}%`);
+    simulationProfile.append(bar);
+  });
+}
+
+function formatSimulationTime(seconds) {
+  const value = Math.max(0, Math.min(86400, Number(seconds) || 0));
+  const hours = String(Math.floor(value / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((value % 3600) / 60)).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+/* Drives the whole ribbon: the wash behind the bars, the playhead knob, the
+   bubble that rides it and the input's spoken value. */
+function paintSimulationTimeline(seconds) {
+  if (!simulationTime) return;
+  const value = Math.max(0, Math.min(86400, Number(seconds) || 0));
+  const label = formatSimulationTime(value);
+  simulationTimeline?.style.setProperty('--timeline-progress', `${(value / 86400) * 100}%`);
+  if (simulationBubble) simulationBubble.textContent = label;
+  simulationTime.setAttribute('aria-valuetext', label);
+}
+
+function setSimulationStatus(status) {
+  const key = String(status || 'idle').toLowerCase();
+  if (simulationStatus) simulationStatus.dataset.state = key;
+  if (simulationStatusText) simulationStatusText.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+  const playing = key === 'running' || key === 'starting';
+  simulationPlayButton?.classList.toggle('is-playing', playing);
+  simulationPlayButton?.setAttribute('aria-label', playing ? 'Pause simulation' : 'Play simulation');
+}
+
+buildSimulationProfile();
+paintSimulationTimeline(simulationTime?.value || 0);
+
+/* Hover read-out: a dashed guide and the time under the pointer. */
+simulationTrack?.addEventListener('pointermove', (event) => {
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+  const rect = simulationTrack.getBoundingClientRect();
+  if (!rect.width) return;
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  simulationTrack.style.setProperty('--hover-progress', `${(ratio * 100).toFixed(3)}%`);
+  simulationTrack.classList.add('is-hovering');
+  if (simulationHoverLabel) simulationHoverLabel.textContent = formatSimulationTime(ratio * 86400);
+});
+simulationTrack?.addEventListener('pointerleave', () => simulationTrack.classList.remove('is-hovering'));
+simulationTrack?.addEventListener('pointerdown', () => simulationTrack.classList.remove('is-hovering'));
+
 let simulationSocket = null;
 let simulationSpeed = 1;
 let latestSimulationState = null;
@@ -1166,10 +1274,10 @@ function updateSimulationState(state) {
   latestSimulationState = state;
   if (sumo3d) sumo3d.update({ ...state, scenario: activeScenario });
   if (simulationClock) simulationClock.textContent = state.clock || '00:00:00';
-  if (simulationStatus) simulationStatus.textContent = state.status || 'Idle';
+  setSimulationStatus(state.status);
   if (simulationMetrics) simulationMetrics.textContent = `${state.metrics?.vehicles || 0} vehicles`;
   if (simulationTime && Number.isFinite(Number(state.simulationTime))) simulationTime.value = state.simulationTime;
-  if (simulationTime) simulationTime.style.setProperty('--timeline-progress', `${(Number(simulationTime.value) / 86400) * 100}%`);
+  paintSimulationTimeline(simulationTime?.value || 0);
   refreshSimulationVehicles(state);
 }
 
@@ -1180,15 +1288,17 @@ function formatSimulationClock(seconds) {
 
 simulationTime?.addEventListener('input', () => {
   const seconds = Number(simulationTime.value);
-  simulationTime.style.setProperty('--timeline-progress', `${(seconds / 86400) * 100}%`);
+  paintSimulationTimeline(seconds);
   if (simulationClock) simulationClock.textContent = formatSimulationClock(seconds);
 });
 
 document.getElementById('simulationPlay')?.addEventListener('click', async (event) => {
-  const status = simulationStatus?.textContent?.toLowerCase();
+  /* currentTarget is null once the handler awaits, so keep the button. */
+  const button = event.currentTarget;
+  const status = simulationStatus?.dataset.state;
   let endpoint = 'resume';
   let options = { method: 'POST' };
-  if (status === 'idle' || status === 'error') {
+  if (!status || status === 'idle' || status === 'error') {
     connectSimulationSocket();
     const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
     endpoint = 'start';
@@ -1196,9 +1306,14 @@ document.getElementById('simulationPlay')?.addEventListener('click', async (even
   } else if (status === 'running' || status === 'starting') {
     endpoint = 'pause';
   }
-  const response = await simulationFetch(`/api/simulation/${endpoint}`, options);
-  updateSimulationState(await response.json());
-  event.currentTarget.classList.toggle('is-playing', endpoint === 'start' || endpoint === 'resume');
+  button.classList.toggle('is-playing', endpoint !== 'pause');
+  try {
+    const response = await simulationFetch(`/api/simulation/${endpoint}`, options);
+    updateSimulationState(await response.json());
+  } catch {
+    button.classList.remove('is-playing');
+    showToast('Simulation service is offline.');
+  }
 });
 
 function connectSimulationSocket() {
@@ -1212,19 +1327,31 @@ function connectSimulationSocket() {
 document.getElementById('simulationStart')?.addEventListener('click', async () => {
   connectSimulationSocket();
   const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
-  const response = await simulationFetch('/api/simulation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) });
-  updateSimulationState(await response.json());
+  try {
+    const response = await simulationFetch('/api/simulation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) });
+    updateSimulationState(await response.json());
+  } catch {
+    showToast('Simulation service is offline.');
+  }
 });
 document.getElementById('simulationPause')?.addEventListener('click', async () => {
-  const endpoint = simulationStatus?.textContent === 'paused' ? 'resume' : 'pause';
-  const response = await simulationFetch(`/api/simulation/${endpoint}`, { method: 'POST' });
-  updateSimulationState(await response.json());
+  const endpoint = simulationStatus?.dataset.state === 'paused' ? 'resume' : 'pause';
+  try {
+    const response = await simulationFetch(`/api/simulation/${endpoint}`, { method: 'POST' });
+    updateSimulationState(await response.json());
+  } catch {
+    showToast('Simulation service is offline.');
+  }
 });
 document.getElementById('simulationSpeed')?.addEventListener('click', async (event) => {
   simulationSpeed = simulationSpeed === 1 ? 5 : simulationSpeed === 5 ? 20 : 1;
   event.currentTarget.textContent = `${simulationSpeed}×`;
-  const response = await simulationFetch('/api/simulation/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2', speed: simulationSpeed }) });
-  updateSimulationState(await response.json());
+  try {
+    const response = await simulationFetch('/api/simulation/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2', speed: simulationSpeed }) });
+    updateSimulationState(await response.json());
+  } catch {
+    showToast('Simulation service is offline.');
+  }
 });
 let activeMapStyle = 'light';
 
@@ -1463,7 +1590,7 @@ function buildLiveMapScene() {
     liveMap.addLayer({
       id: 'live-sumo-road', type: 'line', source: 'live-sumo-road',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#d6a62f', 'line-width': 3.2, 'line-opacity': 0.92 }
+      paint: { 'line-color': '#5f9c2b', 'line-width': 3.2, 'line-opacity': 0.92 }
     });
   }
   if (!liveMap.getSource('live-vehicles')) {
@@ -1480,7 +1607,7 @@ function buildLiveMapScene() {
       }
     });
   }
-  if (liveMap.getLayer('live-sumo-road')) liveMap.setLayoutProperty('live-sumo-road', 'visibility', 'none');
+  if (liveMap.getLayer('live-sumo-road')) liveMap.setLayoutProperty('live-sumo-road', 'visibility', 'visible');
   loadSimulationNetwork(activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2');
   refreshSimulationVehicles(latestSimulationState);
 
@@ -1510,7 +1637,7 @@ function buildLiveMapScene() {
       type: 'line',
       source: 'live-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#f2c95b', 'line-width': 16, 'line-blur': 12, 'line-opacity': 0.3 }
+      paint: { 'line-color': '#7cbd40', 'line-width': 16, 'line-blur': 12, 'line-opacity': 0.3 }
     });
   }
 
@@ -1620,13 +1747,29 @@ function initLiveMap() {
     maxPitch: 72
   });
 
+  // The modes layer falls back to this global when no getter is injected.
+  window.sumoLiveMap = liveMap;
+
   liveMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
-  liveMap.on('load', buildLiveMapScene);
+  liveMap.on('load', () => {
+    hideLiveMapFallback();
+    buildLiveMapScene();
+    document.dispatchEvent(new CustomEvent('sumo:livemapready'));
+  });
   liveMap.on('error', (event) => {
-    const message = String(event?.error?.message || '');
-    if (/token|401|unauthorized|not authorized/i.test(message)) {
-      showLiveMapFallback(message);
+    const message = String(event?.error?.message || event?.message || '');
+    if (/token|401|403|unauthorized|not authorized|NetworkError|failed to fetch/i.test(message)) {
+      showLiveMapFallback(message || 'Mapbox token invalid or network error.');
     }
+  });
+
+  $('liveMapTokenSave')?.addEventListener('click', () => {
+    const val = $('liveMapTokenInput')?.value.trim();
+    if (!val) return;
+    localStorage.setItem(TOKEN_KEY, val);
+    hideLiveMapFallback();
+    if (liveMap) { liveMap.remove(); liveMap = null; }
+    ensureLiveMap();
   });
 
   window.setTimeout(() => liveMap?.resize(), 80);
@@ -1678,6 +1821,15 @@ document.querySelectorAll('[data-queue-close]').forEach((button) => {
 
 document.querySelector('[data-zone-close]')?.addEventListener('click', () => {
   document.querySelector('.zone-panel')?.setAttribute('hidden', '');
+});
+
+mountGauges();
+
+/* Modes layer: Optimize / Predict / Roam panels, map layers and timeline
+   bands. It reads the same scrubber and mode tabs as the rest of the map. */
+initModes({
+  getMap: () => liveMap,
+  showToast: (message, options) => showToast(message, options)
 });
 
 const LIVE_ACTION_MESSAGES = {
@@ -1792,6 +1944,7 @@ document.querySelectorAll('[data-map-layer]').forEach((option) => {
     option.setAttribute('aria-checked', String(enabled));
     option.classList.toggle('is-selected', enabled);
     setMapLayerVisibility(option.dataset.mapLayer, enabled);
+    if (option.dataset.mapLayer === 'basemap') setPanelTheme(enabled);
   });
 });
 
@@ -1802,11 +1955,19 @@ document.querySelectorAll('[data-live-panels-toggle]').forEach((toggle) => toggl
   event.currentTarget.textContent = collapsed ? 'Panels' : 'Panels';
 }));
 document.getElementById('simulationResetView')?.addEventListener('click', () => sumo3d?.reset());
-document.querySelectorAll('[data-panel-theme-toggle]').forEach((toggle) => toggle.addEventListener('click', (event) => {
-  const light = liveMapView?.classList.toggle('live-panels-light');
-  event.currentTarget.setAttribute('title', light ? 'Panels: Light' : 'Panels: Dark');
-  event.currentTarget.setAttribute('aria-label', light ? 'Switch panels to dark mode' : 'Switch panels to light mode');
-  document.querySelectorAll('[data-panel-theme-toggle]').forEach((button) => button.classList.toggle('is-light', Boolean(light)));
+
+function setPanelTheme(light) {
+  const enabled = liveMapView ? liveMapView.classList.toggle('live-panels-light', Boolean(light)) : Boolean(light);
+  document.querySelectorAll('[data-panel-theme-toggle]').forEach((button) => {
+    button.classList.toggle('is-light', enabled);
+    button.setAttribute('title', enabled ? 'Panels: Light' : 'Panels: Dark');
+    button.setAttribute('aria-label', enabled ? 'Switch panels to dark mode' : 'Switch panels to light mode');
+  });
+  return enabled;
+}
+
+document.querySelectorAll('[data-panel-theme-toggle]').forEach((toggle) => toggle.addEventListener('click', () => {
+  setPanelTheme(!liveMapView?.classList.contains('live-panels-light'));
 }));
 
 document.addEventListener('click', (event) => {
@@ -2015,7 +2176,7 @@ $('chatForm')?.addEventListener('submit', (event) => {
   renderChatList();
 });
 
-function showToast(message) {
+function showToast(message, options = {}) {
   let node = document.querySelector('.app-toast');
   if (!node) {
     node = document.createElement('div');
@@ -2023,10 +2184,27 @@ function showToast(message) {
     node.setAttribute('role', 'status');
     document.body.appendChild(node);
   }
-  node.textContent = message;
+  node.textContent = '';
+  const text = document.createElement('span');
+  text.textContent = message;
+  node.append(text);
+  if (options.action) {
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'app-toast-action';
+    action.textContent = options.action.label;
+    action.addEventListener('click', () => {
+      options.action.onClick?.();
+      node.classList.remove('is-visible');
+    });
+    node.append(action);
+  }
   node.classList.add('is-visible');
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => node.classList.remove('is-visible'), 2200);
+  showToast.timer = window.setTimeout(
+    () => node.classList.remove('is-visible'),
+    options.duration || (options.action ? 5200 : 2200)
+  );
 }
 
 renderChatList();
