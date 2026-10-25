@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import urllib.request
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, replace
@@ -30,11 +29,13 @@ import pandas as pd
 
 from cotraffic.llm.advice import Advice
 from cotraffic.llm.client import LLMError, Ollama, Options
+from cotraffic.llm.progress import Progress
 from cotraffic.llm.prompts import DEFAULT_VERSION, load
 from cotraffic.llm.rollout import Stored
-from cotraffic.llm.sources import LlmSource, RuleSource
-from cotraffic.paths import CHECKPOINTS_DIR, REPO_ROOT, RESULTS_DIR
+from cotraffic.llm.sources import RuleSource, llm_source
+from cotraffic.paths import CHECKPOINTS_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS
+from cotraffic.utils.io import git_commit
 
 SITUATIONS = RESULTS_DIR / "tmp" / "llm" / "situations"
 OUT = RESULTS_DIR / "exploration" / "llm_benchmark"
@@ -51,19 +52,6 @@ def situations(name: str, limit: int | None) -> list[Stored]:
 def kind_of(stored: Stored) -> str:
     kinds = sorted({e["kind"] for e in stored.situation.events})
     return "+".join(kinds) if kinds else "none"
-
-
-def commit() -> str:
-    try:
-        return subprocess.run(
-            ["git", "describe", "--always", "--dirty"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
 
 
 def model_info(client: Ollama) -> dict:
@@ -91,10 +79,18 @@ def model_info(client: Ollama) -> dict:
 
 
 def call_phase(
-    items, models, techniques, options: Options, version: str, run: dict
+    items,
+    models,
+    techniques,
+    options: Options,
+    version: str,
+    run: dict,
+    vote: int = 1,
+    vote_temperature: float = 0.7,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     rows, infos = [], []
     opts = {f"opt_{k}": v for k, v in asdict(options).items()}
+    progress = Progress("calls", len(models) * len(techniques) * len(items))
     for model in models:
         for technique in techniques:
             client = Ollama(model, options)
@@ -102,18 +98,19 @@ def call_phase(
                 client.warm_up()
             except LLMError as err:
                 print(f"{model}: unavailable ({err})")
+                progress.tick(len(items))
                 continue
             info = model_info(client)
             prompt = load(version, technique)
-            infos.append({**info, "technique": technique, "prompt": prompt.id, **run})
-            source = LlmSource(client, prompt)
+            source, label = llm_source(model, technique, options, version, vote, vote_temperature)
+            infos.append({**info, "technique": label, "prompt": prompt.id, **run})
             for s in items:
                 reply = source.advise(s.situation)
                 rows.append(
                     {
                         "model": model,
                         "digest": info.get("digest", ""),
-                        "technique": technique,
+                        "technique": label,
                         "prompt": prompt.id,
                         "situation": s.id,
                         "kind": kind_of(s),
@@ -131,7 +128,8 @@ def call_phase(
                         **run,
                     }
                 )
-            done = [r for r in rows if r["model"] == model and r["technique"] == technique]
+                progress.tick()
+            done = [r for r in rows if r["model"] == model and r["technique"] == label]
             lat = [r["latency_s"] for r in done]
             print(
                 f"{model:14s} {technique:5s} p50 {np.median(lat):5.1f}s "
@@ -189,8 +187,13 @@ def score_phase(
                     (paths[row.situation], label, row.advice, row.latency_s, horizon, beta)
                 )
     print(f"{len(tasks)} replays of {horizon:.0f} s on {jobs} workers", flush=True)
+    progress = Progress("replays", len(tasks), every=10)
+    results = []
     with ProcessPoolExecutor(max_workers=jobs) as pool:
-        scores = pd.DataFrame(list(pool.map(_score, tasks, chunksize=4)))
+        for result in pool.map(_score, tasks, chunksize=4):
+            results.append(result)
+            progress.tick()
+    scores = pd.DataFrame(results)
     scores["horizon_s"] = horizon
     scores["mechanism"] = MECHANISM
     for k, v in run.items():
@@ -290,6 +293,8 @@ def main() -> None:
     parser.add_argument("--num-predict", type=int, default=120)
     parser.add_argument("--num-ctx", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--vote", type=int, default=1, help="self-consistency: k samples")
+    parser.add_argument("--vote-temperature", type=float, default=0.7)
     parser.add_argument("--betas", nargs="+", type=float, default=[2.0])
     parser.add_argument("--horizon", type=float, default=300.0)
     parser.add_argument("--jobs", type=int, default=3)
@@ -302,7 +307,12 @@ def main() -> None:
     for p in sorted((SITUATIONS / args.set).glob("*.json")):
         SITUATIONS_PATHS[p.stem] = p
     print(f"{len(items)} situations ({args.set})")
-    run = {"commit": commit(), "tag": args.tag}
+    run = {
+        "commit": git_commit(),
+        "tag": args.tag,
+        "vote_k": args.vote,
+        "vote_temperature": args.vote_temperature if args.vote > 1 else "",
+    }
     if args.reuse_calls:
         calls = pd.read_csv(OUT / f"{args.reuse_calls}_calls.csv", keep_default_na=False)
         infos = pd.read_csv(OUT / f"{args.reuse_calls}_models.csv", keep_default_na=False)
@@ -322,7 +332,16 @@ def main() -> None:
             num_ctx=args.num_ctx,
             temperature=args.temperature,
         )
-        calls, infos = call_phase(items, args.models, args.techniques, options, args.prompt, run)
+        calls, infos = call_phase(
+            items,
+            args.models,
+            args.techniques,
+            options,
+            args.prompt,
+            run,
+            args.vote,
+            args.vote_temperature,
+        )
         OUT.mkdir(parents=True, exist_ok=True)
         calls.to_csv(OUT / f"{args.tag}_calls.csv", index=False)
         infos.to_csv(OUT / f"{args.tag}_models.csv", index=False)

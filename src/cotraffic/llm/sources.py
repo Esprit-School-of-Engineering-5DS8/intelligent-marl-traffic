@@ -2,6 +2,7 @@
 changes only the source of the advice (same mechanism, frequency and latency):
 
 * LlmSource - the local language model;
+* VotingSource - self-consistency: several sampled answers, majority vote;
 * RuleSource - hand-written rules applying the same principles as the prompt;
 * RandomSource - placebo: random advice with the frequency and amplitude of the LLM.
 """
@@ -9,7 +10,8 @@ changes only the source of the advice (same mechanism, frequency and latency):
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from collections import defaultdict
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -23,8 +25,8 @@ from cotraffic.llm.advice import (
     schema_for,
     weight_of,
 )
-from cotraffic.llm.client import LLMError, Ollama
-from cotraffic.llm.prompts import Prompt
+from cotraffic.llm.client import LLMError, Ollama, Options
+from cotraffic.llm.prompts import Prompt, load
 from cotraffic.llm.situation import Situation
 
 MAX_TEXT = 4000  # longer replies are refused before parsing (resource bound)
@@ -90,6 +92,71 @@ class LlmSource(AdviceSource):
                     },
                 ]
         return SourceReply(None, latency, meta)
+
+
+class VotingSource(AdviceSource):
+    """Self-consistency: k answers (sampled at a positive temperature, one seed each); an
+    item is kept when a majority of the k answers give it (same junction and phase), at the
+    lower median of their strengths and validities. An invalid answer counts as a vote for
+    no advice, so disagreement means abstention. The latency is the sum of the k calls:
+    they run one after the other on this machine."""
+
+    def __init__(self, sources: list[AdviceSource]):
+        self.sources = sources
+        self.name = f"vote{len(sources)}:{sources[0].name}"
+
+    def reset(self, seed: int) -> None:
+        for s in self.sources:
+            s.reset(seed)
+
+    def advise(self, situation: Situation) -> SourceReply:
+        replies = [s.advise(situation) for s in self.sources]
+        meta: dict[str, Any] = {
+            k: sum(int(r.meta.get(k, 0)) for r in replies)
+            for k in ("attempts", "prompt_tokens", "output_tokens")
+        }
+        latency = sum(r.latency_s for r in replies)
+        valid = [r.advice for r in replies if r.advice is not None]
+        meta["votes"] = len(valid)
+        if not valid:
+            meta["error"] = "no valid answer among the samples"
+            return SourceReply(None, latency, meta)
+        votes: dict[tuple[str, int], list[Item]] = defaultdict(list)
+        for advice in valid:
+            for item in {(i.j, i.p): i for i in advice.a}.values():  # one vote per answer
+                votes[(item.j, item.p)].append(item)
+        need = len(self.sources) // 2 + 1
+        items = []
+        for (j, p), given in votes.items():
+            if len(given) >= need:
+                w = sorted(i.w for i in given)[(len(given) - 1) // 2]
+                s = sorted(i.s for i in given)[(len(given) - 1) // 2]
+                items.append(Item(j=j, p=p, w=w, s=s))
+        items.sort(key=lambda i: -i.w)
+        return SourceReply(Advice(a=items[:MAX_ITEMS], r=""), latency, meta)
+
+
+def llm_source(
+    model: str,
+    technique: str,
+    options: Options,
+    version: str,
+    vote: int = 1,
+    temperature: float = 0.7,
+) -> tuple[AdviceSource, str]:
+    """The model as an advice source, and its label (technique, plus "+voteK" for
+    self-consistency over K answers sampled at ``temperature``, one seed each)."""
+    prompt = load(version, technique)
+    if vote <= 1:
+        return LlmSource(Ollama(model, options), prompt), technique
+    sampled = [
+        LlmSource(
+            Ollama(model, replace(options, temperature=temperature, top_k=40, top_p=0.95, seed=k)),
+            prompt,
+        )
+        for k in range(vote)
+    ]
+    return VotingSource(sampled), f"{technique}+vote{vote}"
 
 
 class RuleSource(AdviceSource):

@@ -9,7 +9,14 @@ from cotraffic.llm.advice import AdviceError, check, parse, schema_for, to_wire
 from cotraffic.llm.advised import AdvisedPolicy, AdvisorConfig
 from cotraffic.llm.prompts import load, wrap
 from cotraffic.llm.situation import Junction, Situation
-from cotraffic.llm.sources import AdviceSource, FixedSource, RandomSource, RuleSource, SourceReply
+from cotraffic.llm.sources import (
+    AdviceSource,
+    FixedSource,
+    RandomSource,
+    RuleSource,
+    SourceReply,
+    VotingSource,
+)
 
 N_PHASES = {"A0": 2, "B1": 2, "C1": 3}
 
@@ -113,6 +120,25 @@ def test_placebo_has_the_requested_amplitude_and_is_seeded():
     src.reset(3)
     assert src.advise(situation([])).advice == first
     assert len(first.a) == 2 and {i.w for i in first.a} == {0.4} and {i.s for i in first.a} == {30}
+
+
+def test_self_consistency_keeps_majority_items_only():
+    class Broken(AdviceSource):
+        def advise(self, situation):
+            return SourceReply(None, 4.0, {"error": "invalid"})
+
+    answers = [
+        '{"a":[["A0",1,3,60],["B1",0,2,30]],"r":""}',
+        '{"a":[["A0",1,2,40]],"r":""}',
+        '{"a":[["B1",1,3,60]],"r":""}',
+    ]
+    vote = VotingSource([FixedSource(parse(a), 5.0) for a in answers])
+    reply = vote.advise(situation([]))
+    assert [(i.j, i.p, i.w, i.s) for i in reply.advice.a] == [("A0", 1, 0.6667, 40)]
+    assert reply.latency_s == 15.0
+    # an invalid sample is a vote for no advice: one answer out of three is not a majority
+    lonely = VotingSource([FixedSource(parse(answers[0]), 5.0), Broken(), Broken()])
+    assert lonely.advise(situation([])).advice.a == []
 
 
 # ---------------------------------------------------------------- bias, latency, expiry

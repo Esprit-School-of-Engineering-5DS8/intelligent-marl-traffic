@@ -40,7 +40,6 @@ class AdvisorConfig:
     period_s: float = 300.0  # periodic call (5 min)
     min_gap_s: float = 30.0  # rate limit between two calls
     latency: str = "measured"  # measured | zero | double | fixed:<seconds>
-    ped_crowd: int = 8
 
 
 @dataclass
