@@ -6,6 +6,9 @@ import "@fontsource/ibm-plex-sans-arabic/500.css";
 import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
+// Astryx base CSS must come before our overrides so the cascade works correctly
+import "@astryxdesign/core/dist/astryx.css";
+import "@/shared/theme/astryx-tokens.css";
 import "@/shared/theme/index.css";
 import "@/shared/i18n";
 

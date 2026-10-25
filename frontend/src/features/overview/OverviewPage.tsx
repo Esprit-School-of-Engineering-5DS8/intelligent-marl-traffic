@@ -19,6 +19,7 @@ import type { Comparison, Meta, SummaryRow, TimeseriesCell } from "@/shared/sche
 import { useFilters } from "@/shared/state/filters";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
+import { Panel } from "@/shared/ui/panel";
 
 import { Provenance } from "./Provenance";
 
@@ -82,8 +83,8 @@ function Overview({
 
   return (
     <>
-      <Card>
-        <CardContent className="grid gap-4 pt-4 lg:grid-cols-[3fr_2fr]">
+      <Panel>
+        <div className="grid gap-4 p-4 lg:grid-cols-[3fr_2fr]">
           <CellPicker meta={meta} value={cell} onChange={setCell} />
           <div className="grid grid-cols-2 gap-3">
             <MethodSelect
@@ -99,8 +100,8 @@ function Overview({
               onChange={setReference}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {headline?.pairedImprovementPct != null ? (
         <p className="text-lg font-medium text-balance text-text" aria-live="polite">
