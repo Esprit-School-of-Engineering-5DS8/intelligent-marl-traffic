@@ -35,8 +35,8 @@ le dit, montre pourquoi, et liste ce qui a été essayé pour l'améliorer.
 | 3. Hyperparamètres | Un fichier unique ; chaque valeur est justifiée par une mesure | `configs/llm.yaml` ; lecture `src/cotraffic/llm/settings.py:29` | `Get-Content configs\llm.yaml` | `test_code_defaults_match_the_settings_file`. Calibration : beta 8 donne −1,2 % ; N = 3 min donne −5,0 % | **FAIT** |
 | 4. Prompt engineering | Prompt versionné (v1, v2) ; données balisées ; zero, brief, few-shot (exemples des graines d'entraînement) ; self-consistency ; décodage contraint par schéma | `configs/prompts/advisor-v2.yaml` ; `src/cotraffic/llm/prompts.py:23-82` ; `scripts/llm_fewshot.py` ; `src/cotraffic/llm/sources.py:103` (vote) ; `src/cotraffic/llm/advice.py:45` (schéma) | `type results\exploration\llm_benchmark\v2_tech_summary.csv` | v1 → v2 : JSON valide de 67 à 100 % (modèles 3B). Zero +0,15 %, brief −0,18 %, few +0,08 %, vote +0,02 % | **FAIT** |
 | 5. Tool schema | 5 outils en lecture seule et `submit_advice` ; schémas JSON stricts ; validation Pydantic | `src/cotraffic/llm/tools.py:120-262` ; `src/cotraffic/llm/sources.py:152` (`ToolLlmSource`) | `pytest tests\test_llm_tools.py -v` ; `python scripts\llm_tools_demo.py` (environ 1 min) | 12 tests. Essai réel : 27 à 50 s par conseil, le modèle lit les carrefours dans l'ordre | **FAIT**, non retenu (trop lent) |
-| 6. Fine-tuning LoRA | Jeu de données tiré des graines d'entraînement ; notebook Colab prêt (0,5B ou 1,5B, moins d'une heure sur un T4) | `scripts/llm_dataset.py` ; `notebooks/llm_lora_colab.ipynb` (section 8) | Colab (section 6 ci-dessous) | Entraînement lancé ce soir sur Colab | **PRÉLIMINAIRE** |
-| 7. Prompt tuning | Soft prompt PEFT (20 jetons virtuels), même jeu de données, comparé à LoRA et au prompt engineering | `notebooks/llm_lora_colab.ipynb` (sections 9 et 10) | Colab | Entraînement lancé ce soir | **PRÉLIMINAIRE** |
+| 6. Fine-tuning LoRA | Jeu de données tiré des graines d'entraînement ; notebook prêt pour Kaggle et Colab (0,5B ou 1,5B, moins d'une heure sur un T4) | `scripts/llm_dataset.py` ; `notebooks/llm_lora_colab.ipynb` (section 8) | Kaggle (section 6 ci-dessous) | Entraînement sur Kaggle avec le lot final (section 6) | **PRÉLIMINAIRE** |
+| 7. Prompt tuning | Soft prompt PEFT (20 jetons virtuels), même jeu de données, comparé à LoRA et au prompt engineering | `notebooks/llm_lora_colab.ipynb` (sections 9 et 10) | Kaggle | Même exécution que LoRA | **PRÉLIMINAIRE** |
 | 8. Évaluation | Rejeux appariés (63 situations) ; épisodes complets (6 scénarios × 3 périodes) ; contrôle à règles ; placebo et oracle ; pré-enregistrement | `src/cotraffic/llm/rollout.py:168` ; `scripts/llm_period.py` ; `scripts/llm_dataset.py` ; `docs/LLM_PREREGISTRATION.md` | `type results\exploration\llm_period\period_summary.csv` | Épisodes, N = 10 min : −0,38 % en moyenne. Règles : −0,09 %. Oracle et placebo : section 4.5 | **PARTIEL** : validation seulement |
 | 9. Sécurité | Lecture stricte et bornée ; taille maximale ; délai et repli ; données jamais traitées comme instructions ; outils en lecture seule ; bouclier | `src/cotraffic/llm/advice.py:79` et `:125` ; `src/cotraffic/llm/sources.py:34` et `:84` ; `src/cotraffic/llm/client.py:73` ; `src/cotraffic/llm/prompts.py:47` ; `tests/test_llm_security.py` | `pytest tests\test_llm_security.py -v` (environ 20 s) | 10 tests adverses. Attaque avec un biais de 1000 : vert le plus court 13 s pour un minimum de 10 s, sur 100 verts | **FAIT** |
 | 10. Orchestration | Déclencheurs, file d'attente, latence réelle, expiration, limite de fréquence, cache (optionnel), journal d'audit | `src/cotraffic/llm/advised.py:104-198` ; `docs/LLM_DESIGN.md`, section 3 (schéma et flux pas à pas) | `type results\exploration\llm_period\calls\coop_full_llm-N600__grid4x4__emergency__peak__s1000.jsonl` | `test_latency_modes_for_the_sensitivity_analysis`, `test_the_cache_reuses_the_advice_of_an_identical_situation` | **FAIT** |
@@ -242,8 +242,8 @@ Une seule graine par case : un écart de ±3 % n'est pas significatif. L'épisod
 
 ### 4.6 LoRA et prompt tuning
 
-*Entraînement sur Colab ce soir (notebook prêt) : section complétée avec les chiffres du
-notebook, puis avec le rejeu SUMO des prédictions.*
+*Entraînement sur Kaggle avec le lot final : section complétée avec les chiffres du
+notebook, puis avec le rejeu SUMO des prédictions. Résultats préliminaires.*
 
 ---
 
@@ -269,30 +269,45 @@ notebook, puis avec le rejeu SUMO des prédictions.*
   - La latence est modélisée : le conseil n'agit qu'après ce délai.
 - **Détection des capteurs en panne.** Le détecteur d'événements lit l'information du
   scénario : on suppose la panne signalée.
-- **LoRA et prompt tuning sont préliminaires.** Peu d'exemples (environ 200), étiquettes
-  bruitées, petit modèle.
+- **LoRA et prompt tuning sont préliminaires.** Peu d'exemples (lot final, section 6),
+  étiquettes bruitées, petit modèle.
 - **Évaluation finale non faite.** Les graines de test 0 à 4 n'ont pas encore été lancées
   (section 7).
 
 ---
 
-## 6. LoRA et prompt tuning : les étapes sur Colab
+## 6. LoRA et prompt tuning : données et étapes sur Kaggle
 
-1. Ouvrir <https://colab.research.google.com>, puis Fichier > Importer un notebook >
+**Les résultats LoRA et prompt tuning sont préliminaires** : petit modèle (Qwen2.5 0,5B),
+peu d'exemples, et des étiquettes bruitées (le meilleur de quelques candidats, sur un
+rejeu de 5 min). Seul le **lot final** compte pour les résultats présentés.
+
+| Lot | Fichiers | Exemples | Graines | Étiquettes | Rôle |
+|---|---|---|---|---|---|
+| Préliminaire | `results/exploration/llm_lora/preliminary/` | 69 entraînement, 63 validation | 100001 (entraînement), 1000 (validation) | Rejeux sans délai ; validation : règles ou abstention | Test de bout en bout du notebook seulement |
+| **Final** | `results/exploration/llm_lora/` | voir ci-dessous | 100001 à 100003 (entraînement), 1000 (validation) | Rejeux avec le même délai pour tous (8,2 s) ; meilleur candidat, ou abstention sous 0,25 % | **Résultats présentés** |
+
+Les graines d'entraînement servent uniquement à l'entraînement, et la graine 1000
+uniquement à la mesure. Les graines de test 0 à 4 ne sont pas utilisées.
+
+Étapes sur Kaggle (notebook `notebooks/llm_lora_colab.ipynb`, compatible Kaggle et Colab) :
+
+1. kaggle.com > Create > New Notebook > File > Import Notebook, puis choisir
    `notebooks/llm_lora_colab.ipynb`.
-2. Exécution > Modifier le type d'exécution > **GPU T4** > Enregistrer.
-3. Exécuter les cellules **dans l'ordre**, avec Exécution > Tout exécuter, ou Ctrl+Entrée
-   cellule par cellule.
-4. À la cellule 3, téléverser les deux fichiers de `results/exploration/llm_lora/` :
-   `llm_lora_train.jsonl` et `llm_lora_val.jsonl`.
-5. Attendre : 20 à 30 min avec 0,5B. Pour 1,5B, changer `MODEL` dans la cellule 4 ; compter
-   45 à 60 min.
-6. La cellule 11 télécharge :
+2. Settings :
+   - Accelerator **GPU T4 x2** (le notebook n'en utilise qu'un) ;
+   - **Internet on**, nécessaire pour installer les bibliothèques et télécharger le modèle.
+3. Add Input > Upload > New Dataset : les deux fichiers du **lot final**,
+   `llm_lora_train.jsonl` et `llm_lora_val.jsonl`. Le notebook les lit dans
+   `/kaggle/input`.
+4. Run All : environ 20 à 30 min avec 0,5B. Pour 1,5B, changer `MODEL` dans la cellule 4,
+   et compter 45 à 60 min.
+5. Les sorties sont dans `/kaggle/working`, onglet Output :
    - `adapter_lora.zip` et `adapter_prompt_tuning.zip` ;
-   - `lora_comparison.csv`, le tableau de comparaison ;
+   - `lora_comparison.csv` ;
    - les prédictions `base_*`, `lora_*` et `prompt_tuning_*`, en `.csv`.
-7. En local, copier les `.csv` dans `results/exploration/llm_benchmark/`, puis lancer les
-   commandes de la cellule 12, qui rejouent les prédictions dans SUMO :
+6. En local, copier les `.csv` dans `results/exploration/llm_benchmark/`, puis rejouer les
+   prédictions dans SUMO :
 
 ```powershell
 .venv\Scripts\python scripts\llm_benchmark.py --reuse-calls lora --techniques lora --betas 4 --tag lora_val
