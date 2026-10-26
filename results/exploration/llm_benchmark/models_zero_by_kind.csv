@@ -1,0 +1,65 @@
+label,beta,kind,n_situations,n_advised,gain_waiting_%,better_than_none_%,worse_than_none_%,gain_ev_stopped_s,changed_decisions
+rules,2.0,all,63,63,-0.14,10.0,17.0,0.1,1.1
+rules,2.0,any event,40,40,-0.27,10.0,28.0,0.1,1.5
+rules,2.0,detector_fault,7,7,-0.85,0.0,43.0,-0.0,1.1
+rules,2.0,emergency,7,7,0.57,43.0,43.0,0.7,4.7
+rules,2.0,incident,8,8,-0.88,0.0,50.0,-0.0,1.6
+rules,2.0,message_loss,7,7,-0.0,0.0,0.0,-0.0,0.0
+rules,2.0,none,23,23,0.09,9.0,0.0,-0.0,0.4
+rules,2.0,pedestrians,11,11,-0.18,9.0,9.0,-0.0,0.6
+qwen2.5:0.5b|zero,2.0,all,63,63,0.17,22.0,16.0,-0.0,3.2
+qwen2.5:0.5b|zero,2.0,any event,40,40,0.04,20.0,22.0,-0.0,3.2
+qwen2.5:0.5b|zero,2.0,detector_fault,7,7,0.08,43.0,29.0,-0.0,4.7
+qwen2.5:0.5b|zero,2.0,emergency,7,7,0.14,14.0,14.0,-0.0,1.4
+qwen2.5:0.5b|zero,2.0,incident,8,8,0.26,25.0,12.0,-0.0,1.9
+qwen2.5:0.5b|zero,2.0,message_loss,7,7,0.46,14.0,14.0,-0.0,3.9
+qwen2.5:0.5b|zero,2.0,none,23,23,0.38,26.0,4.0,-0.0,3.3
+qwen2.5:0.5b|zero,2.0,pedestrians,11,11,-0.47,9.0,36.0,-0.0,3.7
+qwen2.5:1.5b|zero,2.0,all,63,63,0.12,29.0,22.0,0.4,5.5
+qwen2.5:1.5b|zero,2.0,any event,40,40,-0.11,25.0,28.0,0.6,4.4
+qwen2.5:1.5b|zero,2.0,detector_fault,7,7,-0.56,43.0,43.0,-0.0,5.1
+qwen2.5:1.5b|zero,2.0,emergency,7,7,-0.03,29.0,14.0,3.6,6.4
+qwen2.5:1.5b|zero,2.0,incident,8,8,0.11,38.0,38.0,-0.0,3.5
+qwen2.5:1.5b|zero,2.0,message_loss,7,7,0.13,14.0,0.0,-0.0,4.7
+qwen2.5:1.5b|zero,2.0,none,23,23,0.52,35.0,13.0,-0.0,7.4
+qwen2.5:1.5b|zero,2.0,pedestrians,11,11,-0.18,9.0,36.0,-0.0,2.9
+gemma3:1b|zero,2.0,all,63,17,0.0,2.0,3.0,-0.3,0.2
+gemma3:1b|zero,2.0,any event,40,11,0.0,2.0,5.0,-0.5,0.4
+gemma3:1b|zero,2.0,detector_fault,7,3,-0.0,0.0,14.0,-0.0,0.6
+gemma3:1b|zero,2.0,emergency,7,2,0.06,14.0,0.0,-2.9,0.9
+gemma3:1b|zero,2.0,incident,8,1,-0.0,0.0,0.0,-0.0,0.0
+gemma3:1b|zero,2.0,message_loss,7,1,-0.0,0.0,0.0,-0.0,0.0
+gemma3:1b|zero,2.0,none,23,6,-0.0,0.0,0.0,-0.0,0.0
+gemma3:1b|zero,2.0,pedestrians,11,4,-0.02,0.0,9.0,-0.0,0.4
+llama3.2:1b|zero,2.0,all,63,43,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,any event,40,27,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,detector_fault,7,3,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,emergency,7,4,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,incident,8,7,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,message_loss,7,6,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,none,23,16,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:1b|zero,2.0,pedestrians,11,7,-0.0,0.0,0.0,-0.0,0.0
+qwen3:1.7b|zero,2.0,all,63,51,0.27,17.0,14.0,-0.5,1.2
+qwen3:1.7b|zero,2.0,any event,40,33,0.11,12.0,8.0,-0.5,0.9
+qwen3:1.7b|zero,2.0,detector_fault,7,1,0.2,14.0,0.0,-0.0,0.1
+qwen3:1.7b|zero,2.0,emergency,7,7,-0.22,29.0,14.0,-2.9,2.1
+qwen3:1.7b|zero,2.0,incident,8,8,-0.08,0.0,25.0,-0.0,1.4
+qwen3:1.7b|zero,2.0,message_loss,7,7,0.2,14.0,0.0,-0.0,0.9
+qwen3:1.7b|zero,2.0,none,23,18,0.54,26.0,26.0,-0.4,1.9
+qwen3:1.7b|zero,2.0,pedestrians,11,10,0.33,9.0,0.0,-0.0,0.2
+qwen2.5:3b|zero,2.0,all,63,42,0.05,5.0,5.0,-0.0,0.8
+qwen2.5:3b|zero,2.0,any event,40,29,0.11,8.0,5.0,-0.0,1.2
+qwen2.5:3b|zero,2.0,detector_fault,7,6,-0.0,0.0,0.0,-0.0,1.0
+qwen2.5:3b|zero,2.0,emergency,7,4,-0.06,14.0,14.0,-0.0,2.7
+qwen2.5:3b|zero,2.0,incident,8,6,-0.04,0.0,12.0,-0.0,1.6
+qwen2.5:3b|zero,2.0,message_loss,7,5,-0.0,0.0,0.0,-0.0,0.1
+qwen2.5:3b|zero,2.0,none,23,13,-0.05,0.0,4.0,-0.0,0.1
+qwen2.5:3b|zero,2.0,pedestrians,11,8,0.47,18.0,0.0,-0.0,0.8
+llama3.2:3b|zero,2.0,all,63,45,0.12,25.0,17.0,-0.6,2.8
+llama3.2:3b|zero,2.0,any event,40,25,-0.27,18.0,20.0,-0.9,2.5
+llama3.2:3b|zero,2.0,detector_fault,7,7,-0.21,29.0,43.0,-0.0,3.1
+llama3.2:3b|zero,2.0,emergency,7,4,0.07,14.0,14.0,-5.0,2.6
+llama3.2:3b|zero,2.0,incident,8,1,-0.0,0.0,0.0,-0.0,0.0
+llama3.2:3b|zero,2.0,message_loss,7,5,0.25,29.0,14.0,-0.0,3.1
+llama3.2:3b|zero,2.0,none,23,20,0.81,39.0,13.0,-0.0,3.4
+llama3.2:3b|zero,2.0,pedestrians,11,8,-1.07,18.0,27.0,-0.0,3.4

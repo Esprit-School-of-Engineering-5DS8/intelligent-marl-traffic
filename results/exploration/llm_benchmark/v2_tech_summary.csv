@@ -1,0 +1,5 @@
+model,technique,params,quant,memory_gb,licence,latency_p50_s,latency_p95_s,json_first_try_%,json_valid_%,output_tokens,advice_items,beta,n_situations,n_advised,gain_waiting_%,better_than_none_%,worse_than_none_%,gain_ev_stopped_s,changed_decisions
+qwen2.5:3b,zero,3.1B,Q4_K_M,2.21,Qwen RESEARCH LICENSE AGREEMENT,8.2,11.7,100.0,100.0,30.0,1.8,4.0,63,63,0.15,29.0,25.0,0.1,4.0
+qwen2.5:3b,brief,3.1B,Q4_K_M,2.21,Qwen RESEARCH LICENSE AGREEMENT,10.1,15.0,100.0,100.0,47.0,2.2,4.0,63,63,-0.18,29.0,30.0,-1.0,7.0
+qwen2.5:3b,few,3.1B,Q4_K_M,2.21,Qwen RESEARCH LICENSE AGREEMENT,9.2,15.3,100.0,100.0,27.0,1.7,4.0,63,38,0.08,14.0,11.0,-0.6,2.0
+rules (control),-,,,,,,,,,,,4.0,63,63,-0.09,16.0,25.0,-0.1,2.6

@@ -1,9 +1,9 @@
-model,technique,params,quant,memory_gb,licence,latency_p50_s,latency_p95_s,json_first_try_%,json_valid_%,output_tokens,advice_items,waiting_change_%,better_than_none_%,ev_stopped_change_s,changed_decisions
-qwen2.5:0.5b,zero,494.03M,Q4_K_M,0.46,Apache License,4.3,4.8,98.0,100.0,74.0,3.8,-0.17,22.0,0.0,3.2
-qwen2.5:1.5b,zero,1.5B,Q4_K_M,0.99,Apache License,5.9,6.8,100.0,100.0,49.0,3.1,-0.12,29.0,-0.4,5.5
-gemma3:1b,zero,999.89M,Q4_K_M,0.9,Gemma Terms of Use,12.6,15.7,27.0,27.0,112.0,1.1,-0.01,6.0,1.2,0.8
-llama3.2:1b,zero,1.2B,Q8_0,1.28,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,6.3,11.5,68.0,68.0,55.0,2.7,0.0,0.0,0.0,0.0
-qwen3:1.7b,zero,2.0B,Q4_K_M,1.68,Apache License,9.9,18.9,81.0,81.0,86.0,2.6,-0.33,22.0,0.6,1.5
-qwen2.5:3b,zero,3.1B,Q4_K_M,2.13,Qwen RESEARCH LICENSE AGREEMENT,15.8,34.1,67.0,67.0,81.0,2.1,-0.08,7.0,0.0,1.2
-llama3.2:3b,zero,3.2B,Q4_K_M,2.39,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,15.1,27.7,71.0,71.0,72.0,2.9,-0.17,36.0,0.8,3.9
-rules (control),-,,,,,,,,,,,0.14,10.0,-0.1,1.1
+model,technique,params,quant,memory_gb,licence,latency_p50_s,latency_p95_s,json_first_try_%,json_valid_%,output_tokens,advice_items,beta,n_situations,n_advised,gain_waiting_%,better_than_none_%,worse_than_none_%,gain_ev_stopped_s,changed_decisions
+qwen2.5:0.5b,zero,494.03M,Q4_K_M,0.46,Apache License,4.3,4.8,98.0,100.0,74.0,3.8,2.0,63,63,0.17,22.0,16.0,-0.0,3.2
+qwen2.5:1.5b,zero,1.5B,Q4_K_M,0.99,Apache License,5.9,6.8,100.0,100.0,49.0,3.1,2.0,63,63,0.12,29.0,22.0,0.4,5.5
+gemma3:1b,zero,999.89M,Q4_K_M,0.9,Gemma Terms of Use,12.6,15.7,27.0,27.0,112.0,1.1,2.0,63,17,0.0,2.0,3.0,-0.3,0.2
+llama3.2:1b,zero,1.2B,Q8_0,1.28,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,6.3,11.5,68.0,68.0,55.0,2.7,2.0,63,43,-0.0,0.0,0.0,-0.0,0.0
+qwen3:1.7b,zero,2.0B,Q4_K_M,1.68,Apache License,9.9,18.9,81.0,81.0,86.0,2.6,2.0,63,51,0.27,17.0,14.0,-0.5,1.2
+qwen2.5:3b,zero,3.1B,Q4_K_M,2.13,Qwen RESEARCH LICENSE AGREEMENT,15.8,34.1,67.0,67.0,81.0,2.1,2.0,63,42,0.05,5.0,5.0,-0.0,0.8
+llama3.2:3b,zero,3.2B,Q4_K_M,2.39,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,15.1,27.7,71.0,71.0,72.0,2.9,2.0,63,45,0.12,25.0,17.0,-0.6,2.8
+rules (control),-,,,,,,,,,,,2.0,63,63,-0.14,10.0,17.0,0.1,1.1

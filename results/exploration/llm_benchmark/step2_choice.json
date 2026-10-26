@@ -1,0 +1,15 @@
+{
+  "model": "qwen2.5:3b",
+  "beta": 4.0,
+  "zero_gain_waiting_%": 0.29,
+  "rule": "model and beta: valid >= 95 %, p95 <= 20 s, highest gain on waiting",
+  "convention": "gain > 0 = better than COOP-FULL alone",
+  "technique": "zero",
+  "technique_gain_waiting_%": 0.15,
+  "vote": 1,
+  "vote_gain_waiting_%": 0.02,
+  "vote_latency_p95_s": 24.6,
+  "period_s": 600.0,
+  "period_gain_waiting_%": -0.38,
+  "done": "2026-10-26 15:26"
+}

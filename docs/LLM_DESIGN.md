@@ -238,3 +238,26 @@ Si le temps manque, voici le plan réduit :
 | Non-déterminisme du LLM sur CPU | Reproductibilité imparfaite | Température 0, graine fixe, digest du modèle et chaque réponse journalisés ; les runs sont rejouables à partir des journaux |
 | Pas de GPU local | Fine-tuning impossible sur la machine | Colab ou Kaggle ; à défaut, modèle plus petit et résultats marqués « préliminaires » |
 | Charge de calcul (environ 40 h) | Retard | Plan réduit prêt ; les lots sans LLM tournent en parallèle |
+
+---
+
+## 8. Étape 2 : choix sur la graine de validation 1000 (résultats)
+
+Les tableaux complets, avec les mêmes chiffres, sont dans
+[VALIDATION_LLM.md](VALIDATION_LLM.md), section 4. En résumé (gain positif = mieux) :
+
+| Choix | Valeurs comparées | Retenu | Mesure |
+|---|---|---|---|
+| Modèle | 8 modèles, de 0,5B à 3,8B | `qwen2.5:3b` | +0,29 % (dans le bruit) ; 100 % de JSON valide ; p50 8,6 s |
+| Format de sortie | poids 0 à 1 (v1), force 1 à 3 (v2) | v2 | JSON valide de 67 à 100 % pour les modèles 3B |
+| beta | 2, 4, 8 | 4 | beta 8 donne −1,2 % |
+| Technique | zero, brief, few, vote à 3 | zero | +0,15 % contre −0,18, +0,08 et +0,02 % |
+| Période N | 3, 5, 10 min (épisodes complets) | 10 min | −0,38 % ; 3 min donne −5,0 % (piétons −24,8 %) |
+
+Les règles de choix sont dans `scripts/llm_step2.py`, écrites avant les résultats. Le
+choix est enregistré dans `results/exploration/llm_benchmark/step2_choice.json`, et
+l'enchaînement des calculs est journalisé dans `results/tmp/llm/logs/step2_pipeline.log`.
+
+**Conclusion de l'étape 2 : aucun réglage n'améliore COOP-FULL de façon nette sur la
+validation.** L'évaluation pré-enregistrée sur les graines de test
+([LLM_PREREGISTRATION.md](LLM_PREREGISTRATION.md)) dira si cela se confirme.

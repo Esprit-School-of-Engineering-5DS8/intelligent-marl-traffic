@@ -1,0 +1,2 @@
+model,digest,size_bytes,parameters,quantization,family,license,memory_gb,technique,prompt,commit,tag,vote_k,vote_temperature
+qwen2.5:3b,357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b,1929912432,3.1B,Q4_K_M,qwen2,Qwen RESEARCH LICENSE AGREEMENT,2.21,zero+vote3,advisor-v2/zero/a7f9fa63,79f1c62-dirty,v2_vote,3,0.7

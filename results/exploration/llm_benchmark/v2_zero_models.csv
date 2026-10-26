@@ -1,0 +1,7 @@
+model,digest,size_bytes,parameters,quantization,family,license,memory_gb,technique,prompt,commit,tag
+qwen2.5:0.5b,a8b0c51577010a279d933d14c2a8ab4b268079d44c5c8830c0a93900f1827c67,397821319,494.03M,Q4_K_M,qwen2,Apache License,0.46,zero,advisor-v2/zero/a7f9fa63,9b1d4e9-dirty,v2_zero
+qwen2.5:1.5b,65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b,986061892,1.5B,Q4_K_M,qwen2,Apache License,0.99,zero,advisor-v2/zero/a7f9fa63,9b1d4e9-dirty,v2_zero
+qwen3:1.7b,8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7,1359293444,2.0B,Q4_K_M,qwen3,Apache License,1.68,zero,advisor-v2/zero/a7f9fa63,9b1d4e9-dirty,v2_zero
+llama3.2:3b,a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72,2019393189,3.2B,Q4_K_M,llama,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,2.39,zero,advisor-v2/zero/a7f9fa63,9b1d4e9-dirty,v2_zero
+qwen2.5:3b,357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b,1929912432,3.1B,Q4_K_M,qwen2,Qwen RESEARCH LICENSE AGREEMENT,2.13,zero,advisor-v2/zero/a7f9fa63,9b1d4e9-dirty,v2_zero
+phi4-mini,78fad5d182a7c33065e153a5f8ba210754207ba9d91973f57dffa7f487363753,2491876774,3.8B,Q4_K_M,phi3,Microsoft.,2.88,zero,advisor-v2/zero/a7f9fa63,9b1d4e9-dirty,v2_zero

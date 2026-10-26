@@ -1,11 +1,11 @@
-model,technique,params,quant,memory_gb,licence,latency_p50_s,latency_p95_s,json_first_try_%,json_valid_%,output_tokens,advice_items,beta,n_scored,waiting_change_%,better_than_none_%,worse_than_none_%,ev_stopped_change_s,changed_decisions
-qwen2.5:0.5b,zero,494.03M,Q4_K_M,0.46,Apache License,4.3,4.8,98.0,100.0,74.0,3.8,4.0,63,-0.01,30.0,30.0,0.7,6.6
-qwen2.5:0.5b,zero,494.03M,Q4_K_M,0.46,Apache License,4.3,4.8,98.0,100.0,74.0,3.8,8.0,63,0.37,38.0,51.0,-0.5,14.3
-qwen2.5:1.5b,zero,1.5B,Q4_K_M,0.99,Apache License,5.9,6.8,100.0,100.0,49.0,3.1,4.0,63,-0.01,30.0,37.0,0.4,10.8
-qwen2.5:1.5b,zero,1.5B,Q4_K_M,0.99,Apache License,5.9,6.8,100.0,100.0,49.0,3.1,8.0,63,1.21,35.0,60.0,1.1,24.4
-qwen3:1.7b,zero,2.0B,Q4_K_M,1.68,Apache License,9.9,18.9,81.0,81.0,86.0,2.6,4.0,51,-0.09,22.0,25.0,0.4,3.3
-qwen3:1.7b,zero,2.0B,Q4_K_M,1.68,Apache License,9.9,18.9,81.0,81.0,86.0,2.6,8.0,51,0.08,25.0,31.0,0.7,6.6
-llama3.2:3b,zero,3.2B,Q4_K_M,2.39,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,15.1,27.7,71.0,71.0,72.0,2.9,4.0,45,-0.51,36.0,24.0,0.0,8.3
-llama3.2:3b,zero,3.2B,Q4_K_M,2.39,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,15.1,27.7,71.0,71.0,72.0,2.9,8.0,45,1.17,31.0,58.0,-0.4,16.1
-rules (control),-,,,,,,,,,,,4.0,63,0.09,16.0,25.0,0.1,2.6
-rules (control),-,,,,,,,,,,,8.0,63,0.21,17.0,35.0,-0.2,4.8
+model,technique,params,quant,memory_gb,licence,latency_p50_s,latency_p95_s,json_first_try_%,json_valid_%,output_tokens,advice_items,beta,n_situations,n_advised,gain_waiting_%,better_than_none_%,worse_than_none_%,gain_ev_stopped_s,changed_decisions
+qwen2.5:0.5b,zero,494.03M,Q4_K_M,0.46,Apache License,4.3,4.8,98.0,100.0,74.0,3.8,4.0,63,63,0.01,30.0,30.0,-0.7,6.6
+qwen2.5:0.5b,zero,494.03M,Q4_K_M,0.46,Apache License,4.3,4.8,98.0,100.0,74.0,3.8,8.0,63,63,-0.37,38.0,51.0,0.5,14.3
+qwen2.5:1.5b,zero,1.5B,Q4_K_M,0.99,Apache License,5.9,6.8,100.0,100.0,49.0,3.1,4.0,63,63,0.01,30.0,37.0,-0.4,10.8
+qwen2.5:1.5b,zero,1.5B,Q4_K_M,0.99,Apache License,5.9,6.8,100.0,100.0,49.0,3.1,8.0,63,63,-1.21,35.0,60.0,-1.1,24.4
+qwen3:1.7b,zero,2.0B,Q4_K_M,1.68,Apache License,9.9,18.9,81.0,81.0,86.0,2.6,4.0,63,51,0.08,17.0,21.0,-0.3,2.6
+qwen3:1.7b,zero,2.0B,Q4_K_M,1.68,Apache License,9.9,18.9,81.0,81.0,86.0,2.6,8.0,63,51,-0.06,21.0,25.0,-0.6,5.3
+llama3.2:3b,zero,3.2B,Q4_K_M,2.39,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,15.1,27.7,71.0,71.0,72.0,2.9,4.0,63,45,0.36,25.0,17.0,-0.0,5.9
+llama3.2:3b,zero,3.2B,Q4_K_M,2.39,LLAMA 3.2 COMMUNITY LICENSE AGREEMENT,15.1,27.7,71.0,71.0,72.0,2.9,8.0,63,45,-0.84,22.0,41.0,0.3,11.5
+rules (control),-,,,,,,,,,,,4.0,63,63,-0.09,16.0,25.0,-0.1,2.6
+rules (control),-,,,,,,,,,,,8.0,63,63,-0.21,17.0,35.0,0.2,4.8
