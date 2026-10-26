@@ -240,10 +240,50 @@ Une seule graine par case : un écart de ±3 % n'est pas significatif. L'épisod
 
 *En cours de calcul (`scripts/llm_dataset.py`) : section complétée dès la fin du calcul.*
 
-### 4.6 LoRA et prompt tuning
+### 4.6 LoRA et prompt tuning (préliminaire)
 
-*Entraînement sur Kaggle avec le lot final : section complétée avec les chiffres du
-notebook, puis avec le rejeu SUMO des prédictions. Résultats préliminaires.*
+**Premier essai, lot préliminaire** : test du notebook seulement, pas un résultat.
+- Entraînement : 69 exemples, graine d'entraînement 100001.
+- Validation : 63 situations, graine 1000.
+- Modèle Qwen2.5-0.5B, GPU T4 sur Kaggle, environ 6 min.
+
+| Technique | JSON valide | Abstention | Accord avec l'étiquette | Latence (T4) | Paramètres entraînés |
+|---|---|---|---|---|---|
+| « Toujours s'abstenir » (référence triviale) | 100 % | 100 % | **87 %** | – | 0 |
+| Modèle de base (prompt zero-shot) | 0 % | 0 % | 0 % | 1,55 s | 0 |
+| LoRA (rang 16) | 100 % | 100 % | **87 %** | 0,56 s | 8 798 208 |
+| Prompt tuning (20 jetons) | 71 % | 71 % | 67 % | 0,45 s | 17 920 |
+
+**Le piège de la classe majoritaire.**
+- **Le chiffre trompeur.** 55 des 63 situations de validation ont pour étiquette
+  l'abstention. Répondre « rien » à tout donne donc 87 % d'accord. Les 87 % de LoRA sont
+  exactement ce chiffre : le modèle a appris à toujours s'abstenir, et rien d'autre. Le
+  prompt tuning fait pareil (toutes ses réponses valides sont des abstentions).
+- **Les causes.**
+  - Les abstentions sont majoritaires dans l'entraînement : 42 sur 69.
+  - Il y a eu trop peu de pas d'optimisation : 15 au total (69 exemples, 16 par pas,
+    3 epochs).
+- **Dans SUMO, l'effet est nul par construction.** Un modèle qui ne conseille jamais laisse
+  PPO décider seul : gain exactement 0 %. Une mesure d'accord élevée peut donc cacher un
+  modèle inutile.
+- **D'où les deux règles du projet :**
+  - comparer à la référence triviale, et mesurer le rappel des conseils et les faux
+    conseils ;
+  - juger sur l'effet réel dans SUMO, pas sur l'accord avec l'étiquette.
+- **Les corrections dans le notebook** :
+  - suréchantillonnage des exemples de conseil, dans l'entraînement seulement ;
+  - `ACCUM` 2 et 6 epochs, soit 126 pas au lieu de 15 sur le même lot ;
+  - 10 epochs pour le prompt tuning ;
+  - trois mesures ajoutées : référence triviale, rappel des conseils, faux conseils ;
+  - décodage glouton sans paramètres d'échantillonnage.
+
+**Pourquoi 0 % de JSON valide pour le modèle de base ?** Sur Kaggle, la génération n'est
+pas contrainte. En local, Ollama impose le schéma JSON pendant le décodage, et le même
+modèle 0,5B y donne 100 % de JSON valide. Le décodage contraint est donc ce qui rend un
+petit modèle utilisable sans entraînement.
+
+**Lot final** (graines 100001 à 100003) : résultats à ajouter après l'exécution sur
+Kaggle, puis après le rejeu SUMO des prédictions. Ils resteront **préliminaires**.
 
 ---
 
@@ -269,8 +309,10 @@ notebook, puis avec le rejeu SUMO des prédictions. Résultats préliminaires.*
   - La latence est modélisée : le conseil n'agit qu'après ce délai.
 - **Détection des capteurs en panne.** Le détecteur d'événements lit l'information du
   scénario : on suppose la panne signalée.
-- **LoRA et prompt tuning sont préliminaires.** Peu d'exemples (lot final, section 6),
-  étiquettes bruitées, petit modèle.
+- **LoRA et prompt tuning sont préliminaires.**
+  - Peu d'exemples (lot final, section 6), étiquettes bruitées, petit modèle.
+  - Le premier essai n'a appris que la classe majoritaire (section 4.6) : l'accord avec
+    l'étiquette ne suffit pas, seul le rejeu dans SUMO juge.
 - **Évaluation finale non faite.** Les graines de test 0 à 4 n'ont pas encore été lancées
   (section 7).
 
