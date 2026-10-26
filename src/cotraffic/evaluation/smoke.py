@@ -222,22 +222,21 @@ def _assistant() -> str:
 
 @check("dashboard")
 def _dashboard() -> str:
-    """In a separate process: streamlit loads pyarrow, whose DLLs clash with the Arrow
-    library bundled in libsumo once libsumo is loaded (the dashboard never loads SUMO)."""
-    import subprocess
-    import sys
+    """The FastAPI backend the dashboard calls answers health, policy and the catalog."""
+    from fastapi.testclient import TestClient
 
-    from cotraffic.paths import REPO_ROOT
+    from api.main import app
 
-    app_file = REPO_ROOT / "dashboard" / "app.py"
-    code = (
-        "from streamlit.testing.v1 import AppTest; "
-        f"app = AppTest.from_file(r'{app_file}', default_timeout=180).run(); "
-        "print([e.message for e in app.exception])"
-    )
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
-    assert out.stdout.strip().endswith("[]"), out.stdout + out.stderr
-    return "app runs without exception"
+    with TestClient(app) as client:
+        health = client.get("/api/health")
+        assert health.status_code == 200 and health.json()["ok"] is True, health.text
+        policy = client.get("/api/policy")
+        assert policy.status_code == 200, policy.text
+        body = policy.json()
+        assert body["available"] is True, body
+        methods = {item["method"] for item in body["catalog"]}
+        assert {"mp", "coop", "llm"} <= methods, methods
+    return f"api ok, policy {body['method']} on {body['network']}"
 
 
 def run_smoke(only: list[str] | None = None) -> int:
