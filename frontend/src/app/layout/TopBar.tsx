@@ -47,7 +47,7 @@ export function TopBar() {
         id="topbar-language"
         value={language}
         onChange={(e) => update({ language: e.target.value as Language })}
-        className="h-9 rounded-none border border-border bg-surface-2 px-2 text-sm text-text"
+        className="select-control w-auto text-sm"
       >
         {Object.entries(LANGUAGES).map(([code, { label }]) => (
           <option key={code} value={code} lang={code}>

@@ -8,8 +8,7 @@ import { methodColor, sortMethods } from "@/shared/domain/methods";
 import { cn } from "@/shared/lib/cn";
 import type { Cell, Meta } from "@/shared/schemas";
 
-const selectClass =
-  "h-9 min-w-0 rounded-none border border-border-strong bg-surface-2 px-2 text-sm text-text";
+const selectClass = "select-control w-full text-sm";
 
 function Select({
   label,

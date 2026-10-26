@@ -34,7 +34,7 @@ export function ReplayPicker({ meta }: { meta: Meta }) {
         id={id}
         value={replayId ?? ""}
         onChange={(e) => setReplay(e.target.value)}
-        className="h-9 min-w-0 rounded-md border border-border-strong bg-surface-2 px-2 text-sm text-text"
+        className="select-control w-full text-sm"
       >
         {meta.replays.map((r) => (
           <option key={r.id} value={r.id}>
@@ -133,7 +133,7 @@ export function ReplayControls({ replay }: { replay: Replay }) {
         id={speedId}
         value={speed}
         onChange={(e) => setSpeed(Number(e.target.value))}
-        className="h-9 rounded-md border border-border-strong bg-surface-2 px-2 text-sm text-text"
+        className="select-control w-auto text-sm"
       >
         {SPEEDS.map((s) => (
           <option key={s} value={s}>

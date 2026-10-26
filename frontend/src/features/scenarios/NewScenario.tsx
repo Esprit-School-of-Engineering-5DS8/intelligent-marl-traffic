@@ -126,7 +126,7 @@ export function NewScenario({ meta }: { meta: Meta }) {
                 max={999}
                 aria-invalid={Boolean(errors.seed)}
                 aria-describedby={errors.seed ? "sc-seed-error" : undefined}
-                className="h-9 rounded-md border border-border-strong bg-surface-2 px-3 text-sm text-text"
+                className="input-control w-full text-sm"
                 {...register("seed", { valueAsNumber: true })}
               />
               {errors.seed ? (
