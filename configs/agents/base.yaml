@@ -34,6 +34,7 @@ ppo:
 training:
   total_timesteps: 500000     # agent steps (one decision of one intersection = 1 step)
   checkpoint_every: 50000     # agent steps
+  progress_every_s: 15        # console + progress.log update interval
   demand_levels: [low, medium, peak, rush_profile]
   scenarios: []
   quick_timesteps: 3000

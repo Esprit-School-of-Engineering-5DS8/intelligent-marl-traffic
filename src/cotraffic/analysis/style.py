@@ -18,6 +18,7 @@ METHOD_LABELS = {
     "coop_full_ev1": "COOP-FULL (λ_ev=1)",
     "coop_full_ev4": "COOP-FULL (λ_ev=4)",
     "dqn": "DQN",
+    "llm": "LLM",
     "random": "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS)
@@ -43,6 +44,7 @@ METHOD_COLORS = {
     "coop_full_ev1": "#c98a00",
     "coop_full_ev4": "#f4c455",
     "dqn": "#c2185b",
+    "llm": "#7b3fa0",
     "random": "#52514e",
 }
 SURFACE = "#fcfcfb"

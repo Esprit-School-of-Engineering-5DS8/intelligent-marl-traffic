@@ -11,8 +11,8 @@ mouse button to zoom (the wheel does not zoom in 3D), with the left button to mo
 middle button to rotate; the arrow keys move forward, back and sideways; F switches to the
 "ego" camera, steered with the mouse. The signals run a classical program: fixed-time
 (Webster) by default, or
-actuated control (``--controller act``). Max-Pressure and the learned agents decide from
-live measurements, so they need the demo: ``scripts/demo_side_by_side.py``.
+actuated control (``--controller act``). Max-Pressure, the learned agents and the LLM
+controller decide from live measurements, so they need the demo: ``scripts/demo_side_by_side.py``.
 
     python scripts/open_in_sumo.py [--net real_district] [--demand peak]
         [--scenarios emergency buses] [--seed 3] [--controller ft] [--quick] [--3d]

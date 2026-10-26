@@ -1,0 +1,16 @@
+name: llm_ab_quick
+description: >-
+  Short smoke matrix for the LLM pipeline on both small grids. It checks the same
+  runner path as llm_ab.yaml without spending evaluation-length simulations.
+
+quick: true
+seeds: [0, 1]
+cells:
+  - network: grid2x2
+    methods: [mp, coop, llm]
+    demands: [medium]
+    scenarios: [normal]
+  - network: grid3x3
+    methods: [mp, coop, llm]
+    demands: [medium]
+    scenarios: [normal]

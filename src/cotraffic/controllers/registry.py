@@ -8,6 +8,8 @@ from cotraffic.controllers.base import Controller
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
 LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
+LLM = ("llm",)
+NO_CHECKPOINT = BASELINES + LLM
 
 
 def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Controller:
@@ -39,6 +41,10 @@ def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Co
         from cotraffic.controllers.random_policy import RandomPolicy
 
         return RandomPolicy(**kwargs)
+    if method == "llm":
+        from cotraffic.controllers.llm import LLMController
+
+        return LLMController(**kwargs)
     if method in LEARNED or checkpoint is not None:
         from cotraffic.controllers.rl_policy import LearnedPolicy
 

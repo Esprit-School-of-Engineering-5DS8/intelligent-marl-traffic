@@ -181,6 +181,9 @@ def run_episode(
             "preemptions": getattr(controller, "preemptions", ""),
         }
     )
+    controller_metrics = getattr(controller, "metrics", None)
+    if callable(controller_metrics):
+        row.update(controller_metrics())
     write_row(raw_dir / f"{rid}.csv", row)
     ts_dir = logs_dir / "timeseries"
     ts_dir.mkdir(parents=True, exist_ok=True)

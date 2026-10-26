@@ -81,6 +81,94 @@ def make_vec_env(network: str, agent_cfg: dict[str, Any], quick: bool = False):
     return vec, env
 
 
+def _duration(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    hours, rest = divmod(seconds, 3600)
+    minutes, seconds = divmod(rest, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m"
+    if minutes:
+        return f"{minutes}m{seconds:02d}s"
+    return f"{seconds}s"
+
+
+def _progress_logger(path: Path, label: str, total: int, every_s: float = 15.0):
+    from stable_baselines3.common.callbacks import BaseCallback
+
+    class ProgressLogger(BaseCallback):
+        """Print a throttled progress line and append it to ``progress.log``."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = 0.0
+            self.last_time = 0.0
+            self.start_steps = 0
+            self.last_steps = 0
+            self.episodes = 0
+            self.last_summary: dict[str, Any] = {}
+
+        def _on_training_start(self) -> None:
+            self.started = time.perf_counter()
+            self.last_time = self.started
+            self.start_steps = self.model.num_timesteps
+            self.last_steps = self.start_steps
+            self.episodes = 0
+            self.last_summary = {}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            header = (
+                f"=== {label} started {time.strftime('%Y-%m-%d %H:%M:%S')} "
+                f"from {self.start_steps:,} / {total:,} steps ==="
+            )
+            print(header, flush=True)
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(header + "\n")
+
+        def _emit(self, force: bool = False) -> None:
+            now = time.perf_counter()
+            if not force and now - self.last_time < every_s:
+                return
+            steps = int(self.model.num_timesteps)
+            elapsed = now - self.started
+            interval = now - self.last_time
+            rate = (steps - self.last_steps) / interval if interval > 0 else 0.0
+            overall = (steps - self.start_steps) / elapsed if elapsed > 0 else 0.0
+            remaining = max(0, total - steps)
+            eta = remaining / overall if overall > 0 else 0.0
+            percent = min(100.0, 100.0 * steps / total) if total else 100.0
+            parts = [
+                f"{steps:,}/{total:,} ({percent:.1f}%)",
+                f"{rate:.1f} steps/s",
+                f"elapsed {_duration(elapsed)}",
+                f"eta {_duration(eta)}",
+                f"episodes {self.episodes}",
+            ]
+            if self.last_summary:
+                parts.append(
+                    "last "
+                    f"reward={self.last_summary.get('episode_reward', float('nan')):.1f} "
+                    f"halting={self.last_summary.get('mean_halting', float('nan')):.2f}"
+                )
+            line = f"[train] {label} | " + " | ".join(parts)
+            print(line, flush=True)
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
+            self.last_time = now
+            self.last_steps = steps
+
+        def _on_step(self) -> bool:
+            summary = self.locals["infos"][0].get("episode_summary")
+            if summary:
+                self.last_summary = summary
+                self.episodes += 1
+            self._emit()
+            return True
+
+        def _on_training_end(self) -> None:
+            self._emit(force=True)
+
+    return ProgressLogger()
+
+
 def _episode_logger(path: Path):
     from stable_baselines3.common.callbacks import BaseCallback
 
@@ -176,12 +264,24 @@ def train(
     env.seed_episodes(seed + steps_done)
     remaining = total - model.num_timesteps
     wall = time.perf_counter()
-    if remaining > 0:
+    label = f"{agent}/{network}/seed{seed}"
+    if remaining <= 0:
+        print(
+            f"[train] {label} | already at {model.num_timesteps:,}/{total:,} steps",
+            flush=True,
+        )
+    else:
         every = max(1, int(training["checkpoint_every"]) // n_agents)
         callbacks = CallbackList(
             [
                 CheckpointCallback(save_freq=every, save_path=str(ckpt_dir), name_prefix="model"),
                 _episode_logger(folder / "episodes.csv"),
+                _progress_logger(
+                    folder / "progress.log",
+                    label,
+                    total,
+                    every_s=float(training.get("progress_every_s", 15)),
+                ),
             ]
         )
         model.learn(
@@ -190,7 +290,9 @@ def train(
             reset_num_timesteps=False,
             tb_log_name=algorithm,
         )
-        model.save(ckpt_dir / f"model_{model.num_timesteps}_steps.zip")
+        saved = ckpt_dir / f"model_{model.num_timesteps}_steps.zip"
+        model.save(saved)
+        print(f"[train] {label} | saved {saved}", flush=True)
     vec.close()
     info_file = folder / "run_info.json"
     history = (

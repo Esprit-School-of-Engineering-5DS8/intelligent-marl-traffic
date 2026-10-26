@@ -1,0 +1,14 @@
+name: llm
+description: >-
+  Batched language-model signal controller. One request covers every intersection;
+  invalid, missing or unavailable answers fall back to Max-Pressure, and every
+  decision still passes through the environment's safety shield.
+
+provider: groq
+model: null
+call_interval_s: 30
+timeout_s: 30
+attempts: 2
+max_tokens: 700
+max_calls: 0
+fallback: mp

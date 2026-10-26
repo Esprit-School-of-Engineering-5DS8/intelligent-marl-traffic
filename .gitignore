@@ -15,6 +15,7 @@ build/
 
 # SUMO outputs
 results/
+sumo_files/
 *.gz
 tripinfo*.xml
 summary*.xml
@@ -37,6 +38,7 @@ Thumbs.db
 
 # Secrets
 *.env
+.env
 
 # Documents & Presentations
 *.docx

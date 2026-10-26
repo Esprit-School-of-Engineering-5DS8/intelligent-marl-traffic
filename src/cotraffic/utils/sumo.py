@@ -7,6 +7,7 @@ pip wheel (which ships the binaries inside the ``sumo`` package), or simply be o
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import sys
@@ -74,7 +75,9 @@ def use_libsumo(gui: bool = False) -> bool:
     """libsumo is much faster than TraCI but cannot drive sumo-gui."""
     if gui:
         return False
-    return os.environ.get("LIBSUMO_AS_TRACI", "0") not in ("", "0", "false", "False")
+    if os.environ.get("LIBSUMO_AS_TRACI", "0") in ("", "0", "false", "False"):
+        return False
+    return importlib.util.find_spec("libsumo") is not None
 
 
 def backend(gui: bool = False) -> ModuleType:

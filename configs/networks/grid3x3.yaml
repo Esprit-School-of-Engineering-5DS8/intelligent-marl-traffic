@@ -1,0 +1,42 @@
+name: grid3x3
+kind: grid
+description: 3x3 grid of signalised 4-way intersections, 2 lanes per approach, 250 m links.
+
+grid:
+  x: 3
+  y: 3
+  length: 250
+  attach_length: 250
+  lanes: 2
+  speed: 13.89
+
+pedestrians: true
+
+padding:
+  lanes_per_side: 2
+  max_phases: 2
+  max_crossings: 4
+
+neighbours:
+  max_distance_m: 400
+
+demand:
+  peak_vehicles_per_hour: 5000
+  origin_side_weights: {west: 1.6, east: 0.8, north: 1.0, south: 0.6}
+  opposite_side_prob: 0.6
+  route_random_factor: 1.5
+
+bus_lines:
+  - {id: L1, from_side: west, from_index: 1, to_side: east, to_index: 1}
+  - {id: L2, from_side: south, from_index: 1, to_side: north, to_index: 1}
+
+incident:
+  edge: B1C1
+  lane: 1
+  position_frac: 0.85
+
+reward_norm:
+  wait: 1.0
+  co2: 1.0
+  ev: 1.0
+  ped: 1.0

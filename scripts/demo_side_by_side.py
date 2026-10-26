@@ -9,6 +9,8 @@ emergency-vehicle preemption (report, section 8.2).
         [--checkpoint results/checkpoints/coop_full/real_district/seed1.zip]
         [--net real_district] [--demand peak] [--scenarios ...] [--seed 3]
 
+    python scripts/demo_side_by_side.py --left llm --right coop --net grid2x2 --demand medium
+
 Scenarios by default: emergency vehicles and buses, plus pedestrians on the networks that
 have sidewalks. The district's OpenStreetMap import has almost none (FAILURES F-011);
 ``--net real_district_ped`` is the same district with sidewalks and crossings on every
@@ -53,7 +55,7 @@ from pathlib import Path
 
 from demo_chart import SIDE_COLORS
 
-from cotraffic.controllers.registry import BASELINES
+from cotraffic.controllers.registry import NO_CHECKPOINT
 from cotraffic.paths import default_checkpoint
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "results" / "tmp" / "demo"
@@ -577,7 +579,7 @@ def run(
                 if not pending and stop_after_snapshots:
                     try:  # the screenshot is written at the next step
                         env.step(controller.act(env, obs))
-                    except Exception as exc:  # sumo-gui may close first; the file is usually there
+                    except Exception as exc:  # noqa: BLE001 - sumo-gui may close first; the file is usually there
                         print(f"{method}: last step after the screenshot failed ({exc})")
                     break
     except FatalTraCIError:  # the window was closed, or sumo-gui stopped (e.g. its 3D view)
@@ -649,7 +651,9 @@ def main() -> None:
     jobs = []
     for method, x in ((args.left, 0), (args.right, 960)):
         ckpt = (
-            None if method in BASELINES else args.checkpoint or default_checkpoint(method, args.net)
+            None
+            if method in NO_CHECKPOINT
+            else args.checkpoint or default_checkpoint(method, args.net)
         )
         p = mp.Process(
             target=run,

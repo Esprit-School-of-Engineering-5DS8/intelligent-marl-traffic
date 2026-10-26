@@ -1,0 +1,16 @@
+name: llm_ab
+description: >-
+  Paired LLM vs PPO vs Max-Pressure comparison on the two small grids. Evaluation
+  seeds are shared so all methods see the same demand realisation. LLM calls are
+  batched across intersections and use the same safety shield as every controller.
+
+seeds: [0, 1, 2]
+cells:
+  - network: grid2x2
+    methods: [mp, coop, llm]
+    demands: [medium, peak]
+    scenarios: [normal]
+  - network: grid3x3
+    methods: [mp, coop, llm]
+    demands: [medium, peak]
+    scenarios: [normal]

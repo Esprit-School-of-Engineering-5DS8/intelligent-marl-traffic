@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from cotraffic import config
-from cotraffic.controllers.registry import BASELINES
+from cotraffic.controllers.registry import BASELINES, NO_CHECKPOINT
 from cotraffic.paths import CHECKPOINTS_DIR, EXTRA_DIR, LOGS_DIR, RAW_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS, check_seeds
 
@@ -61,7 +61,7 @@ def expand(exp: dict[str, Any]) -> tuple[list[RunSpec], list[str]]:
         network = cell["network"]
         trained_on = cell.get("checkpoint_network", network)
         for method in cell["methods"]:
-            if method in BASELINES or method == "random":
+            if method in NO_CHECKPOINT or method == "random":
                 variants = [("", "")]
             else:
                 ckpts = find_checkpoints(method, trained_on)
