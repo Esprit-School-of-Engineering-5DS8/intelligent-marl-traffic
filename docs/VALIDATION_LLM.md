@@ -20,6 +20,8 @@ contraire :
   **8 situations « conseil » sur 63** en validation.
 
 Autres documents :
+- [GUIDE_SOUTENANCE_LLM.md](GUIDE_SOUTENANCE_LLM.md) (et sa version HTML hors ligne) :
+  le guide de soutenance complet, en français simple ;
 - [VISITE_DU_CODE.md](VISITE_DU_CODE.md) : le parcours du code devant le prof ;
 - [FICHE_QUESTIONS_LLM.md](FICHE_QUESTIONS_LLM.md) : 15 questions probables ;
 - [DEMO_GUIDE.md](DEMO_GUIDE.md), section « Démo LLM » : les commandes ;

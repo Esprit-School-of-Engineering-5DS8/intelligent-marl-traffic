@@ -1,0 +1,1787 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide de soutenance : le LLM dans la boucle de décision</title>
+<style>
+:root { --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --line: #d1d9e0; --soft: #f6f8fa;
+         --link: #0969da; --accent: #0b5cad; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #30363d; --soft: #161b22;
+           --link: #4493f8; --accent: #79b8ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+        font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+a { color: var(--link); }
+.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr);
+           max-width: 1400px; margin: 0 auto; }
+nav.toc { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 24px 16px;
+           border-right: 1px solid var(--line); font-size: 14px; }
+nav.toc .title { font-weight: 700; margin-bottom: 8px; }
+nav.toc ul { list-style: none; padding-left: 12px; margin: 4px 0; }
+nav.toc > ul { padding-left: 0; }
+nav.toc a { text-decoration: none; display: block; padding: 2px 0; }
+nav.toc a:hover { text-decoration: underline; }
+main { padding: 24px 40px 80px; min-width: 0; }
+h1 { font-size: 2em; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+h2 { font-size: 1.5em; border-bottom: 1px solid var(--line); padding-bottom: 6px;
+      margin-top: 48px; }
+h3 { font-size: 1.2em; margin-top: 36px; color: var(--accent); }
+code { font-family: Consolas, "Cascadia Mono", Menlo, monospace; font-size: 0.9em;
+        background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+.codehilite { background: var(--soft) !important; border: 1px solid var(--line);
+               border-radius: 6px; overflow-x: auto; margin: 12px 0; }
+.codehilite pre { margin: 0; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; }
+.codehilite code { background: none; padding: 0; }
+table { border-collapse: collapse; margin: 12px 0; display: block; overflow-x: auto;
+         font-size: 14.5px; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; vertical-align: top;
+          text-align: left; }
+th { background: var(--soft); }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+.top { font-size: 13px; color: var(--muted); }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; border-right: 0;
+             border-bottom: 1px solid var(--line); }
+  main { padding: 16px; }
+}
+@media print { nav.toc { display: none; } .layout { display: block; } }
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+
+.codehilite .c { color: #3D7B7B; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #008000; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #9C6500 } /* Comment.Preproc */
+.codehilite .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #E40000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #008400 } /* Generic.Inserted */
+.codehilite .go { color: #717171 } /* Generic.Output */
+.codehilite .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #008000 } /* Keyword.Pseudo */
+.codehilite .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #B00040 } /* Keyword.Type */
+.codehilite .m { color: #666 } /* Literal.Number */
+.codehilite .s { color: #BA2121 } /* Literal.String */
+.codehilite .na { color: #687822 } /* Name.Attribute */
+.codehilite .nb { color: #008000 } /* Name.Builtin */
+.codehilite .nc { color: #00F; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #800 } /* Name.Constant */
+.codehilite .nd { color: #A2F } /* Name.Decorator */
+.codehilite .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #00F } /* Name.Function */
+.codehilite .nl { color: #767600 } /* Name.Label */
+.codehilite .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #19177C } /* Name.Variable */
+.codehilite .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #666 } /* Literal.Number.Bin */
+.codehilite .mf { color: #666 } /* Literal.Number.Float */
+.codehilite .mh { color: #666 } /* Literal.Number.Hex */
+.codehilite .mi { color: #666 } /* Literal.Number.Integer */
+.codehilite .mo { color: #666 } /* Literal.Number.Oct */
+.codehilite .sa { color: #BA2121 } /* Literal.String.Affix */
+.codehilite .sb { color: #BA2121 } /* Literal.String.Backtick */
+.codehilite .sc { color: #BA2121 } /* Literal.String.Char */
+.codehilite .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #BA2121 } /* Literal.String.Double */
+.codehilite .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.codehilite .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.codehilite .sx { color: #008000 } /* Literal.String.Other */
+.codehilite .sr { color: #A45A77 } /* Literal.String.Regex */
+.codehilite .s1 { color: #BA2121 } /* Literal.String.Single */
+.codehilite .ss { color: #19177C } /* Literal.String.Symbol */
+.codehilite .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #00F } /* Name.Function.Magic */
+.codehilite .vc { color: #19177C } /* Name.Variable.Class */
+.codehilite .vg { color: #19177C } /* Name.Variable.Global */
+.codehilite .vi { color: #19177C } /* Name.Variable.Instance */
+.codehilite .vm { color: #19177C } /* Name.Variable.Magic */
+.codehilite .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #6e7681 }
+.codehilite { background: #0d1117; color: #E6EDF3 }
+.codehilite .c { color: #8B949E; font-style: italic } /* Comment */
+.codehilite .err { color: #F85149 } /* Error */
+.codehilite .esc { color: #E6EDF3 } /* Escape */
+.codehilite .g { color: #E6EDF3 } /* Generic */
+.codehilite .k { color: #FF7B72 } /* Keyword */
+.codehilite .l { color: #A5D6FF } /* Literal */
+.codehilite .n { color: #E6EDF3 } /* Name */
+.codehilite .o { color: #FF7B72; font-weight: bold } /* Operator */
+.codehilite .x { color: #E6EDF3 } /* Other */
+.codehilite .p { color: #E6EDF3 } /* Punctuation */
+.codehilite .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.codehilite .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.codehilite .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.codehilite .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #FFA198 } /* Generic.Error */
+.codehilite .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.codehilite .go { color: #8B949E } /* Generic.Output */
+.codehilite .gp { color: #8B949E } /* Generic.Prompt */
+.codehilite .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #79C0FF } /* Generic.Subheading */
+.codehilite .gt { color: #FF7B72 } /* Generic.Traceback */
+.codehilite .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.codehilite .kc { color: #79C0FF } /* Keyword.Constant */
+.codehilite .kd { color: #FF7B72 } /* Keyword.Declaration */
+.codehilite .kn { color: #FF7B72 } /* Keyword.Namespace */
+.codehilite .kp { color: #79C0FF } /* Keyword.Pseudo */
+.codehilite .kr { color: #FF7B72 } /* Keyword.Reserved */
+.codehilite .kt { color: #FF7B72 } /* Keyword.Type */
+.codehilite .ld { color: #79C0FF } /* Literal.Date */
+.codehilite .m { color: #A5D6FF } /* Literal.Number */
+.codehilite .s { color: #A5D6FF } /* Literal.String */
+.codehilite .na { color: #E6EDF3 } /* Name.Attribute */
+.codehilite .nb { color: #E6EDF3 } /* Name.Builtin */
+.codehilite .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.codehilite .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #FFA657 } /* Name.Entity */
+.codehilite .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.codehilite .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #FF7B72 } /* Name.Namespace */
+.codehilite .nx { color: #E6EDF3 } /* Name.Other */
+.codehilite .py { color: #79C0FF } /* Name.Property */
+.codehilite .nt { color: #7EE787 } /* Name.Tag */
+.codehilite .nv { color: #79C0FF } /* Name.Variable */
+.codehilite .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.codehilite .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.codehilite .w { color: #6E7681 } /* Text.Whitespace */
+.codehilite .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.codehilite .mf { color: #A5D6FF } /* Literal.Number.Float */
+.codehilite .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.codehilite .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.codehilite .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.codehilite .sa { color: #79C0FF } /* Literal.String.Affix */
+.codehilite .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.codehilite .sc { color: #A5D6FF } /* Literal.String.Char */
+.codehilite .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.codehilite .sd { color: #A5D6FF } /* Literal.String.Doc */
+.codehilite .s2 { color: #A5D6FF } /* Literal.String.Double */
+.codehilite .se { color: #79C0FF } /* Literal.String.Escape */
+.codehilite .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.codehilite .si { color: #A5D6FF } /* Literal.String.Interpol */
+.codehilite .sx { color: #A5D6FF } /* Literal.String.Other */
+.codehilite .sr { color: #79C0FF } /* Literal.String.Regex */
+.codehilite .s1 { color: #A5D6FF } /* Literal.String.Single */
+.codehilite .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.codehilite .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.codehilite .vc { color: #79C0FF } /* Name.Variable.Class */
+.codehilite .vg { color: #79C0FF } /* Name.Variable.Global */
+.codehilite .vi { color: #79C0FF } /* Name.Variable.Instance */
+.codehilite .vm { color: #79C0FF } /* Name.Variable.Magic */
+.codehilite .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><div class="title">Sommaire</div><div class="toc">
+<ul>
+<li><a href="#partie-0-le-projet-en-1-minute">Partie 0 : le projet en 1 minute</a><ul>
+<li><a href="#le-trajet-dun-conseil-de-lévénement-jusquau-feu">Le trajet d'un conseil, de l'événement jusqu'au feu</a></li>
+</ul>
+</li>
+<li><a href="#partie-1-les-dix-exigences-une-par-une">Partie 1 : les dix exigences, une par une</a><ul>
+<li><a href="#exigence-1-le-llm-intervient-dans-la-décision-des-agents-pour-améliorer-leurs-scores">Exigence 1 : le LLM intervient dans la décision des agents, pour améliorer leurs scores</a></li>
+<li><a href="#exigence-2-le-llm-choisi">Exigence 2 : le LLM choisi</a></li>
+<li><a href="#exigence-3-les-hyperparamètres">Exigence 3 : les hyperparamètres</a></li>
+<li><a href="#exigence-4-les-techniques-de-prompt-engineering">Exigence 4 : les techniques de prompt engineering</a></li>
+<li><a href="#exigence-5-le-tool-schema">Exigence 5 : le tool schema</a></li>
+<li><a href="#exigence-6-le-fine-tuning-lora">Exigence 6 : le fine-tuning LoRA</a></li>
+<li><a href="#exigence-7-le-prompt-tuning">Exigence 7 : le prompt tuning</a></li>
+<li><a href="#exigence-8-lévaluation">Exigence 8 : l'évaluation</a></li>
+<li><a href="#exigence-9-la-sécurité">Exigence 9 : la sécurité</a></li>
+<li><a href="#exigence-10-lorchestration">Exigence 10 : l'orchestration</a></li>
+</ul>
+</li>
+<li><a href="#partie-2-le-déroulé-de-la-présentation-15-minutes">Partie 2 : le déroulé de la présentation (15 minutes)</a></li>
+<li><a href="#partie-3-tableau-récapitulatif">Partie 3 : tableau récapitulatif</a></li>
+<li><a href="#partie-4-les-limites-et-les-prochaines-étapes">Partie 4 : les limites et les prochaines étapes</a></li>
+<li><a href="#lexique">Lexique</a></li>
+</ul>
+</div>
+</nav>
+<main>
+<h1 id="guide-de-soutenance-le-llm-dans-la-boucle-de-décision">Guide de soutenance : le LLM dans la boucle de décision</h1>
+<p>Ce guide sert à présenter la partie « LLM dans la boucle » de CoTraffic au professeur. Il
+est écrit pour quelqu'un qui n'est pas expert : chaque terme technique est expliqué la
+première fois qu'il apparaît, et un lexique se trouve à la fin.</p>
+<p><strong>Règles du guide :</strong></p>
+<ul>
+<li><strong>convention : gain positif = mieux</strong>, c'est-à-dire moins d'attente que sans LLM ;</li>
+<li>chaque chiffre cite le fichier d'où il vient ;</li>
+<li>chaque <code>fichier:ligne</code> a été vérifié dans le code au commit <code>6481f68</code> ;</li>
+<li>tous les résultats viennent de la <strong>graine de validation 1000</strong>. Une graine est le numéro
+    qui fixe le hasard d'une simulation : même graine, même trafic. Les graines de test 0 à 4
+    n'ont pas encore été utilisées.</li>
+</ul>
+<p>Toutes les commandes se lancent dans PowerShell, depuis le dossier du projet :</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd </span><span class="n">G</span><span class="p">:\</span><span class="n">pi5eme</span><span class="p">\</span><span class="n">cotraffic</span>
+</code></pre></div>
+
+<hr />
+<h2 id="partie-0-le-projet-en-1-minute">Partie 0 : le projet en 1 minute</h2>
+<p><strong>CoTraffic</strong> contrôle les feux de circulation d'un quartier simulé.</p>
+<p><strong>SUMO</strong> est le simulateur de trafic : il fait rouler des milliers de véhicules virtuels,
+des piétons, des bus et des ambulances, seconde par seconde. Le réseau principal est une
+grille de 4 × 4 carrefours.</p>
+<p><strong>Les agents PPO.</strong></p>
+<ul>
+<li>Chaque carrefour est piloté par un <strong>agent</strong>, un petit programme qui décide.</li>
+<li>Ces agents ont appris par <strong>apprentissage par renforcement</strong> : ils ont essayé des
+    milliers de fois, et ils ont été récompensés quand l'attente baissait.</li>
+<li>La méthode d'apprentissage s'appelle <strong>PPO</strong>. Notre meilleure version s'appelle
+    <strong>COOP-FULL</strong> : les agents coopèrent avec leurs voisins.</li>
+<li>Toutes les 5 secondes, chaque agent choisit la <strong>phase</strong> de son feu, c'est-à-dire quel
+    axe a le vert. Sur la grille, il n'y a que 2 phases : nord-sud ou est-ouest.</li>
+</ul>
+<p><strong>Ce qu'ajoute le LLM.</strong></p>
+<ul>
+<li>Un <strong>LLM</strong> (« grand modèle de langage », comme ChatGPT, mais petit et installé sur la
+    machine) lit de temps en temps un résumé de la situation, et <strong>conseille</strong> les agents :
+    par exemple « au carrefour B1, préfère la phase est-ouest pendant 60 s ».</li>
+<li>Il est appelé à chaque événement rare (ambulance, accident, capteur en panne, pertes de
+    messages, foule de piétons) et toutes les 10 minutes.</li>
+<li>Il ne commande jamais un feu lui-même : son conseil modifie seulement la préférence de
+    l'agent, et un <strong>bouclier de sécurité</strong> garde le dernier mot.</li>
+</ul>
+<h3 id="le-trajet-dun-conseil-de-lévénement-jusquau-feu">Le trajet d'un conseil, de l'événement jusqu'au feu</h3>
+<div class="codehilite"><pre><span></span><code>  [1] ÉVÉNEMENT          une ambulance arrive, un accident, ou 10 minutes passées
+        |
+  [2] PROMPT             on résume la situation en texte (files d'attente, phases, événements)
+        |                et on l'envoie au LLM avec des consignes
+  [3] LLM                le modèle local répond en JSON : carrefour, phase, force, durée
+        |
+  [4] VALIDATION         on vérifie la réponse : format, bornes, carrefour qui existe...
+        |                si elle est mauvaise -&gt; on l'ignore, PPO décide seul
+  [5] FILE D'ATTENTE     le conseil validé attend son heure
+        |
+  [6] DÉLAI              il n'agit qu'après le temps réel de réponse du LLM (environ 8 s)
+        |
+  [7] BIAIS SUR PPO      on ajoute un petit bonus au score de la phase conseillée
+        |                -&gt; l'agent PPO choisit sa phase avec ce bonus
+  [8] BOUCLIER           il vérifie que la phase demandée est sûre (vert minimum de 10 s...)
+        |
+  [9] SUMO               le feu change (ou non), et la simulation avance de 5 s
+</code></pre></div>
+
+<hr />
+<h2 id="partie-1-les-dix-exigences-une-par-une">Partie 1 : les dix exigences, une par une</h2>
+<h3 id="exigence-1-le-llm-intervient-dans-la-décision-des-agents-pour-améliorer-leurs-scores">Exigence 1 : le LLM intervient dans la décision des agents, pour améliorer leurs scores</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Le logit.</strong> Toutes les 5 s, l'agent PPO donne un score à chaque phase. Ce score
+    s'appelle un <strong>logit</strong> : plus il est grand, plus l'agent préfère la phase. L'agent prend
+    la phase au plus grand logit.</li>
+<li><strong>Le biais.</strong> Quand le LLM conseille une phase, on ajoute un bonus à son logit. C'est ce
+    qu'on appelle un <strong>biais</strong>.</li>
+<li><strong>Une analogie</strong> : l'agent est un conducteur qui connaît bien son carrefour, et le LLM
+    un collègue au téléphone qui voit tout le quartier. Le collègue peut dire « je te
+    conseille de tourner à gauche », mais c'est le conducteur qui tient le volant. Et le
+    code de la route (le bouclier) passe avant tout.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>Le bonus vaut <code>beta × force / 3</code>.</strong> La force est donnée par le LLM (1, 2 ou 3), et
+    <strong>beta</strong> fixe la taille maximale du bonus : 4.</li>
+<li><strong>Pourquoi un biais plutôt qu'un ordre :</strong> un conseil faible ne renverse pas une forte
+    préférence de PPO ; une erreur du LLM ne peut au pire que dégrader un peu le trafic ; et
+    on peut comparer au hasard avec la même amplitude.</li>
+<li><strong>Le couloir vert :</strong> un conseil peut viser jusqu'à 4 carrefours à la fois, pendant 10 à
+    120 s, par exemple le long de la route d'une ambulance.</li>
+<li><strong>Le changement de mode</strong> (basculer vers une autre politique pendant une urgence) :
+    <strong>pas réalisé</strong>.</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/advised.py:183-205</code> (le calcul) ;</li>
+<li><code>src/cotraffic/envs/traffic_env.py:190</code> (le bouclier) ;</li>
+<li><code>src/cotraffic/llm/advice.py:39</code> (au plus 4 carrefours par conseil).</li>
+</ul>
+<p><strong>d. Extrait du code</strong> (<code>advised.py</code>, lignes 186 à 199 ; les commentaires en français ont
+été ajoutés pour ce guide) :</p>
+<div class="codehilite"><pre><span></span><code><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">logits</span> <span class="o">=</span> <span class="n">policy</span><span class="o">.</span><span class="n">get_distribution</span><span class="p">(</span><span class="n">policy</span><span class="o">.</span><span class="n">obs_to_tensor</span><span class="p">(</span><span class="n">batch</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">distribution</span><span class="o">.</span><span class="n">logits</span>  <span class="c1"># scores de PPO</span>
+<span class="n">logits</span> <span class="o">=</span> <span class="n">logits</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">plain</span> <span class="o">=</span> <span class="n">logits</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>                       <span class="c1"># ligne 189 : la phase que PPO choisirait SEUL</span>
+<span class="n">index</span> <span class="o">=</span> <span class="p">{</span><span class="n">a</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">agents</span><span class="p">)}</span>
+<span class="n">biased</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Active</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>                               <span class="c1"># pour chaque conseil actif du LLM</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">junction</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">phase</span> <span class="o">&lt;</span> <span class="n">logits</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">logits</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">phase</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">beta</span> <span class="o">*</span> <span class="n">a</span><span class="o">.</span><span class="n">weight</span>   <span class="c1"># ligne 195 : LE BIAIS (bonus beta x force/3)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">biased_decisions</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">biased</span><span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">junction</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span>
+<span class="n">chosen</span> <span class="o">=</span> <span class="n">logits</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>                      <span class="c1"># ligne 198 : la décision APRÈS le conseil</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">changed_decisions</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">((</span><span class="n">chosen</span> <span class="o">!=</span> <span class="n">plain</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>  <span class="c1"># on compte les décisions changées</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir le fichier à la bonne ligne.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">advised</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">189</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">envs</span><span class="p">\</span><span class="n">traffic_env</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">190</span>
+</code></pre></div>
+
+<p><strong>f. La démo</strong> (environ 2 min) :</p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span> <span class="n">scripts</span><span class="p">\</span><span class="n">llm_demo</span><span class="p">.</span><span class="n">py</span>
+</code></pre></div>
+
+<p>À montrer dans la sortie :</p>
+<ul>
+<li>une ligne <code>PPO seul -&gt; p0 (NS) | avec le conseil -&gt; p1 (EW) | bouclier -&gt; p1 (EW) (accepté)</code> :
+    <strong>le LLM a changé la décision</strong> ;</li>
+<li>une ligne <code>... | bouclier -&gt; p0 (NS), corrigé : vert minimum pas encore atteint</code> : le
+    bouclier a refusé ;</li>
+<li>le bilan final, par exemple <code>106 décisions sous conseil : 6 changées par le conseil</code>.</li>
+</ul>
+<p>Secours : <code>type docs\demo\llm_demo_emergency.txt</code>, une sortie déjà enregistrée.</p>
+<p><strong>g. Les chiffres clés.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Ce qu'on mesure</th>
+<th>Chiffre</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Démo (épisode court de 20 min)</td>
+<td>5 appels ; 106 décisions sous conseil ; <strong>6 changées</strong> (1 refusée ensuite par le bouclier) ; 51 demandes corrigées par le bouclier</td>
+<td><code>docs/demo/llm_demo_emergency.txt</code></td>
+</tr>
+<tr>
+<td>Épisode complet (50 min, 8 640 décisions), N = 10 min</td>
+<td>conseil actif sur 82 à 230 décisions ; <strong>12 à 44 changées</strong> selon le scénario</td>
+<td><code>results/exploration/llm_period/raw/coop_full_llm-N600__*.csv</code></td>
+</tr>
+<tr>
+<td>Scores (63 situations)</td>
+<td>LLM <strong>+0,16 %</strong> ; placebo +0,09 % ; règles −0,17 % ; <strong>oracle +1,09 %</strong></td>
+<td><code>results/exploration/llm_oracle/oracle_summary.csv</code></td>
+</tr>
+<tr>
+<td>Épisodes complets, N = 10 min</td>
+<td><strong>−0,38 %</strong> en moyenne sur 6 scénarios</td>
+<td><code>results/exploration/llm_period/period_summary.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pourquoi le gain n'est pas mesurable</strong>, expliqué simplement :</p>
+<ul>
+<li><strong>Le conseiller à règles</strong> : un conseiller écrit à la main, qui applique les mêmes
+    principes que la consigne du LLM (« vert devant l'ambulance », etc.). Il sert à savoir
+    si le LLM fait mieux qu'une simple recette.</li>
+<li><strong>Le placebo</strong> : un conseiller qui donne des conseils <strong>au hasard</strong>, aussi souvent et aussi
+    forts que ceux du LLM. Comme en médecine, il sert à vérifier qu'un effet vient bien du
+    « bon » conseil, et pas du simple fait de perturber les agents.</li>
+<li><strong>L'oracle</strong> : un conseiller « tricheur ». Pour chaque situation, on essaie après coup
+    tous les conseils candidats et on garde le meilleur. Aucun vrai conseiller ne peut faire
+    mieux : c'est une <strong>borne haute</strong>.</li>
+</ul>
+<p>Le constat :</p>
+<ul>
+<li><strong>La borne est faible.</strong> L'oracle ne gagne que <strong>+1,09 %</strong>, et une partie vient de la
+    chance : le meilleur candidat est un conseil au hasard dans 21 situations sur 63
+    (<code>results/exploration/llm_oracle/oracle_choices.csv</code>).</li>
+<li><strong>Il y a deux raisons.</strong> COOP-FULL est déjà bon, et chaque carrefour n'a que 2 phases, ce
+    qui laisse peu de choix.</li>
+<li><strong>Le LLM et le placebo font presque pareil</strong> (+0,16 % contre +0,09 %).</li>
+</ul>
+<p><strong>h. La phrase à dire.</strong> « Le LLM intervient vraiment dans la décision : son conseil
+modifie les logits de PPO, et la démo montre des décisions changées. Mais il n'améliore pas
+les scores de façon mesurable. Même un conseiller parfait, l'oracle, ne gagne qu'environ
+1 %, parce que COOP-FULL est déjà bon et qu'il n'y a que 2 phases par carrefour. »</p>
+<p><strong>i. Limites.</strong> Gain non mesurable ; changement de mode non réalisé ; une seule graine de
+validation.</p>
+<p><strong>j. Question probable.</strong> <em>« Si le LLM n'améliore pas les scores, à quoi sert-il ? »</em> →
+Nous avons construit une architecture sûre et mesurable pour le tester, et la réponse
+honnête est : ici, pas d'amélioration. L'oracle montre que la marge de progrès est faible
+pour n'importe quel conseiller.</p>
+<hr />
+<h3 id="exigence-2-le-llm-choisi">Exigence 2 : le LLM choisi</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Les modèles candidats.</strong> Un LLM se reconnaît à sa taille, en milliards de
+    <strong>paramètres</strong> (les « réglages internes » appris) : 0,5B, 1,5B, 3B…</li>
+<li><strong>Le compromis.</strong> Plus il est gros, plus il est capable, mais plus il est lent.</li>
+<li><strong>La latence</strong> est le temps qu'il met à répondre. On la résume par la <strong>p50</strong> (la valeur
+    médiane : la moitié des réponses est plus rapide) et la <strong>p95</strong> (95 % des réponses sont
+    plus rapides).</li>
+<li><strong>Le logiciel.</strong> Les modèles tournent dans <strong>Ollama</strong>, qui fait fonctionner un LLM sur la
+    machine, sans Internet.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>8 modèles testés</strong>, de 0,5B à 3,8B, sur les mêmes 63 situations de validation.</li>
+<li><strong>Mesuré pour chacun</strong> : latence, taux de <strong>JSON valide</strong> (le JSON est un format de texte
+    structuré que le programme peut lire), et gain obtenu en rejouant chaque conseil dans SUMO.</li>
+<li><strong>La règle de choix a été écrite avant de voir les résultats</strong> :<ul>
+<li>au moins 95 % de JSON valide ;</li>
+<li>une latence p95 d'au plus 20 s ;</li>
+<li>puis le meilleur gain, et le plus rapide en cas d'égalité.</li>
+</ul>
+</li>
+<li>Elle désigne <strong>qwen2.5:3b</strong>.</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>scripts/llm_benchmark.py</code> (le benchmark) ;</li>
+<li><code>scripts/llm_step2.py:73-77</code> (la fonction <code>best</code>) et <code>:101-104</code> (la règle) ;</li>
+<li><code>configs/llm.yaml:8-20</code> (le modèle retenu, avec sa justification).</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>scripts/llm_step2.py</code>, lignes 73 à 77 et 101 à 104) :</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">best</span><span class="p">(</span><span class="n">rows</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">tie</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">by</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Highest mean gain on waiting; within ``tie`` points of it, the lowest ``by``."""</span>
+    <span class="n">top</span> <span class="o">=</span> <span class="n">rows</span><span class="p">[</span><span class="s2">"gain_waiting_%"</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>                 <span class="c1"># le meilleur gain (positif = mieux)</span>
+    <span class="n">near</span> <span class="o">=</span> <span class="n">rows</span><span class="p">[</span><span class="n">rows</span><span class="p">[</span><span class="s2">"gain_waiting_%"</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">top</span> <span class="o">-</span> <span class="n">tie</span><span class="p">]</span>   <span class="c1"># les ex aequo (à 0,05 point près)</span>
+    <span class="k">return</span> <span class="n">near</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>                <span class="c1"># parmi eux : le plus rapide</span>
+
+<span class="n">zero</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">BENCH</span> <span class="o">/</span> <span class="s2">"v2_zero_summary.csv"</span><span class="p">)</span>      <span class="c1"># résultats du benchmark (graine 1000)</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">zero</span><span class="p">[(</span><span class="n">zero</span><span class="o">.</span><span class="n">technique</span> <span class="o">==</span> <span class="s2">"zero"</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">zero</span><span class="p">[</span><span class="s2">"gain_waiting_%"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span>
+<span class="n">ok</span> <span class="o">=</span> <span class="n">llm</span><span class="p">[(</span><span class="n">llm</span><span class="p">[</span><span class="s2">"json_valid_%"</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">95</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">llm</span><span class="p">[</span><span class="s2">"latency_p95_s"</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">20</span><span class="p">)]</span>   <span class="c1"># critères fixés à l'avance</span>
+<span class="n">pick</span> <span class="o">=</span> <span class="n">best</span><span class="p">(</span><span class="n">ok</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ok</span><span class="p">)</span> <span class="k">else</span> <span class="n">llm</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="s2">"latency_p50_s"</span><span class="p">)</span>             <span class="c1"># -&gt; qwen2.5:3b</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">scripts</span><span class="p">\</span><span class="n">llm_step2</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">101</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">configs</span><span class="p">\</span><span class="n">llm</span><span class="p">.</span><span class="n">yaml</span><span class="p">:</span><span class="n">9</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> :</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">type </span><span class="n">results</span><span class="p">\</span><span class="n">exploration</span><span class="p">\</span><span class="n">llm_benchmark</span><span class="p">\</span><span class="n">step2_choice</span><span class="p">.</span><span class="n">json</span>
+</code></pre></div>
+
+<p>À montrer : <code>"model": "qwen2.5:3b"</code>, <code>"beta": 4.0</code>, <code>"technique": "zero"</code>, <code>"period_s": 600.0</code>.</p>
+<p><strong>g. Chiffres clés.</strong> qwen2.5:3b : 100 % de JSON valide, latence p50 8,6 s et p95 15,4 s,
+gain +0,29 %. qwen2.5:0.5b : +0,22 % en 4,0 s. Source :
+<code>results/exploration/llm_benchmark/v2_zero_summary.csv</code>.</p>
+<p><strong>h. La phrase à dire.</strong> « Nous avons comparé 8 modèles locaux avec une règle écrite
+avant les résultats. Elle retient qwen2.5:3b, mais son avance est dans le bruit : un modèle
+deux fois plus petit ferait presque aussi bien. »</p>
+<p><strong>i. Limite.</strong> L'écart entre modèles est de l'ordre du bruit. De plus, la licence de
+qwen2.5:3b (Qwen Research) interdit l'usage commercial.</p>
+<p><strong>j. Question probable.</strong> <em>« Pourquoi pas un plus gros modèle, comme GPT-4 ? »</em> → La
+contrainte est un modèle local, sans aucune donnée envoyée à l'extérieur. Et la latence :
+le 3B met déjà 8 s à répondre sur cette machine.</p>
+<hr />
+<h3 id="exigence-3-les-hyperparamètres">Exigence 3 : les hyperparamètres</h3>
+<p><strong>a. Explication simple.</strong> Un <strong>hyperparamètre</strong> est un réglage choisi par nous, pas
+appris par le modèle, comme le volume ou la luminosité d'un écran. Il y en a deux sortes :</p>
+<ul>
+<li><strong>ceux de l'inférence</strong>, c'est-à-dire de la façon dont le LLM génère sa réponse ;</li>
+<li><strong>ceux du conseiller</strong> : la force du biais, et la fréquence des appels.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong> Tous les réglages sont dans un seul fichier,
+<code>configs/llm.yaml</code>. Le code le lit, et chaque valeur y est justifiée par une mesure.</p>
+<table>
+<thead>
+<tr>
+<th>Réglage</th>
+<th>Valeur</th>
+<th>Ce que ça veut dire</th>
+<th>Pourquoi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>temperature</code></td>
+<td>0</td>
+<td>Le degré de hasard dans le choix des mots : 0 veut dire « toujours le mot le plus probable »</td>
+<td>Même situation, même conseil : des résultats reproductibles</td>
+</tr>
+<tr>
+<td><code>top_p</code> / <code>top_k</code></td>
+<td>1 / 1</td>
+<td>Combien de mots candidats sont gardés à chaque étape</td>
+<td>1 seul : cohérent avec la température 0</td>
+</tr>
+<tr>
+<td><code>num_ctx</code></td>
+<td>4096</td>
+<td>La taille de la mémoire de lecture, en <strong>tokens</strong> (un token est un morceau de mot, environ 4 lettres)</td>
+<td>Le prompt fait au plus 829 tokens ; c'est la valeur des essais de validation</td>
+</tr>
+<tr>
+<td><code>num_predict</code></td>
+<td>96</td>
+<td>Le nombre maximal de tokens dans la réponse</td>
+<td>Les réponses en font 30 en moyenne, 75 au plus</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>0</td>
+<td>La graine du hasard du modèle</td>
+<td>Fixée et enregistrée</td>
+</tr>
+<tr>
+<td><code>timeout_s</code></td>
+<td>60</td>
+<td>Le temps maximal d'attente de la réponse</td>
+<td>La p95 est de 11,7 s ; au-delà, le conseil serait périmé</td>
+</tr>
+<tr>
+<td><code>keep_alive</code></td>
+<td>30 min</td>
+<td>Le temps pendant lequel le modèle reste chargé en mémoire</td>
+<td>Il évite de le recharger entre deux appels</td>
+</tr>
+<tr>
+<td>quantification</td>
+<td>Q4_K_M</td>
+<td>Le modèle est compressé en nombres de 4 bits, pour tenir dans 1,9 Go</td>
+<td>C'est la valeur par défaut d'Ollama ; elle n'a pas été réglée</td>
+</tr>
+<tr>
+<td><code>beta</code></td>
+<td>4</td>
+<td>La taille maximale du biais</td>
+<td>beta 8 dégrade l'attente</td>
+</tr>
+<tr>
+<td><code>period_s</code></td>
+<td>600</td>
+<td>La période N entre deux appels réguliers (10 min)</td>
+<td>3 min dégrade les piétons</td>
+</tr>
+<tr>
+<td><code>min_gap_s</code></td>
+<td>30</td>
+<td>Le délai minimal entre deux appels</td>
+<td>Une limite de fréquence</td>
+</tr>
+</tbody>
+</table>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>configs/llm.yaml:21-41</code> (inférence) et <code>:53-73</code> (conseiller) ;</li>
+<li>lu par <code>src/cotraffic/llm/settings.py:29</code> (<code>load_settings</code>).</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>configs/llm.yaml</code>, valeurs seules, sans les commentaires du fichier) :</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">sampling</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span><span class="w">   </span><span class="c1"># ligne 22 : aucun hasard -&gt; mêmes réponses à chaque essai</span>
+<span class="w">  </span><span class="nt">top_p</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span><span class="w">         </span><span class="c1"># ligne 25</span>
+<span class="w">  </span><span class="nt">top_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">           </span><span class="c1"># ligne 26 : un seul mot candidat (décodage « glouton »)</span>
+<span class="w">  </span><span class="nt">num_ctx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span><span class="w">      </span><span class="c1"># ligne 30 : mémoire de lecture, en tokens</span>
+<span class="w">  </span><span class="nt">num_predict</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">96</span><span class="w">    </span><span class="c1"># ligne 36 : taille maximale de la réponse</span>
+<span class="w">  </span><span class="nt">timeout_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span><span class="w">      </span><span class="c1"># ligne 39 : au-delà, on abandonne et PPO décide seul</span>
+<span class="nt">advisor</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">beta</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4.0</span><span class="w">          </span><span class="c1"># ligne 54 : force maximale du biais</span>
+<span class="w">  </span><span class="nt">period_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600</span><span class="w">      </span><span class="c1"># ligne 59 : un appel régulier toutes les 10 min</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">configs</span><span class="p">\</span><span class="n">llm</span><span class="p">.</span><span class="n">yaml</span><span class="p">:</span><span class="n">53</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">settings</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">29</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> :</p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span> <span class="n">-m</span> <span class="n">pytest</span> <span class="n">tests</span><span class="p">\</span><span class="n">test_llm_settings</span><span class="p">.</span><span class="n">py</span> <span class="n">-v</span>
+</code></pre></div>
+
+<p>À montrer : <code>2 passed</code>. Le test vérifie que le code utilise bien les valeurs du fichier.</p>
+<p><strong>g. Chiffres clés.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Réglage testé</th>
+<th>Gain sur l'attente</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>beta 8 (qwen2.5:1.5b)</td>
+<td><strong>−1,21 %</strong>, pire que PPO seul dans 60 % des situations</td>
+<td><code>results/exploration/llm_benchmark/beta_v1_summary.csv</code></td>
+</tr>
+<tr>
+<td>Appel toutes les 3 min</td>
+<td><strong>−4,98 %</strong> en moyenne, dont piétons <strong>−24,76 %</strong></td>
+<td><code>results/exploration/llm_period/period_summary.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>h. La phrase à dire.</strong> « Tous les réglages sont dans un seul fichier, chacun avec la
+mesure qui le justifie. Par exemple, un biais trop fort, ou des appels trop fréquents,
+dégradent le trafic. »</p>
+<p><strong>i. Limite.</strong> Les choix reposent sur une seule graine de validation. La quantification
+n'a pas été comparée.</p>
+<p><strong>j. Question probable.</strong> <em>« Pourquoi une température de 0 ? »</em> → Pour que la même
+situation donne toujours le même conseil : les résultats sont reproductibles et
+vérifiables.</p>
+<hr />
+<h3 id="exigence-4-les-techniques-de-prompt-engineering">Exigence 4 : les techniques de prompt engineering</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Le prompt</strong> est le texte de consignes envoyé au LLM.</li>
+<li><strong>Le prompt engineering</strong> consiste à écrire ce texte avec soin, sans rien entraîner,
+    comme on rédige une fiche de poste claire pour un employé.</li>
+<li><strong>Les techniques comparées</strong> :<ul>
+<li><strong>zero-shot</strong> : les consignes seules ;</li>
+<li><strong>few-shot</strong> : on ajoute des exemples de bonnes réponses ;</li>
+<li><strong>brief</strong> : on demande en plus une courte raison ;</li>
+<li><strong>self-consistency</strong> : on pose la question 3 fois, et on garde ce qui revient à la
+    majorité.</li>
+</ul>
+</li>
+<li><strong>La sortie contrainte</strong> : on impose au modèle un <strong>schéma JSON</strong>, c'est-à-dire un modèle
+    de réponse obligatoire. Il ne peut alors écrire que des réponses qui ont la bonne forme.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>Un prompt versionné.</strong> La version 2 (v2) a corrigé deux défauts mesurés avec la v1 :<ul>
+<li>les modèles 3B écrivaient des pourcentages au lieu d'un poids de 0 à 1 : la v2 demande
+    une force 1, 2 ou 3, imposée par le schéma ;</li>
+<li>aucun modèle ne s'abstenait : la v2 dit que, la plupart du temps, il ne faut rien
+    conseiller.</li>
+</ul>
+</li>
+<li><strong>Les données ne sont jamais des instructions.</strong> La situation est placée entre balises
+    <code>&lt;state&gt;</code>, et le prompt dit que ce texte n'est jamais une consigne.</li>
+<li><strong>Le few-shot.</strong> Les exemples viennent des graines d'entraînement uniquement, et sont
+    choisis par leur gain moyen.</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>configs/prompts/advisor-v2.yaml:15-16</code> (données ≠ instructions), <code>:26-37</code> (abstention
+    et format) et <code>:39-48</code> (les techniques) ;</li>
+<li><code>src/cotraffic/llm/prompts.py:47-50</code> (<code>wrap</code>, le balisage) ;</li>
+<li><code>src/cotraffic/llm/advice.py:45-72</code> (le schéma) ;</li>
+<li><code>src/cotraffic/llm/sources.py:103</code> (<code>VotingSource</code>, la self-consistency) ;</li>
+<li><code>scripts/llm_fewshot.py:121</code> (<code>choose</code>, le choix des exemples).</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>src/cotraffic/llm/advice.py</code>, lignes 50 à 64 : le schéma JSON imposé au
+LLM) :</p>
+<div class="codehilite"><pre><span></span><code><span class="k">return</span> <span class="p">{</span>
+    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"object"</span><span class="p">,</span>
+    <span class="s2">"additionalProperties"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>                <span class="c1"># aucune autre clé n'est permise</span>
+    <span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"a"</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">],</span>                       <span class="c1"># a = liste de conseils, r = raison</span>
+    <span class="s2">"properties"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"a"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span>
+            <span class="s2">"maxItems"</span><span class="p">:</span> <span class="n">MAX_ITEMS</span><span class="p">,</span>                <span class="c1"># au plus 4 conseils</span>
+            <span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span>
+                <span class="s2">"prefixItems"</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"enum"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">junctions</span><span class="p">)},</span>          <span class="c1"># seulement des carrefours qui existent</span>
+                    <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="s2">"minimum"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"maximum"</span><span class="p">:</span> <span class="n">max_phase</span><span class="p">},</span>  <span class="c1"># une phase qui existe</span>
+                    <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="s2">"enum"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">STRENGTHS</span><span class="p">)},</span>           <span class="c1"># force 1, 2 ou 3</span>
+                    <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="s2">"minimum"</span><span class="p">:</span> <span class="n">MIN_VALID_S</span><span class="p">,</span> <span class="s2">"maximum"</span><span class="p">:</span> <span class="n">MAX_VALID_S</span><span class="p">},</span>  <span class="c1"># durée 10 à 120 s</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">configs</span><span class="p">\</span><span class="n">prompts</span><span class="p">\</span><span class="n">advisor-v2</span><span class="p">.</span><span class="n">yaml</span><span class="p">:</span><span class="n">26</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">advice</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">45</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> :</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">type </span><span class="n">results</span><span class="p">\</span><span class="n">exploration</span><span class="p">\</span><span class="n">llm_benchmark</span><span class="p">\</span><span class="n">v2_tech_summary</span><span class="p">.</span><span class="n">csv</span>
+</code></pre></div>
+
+<p>À montrer : la colonne <code>gain_waiting_%</code>, avec zero 0.15, brief −0.18 et few 0.08.</p>
+<p><strong>g. Chiffres clés.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mesure</th>
+<th>Résultat</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JSON valide de qwen2.5:3b, v1 → v2</td>
+<td>67 % → <strong>100 %</strong></td>
+<td><code>models_zero_summary.csv</code>, <code>v2_zero_summary.csv</code></td>
+</tr>
+<tr>
+<td>zero-shot</td>
+<td><strong>+0,15 %</strong></td>
+<td><code>v2_tech_summary.csv</code></td>
+</tr>
+<tr>
+<td>brief</td>
+<td>−0,18 %</td>
+<td><code>v2_tech_summary.csv</code></td>
+</tr>
+<tr>
+<td>few-shot</td>
+<td>+0,08 %</td>
+<td><code>v2_tech_summary.csv</code></td>
+</tr>
+<tr>
+<td>vote à 3 réponses</td>
+<td>+0,02 %, pour une latence p95 de 24,6 s</td>
+<td><code>v2_vote_summary.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p>Tous ces fichiers sont dans <code>results/exploration/llm_benchmark/</code>.</p>
+<p><strong>h. La phrase à dire.</strong> « Nous avons comparé quatre techniques de prompt sur le même
+modèle. La plus simple, zero-shot, est la meilleure et la plus rapide. Le schéma JSON
+imposé fait passer les réponses valides de 67 % à 100 %. »</p>
+<p><strong>i. Limite.</strong> Les écarts entre techniques sont dans le bruit.</p>
+<p><strong>j. Question probable.</strong> <em>« Pourquoi le few-shot n'aide-t-il pas ? »</em> → Les exemples
+apprennent surtout au modèle à se taire (40 % d'abstentions). Comme COOP-FULL est déjà bon,
+se taire ne gagne rien.</p>
+<hr />
+<h3 id="exigence-5-le-tool-schema">Exigence 5 : le tool schema</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Le principe.</strong> Au lieu de tout lire d'un coup, le LLM peut appeler des <strong>outils</strong>
+    (function calling) : de petites fonctions qu'il déclenche en écrivant leur nom et leurs
+    arguments.</li>
+<li><strong>Le tool schema</strong> décrit chaque outil (nom, arguments, bornes), comme le menu d'un
+    restaurant : on ne peut commander que ce qui est au menu.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>5 outils en lecture seule</strong> : état d'un carrefour, voisins, événements, route d'une
+    ambulance, véhicules qui arrivent.</li>
+<li><strong>Un seul outil qui agit</strong> : <code>submit_advice</code>, qui soumet le conseil.</li>
+<li><strong>Les outils ne peuvent rien modifier</strong> : ils lisent une copie de la situation, et aucun
+    ne peut toucher la simulation.</li>
+<li><strong>Chaque appel est validé</strong> par <strong>Pydantic</strong>, une bibliothèque qui vérifie qu'une donnée a
+    le bon type et les bonnes bornes. Un outil inconnu, comme <code>set_traffic_light</code>, est refusé.</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/tools.py:120</code> (<code>run_tool</code>), <code>:162</code> (<code>tool_schemas</code>), <code>:214-240</code>
+    (le schéma de <code>submit_advice</code>) et <code>:252-266</code> (<code>validate_call</code>) ;</li>
+<li><code>src/cotraffic/llm/sources.py:152</code> (<code>ToolLlmSource</code>, la boucle d'appels).</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>src/cotraffic/llm/tools.py</code>, lignes 252 à 266, sans la docstring de la
+ligne 253) :</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_call</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseModel</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ARGS</span><span class="p">:</span>                                    <span class="c1"># outil inconnu (ex. set_traffic_light)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown tool </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">: only </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ARGS</span><span class="p">)</span><span class="si">}</span><span class="s2"> exist"</span><span class="p">)</span>   <span class="c1"># -&gt; refusé</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arguments</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>                          <span class="c1"># arguments envoyés sous forme de texte</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">arguments</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">arguments</span> <span class="ow">or</span> <span class="s2">"</span><span class="si">{}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"arguments are not JSON: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arguments</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"arguments must be an object"</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ARGS</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">arguments</span><span class="p">)</span>         <span class="c1"># Pydantic vérifie types et bornes</span>
+    <span class="k">except</span> <span class="n">ValidationError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"invalid arguments for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="o">.</span><span class="n">errors</span><span class="p">()[:</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">tools</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">252</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> :</p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span> <span class="n">-m</span> <span class="n">pytest</span> <span class="n">tests</span><span class="p">\</span><span class="n">test_llm_tools</span><span class="p">.</span><span class="n">py</span> <span class="n">-v</span>
+</code></pre></div>
+
+<p>À montrer : <code>12 passed</code>, dont <code>test_invalid_tool_calls_are_refused</code> et
+<code>test_an_unknown_tool_is_refused_and_reported_to_the_model</code>.</p>
+<p>Pour un essai réel avec le LLM (environ 1 min) : <code>.venv\Scripts\python scripts\llm_tools_demo.py</code>,
+ou sa sortie enregistrée <code>type docs\demo\llm_tools_demo.txt</code>.</p>
+<p><strong>g. Chiffres clés.</strong> 12 tests réussis. En réel, un conseil prend 27,2 s et 50,0 s sur les
+deux situations essayées (<code>docs/demo/llm_tools_demo.txt</code>).</p>
+<p><strong>h. La phrase à dire.</strong> « Le LLM peut lire la situation par des outils en lecture seule,
+et un seul outil agit. Tout est validé. Le mécanisme fonctionne, mais il est trop lent pour
+être retenu. »</p>
+<p><strong>i. Limite.</strong> Non retenu : trop lent, et le modèle lit les carrefours dans l'ordre au lieu
+de suivre l'ambulance.</p>
+<p><strong>j. Question probable.</strong> <em>« Et si le LLM invente un outil ? »</em> → Il est refusé avant
+toute exécution, et le modèle reçoit un message d'erreur. Aucun outil ne peut modifier la
+simulation.</p>
+<hr />
+<h3 id="exigence-6-le-fine-tuning-lora">Exigence 6 : le fine-tuning LoRA</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Le fine-tuning</strong> consiste à continuer l'apprentissage d'un modèle déjà entraîné, sur
+    nos propres exemples.</li>
+<li><strong>LoRA</strong> (Low-Rank Adaptation) ne modifie pas les milliards de poids du modèle. Il ajoute
+    de petites matrices à côté, et n'entraîne qu'elles. C'est comme ajouter des post-it dans
+    un livre au lieu de le réécrire : le livre reste intact, et les post-it se retirent.</li>
+<li><strong>Trois approches à distinguer :</strong><ul>
+<li><strong>prompt engineering</strong> : on améliore les consignes à la main, et rien n'est appris ;</li>
+<li><strong>LoRA</strong> : on apprend de petites matrices dans chaque couche du modèle ;</li>
+<li><strong>prompt tuning</strong> : on apprend seulement quelques vecteurs placés devant les consignes
+    (exigence 7).</li>
+</ul>
+</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>Le jeu de données.</strong> Chaque situation des graines d'entraînement (100001 à 100003) est
+    <strong>rejouée</strong> 5 min dans SUMO, depuis le même instantané, avec plusieurs conseils candidats :
+    rien, ou les règles à la force 1, 2 ou 3. L'étiquette (la « bonne réponse ») est le
+    meilleur candidat, ou l'abstention si aucun ne gagne au moins 0,25 %.<ul>
+<li>Lot final : <strong>169 exemples d'entraînement</strong> (119 abstentions, 50 conseils).</li>
+<li>Validation : 63 situations, dont 15 « conseil ».</li>
+</ul>
+</li>
+<li><strong>L'entraînement.</strong> Il se fait sur Kaggle (un service gratuit qui prête un GPU), avec
+    Qwen2.5-0.5B.</li>
+</ul>
+<p><strong>Les hyperparamètres de LoRA</strong>, expliqués :</p>
+<table>
+<thead>
+<tr>
+<th>Réglage</th>
+<th>Valeur</th>
+<th>Ce que ça veut dire</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>r</code> (rang)</td>
+<td>16</td>
+<td>La taille des petites matrices : plus elle est grande, plus LoRA peut apprendre</td>
+</tr>
+<tr>
+<td><code>alpha</code></td>
+<td>32</td>
+<td>Le poids des matrices LoRA par rapport au modèle (ici 32/16 = 2)</td>
+</tr>
+<tr>
+<td><code>dropout</code></td>
+<td>0,05</td>
+<td>5 % des connexions éteintes au hasard pendant l'entraînement, pour éviter d'apprendre par cœur</td>
+</tr>
+<tr>
+<td>modules visés</td>
+<td>7 (<code>q_proj</code>, <code>k_proj</code>, <code>v_proj</code>, <code>o_proj</code>, <code>gate_proj</code>, <code>up_proj</code>, <code>down_proj</code>)</td>
+<td>Les couches du modèle où l'on ajoute LoRA (attention et MLP)</td>
+</tr>
+<tr>
+<td><code>learning rate</code></td>
+<td>2e-4</td>
+<td>La taille de chaque pas de correction (0,0002)</td>
+</tr>
+<tr>
+<td><code>epochs</code></td>
+<td>6</td>
+<td>Le nombre de passages complets sur les exemples</td>
+</tr>
+<tr>
+<td><code>batch</code> et accumulation</td>
+<td>2 et 2</td>
+<td>4 exemples par pas de correction</td>
+</tr>
+<tr>
+<td>programme du pas</td>
+<td>cosinus, 5 % d'échauffement</td>
+<td>Le pas démarre petit, puis diminue doucement</td>
+</tr>
+<tr>
+<td>perte</td>
+<td>sur la réponse seulement</td>
+<td>Le modèle apprend à répondre, pas à recopier la consigne</td>
+</tr>
+</tbody>
+</table>
+<p>Avec ces réglages, le lot final donne <strong>360 pas de correction</strong> (calculé avec la formule de
+la cellule 5 du notebook : 238 exemples rééquilibrés, divisés par 4, puis multipliés par
+6 epochs).</p>
+<p><strong>Le piège de la classe majoritaire</strong>, au premier essai :</p>
+<ul>
+<li>La validation préliminaire comptait 55 abstentions sur 63 situations. Répondre « rien » à
+    tout donnait donc 87 % d'<strong>accord</strong> avec les étiquettes.</li>
+<li>LoRA a obtenu exactement 87 % : il avait appris à toujours se taire. C'est la <strong>classe
+    majoritaire</strong>, la réponse la plus fréquente.</li>
+<li><strong>Les causes</strong> : trop d'abstentions dans l'entraînement, et seulement 15 pas de
+    correction.</li>
+<li><strong>La correction</strong> :<ul>
+<li><strong>rééquilibrage</strong> : les exemples de conseil sont recopiés jusqu'à égaler les
+    abstentions, dans l'entraînement seulement ;</li>
+<li>plus de pas de correction ;</li>
+<li>deux nouvelles mesures. Le <strong>rappel</strong> est la part des bons conseils (bon carrefour et
+    bonne phase) que le modèle retrouve. Les <strong>faux conseils</strong> sont la part des situations
+    où le modèle conseille alors qu'il fallait se taire.</li>
+</ul>
+</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>scripts/llm_dataset.py:74-110</code> (les candidats et leurs rejeux), <code>:158-160</code>
+    (<code>label_of</code>, l'étiquette) et <code>:163</code> (<code>write_dataset</code>) ;</li>
+<li><code>notebooks/llm_lora_colab.ipynb</code>, sections 4 (réglages), 5 (rééquilibrage) et 8 (LoRA).</li>
+</ul>
+<p><strong>d. Extrait</strong> (notebook : 4 lignes de la section 4, réglages, puis 5 lignes de la
+section 8, création et entraînement de LoRA) :</p>
+<div class="codehilite"><pre><span></span><code><span class="n">MODEL</span> <span class="o">=</span> <span class="s2">"Qwen/Qwen2.5-0.5B-Instruct"</span>       <span class="c1"># petit modèle de 0,5 milliard de paramètres</span>
+<span class="n">EPOCHS</span><span class="p">,</span> <span class="n">LR</span><span class="p">,</span> <span class="n">BATCH</span><span class="p">,</span> <span class="n">ACCUM</span> <span class="o">=</span> <span class="mi">6</span><span class="p">,</span> <span class="mf">2e-4</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span>   <span class="c1"># 6 passages, pas de 0,0002, 4 exemples par pas</span>
+<span class="n">R</span><span class="p">,</span> <span class="n">ALPHA</span><span class="p">,</span> <span class="n">DROPOUT</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mf">0.05</span>           <span class="c1"># rang, poids et dropout de LoRA</span>
+<span class="n">TARGETS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"q_proj"</span><span class="p">,</span> <span class="s2">"k_proj"</span><span class="p">,</span> <span class="s2">"v_proj"</span><span class="p">,</span> <span class="s2">"o_proj"</span><span class="p">,</span> <span class="s2">"gate_proj"</span><span class="p">,</span> <span class="s2">"up_proj"</span><span class="p">,</span> <span class="s2">"down_proj"</span><span class="p">]</span>  <span class="c1"># couches visées</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">base_model</span><span class="p">()</span>                       <span class="c1"># le modèle de base reste figé</span>
+<span class="n">lora</span> <span class="o">=</span> <span class="n">get_peft_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">LoraConfig</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="n">R</span><span class="p">,</span> <span class="n">lora_alpha</span><span class="o">=</span><span class="n">ALPHA</span><span class="p">,</span> <span class="n">lora_dropout</span><span class="o">=</span><span class="n">DROPOUT</span><span class="p">,</span>
+                                        <span class="n">target_modules</span><span class="o">=</span><span class="n">TARGETS</span><span class="p">,</span> <span class="n">task_type</span><span class="o">=</span><span class="s2">"CAUSAL_LM"</span><span class="p">))</span>  <span class="c1"># ajoute les matrices</span>
+<span class="n">lora_minutes</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span><span class="n">lora</span><span class="p">,</span> <span class="n">EPOCHS</span><span class="p">,</span> <span class="n">LR</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">OUT</span> <span class="o">/</span> <span class="s2">"out_lora"</span><span class="p">))</span>   <span class="c1"># entraîne seulement LoRA</span>
+<span class="n">lora</span><span class="o">.</span><span class="n">save_pretrained</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">OUT</span> <span class="o">/</span> <span class="s2">"adapter_lora"</span><span class="p">))</span>                 <span class="c1"># sauve l'adaptateur (quelques dizaines de Mo)</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">scripts</span><span class="p">\</span><span class="n">llm_dataset</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">158</span>
+<span class="n">code</span> <span class="n">notebooks</span><span class="p">\</span><span class="n">llm_lora_colab</span><span class="p">.</span><span class="n">ipynb</span>
+</code></pre></div>
+
+<p>Dans le notebook, utiliser Ctrl+F et chercher <code>LoraConfig</code>. Le notebook n'a pas de numéros
+de ligne utilisables.</p>
+<p><strong>f. Démo</strong> :</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">type </span><span class="n">results</span><span class="p">\</span><span class="n">exploration</span><span class="p">\</span><span class="n">llm_lora</span><span class="p">\</span><span class="n">final_lora_comparison</span><span class="p">.</span><span class="n">csv</span>
+</code></pre></div>
+
+<p>À montrer : la ligne <code>always_abstain</code> (accord de 76 %) et la ligne <code>lora</code> (rappel de 17 %,
+faux conseils 12 %).</p>
+<p><strong>g. Chiffres clés : les trois essais</strong>, avec Qwen2.5-0.5B :</p>
+<table>
+<thead>
+<tr>
+<th>Essai</th>
+<th>Données</th>
+<th>Abstention</th>
+<th>Accord</th>
+<th>Rappel</th>
+<th>Faux conseils</th>
+<th>Gain dans SUMO</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Référence « toujours s'abstenir »</td>
+<td>lot préliminaire</td>
+<td>100 %</td>
+<td>87 %</td>
+<td>0 %</td>
+<td>0 %</td>
+<td>0 %</td>
+</tr>
+<tr>
+<td>1 (15 pas)</td>
+<td>69 exemples</td>
+<td>100 %</td>
+<td>87 %</td>
+<td>0 %</td>
+<td>0 %</td>
+<td>0 % (déduit : aucun conseil)</td>
+</tr>
+<tr>
+<td>2 (rééquilibré)</td>
+<td>69 exemples</td>
+<td>76 %</td>
+<td>71 %</td>
+<td>27 %</td>
+<td>16 %</td>
+<td>+0,01 %</td>
+</tr>
+<tr>
+<td>Référence « toujours s'abstenir »</td>
+<td>lot final</td>
+<td>100 %</td>
+<td>76 %</td>
+<td>0 %</td>
+<td>0 %</td>
+<td>0 %</td>
+</tr>
+<tr>
+<td><strong>3 (lot final)</strong></td>
+<td><strong>169 exemples</strong></td>
+<td>87 %</td>
+<td>67 %</td>
+<td><strong>17 %</strong></td>
+<td><strong>12 %</strong></td>
+<td><strong>+0,05 %</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Sources :</p>
+<ul>
+<li>essai 1 : les chiffres transmis après la première exécution sur Kaggle ;</li>
+<li>essai 2 : <code>results/exploration/llm_benchmark/results/lora_comparison.csv</code> et
+    <code>prelim_kaggle_val_summary.csv</code> ;</li>
+<li>essai 3 : <code>results/exploration/llm_lora/final_lora_comparison.csv</code> et
+    <code>results/exploration/llm_benchmark/final_kaggle_val_summary.csv</code>.</li>
+</ul>
+<p><strong>Ce que LoRA a appris</strong> : sur le lot final, il ne conseille que dans 8 situations, dont
+<strong>les 7 urgences</strong> de la validation, avec +0,45 % sur ces 7 urgences
+(<code>results/exploration/llm_benchmark/final_kaggle_val_by_kind.csv</code>). Il a donc appris
+<em>quand</em> intervenir, mais pas encore à faire gagner le trafic.</p>
+<p><strong>h. La phrase à dire.</strong> « Au premier essai, LoRA avait 87 % d'accord, mais il se taisait
+toujours : c'était le piège de la classe majoritaire. Après rééquilibrage, il apprend à
+intervenir pendant les urgences, mais son gain dans SUMO reste de +0,05 %. On juge sur
+l'effet réel, pas sur l'accord. »</p>
+<p><strong>i. Limite.</strong> Préliminaire : 169 exemples, 15 situations « conseil » en validation, des
+étiquettes bruitées, un seul petit modèle.</p>
+<p><strong>j. Question probable.</strong> <em>« 87 % d'accord, ce n'est pas bien ? »</em> → Non : répondre « rien »
+à tout donne déjà 87 %. Il faut toujours comparer à cette référence triviale, et regarder
+le rappel et l'effet dans SUMO.</p>
+<hr />
+<h3 id="exigence-7-le-prompt-tuning">Exigence 7 : le prompt tuning</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Le principe.</strong> Le <strong>prompt tuning</strong> apprend seulement quelques <strong>jetons virtuels</strong>, des
+    vecteurs de nombres placés devant la consigne, que le modèle lit comme des mots. Le
+    modèle lui-même ne change pas du tout.</li>
+<li><strong>La différence avec le prompt engineering</strong> : on optimise le début du prompt par le
+    calcul, au lieu de l'écrire à la main.</li>
+<li><strong>Une analogie</strong> : c'est comme trouver, par essais, la meilleure formule de politesse à
+    dire avant chaque question pour que l'interlocuteur réponde mieux.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait.</strong> 20 jetons virtuels, initialisés à partir de la phrase « You
+advise traffic signal agents… », 10 epochs, learning rate 0,01, sur les mêmes données que
+LoRA.</p>
+<table>
+<thead>
+<tr>
+<th>Approche</th>
+<th>Ce qui est appris</th>
+<th>Paramètres appris</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prompt engineering</td>
+<td>rien (texte écrit à la main)</td>
+<td>0</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Prompt tuning</td>
+<td>20 jetons virtuels</td>
+<td>17 920</td>
+<td><code>final_lora_comparison.csv</code></td>
+</tr>
+<tr>
+<td>LoRA</td>
+<td>petites matrices dans 7 types de couches</td>
+<td>8 798 208</td>
+<td><code>final_lora_comparison.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>c. Où c'est dans le code.</strong> <code>notebooks/llm_lora_colab.ipynb</code>, section 9 (prompt tuning)
+et section 10 (comparaison).</p>
+<p><strong>d. Extrait</strong> (notebook, section 9) :</p>
+<div class="codehilite"><pre><span></span><code><span class="n">model</span> <span class="o">=</span> <span class="n">base_model</span><span class="p">()</span>                                     <span class="c1"># le même modèle de base, figé</span>
+<span class="n">pt</span> <span class="o">=</span> <span class="n">get_peft_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">PromptTuningConfig</span><span class="p">(</span>
+    <span class="n">task_type</span><span class="o">=</span><span class="s2">"CAUSAL_LM"</span><span class="p">,</span> <span class="n">prompt_tuning_init</span><span class="o">=</span><span class="n">PromptTuningInit</span><span class="o">.</span><span class="n">TEXT</span><span class="p">,</span>   <span class="c1"># départ : une vraie phrase</span>
+    <span class="n">prompt_tuning_init_text</span><span class="o">=</span><span class="n">PT_INIT</span><span class="p">,</span> <span class="n">num_virtual_tokens</span><span class="o">=</span><span class="n">PT_TOKENS</span><span class="p">,</span> <span class="n">tokenizer_name_or_path</span><span class="o">=</span><span class="n">MODEL</span><span class="p">))</span>
+<span class="c1"># PT_INIT = « You advise traffic signal agents... » ; PT_TOKENS = 20 jetons virtuels appris</span>
+<span class="n">pt_minutes</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span><span class="n">pt</span><span class="p">,</span> <span class="n">PT_EPOCHS</span><span class="p">,</span> <span class="n">PT_LR</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">OUT</span> <span class="o">/</span> <span class="s2">"out_pt"</span><span class="p">))</span>   <span class="c1"># 10 epochs, pas de 0,01</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong> <code>code notebooks\llm_lora_colab.ipynb</code>, puis Ctrl+F et chercher
+<code>PromptTuningConfig</code>.</p>
+<p><strong>f. Démo.</strong> Le même fichier que l'exigence 6 :
+<code>type results\exploration\llm_lora\final_lora_comparison.csv</code>. À montrer : la ligne
+<code>prompt_tuning</code>, avec 17 920 paramètres et un rappel de 11 %.</p>
+<p><strong>g. Chiffres clés.</strong> Lot final : rappel 11 %, faux conseils 15 %, <strong>gain dans SUMO
+−0,09 %</strong> (<code>final_lora_comparison.csv</code> et <code>final_kaggle_val_summary.csv</code>). Lot
+préliminaire : +0,04 %.</p>
+<p><strong>h. La phrase à dire.</strong> « Le prompt tuning n'apprend que 17 920 paramètres, environ 500
+fois moins que LoRA. Il apprend moins bien, et son effet dans SUMO est nul. »</p>
+<p><strong>i. Limite.</strong> Préliminaire, comme LoRA.</p>
+<p><strong>j. Question probable.</strong> <em>« Pourquoi faire du prompt tuning si LoRA fait mieux ? »</em> →
+Il est beaucoup plus léger, et c'était une exigence à comparer. La mesure montre que, sur
+un petit modèle, il apprend moins.</p>
+<hr />
+<h3 id="exigence-8-lévaluation">Exigence 8 : l'évaluation</h3>
+<p><strong>a. Explication simple.</strong></p>
+<ul>
+<li><strong>Le rejeu apparié.</strong> On sauvegarde l'état exact de la simulation à un instant (un
+    <strong>instantané</strong>). Puis on rejoue les 5 minutes suivantes deux fois, depuis ce même
+    instantané : une fois sans conseil, une fois avec. La différence ne vient alors que du
+    conseil.</li>
+<li><strong>Une analogie</strong> : comparer deux recettes en partant de la même pâte.</li>
+</ul>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>Les contrôles :</strong><ul>
+<li>63 situations de validation, rejouées pour chaque conseiller : LLM, règles, placebo et
+    oracle ;</li>
+<li>des <strong>épisodes complets</strong> de 50 min, avec le LLM dans la boucle.</li>
+</ul>
+</li>
+<li><strong>Les mêmes conditions pour tous</strong> : tous les conseils candidats agissent après le même
+    délai (8,2 s).</li>
+<li><strong>Le pré-enregistrement de l'évaluation finale sur les graines de test.</strong> Il est écrit
+    avant de lancer les calculs, comme en recherche médicale. Il fixe :<ul>
+<li>les contrôles et les scénarios ;</li>
+<li>les tests statistiques. <strong>Mann-Whitney</strong> dit si deux séries de résultats diffèrent
+    vraiment ou par hasard. <strong>La correction de Holm</strong> évite de trouver de faux effets quand
+    on fait beaucoup de tests à la fois.</li>
+</ul>
+</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/rollout.py:168-189</code> (<code>score</code>, le rejeu apparié) ;</li>
+<li><code>scripts/llm_dataset.py:129-155</code> (<code>oracle_tables</code>) ;</li>
+<li><code>scripts/llm_period.py</code> (les épisodes complets) ;</li>
+<li><code>docs/LLM_PREREGISTRATION.md</code>.</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>src/cotraffic/llm/rollout.py</code>, lignes 178 à 189) :</p>
+<div class="codehilite"><pre><span></span><code><span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">stored</span><span class="o">.</span><span class="n">spec</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span>                       <span class="c1"># même graine que l'épisode d'origine</span>
+<span class="n">source</span> <span class="o">=</span> <span class="n">FixedSource</span><span class="p">(</span><span class="n">advice</span><span class="p">,</span> <span class="n">delay_s</span><span class="p">)</span> <span class="k">if</span> <span class="n">advice</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">AdviceSource</span><span class="p">()</span>  <span class="c1"># un conseil, ou aucun</span>
+<span class="n">cfg</span> <span class="o">=</span> <span class="n">AdvisorConfig</span><span class="p">(</span><span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="n">period_s</span><span class="o">=</span><span class="mf">1e9</span><span class="p">,</span> <span class="n">min_gap_s</span><span class="o">=</span><span class="mf">1e9</span><span class="p">,</span> <span class="n">latency</span><span class="o">=</span><span class="s2">"measured"</span><span class="p">)</span>
+<span class="n">policy</span> <span class="o">=</span> <span class="n">AdvisedPolicy</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>
+<span class="n">policy</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
+<span class="n">obs</span> <span class="o">=</span> <span class="n">restore</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="n">stored</span><span class="o">.</span><span class="n">snapshot</span><span class="p">)</span>                    <span class="c1"># repart du MÊME instantané SUMO</span>
+<span class="k">if</span> <span class="n">advice</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">policy</span><span class="o">.</span><span class="n">_ask</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="s2">"replay"</span><span class="p">)</span>                         <span class="c1"># le conseil testé, émis à l'instant de l'instantané</span>
+<span class="n">policy</span><span class="o">.</span><span class="n">_last_call</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">now</span>                            <span class="c1"># aucun autre appel pendant le rejeu</span>
+<span class="n">policy</span><span class="o">.</span><span class="n">_next_periodic</span> <span class="o">=</span> <span class="mf">1e12</span>
+<span class="n">policy</span><span class="o">.</span><span class="n">_seen</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"*"</span><span class="p">}</span>
+<span class="n">end</span> <span class="o">=</span> <span class="n">stored</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">time</span> <span class="o">+</span> <span class="n">horizon_s</span>                 <span class="c1"># on rejoue 300 s</span>
+</code></pre></div>
+
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">rollout</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">168</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">scripts</span><span class="p">\</span><span class="n">llm_dataset</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">129</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> (moins d'une minute) :</p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span> <span class="n">scripts</span><span class="p">\</span><span class="n">llm_results_table</span><span class="p">.</span><span class="n">py</span>
+</code></pre></div>
+
+<p>À montrer : le tableau complet. L'oracle fait +1,09 %, le LLM +0,16 %, le placebo +0,09 %
+et les règles −0,17 %.</p>
+<p><strong>g. Chiffres clés.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Contrôleur</th>
+<th>Gain sur l'attente</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PPO seul</td>
+<td>0,00 %</td>
+</tr>
+<tr>
+<td>Règles</td>
+<td>−0,17 %</td>
+</tr>
+<tr>
+<td>Placebo</td>
+<td>+0,09 %</td>
+</tr>
+<tr>
+<td>LLM zero-shot</td>
+<td>+0,16 %</td>
+</tr>
+<tr>
+<td><strong>Oracle</strong></td>
+<td><strong>+1,09 %</strong></td>
+</tr>
+<tr>
+<td>LoRA 0,5B</td>
+<td>+0,05 %</td>
+</tr>
+<tr>
+<td>Prompt tuning 0,5B</td>
+<td>−0,09 %</td>
+</tr>
+</tbody>
+</table>
+<p>Source : <code>results/exploration/llm_summary/validation_table.csv</code>, produit par
+<code>scripts/llm_results_table.py</code>.</p>
+<p><strong>h. La phrase à dire.</strong> « Chaque conseil est comparé à "sans conseil" sur exactement le
+même trafic. Avec les contrôles placebo, règles et oracle, on sait d'où vient un effet. Ici,
+aucun conseiller ne se détache, et l'évaluation finale est pré-enregistrée. »</p>
+<p><strong>i. Limite.</strong> Validation seulement, sur la graine 1000. Les graines de test 0 à 4 ne sont
+pas lancées (environ 24 à 28 h de calcul) : les tests de Mann-Whitney et de Holm ne sont
+donc <strong>pas encore appliqués</strong> à la partie LLM.</p>
+<p><strong>j. Question probable.</strong> <em>« Vos résultats sont-ils significatifs ? »</em> → Pas encore : les
+écarts sont de l'ordre du bruit sur une seule graine. Le test statistique est prévu dans le
+pré-enregistrement, sur les graines de test.</p>
+<hr />
+<h3 id="exigence-9-la-sécurité">Exigence 9 : la sécurité</h3>
+<p><strong>a. Explication simple.</strong> Un LLM peut se tromper, être lent, ou être manipulé. Par exemple,
+une <strong>injection de prompt</strong> est un texte caché dans les données qui essaie de donner des
+ordres au modèle (« ignore tes consignes »).</p>
+<p>La sécurité consiste à ce que, quoi que dise le LLM, rien de dangereux n'arrive au feu.
+Nous suivons la liste de référence <strong>OWASP Top 10 pour les LLM</strong>, qui recense les principaux
+risques.</p>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong> Plusieurs barrières, l'une derrière l'autre :</p>
+<ol>
+<li><strong>La sortie est contrainte</strong> par le schéma JSON (exigence 4).</li>
+<li><strong>La lecture est stricte.</strong><ul>
+<li>On vérifie : clés, types, bornes, carrefours et phases qui existent.</li>
+<li>Une réponse de plus de 4 000 caractères est refusée avant même d'être lue.</li>
+</ul>
+</li>
+<li><strong>Le repli</strong> : en cas de délai dépassé (60 s) ou de réponse invalide, PPO décide seul.</li>
+<li><strong>Les données ne sont jamais des instructions</strong> : balises <code>&lt;state&gt;</code> neutralisées.</li>
+<li><strong>Le biais est borné</strong> et expire après 10 à 120 s.</li>
+<li><strong>Le bouclier</strong> a le dernier mot (vert minimum, vert maximum, anti-famine, jaune).</li>
+</ol>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/advice.py:79-107</code> (<code>parse</code>) et <code>:125</code> (<code>check</code>) ;</li>
+<li><code>src/cotraffic/llm/sources.py:84-86</code> (taille maximale) ;</li>
+<li><code>src/cotraffic/llm/client.py:73</code> (délai maximal) ;</li>
+<li><code>src/cotraffic/llm/prompts.py:47-50</code> (balisage) ;</li>
+<li><code>tests/test_llm_security.py:54</code> (injection) et <code>:159</code> (conseil malveillant).</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>src/cotraffic/llm/advice.py</code>, lignes 86 à 99 : la lecture stricte) :</p>
+<div class="codehilite"><pre><span></span><code><span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"a"</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">}:</span>
+    <span class="k">raise</span> <span class="n">AdviceError</span><span class="p">(</span><span class="s2">"expected an object with keys a and r"</span><span class="p">)</span>        <span class="c1"># clé en trop -&gt; refusé</span>
+<span class="n">raw</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"a"</span><span class="p">,</span> <span class="p">[])</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="n">AdviceError</span><span class="p">(</span><span class="s2">"a must be a list"</span><span class="p">)</span>
+<span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">raw</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">AdviceError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"item must be [junction, phase, strength, seconds]: </span><span class="si">{</span><span class="n">entry</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">j</span><span class="p">,</span> <span class="n">phase</span><span class="p">,</span> <span class="n">strength</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="n">entry</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="n">phase</span><span class="p">,</span> <span class="n">strength</span><span class="p">,</span> <span class="n">s</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="n">AdviceError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"booleans are not numbers: </span><span class="si">{</span><span class="n">entry</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>    <span class="c1"># piège : true n'est pas un nombre</span>
+    <span class="k">if</span> <span class="n">strength</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">STRENGTHS</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">strength</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">AdviceError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"strength must be 1, 2 or 3: </span><span class="si">{</span><span class="n">entry</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># force hors bornes -&gt; refusé</span>
+</code></pre></div>
+
+<p>Les lignes 100 à 103 créent ensuite l'objet <code>Item</code> avec Pydantic, qui revérifie la phase
+et la durée, et refusent tout ce qui sort des bornes.</p>
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">advice</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">79</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">tests</span><span class="p">\</span><span class="n">test_llm_security</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">159</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> (environ 20 s) :</p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span> <span class="n">-m</span> <span class="n">pytest</span> <span class="n">tests</span><span class="p">\</span><span class="n">test_llm_security</span><span class="p">.</span><span class="n">py</span> <span class="n">-v</span>
+</code></pre></div>
+
+<p>À montrer : <code>10 passed</code>, en particulier :</p>
+<ul>
+<li><code>test_injection_in_an_incident_stays_inside_the_data_block</code> ;</li>
+<li><code>test_a_real_timeout_falls_back_to_the_policy_quickly</code> ;</li>
+<li><code>test_malicious_advice_cannot_break_the_shield</code>.</li>
+</ul>
+<p><strong>g. Chiffres clés.</strong></p>
+<ul>
+<li>10 tests adverses, plus 13 réponses invalides refusées dans <code>tests/test_llm.py</code>
+    (<code>test_invalid_advice_is_refused</code>).</li>
+<li><strong>L'attaque</strong> : une source malveillante qui conseille de changer de phase à chaque
+    décision, avec un biais de 1000.<ul>
+<li>Elle change bien les demandes : 92 décisions changées.</li>
+<li>Mais le bouclier ne laisse jamais un vert durer moins de 10 s : <strong>le plus court mesuré
+    fait 13 s, sur 100 verts</strong>.</li>
+<li>Mesure faite avec le scénario du test <code>test_malicious_advice_cannot_break_the_shield</code>.</li>
+</ul>
+</li>
+</ul>
+<p><strong>h. La phrase à dire.</strong> « Tout ce qui sort du LLM passe par plusieurs barrières. Même un
+conseil malveillant très fort ne peut pas violer le bouclier : nous l'avons testé dans une
+vraie simulation SUMO. »</p>
+<p><strong>i. Limite.</strong> Le détecteur de capteurs en panne lit l'information du scénario : on suppose
+que la panne est signalée.</p>
+<p><strong>j. Question probable.</strong> <em>« Comment empêchez-vous un conseil dangereux ? »</em> → Le LLM ne
+commande jamais le feu. Son conseil est lu strictement, borné, retardé, puis le bouclier
+vérifie la phase demandée, comme pour tout contrôleur.</p>
+<hr />
+<h3 id="exigence-10-lorchestration">Exigence 10 : l'orchestration</h3>
+<p><strong>a. Explication simple.</strong> L'<strong>orchestration</strong> est l'organisation de qui fait quoi et
+quand : quand appeler le LLM, que faire pendant qu'il réfléchit, quand le conseil agit, et
+quand il expire. C'est le chef d'orchestre qui donne le tempo.</p>
+<p><strong>b. Ce que nous avons fait, et pourquoi.</strong></p>
+<ul>
+<li><strong>Les déclencheurs</strong> : un appel à chaque nouvel événement, et toutes les 10 min ; au plus
+    un appel toutes les 30 s.</li>
+<li><strong>La file d'attente et le délai</strong> : le conseil n'agit qu'après la latence réelle de
+    l'appel, comme si la simulation tournait en temps réel.</li>
+<li><strong>L'expiration</strong> : chaque conseil a une durée de validité de 10 à 120 s.</li>
+<li><strong>Le journal d'audit</strong> : chaque appel est enregistré (déclencheur, latence, conseil,
+    rejets).</li>
+<li><strong>Le cache</strong> : réutiliser le conseil d'une situation identique. Il est codé, mais
+    <strong>désactivé</strong>, car il n'a pas été évalué.</li>
+</ul>
+<p><strong>c. Où c'est dans le code.</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/advised.py:104-117</code> (<code>_trigger</code>), <code>:119</code> (<code>_delay</code>), <code>:131-160</code>
+    (<code>_ask</code>), <code>:163-181</code> (activation et expiration), <code>:48</code> (cache) et <code>:59</code> (<code>CallLog</code>, le
+    journal) ;</li>
+<li>le schéma : <code>docs/LLM_DESIGN.md:59-100</code>.</li>
+</ul>
+<p><strong>d. Extrait</strong> (<code>src/cotraffic/llm/advised.py</code>, lignes 143 à 159) :</p>
+<div class="codehilite"><pre><span></span><code><span class="bp">self</span><span class="o">.</span><span class="n">_last_call</span> <span class="o">=</span> <span class="n">now</span>                                  <span class="c1"># mémorise l'heure de l'appel (limite de fréquence)</span>
+<span class="k">if</span> <span class="n">trigger</span> <span class="o">==</span> <span class="s2">"periodic"</span> <span class="ow">or</span> <span class="n">now</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_next_periodic</span><span class="p">:</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_next_periodic</span> <span class="o">=</span> <span class="n">now</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">period_s</span>      <span class="c1"># prochain appel régulier dans 10 min</span>
+<span class="n">call</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">calls</span><span class="p">)</span>
+<span class="n">delay</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_delay</span><span class="p">(</span><span class="n">reply</span><span class="o">.</span><span class="n">latency_s</span><span class="p">)</span>                   <span class="c1"># délai = latence réelle mesurée</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">CallLog</span><span class="p">(</span>                                         <span class="c1"># journal d'audit de l'appel</span>
+    <span class="n">call</span><span class="p">,</span> <span class="n">now</span><span class="p">,</span> <span class="n">trigger</span><span class="p">,</span> <span class="n">reply</span><span class="o">.</span><span class="n">latency_s</span><span class="p">,</span> <span class="n">delay</span><span class="p">,</span> <span class="n">reply</span><span class="o">.</span><span class="n">advice</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">[],</span> <span class="n">reply</span><span class="o">.</span><span class="n">meta</span>
+<span class="p">)</span>
+<span class="k">if</span> <span class="n">reply</span><span class="o">.</span><span class="n">advice</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">checked</span> <span class="o">=</span> <span class="n">check</span><span class="p">(</span><span class="n">reply</span><span class="o">.</span><span class="n">advice</span><span class="p">,</span> <span class="n">situation</span><span class="o">.</span><span class="n">n_phases</span><span class="p">())</span>   <span class="c1"># validation contre le réseau</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">accepted</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">checked</span><span class="o">.</span><span class="n">items</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">rejected</span> <span class="o">=</span> <span class="n">checked</span><span class="o">.</span><span class="n">rejected</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">now</span> <span class="o">+</span> <span class="n">delay</span>                                <span class="c1"># le conseil n'agit qu'après le délai</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">checked</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pending</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Active</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">j</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">w</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">start</span> <span class="o">+</span> <span class="n">item</span><span class="o">.</span><span class="n">s</span><span class="p">,</span> <span class="n">call</span><span class="p">))</span>  <span class="c1"># en file, avec expiration</span>
+</code></pre></div>
+
+<p>L'extrait omet deux lignes de journal (155-156).</p>
+<p><strong>e. Ouvrir.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">src</span><span class="p">\</span><span class="n">cotraffic</span><span class="p">\</span><span class="n">llm</span><span class="p">\</span><span class="n">advised</span><span class="p">.</span><span class="n">py</span><span class="p">:</span><span class="n">131</span>
+<span class="n">code</span> <span class="p">-</span><span class="n">-goto</span> <span class="n">docs</span><span class="p">\</span><span class="n">LLM_DESIGN</span><span class="p">.</span><span class="n">md</span><span class="p">:</span><span class="n">59</span>
+</code></pre></div>
+
+<p><strong>f. Démo</strong> :</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">type </span><span class="n">results</span><span class="p">\</span><span class="n">exploration</span><span class="p">\</span><span class="n">llm_period</span><span class="p">\</span><span class="n">calls</span><span class="p">\</span><span class="n">coop_full_llm-N600__grid4x4__emergency__peak__s1000</span><span class="p">.</span><span class="n">jsonl</span>
+</code></pre></div>
+
+<p>À montrer : une ligne par appel, avec <code>trigger</code> (<code>periodic</code> ou <code>emergency:ev_…</code>),
+<code>latency_s</code> et <code>delay_s</code>.</p>
+<p><strong>g. Chiffres clés.</strong> Sur un épisode complet de 50 min à N = 10 min, il y a de 5 à 13
+appels selon le scénario : 5 réguliers, plus les événements
+(<code>results/exploration/llm_period/period_summary.csv</code>, colonne <code>llm_calls</code>).</p>
+<p><strong>h. La phrase à dire.</strong> « L'orchestration décide quand appeler le LLM, retarde son
+conseil de sa vraie latence, le fait expirer, et journalise tout. Un appel à chaque
+décision est impossible : le LLM met 8 s à répondre. »</p>
+<p><strong>i. Limite.</strong> Le cache existe, mais il est désactivé, faute d'évaluation.</p>
+<p><strong>j. Question probable.</strong> <em>« Pourquoi ne pas appeler le LLM toutes les 5 s ? »</em> → Il met
+environ 8 s à répondre (p95 de 11,7 s). Appelé trop souvent, il dégrade aussi le trafic :
+toutes les 3 min, les piétons perdent 24,8 %.</p>
+<hr />
+<h2 id="partie-2-le-déroulé-de-la-présentation-15-minutes">Partie 2 : le déroulé de la présentation (15 minutes)</h2>
+<p><strong>Préparation, 10 minutes avant :</strong></p>
+<ol>
+<li>Brancher le chargeur : en veille, le PC interrompt les calculs.</li>
+<li>Ne lancer aucun autre calcul pendant la séance.</li>
+<li>Lancer ces trois commandes :</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd </span><span class="n">G</span><span class="p">:\</span><span class="n">pi5eme</span><span class="p">\</span><span class="n">cotraffic</span>
+<span class="n">ollama</span> <span class="n">list</span>                                                   <span class="c"># qwen2.5:3b doit apparaître</span>
+<span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span> <span class="n">scripts</span><span class="p">\</span><span class="n">llm_demo</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-source</span> <span class="n">rules</span>       <span class="c"># préchauffe SUMO (1 min, sans LLM)</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>Temps</th>
+<th>Durée</th>
+<th>Quoi dire</th>
+<th>Fichier à ouvrir</th>
+<th>Commande à lancer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0:00</td>
+<td>1 min</td>
+<td>Le projet en 1 minute, et le trajet d'un conseil (partie 0)</td>
+<td><code>docs\GUIDE_SOUTENANCE_LLM.html</code></td>
+<td><code>start docs\GUIDE_SOUTENANCE_LLM.html</code></td>
+</tr>
+<tr>
+<td>1:00</td>
+<td>3 min</td>
+<td><strong>Exigence 1 : le LLM change des décisions</strong> (lire les lignes « PPO seul / avec le conseil / bouclier »)</td>
+<td>–</td>
+<td><code>.venv\Scripts\python scripts\llm_demo.py</code></td>
+</tr>
+<tr>
+<td>4:00</td>
+<td>1 min</td>
+<td>Où le conseil agit dans le code : PPO seul, biais, décision</td>
+<td><code>advised.py:189</code></td>
+<td><code>code --goto src\cotraffic\llm\advised.py:189</code></td>
+</tr>
+<tr>
+<td>5:00</td>
+<td>1 min</td>
+<td>Le bouclier garde le dernier mot</td>
+<td><code>traffic_env.py:190</code></td>
+<td><code>code --goto src\cotraffic\envs\traffic_env.py:190</code></td>
+</tr>
+<tr>
+<td>6:00</td>
+<td>1 min</td>
+<td>Exigences 2 et 3 : le modèle choisi, et les réglages justifiés</td>
+<td><code>configs\llm.yaml</code></td>
+<td><code>code --goto configs\llm.yaml:53</code></td>
+</tr>
+<tr>
+<td>7:00</td>
+<td>1 min</td>
+<td>Exigence 4 : le prompt et le schéma JSON</td>
+<td><code>advice.py:45</code></td>
+<td><code>code --goto src\cotraffic\llm\advice.py:45</code></td>
+</tr>
+<tr>
+<td>8:00</td>
+<td>1 min</td>
+<td>Exigence 5 : le tool schema</td>
+<td><code>tools.py:252</code></td>
+<td><code>.venv\Scripts\python -m pytest tests\test_llm_tools.py -q</code></td>
+</tr>
+<tr>
+<td>9:00</td>
+<td>2 min</td>
+<td>Exigence 9 : la sécurité et l'attaque contre le bouclier</td>
+<td><code>test_llm_security.py:159</code></td>
+<td><code>.venv\Scripts\python -m pytest tests\test_llm_security.py -v</code></td>
+</tr>
+<tr>
+<td>11:00</td>
+<td>2 min</td>
+<td>Exigence 8 : les résultats, l'oracle, le placebo et les règles, dits honnêtement</td>
+<td>–</td>
+<td><code>.venv\Scripts\python scripts\llm_results_table.py</code></td>
+</tr>
+<tr>
+<td>13:00</td>
+<td>1 min</td>
+<td>Exigences 6 et 7 : LoRA, le prompt tuning et le piège de la classe majoritaire</td>
+<td><code>final_lora_comparison.csv</code></td>
+<td><code>type results\exploration\llm_lora\final_lora_comparison.csv</code></td>
+</tr>
+<tr>
+<td>14:00</td>
+<td>1 min</td>
+<td>Exigence 10 et la suite : l'orchestration, le pré-enregistrement et les limites (partie 4)</td>
+<td><code>docs\LLM_PREREGISTRATION.md</code></td>
+<td><code>code docs\LLM_PREREGISTRATION.md</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Plan de secours :</strong></p>
+<table>
+<thead>
+<tr>
+<th>Problème</th>
+<th>Que faire</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ollama lent (premier appel de plus de 30 s) ou absent</td>
+<td>Montrer la sortie enregistrée : <code>type docs\demo\llm_demo_emergency.txt</code>. Ou lancer la même démo sans LLM : <code>.venv\Scripts\python scripts\llm_demo.py --source rules</code> (même mécanisme, conseils des règles)</td>
+</tr>
+<tr>
+<td>La démo des outils est trop lente</td>
+<td><code>type docs\demo\llm_tools_demo.txt</code></td>
+</tr>
+<tr>
+<td>SUMO ne démarre pas</td>
+<td>Montrer d'abord les tests (<code>test_llm_tools.py</code>, puis <code>test_llm.py -k refused</code>), puis la sortie enregistrée de la démo</td>
+</tr>
+<tr>
+<td>La commande <code>code</code> ne répond pas</td>
+<td>Dans VS Code, Ctrl+P, puis taper <code>advised.py:189</code> et Entrée</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="partie-3-tableau-récapitulatif">Partie 3 : tableau récapitulatif</h2>
+<table>
+<thead>
+<tr>
+<th>Exigence</th>
+<th>Statut</th>
+<th>Fichier:lignes</th>
+<th>Commande</th>
+<th>Preuve</th>
+<th>Phrase clé</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. LLM dans la décision, pour les scores</td>
+<td><strong>Partiel</strong> : biais et couloir vert faits ; changement de mode <strong>pas réalisé</strong> ; gain non mesurable</td>
+<td><code>src/cotraffic/llm/advised.py:189-198</code> ; <code>src/cotraffic/envs/traffic_env.py:190</code></td>
+<td><code>.venv\Scripts\python scripts\llm_demo.py</code></td>
+<td>6 décisions changées dans la démo ; 12 à 44 par épisode de 50 min ; LLM +0,16 %, oracle +1,09 %</td>
+<td>« Le LLM change des décisions, mais même un conseiller parfait ne gagne qu'environ 1 %. »</td>
+</tr>
+<tr>
+<td>2. LLM choisi</td>
+<td><strong>Fait</strong></td>
+<td><code>scripts/llm_step2.py:73-77</code>, <code>:101-104</code> ; <code>configs/llm.yaml:8-20</code></td>
+<td><code>type results\exploration\llm_benchmark\step2_choice.json</code></td>
+<td>8 modèles ; qwen2.5:3b : 100 % de JSON valide, p50 8,6 s</td>
+<td>« Une règle écrite avant les résultats a choisi qwen2.5:3b. »</td>
+</tr>
+<tr>
+<td>3. Hyperparamètres</td>
+<td><strong>Fait</strong></td>
+<td><code>configs/llm.yaml:21-41</code>, <code>:53-73</code> ; <code>src/cotraffic/llm/settings.py:29</code></td>
+<td><code>.venv\Scripts\python -m pytest tests\test_llm_settings.py -v</code></td>
+<td>beta 8 : −1,21 % ; N = 3 min : −4,98 %</td>
+<td>« Un seul fichier, chaque valeur justifiée par une mesure. »</td>
+</tr>
+<tr>
+<td>4. Prompt engineering</td>
+<td><strong>Fait</strong></td>
+<td><code>configs/prompts/advisor-v2.yaml:26-48</code> ; <code>src/cotraffic/llm/advice.py:45-72</code> ; <code>src/cotraffic/llm/prompts.py:47-50</code></td>
+<td><code>type results\exploration\llm_benchmark\v2_tech_summary.csv</code></td>
+<td>JSON valide de 67 % à 100 % ; zero +0,15 %</td>
+<td>« Le plus simple, zero-shot, est le meilleur. »</td>
+</tr>
+<tr>
+<td>5. Tool schema</td>
+<td><strong>Fait</strong> (non retenu : trop lent)</td>
+<td><code>src/cotraffic/llm/tools.py:214-240</code>, <code>:252-266</code> ; <code>src/cotraffic/llm/sources.py:152</code></td>
+<td><code>.venv\Scripts\python -m pytest tests\test_llm_tools.py -v</code></td>
+<td>12 tests ; 27 à 50 s par conseil</td>
+<td>« Lecture seule, un seul outil qui agit, tout est validé. »</td>
+</tr>
+<tr>
+<td>6. LoRA</td>
+<td><strong>Partiel</strong> (préliminaire)</td>
+<td><code>scripts/llm_dataset.py:158-160</code> ; notebook, sections 4, 5 et 8</td>
+<td><code>type results\exploration\llm_lora\final_lora_comparison.csv</code></td>
+<td>Rappel 17 %, faux conseils 12 %, gain +0,05 % ; intervient pendant les 7 urgences</td>
+<td>« Il a appris quand intervenir, pas encore à faire gagner le trafic. »</td>
+</tr>
+<tr>
+<td>7. Prompt tuning</td>
+<td><strong>Partiel</strong> (préliminaire)</td>
+<td>notebook, sections 9 et 10</td>
+<td>même commande que la ligne 6</td>
+<td>17 920 paramètres ; rappel 11 % ; gain −0,09 %</td>
+<td>« Environ 500 fois plus léger que LoRA, et il apprend moins. »</td>
+</tr>
+<tr>
+<td>8. Évaluation</td>
+<td><strong>Partiel</strong> : validation seulement</td>
+<td><code>src/cotraffic/llm/rollout.py:168-189</code> ; <code>scripts/llm_dataset.py:129-155</code> ; <code>docs/LLM_PREREGISTRATION.md</code></td>
+<td><code>.venv\Scripts\python scripts\llm_results_table.py</code></td>
+<td>Oracle +1,09 %, LLM +0,16 %, placebo +0,09 %, règles −0,17 %</td>
+<td>« Même trafic, avec et sans conseil, et des contrôles placebo, règles et oracle. »</td>
+</tr>
+<tr>
+<td>9. Sécurité</td>
+<td><strong>Fait</strong></td>
+<td><code>src/cotraffic/llm/advice.py:79-107</code> ; <code>src/cotraffic/llm/sources.py:84-86</code> ; <code>tests/test_llm_security.py:159</code></td>
+<td><code>.venv\Scripts\python -m pytest tests\test_llm_security.py -v</code></td>
+<td>10 tests ; vert le plus court 13 s pour un minimum de 10 s, sous attaque</td>
+<td>« Même un conseil malveillant ne viole pas le bouclier. »</td>
+</tr>
+<tr>
+<td>10. Orchestration</td>
+<td><strong>Fait</strong></td>
+<td><code>src/cotraffic/llm/advised.py:104-117</code>, <code>:131-160</code> ; <code>docs/LLM_DESIGN.md:59-100</code></td>
+<td><code>type results\exploration\llm_period\calls\coop_full_llm-N600__grid4x4__emergency__peak__s1000.jsonl</code></td>
+<td>5 à 13 appels par épisode, tous journalisés</td>
+<td>« On appelle rarement, on retarde le conseil de sa vraie latence, on journalise tout. »</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="partie-4-les-limites-et-les-prochaines-étapes">Partie 4 : les limites et les prochaines étapes</h2>
+<p><strong>Ce qui n'est pas fait, ou pas fini.</strong></p>
+<ul>
+<li><strong>Le changement de mode n'est pas réalisé.</strong> Basculer vers une politique « urgences »
+    pendant une ambulance demandait un nouveau format de conseil, un nouveau prompt et une
+    nouvelle évaluation.</li>
+<li><strong>LoRA et le prompt tuning sont préliminaires.</strong><ul>
+<li>Un petit modèle (0,5B), et peu d'exemples : 169 en entraînement.</li>
+<li>Seulement 15 situations « conseil » en validation, et des étiquettes bruitées.</li>
+<li>Ils ne donnent pas de gain mesurable : +0,05 % et −0,09 %.</li>
+</ul>
+</li>
+<li><strong>Les graines de test 0 à 4 ne sont pas lancées.</strong> Tous les chiffres sont des chiffres de
+    validation, sur une seule graine. Les tests de Mann-Whitney et la correction de Holm ne
+    sont donc pas encore appliqués à la partie LLM. L'évaluation est pré-enregistrée, et
+    demande environ 24 à 28 h de calcul.</li>
+<li><strong>Le gain sur les scores n'est pas mesurable.</strong><ul>
+<li>Le LLM fait à peu près comme le placebo.</li>
+<li>L'oracle montre que la marge de progrès, pour n'importe quel conseiller, est d'environ
+    1 % ici.</li>
+</ul>
+</li>
+<li><strong>Autres limites.</strong><ul>
+<li>La latence est de 8 s par conseil sur la puce graphique intégrée, et de 27 à 50 s avec
+    les outils.</li>
+<li>La panne de capteur est supposée signalée.</li>
+<li>Le cache est désactivé.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Ce que nous ferions ensuite.</strong></p>
+<ol>
+<li>Lancer l'évaluation pré-enregistrée sur les graines de test : 15 runs par scénario, avec
+      placebo, règles et oracle, puis Mann-Whitney et Holm.</li>
+<li>Essayer LoRA sur un modèle plus grand (1,5B), avec plus d'exemples et des étiquettes
+      plus fiables.</li>
+<li>Viser les situations où COOP-FULL est le plus faible, et donner au LLM ce que PPO n'a
+      pas : l'état au-delà des voisins, une prévision de la demande.</li>
+<li>Réaliser le changement de mode pendant les urgences, puisque LoRA a appris à intervenir
+      surtout à ces moments-là.</li>
+</ol>
+<hr />
+<h2 id="lexique">Lexique</h2>
+<table>
+<thead>
+<tr>
+<th>Terme</th>
+<th>Explication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent</td>
+<td>Programme qui décide la phase d'un feu, ici toutes les 5 s</td>
+</tr>
+<tr>
+<td>Apprentissage par renforcement</td>
+<td>Apprendre par essais et récompenses</td>
+</tr>
+<tr>
+<td>PPO, COOP-FULL</td>
+<td>La méthode d'apprentissage des agents, et notre meilleure version (agents coopératifs)</td>
+</tr>
+<tr>
+<td>Phase</td>
+<td>L'axe qui a le vert (nord-sud ou est-ouest sur la grille)</td>
+</tr>
+<tr>
+<td>Logit</td>
+<td>Le score que l'agent donne à chaque phase ; il choisit le plus grand</td>
+</tr>
+<tr>
+<td>Biais, beta</td>
+<td>Le bonus ajouté au logit de la phase conseillée ; beta est sa taille maximale (4)</td>
+</tr>
+<tr>
+<td>Bouclier</td>
+<td>La couche de sécurité qui vérifie la phase demandée (vert minimum, etc.)</td>
+</tr>
+<tr>
+<td>LLM</td>
+<td>Grand modèle de langage : un programme qui lit et écrit du texte</td>
+</tr>
+<tr>
+<td>Ollama</td>
+<td>Le logiciel qui fait tourner le LLM sur la machine, sans Internet</td>
+</tr>
+<tr>
+<td>Token</td>
+<td>Un morceau de mot (environ 4 lettres), l'unité de texte du LLM</td>
+</tr>
+<tr>
+<td>Latence, p50, p95</td>
+<td>Le temps de réponse ; sa médiane ; la valeur sous laquelle se trouvent 95 % des réponses</td>
+</tr>
+<tr>
+<td>Prompt</td>
+<td>Le texte de consignes envoyé au LLM</td>
+</tr>
+<tr>
+<td>Zero-shot, few-shot</td>
+<td>Les consignes seules ; les consignes avec des exemples</td>
+</tr>
+<tr>
+<td>Self-consistency</td>
+<td>Poser la question plusieurs fois et garder la réponse majoritaire</td>
+</tr>
+<tr>
+<td>JSON, schéma JSON</td>
+<td>Un format de texte structuré ; le modèle de réponse obligatoire</td>
+</tr>
+<tr>
+<td>Pydantic</td>
+<td>Une bibliothèque qui vérifie les types et les bornes des données</td>
+</tr>
+<tr>
+<td>Tool schema</td>
+<td>La description des outils que le LLM peut appeler</td>
+</tr>
+<tr>
+<td>Fine-tuning, LoRA</td>
+<td>Continuer l'apprentissage ; le faire avec de petites matrices ajoutées</td>
+</tr>
+<tr>
+<td>Prompt tuning</td>
+<td>Apprendre seulement quelques vecteurs placés devant le prompt</td>
+</tr>
+<tr>
+<td>Rang r, alpha, dropout</td>
+<td>La taille des matrices LoRA ; leur poids ; la part de connexions éteintes au hasard</td>
+</tr>
+<tr>
+<td>Learning rate, epoch</td>
+<td>La taille d'un pas de correction ; un passage complet sur les exemples</td>
+</tr>
+<tr>
+<td>Classe majoritaire</td>
+<td>La réponse la plus fréquente (ici « ne rien conseiller »)</td>
+</tr>
+<tr>
+<td>Accord, rappel, faux conseils</td>
+<td>Réponse identique à l'étiquette ; part des bons conseils retrouvés ; conseils donnés à tort</td>
+</tr>
+<tr>
+<td>Graine</td>
+<td>Le numéro qui fixe le hasard d'une simulation (1000 = validation, 0 à 4 = test)</td>
+</tr>
+<tr>
+<td>Rejeu apparié</td>
+<td>Rejouer la même situation avec et sans conseil, depuis le même instantané</td>
+</tr>
+<tr>
+<td>Placebo, règles, oracle</td>
+<td>Conseils au hasard ; conseils écrits à la main ; le meilleur conseil choisi après coup</td>
+</tr>
+<tr>
+<td>Mann-Whitney, Holm</td>
+<td>Un test qui dit si deux séries diffèrent vraiment ; une correction pour les tests multiples</td>
+</tr>
+<tr>
+<td>Injection de prompt</td>
+<td>Un texte caché dans les données qui essaie de donner des ordres au LLM</td>
+</tr>
+<tr>
+<td>Orchestration</td>
+<td>L'organisation de quand appeler le LLM, quand son conseil agit, et quand il expire</td>
+</tr>
+</tbody>
+</table>
+<p class="top"><a href="#">Retour en haut</a> · généré depuis docs/GUIDE_SOUTENANCE_LLM.md</p>
+</main>
+</div>
+</body>
+</html>
