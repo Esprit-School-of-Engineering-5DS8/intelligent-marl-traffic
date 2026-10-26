@@ -178,10 +178,10 @@ Pourquoi le biais comme mécanisme principal :
 | COOP-FULL | Référence sans LLM (résultats existants, plus les runs manquants sur capteurs et pertes de messages) | Situations et épisodes de validation faits ; runs de test manquants à faire (étape 4) |
 | COOP-FULL + LLM zero-shot | Effet du LLM sans exemples | Fait (6 modèles) |
 | COOP-FULL + LLM few-shot | Effet des exemples (tirés des graines d'entraînement) | Fait (qwen2.5:3b) |
-| COOP-FULL + LLM LoRA | Effet du fine-tuning | Jeu de données et notebook (étape 5) |
-| COOP-FULL + conseils aléatoires | **Placebo** : même fréquence, mêmes carrefours visés en nombre, même distribution d'amplitude que le LLM | Source codée (`RandomSource`) ; mesure : oracle et placebo (section 8) |
+| COOP-FULL + LLM LoRA | Effet du fine-tuning | Préliminaire (0,5B, lot de 69 exemples) : gain +0,01 % dans SUMO ; lot final de 169 exemples à entraîner ([VALIDATION_LLM.md](VALIDATION_LLM.md), 3.2) |
+| COOP-FULL + conseils aléatoires | **Placebo** : même fréquence, mêmes carrefours visés en nombre, même distribution d'amplitude que le LLM | Mesuré sur la validation : +0,09 % (3 tirages, même délai de 8,2 s que le LLM) |
 | COOP-FULL + conseiller à règles | **Contrôle** : les mêmes conseils produits par des règles simples (couloir vert sur la route de l'ambulance, etc.), même mécanisme, même fréquence, même latence | Fait |
-| Oracle | Meilleur conseil candidat de chaque situation, choisi après coup par rejeu : borne haute de ce qu'un conseiller peut apporter | Section 8 |
+| Oracle | Meilleur conseil candidat de chaque situation, choisi après coup par rejeu : borne haute de ce qu'un conseiller peut apporter | Mesuré sur la validation : +1,09 %, dont une part due à la chance (un tirage du placebo est le meilleur dans 21 situations sur 63) |
 | COOP-FULL + mode urgence (`coop_full_ev4`) choisi par le LLM | Second mécanisme | Pas réalisé |
 | LLM seul sur un carrefour (type LLMLight) | Facultatif, épisode court | Pas réalisé |
 
@@ -258,6 +258,10 @@ Les règles de choix sont dans `scripts/llm_step2.py`, écrites avant les résul
 choix est enregistré dans `results/exploration/llm_benchmark/step2_choice.json`, et
 l'enchaînement des calculs est journalisé dans `results/tmp/llm/logs/step2_pipeline.log`.
 
+Contrôles mesurés ensuite sur les mêmes 63 situations, avec le même délai de 8,2 s pour
+tous (`results/exploration/llm_oracle/oracle_summary.csv`) : LLM +0,16 %, placebo +0,09 %,
+règles −0,17 %, oracle +1,09 %.
+
 **Conclusion de l'étape 2 : aucun réglage n'améliore COOP-FULL de façon nette sur la
-validation.** L'évaluation pré-enregistrée sur les graines de test
+validation, et la marge maximale (oracle) n'est que d'environ 1 %.** L'évaluation pré-enregistrée sur les graines de test
 ([LLM_PREREGISTRATION.md](LLM_PREREGISTRATION.md)) dira si cela se confirme.

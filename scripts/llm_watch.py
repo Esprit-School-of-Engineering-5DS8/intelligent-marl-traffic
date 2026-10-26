@@ -64,6 +64,11 @@ VALIDATION = [
         "dataset.log",
         RESULTS_DIR / "exploration" / "llm_lora" / "llm_lora_val.jsonl",
     ),
+    Task(
+        "Rejeu SUMO des prédictions LoRA et prompt tuning (Kaggle, prelim2)",
+        "prelim_kaggle_val.log",
+        BENCH / "prelim_kaggle_val_summary.csv",
+    ),
 ]
 
 
@@ -111,7 +116,7 @@ def show() -> None:
     print("  Validation (partie B)")
     for task in VALIDATION:
         state, detail = status(task)
-        print(f"  [{state:^12s}] B6. {task.label}")
+        print(f"  [{state:^12s}] {task.label}")
         if detail:
             print(f"                 {detail}")
     choice = BENCH / "step2_choice.json"

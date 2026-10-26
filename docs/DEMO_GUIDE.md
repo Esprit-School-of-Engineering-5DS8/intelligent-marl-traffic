@@ -224,67 +224,52 @@ curl.exe -N -X POST http://localhost:8000/api/assistant/chat -H "Content-Type: a
 - qu'aucune simulation ne démarre sans backend ni confirmation ;
 - la réponse en anglais quand l'interface est en anglais.
 
-## LLM dans la boucle de décision (validation, environ 15 min)
+## Démo LLM : le LLM dans la boucle de décision (environ 15 min)
 
 Le déroulé détaillé, les preuves et les questions probables sont dans
-[VALIDATION_LLM.md](VALIDATION_LLM.md). Convention : gain positif = mieux. Tous les
-chiffres viennent de la graine de validation 1000.
+[VALIDATION_LLM.md](VALIDATION_LLM.md). La visite du code, fichier par fichier, est dans
+[VISITE_DU_CODE.md](VISITE_DU_CODE.md), et les réponses aux questions dans
+[FICHE_QUESTIONS_LLM.md](FICHE_QUESTIONS_LLM.md). Convention : gain positif = mieux.
+Tous les chiffres viennent de la graine de validation 1000.
 
-### Préparation (5 minutes avant)
+### Préparation (10 minutes avant)
 
 ```powershell
 cd G:\pi5eme\cotraffic
-ollama list                                   # qwen2.5:3b doit être présent
-.venv\Scripts\python -m pytest tests\test_llm_settings.py -q    # réglages cohérents
+ollama list                                                  # qwen2.5:3b doit être présent
+.venv\Scripts\python -m pytest tests\test_llm_settings.py -q    # réglages cohérents (2 s)
+.venv\Scripts\python scripts\llm_demo.py --source rules        # préchauffe SUMO (1 min, sans LLM)
 ```
 
-La démo charge elle-même le modèle et le garde en mémoire 30 min (`keep_alive`). Pour
-qu'elle soit fluide, ne pas lancer d'autre calcul pendant la séance.
+Ne lancer aucun autre calcul pendant la séance. Brancher le chargeur : en veille, le PC
+interrompt les calculs.
 
-### 1. Le LLM agit sur les décisions des agents (environ 2 min)
+### Commandes, dans l'ordre
 
-```powershell
-.venv\Scripts\python scripts\llm_demo.py                      # urgences, grille 4x4
-.venv\Scripts\python scripts\llm_demo.py --scenario incident --compare   # + COOP-FULL seul
-.venv\Scripts\python scripts\llm_demo.py --source rules       # sans LLM, si Ollama est absent
-type docs\demo\llm_demo_emergency.txt                         # secours : sortie déjà enregistrée
-```
+| Ordre | Durée | Ce qu'on montre | Commande |
+|---|---|---|---|
+| 1 | 2 min | **Le LLM change les décisions de PPO, et le bouclier garde le dernier mot** | `.venv\Scripts\python scripts\llm_demo.py` |
+| 2 | 1 min | Les réglages justifiés et le choix du modèle | `Get-Content configs\llm.yaml` puis `type results\exploration\llm_benchmark\step2_choice.json` |
+| 3 | 1 min | La sécurité : 10 tests adverses, dont l'attaque contre le bouclier | `.venv\Scripts\python -m pytest tests\test_llm_security.py -v` |
+| 4 | 30 s | 12 réponses invalides refusées | `.venv\Scripts\python -m pytest tests\test_llm.py -k refused -v` |
+| 5 | 30 s | Le tool schema | `.venv\Scripts\python -m pytest tests\test_llm_tools.py -v` |
+| 6 | 1 min | Le tool schema avec le vrai LLM (facultatif) | `.venv\Scripts\python scripts\llm_tools_demo.py --kind emergency` |
+| 7 | 1 min | Le tableau des résultats de validation | `.venv\Scripts\python scripts\llm_results_table.py` |
+| 8 | 30 s | Les épisodes complets (période N) | `type results\exploration\llm_period\period_summary.csv` |
 
-Pour chaque appel, la démo affiche :
-- la situation envoyée ;
-- le conseil reçu, avec sa latence et l'instant où il agit ;
-- ce que proposeraient les règles.
+Pendant la démo 1, il faut montrer :
+- une ligne `PPO seul -> p0 | avec le conseil -> p1 | bouclier -> p1 (accepté)` : le
+  conseil a changé la décision ;
+- une ligne `..., corrigé : vert minimum pas encore atteint` : le bouclier a refusé ;
+- la ligne « Pour comparaison, le conseiller à règles proposerait » : à l'appel n°4, les
+  règles donnent la phase dont l'ambulance a besoin, le LLM l'inverse. C'est l'une des
+  raisons de l'absence de gain.
 
-Puis, pour chaque décision changée : la phase choisie par PPO seul, celle demandée avec le
-conseil, et celle exécutée par le bouclier.
+### Plan de secours
 
-### 2. Réglages et choix du modèle (1 min)
-
-```powershell
-Get-Content configs\llm.yaml
-type results\exploration\llm_benchmark\step2_choice.json
-type results\exploration\llm_benchmark\v2_zero_summary.csv
-```
-
-### 3. Sécurité (1 min)
-
-```powershell
-.venv\Scripts\python -m pytest tests\test_llm_security.py -v    # 10 tests, dont l'attaque contre le bouclier
-.venv\Scripts\python -m pytest tests\test_llm.py -k refused -v   # 12 réponses invalides refusées
-```
-
-### 4. Tool schema (1 min)
-
-```powershell
-.venv\Scripts\python -m pytest tests\test_llm_tools.py -v
-.venv\Scripts\python scripts\llm_tools_demo.py --kind emergency   # environ 1 min, avec le LLM
-type docs\demo\llm_tools_demo.txt                                  # secours
-```
-
-### 5. Résultats (2 min)
-
-```powershell
-type results\exploration\llm_benchmark\v2_tech_summary.csv     # zero / brief / few / vote
-type results\exploration\llm_period\period_summary.csv         # épisodes complets, N = 3, 5, 10 min
-type results\exploration\llm_oracle\oracle_summary.csv         # PPO seul, règles, LLM, placebo, oracle
-```
+| Problème | Que faire |
+|---|---|
+| Ollama lent (premier appel de plus de 30 s) ou absent | Montrer la sortie enregistrée : `type docs\demo\llm_demo_emergency.txt`. Ou lancer la même démo sans LLM : `.venv\Scripts\python scripts\llm_demo.py --source rules` (même mécanisme, conseils des règles) |
+| La démo des outils est trop lente (27 à 50 s par conseil) | `type docs\demo\llm_tools_demo.txt` |
+| SUMO ne démarre pas | Les tests de sécurité et d'outils ne lancent pas tous SUMO : les montrer d'abord (lignes 3 à 5), puis la sortie enregistrée de la démo |
+| Plus de temps | `--compare` ajoute COOP-FULL seul sur le même épisode : `.venv\Scripts\python scripts\llm_demo.py --scenario incident --compare` (environ 3 min) |
