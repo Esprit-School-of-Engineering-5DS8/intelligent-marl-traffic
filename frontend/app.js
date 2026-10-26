@@ -1,7 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { mountSumoLiveMap } from './sumo-env.js';
-import { mountRamiBenchmark } from './benchmark-rami.jsx';
+import { mountBenchmarkView, setBenchmarkTab } from './benchmark-view.jsx';
 import { mountGauges } from './gauge.js';
 import { initModes } from './modes/index.js';
 
@@ -135,6 +135,7 @@ function getScenario() {
 
 let map = null;
 let benchmarkMounted = false;
+let benchmarkTab = 'overview';
 let mapFocusMarker = null;
 
 function resolveToken() {
@@ -831,7 +832,7 @@ function showView(name) {
   if (activityLogView) activityLogView.hidden = !isActivityLog;
   const benchmarkView = $('benchmarkView');
   if (benchmarkView) benchmarkView.hidden = !isBenchmark;
-  if (isBenchmark && !benchmarkMounted && benchmarkView) { benchmarkView.replaceChildren(); const mountPoint = document.createElement('div'); benchmarkView.appendChild(mountPoint); mountRamiBenchmark(mountPoint); benchmarkMounted = true; }
+  if (isBenchmark && !benchmarkMounted && benchmarkView) { benchmarkView.replaceChildren(); const mountPoint = document.createElement('div'); mountPoint.className = 'benchmark-react-shell'; benchmarkView.appendChild(mountPoint); mountBenchmarkView(mountPoint, benchmarkTab); benchmarkMounted = true; }
   setLiveMapMode(isLiveMap);
   if (isLiveMap) {
     ensureLiveMap();
@@ -852,24 +853,11 @@ function showView(name) {
   }, 60);
 }
 
-let benchmarkPollTimer;
-function updateBenchmarkLive(state) {
-  const vehicles = state?.metrics?.vehicles ?? state?.vehicles?.length ?? 0;
-  const clock = state?.clock || '00:00:00';
-  const status = state?.status || 'idle';
-  if ($('benchmarkLiveClock')) $('benchmarkLiveClock').textContent = clock;
-  if ($('benchmarkLiveStatus')) $('benchmarkLiveStatus').textContent = status;
-  if ($('benchmarkLiveVehicles')) $('benchmarkLiveVehicles').textContent = String(vehicles);
-  if ($('benchmarkAgentStatus')) $('benchmarkAgentStatus').textContent = status === 'running' ? 'Learning from live SUMO state' : 'Waiting for SUMO';
-  if ($('benchmarkAgentCount')) $('benchmarkAgentCount').textContent = `${vehicles} active agents`;
-  if ($('benchmarkEpisode')) $('benchmarkEpisode').textContent = state?.simulationTime ? `Episode ${Math.floor(Number(state.simulationTime) / 10)}` : 'Episode —';
-  if ($('benchmarkReward')) $('benchmarkReward').textContent = state?.metrics?.arrived != null ? `Reward +${state.metrics.arrived}` : 'Reward —';
-  if ($('benchmarkTrainingProgress')) $('benchmarkTrainingProgress').style.width = `${Math.min(100, (Number(state?.simulationTime || 0) / 864) * 100)}%`;
-  ['benchmarkBaseline', 'benchmarkCotraffic', 'benchmarkRlPolicy'].forEach((id, index) => { if ($(id)) $(id).textContent = status === 'running' ? `${vehicles ? Math.round(1000 / Math.max(vehicles, 1)) : 0} live score` : 'Waiting'; });
-}
-async function pollBenchmarkState() { try { const response = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/simulation/state`); if (response.ok) updateBenchmarkLive(await response.json()); } catch { /* backend may be offline */ } benchmarkPollTimer = window.setTimeout(pollBenchmarkState, 1000); }
-document.querySelectorAll('[data-benchmark-tab]').forEach((tab) => tab.addEventListener('click', () => { document.querySelectorAll('[data-benchmark-tab]').forEach((item) => item.classList.toggle('is-active', item === tab)); const active = tab.dataset.benchmarkTab; document.querySelectorAll('[data-benchmark-panel]').forEach((panel) => { panel.hidden = panel.dataset.benchmarkPanel !== active; }); const shell = document.querySelector('.benchmark-shell'); shell?.classList.toggle('benchmark-show-overview', active === 'overview'); document.querySelector('.benchmark-head')?.toggleAttribute('hidden', active !== 'overview'); document.querySelector('.benchmark-grid')?.toggleAttribute('hidden', active !== 'overview'); document.querySelector('.benchmark-table-card')?.toggleAttribute('hidden', active !== 'overview'); }));
-pollBenchmarkState();
+document.querySelectorAll('[data-benchmark-tab]').forEach((tab) => tab.addEventListener('click', () => {
+  document.querySelectorAll('[data-benchmark-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
+  benchmarkTab = tab.dataset.benchmarkTab || 'overview';
+  setBenchmarkTab(benchmarkTab);
+}));
 
 const ACTIVITY_LOG = [
   {
@@ -1137,7 +1125,11 @@ benchmarkNavParent?.addEventListener('click', () => {
 document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((link) => {
   link.addEventListener('click', () => {
     setActiveNav('Benchmark'); setActiveViewTab('Dashboard'); showView('Benchmark');
-    document.querySelector(`.benchmark-tabs [data-benchmark-tab="${link.dataset.benchmarkTab}"]`)?.click();
+    benchmarkTab = link.dataset.benchmarkTab || 'overview';
+    setBenchmarkTab(benchmarkTab);
+    document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((item) => {
+      item.classList.toggle('is-active', item === link);
+    });
   });
 });
 

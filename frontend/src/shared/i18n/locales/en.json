@@ -121,7 +121,18 @@
     "reset": "Restore the defaults",
     "saved": "Saved",
     "save": "Save",
-    "unsaved": "Unsaved changes"
+    "unsaved": "Unsaved changes",
+    "control": "Control",
+    "controlMode": "Control mode",
+    "controlBaseline": "Baseline (scripted rules)",
+    "controlLearned": "Learned policy (RL)",
+    "controlLlm": "Language model (LLM)",
+    "baselineMethod": "Reference controller",
+    "learnedMethod": "Learned policy",
+    "learnedHelp": "Needs a trained checkpoint for this network.",
+    "controlHelp": "Applied to the live simulation when the backend is used.",
+    "policyActive": "Active policy: {{method}}",
+    "policyOffline": "Backend offline: the policy is stored locally."
   },
   "assistant": {
     "title": "Assistant",

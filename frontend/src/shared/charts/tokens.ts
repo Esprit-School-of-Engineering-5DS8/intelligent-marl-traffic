@@ -24,7 +24,7 @@ export function readTokens(): ChartTokens {
     border: v("--border", "#26323f"),
     surface: v("--surface", "#111921"),
     surface2: v("--surface-2", "#17212b"),
-    accent: v("--accent", "#9a8cff"),
+    accent: v("--accent", "#9ed36a"),
     flow: v("--flow", "#38c980"),
     dense: v("--dense", "#f2a33a"),
     jam: v("--jam", "#f06063"),

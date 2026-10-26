@@ -31,20 +31,19 @@ We use [Eclipse SUMO](https://sumo.dlr.de) as the microscopic traffic simulator 
 
 ```
 intelligent-marl-traffic/
-├── scenarios/
-│   ├── grid_2x2/        # Phase 1 - 4-intersection toy grid
-│   ├── grid_3x3/        # Phase 2 - 9-intersection benchmark
-│   └── monaco/          # Phase 3 - Real OSM network (TBD)
-├── agents/              # Traffic light controller policies
-│   └── rl/              # Deep RL agents (DQN, PPO)
-├── environment/         # Core multi-agent SUMO environment
-├── baselines/           # Fixed-time & actuated reference controllers
-├── forecasting/         # Travel time, pedestrian & EV prediction models
-├── evaluation/          # Batch experiments, KPI comparison, plots
-├── notebooks/           # Analysis and reporting notebooks
-├── docs/                # Design Thinking documentation
-└── results/             # Auto-generated (gitignored)
+├── src/cotraffic/       # Domain: env, controllers, training, evaluation, CLI (authoritative)
+├── api/                 # FastAPI adapter for the dashboard (data, runs, assistant, live sim)
+├── configs/             # protocol, networks, agents, scenarios, experiments (all parameters)
+├── scenarios/           # SUMO assets: grid_2x2, grid_3x3, monaco
+├── scripts/             # export_dashboard_data.py, record_replay.py
+├── frontend/            # KEMETRA dashboard (Vite: index.html + app.js + styles.css)
+├── docs/                # ARCHITECTURE.md, MIGRATION_CHECKLIST.md, Design Thinking
+└── results/             # Auto-generated (gitignored): raw runs, summary, checkpoints
 ```
+
+> Legacy folders (`environment/`, `baselines/`, `evaluation/`, `agents/`) are retired
+> progressively — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+> [docs/MIGRATION_CHECKLIST.md](docs/MIGRATION_CHECKLIST.md).
 
 ---
 
@@ -62,31 +61,34 @@ cd intelligent-marl-traffic
 pip install -r requirements.txt
 ```
 
-### Run the 2x2 scenario (Phase 1 Validation)
-```powershell
-cd scenarios/grid_2x2
-python runner.py --mode max_pressure --steps 1000
-
-# Or with GUI
-python runner.py --gui --mode max_pressure --steps 1000
+### Run a scenario (cotraffic CLI)
+```bash
+python -m cotraffic networks --net grid2x2           # build the SUMO network
+python -m cotraffic episode --net grid2x2 --demand medium --steps 600
+python -m cotraffic evaluate --experiment llm_ab_quick --jobs 1
+python -m cotraffic aggregate && python -m cotraffic tables
 ```
 
-### Run the 3x3 scenario (Phase 2 Grid)
-```powershell
-cd scenarios/grid_3x3
-python runner.py --mode max_pressure --steps 1000
-
-# Or with GUI
-python runner.py --gui --mode sumo_default --steps 1000
+### Dashboard (live simulation + results)
+```bash
+uvicorn api.main:app --port 8000                     # backend
+cd frontend && npm install && npm run dev            # Vite on :5173
+python scripts/export_dashboard_data.py              # refresh served result files
 ```
 
-### Available controller modes
-| Mode | Description |
+### Controller methods
+| `method` | Description |
 |------|-------------|
-| `sumo_default` | SUMO built-in pre-timed logic (baseline) |
-| `fixed` | Fixed-time cycle coordination |
-| `max_pressure` | Adaptive queue-pressure heuristic |
-| `custom` | Hook for your RL / custom policy |
+| `ft` | Fixed-time Webster plan (baseline) |
+| `act` | Actuated gap-out / max-out |
+| `mp` | Max-Pressure adaptive heuristic |
+| `ev_rule`, `ev_rule_mp` | Emergency pre-emption |
+| `ped_rule_mp` | Pedestrian-aware MP |
+| `ind`, `coop`, `coop_full`, `coop_eco*` | PPO learned variants (checkpoint required) |
+| `dqn` | DQN comparison agent |
+| `llm` | Batched language-model controller, MP fallback |
+
+Full architecture, controller catalog and A/B protocol: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 

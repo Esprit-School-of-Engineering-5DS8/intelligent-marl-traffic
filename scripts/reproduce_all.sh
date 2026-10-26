@@ -2,7 +2,7 @@
 # Regenerate every result of the report from the configs.
 #   networks -> reward scales -> forecast model -> (training if no selected checkpoint)
 #   -> evaluation (full matrix + sensitivity) -> statistics -> feature importance
-#   -> figures -> tables
+#   -> figures -> tables -> A/B (llm_ab) -> dashboard export
 # Set TRAIN=1 to retrain missing policies (hours on a laptop); by default the selected
 # checkpoints shipped in results/checkpoints are used.
 set -euo pipefail
@@ -43,4 +43,19 @@ $PY -m cotraffic aggregate
 [ -f results/summary/importance_coop_grid4x4.csv ] || $PY -m cotraffic explain --agent coop --net grid4x4 --demand peak --scenarios normal
 $PY -m cotraffic figures
 $PY -m cotraffic tables
-echo "done: results/summary/REPORT_TABLES.md and figures/"
+
+# A/B: LLM vs PPO vs Max-Pressure (configs/experiments/llm_ab.yaml).
+# AB=0 skips it. Keep AB_JOBS=1 for the LLM cells: two workers share one API key and hit
+# the provider's rate limits (see docs/ARCHITECTURE.md §6).
+if [ "${AB:-1}" = "1" ]; then
+  $PY -m cotraffic evaluate --experiment llm_ab --jobs "${AB_JOBS:-1}"
+  $PY -m cotraffic aggregate
+  $PY -m cotraffic tables
+fi
+
+# The files the dashboard serves (frontend/public/data) come from the results above.
+$PY scripts/export_dashboard_data.py
+
+echo "done: results/summary/REPORT_TABLES.md, figures/, frontend/public/data"
+echo "live policy defaults: configs/dashboard_policy.yaml (GET/PUT /api/policy)"
+

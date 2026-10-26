@@ -121,7 +121,18 @@
     "reset": "Rétablir les valeurs par défaut",
     "saved": "Enregistré",
     "save": "Enregistrer",
-    "unsaved": "Modifications non enregistrées"
+    "unsaved": "Modifications non enregistrées",
+    "control": "Contrôle",
+    "controlMode": "Mode de contrôle",
+    "controlBaseline": "Baseline (règles scriptées)",
+    "controlLearned": "Politique apprise (RL)",
+    "controlLlm": "Modèle de langage (LLM)",
+    "baselineMethod": "Contrôleur de référence",
+    "learnedMethod": "Politique apprise",
+    "learnedHelp": "Nécessite un checkpoint entraîné pour ce réseau.",
+    "controlHelp": "Appliqué à la simulation en direct lorsque le backend est utilisé.",
+    "policyActive": "Politique active : {{method}}",
+    "policyOffline": "Backend hors ligne : la politique est enregistrée localement."
   },
   "assistant": {
     "title": "Assistant",

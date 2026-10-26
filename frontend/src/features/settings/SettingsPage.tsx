@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 
+import { usePolicy, useUpdatePolicy } from "@/shared/api/policy";
 import { LANGUAGES } from "@/shared/i18n";
 import { usePageTitle } from "@/shared/lib/use-page-title";
 import { Button } from "@/shared/ui/button";
@@ -13,7 +14,14 @@ import { SelectField } from "@/shared/ui/field";
 import { PageHeader } from "@/shared/ui/page-header";
 
 import { SettingsSchema } from "./schema";
-import { DEFAULT_SETTINGS, useSettings, type Settings } from "./store";
+import {
+  BASELINE_METHODS,
+  DEFAULT_SETTINGS,
+  LEARNED_METHODS,
+  controlMethod,
+  useSettings,
+  type Settings,
+} from "./store";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -38,10 +46,16 @@ export default function SettingsPage() {
       speedUnit: s.speedUnit,
       dataSource: s.dataSource,
       llmProvider: s.llmProvider,
+      controlMode: s.controlMode,
+      baselineMethod: s.baselineMethod,
+      learnedMethod: s.learnedMethod,
     })),
   );
   const update = useSettings((s) => s.update);
   const [saved, setSaved] = useState(false);
+  const policy = usePolicy();
+  const updatePolicy = useUpdatePolicy();
+  const [policyNote, setPolicyNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const form = useForm<Settings>({
     resolver: zodResolver(SettingsSchema),
@@ -54,6 +68,24 @@ export default function SettingsPage() {
   const onSubmit = handleSubmit((values) => {
     update(values);
     setSaved(true);
+    // The live simulation runs the policy the backend holds; mock data needs no backend.
+    if (values.dataSource === "live") {
+      updatePolicy.mutate(
+        { method: controlMethod(values) },
+        {
+          onSuccess: (data) =>
+            setPolicyNote({
+              ok: data.available && !data.degraded,
+              text: data.reason ?? `${data.label} · ${data.network}`,
+            }),
+          onError: (error) =>
+            setPolicyNote({
+              ok: false,
+              text: error instanceof Error ? error.message : String(error),
+            }),
+        },
+      );
+    }
   });
 
   const onReset = () => {
@@ -108,6 +140,51 @@ export default function SettingsPage() {
             <option value="mock">{t("settings.dataSourceMock")}</option>
             <option value="live">{t("settings.dataSourceLive")}</option>
           </SelectField>
+        </Section>
+
+        <Section title={t("settings.control")}>
+          <SelectField
+            id="controlMode"
+            label={t("settings.controlMode")}
+            help={t("settings.controlHelp")}
+            {...register("controlMode")}
+          >
+            <option value="baseline">{t("settings.controlBaseline")}</option>
+            <option value="learned">{t("settings.controlLearned")}</option>
+            <option value="llm">{t("settings.controlLlm")}</option>
+          </SelectField>
+          <SelectField
+            id="baselineMethod"
+            label={t("settings.baselineMethod")}
+            {...register("baselineMethod")}
+          >
+            {BASELINE_METHODS.map((method) => (
+              <option key={method} value={method}>
+                {method}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            id="learnedMethod"
+            label={t("settings.learnedMethod")}
+            help={t("settings.learnedHelp")}
+            {...register("learnedMethod")}
+          >
+            {LEARNED_METHODS.map((method) => (
+              <option key={method} value={method}>
+                {method}
+              </option>
+            ))}
+          </SelectField>
+          <p className="text-sm text-text-2 sm:col-span-2" role="status" aria-live="polite">
+            {policyNote ? (
+              <span className={policyNote.ok ? "text-flow" : "text-jam"}>{policyNote.text}</span>
+            ) : policy.data ? (
+              t("settings.policyActive", { method: policy.data.label })
+            ) : (
+              t("settings.policyOffline")
+            )}
+          </p>
         </Section>
 
         <Section title={t("settings.llm")}>

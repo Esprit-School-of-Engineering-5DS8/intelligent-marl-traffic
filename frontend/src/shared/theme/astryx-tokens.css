@@ -39,17 +39,17 @@ body,
   --color-text-primary:       #e6edf3;
   --color-text-secondary:     #a7b6c4;
   --color-text-disabled:      #8193a4;
-  --color-text-accent:        #b3a8ff;
+  --color-text-accent:        #a8d96e;
 
   /* ── Icon ─────────────────────────────────────────────────────────── */
   --color-icon-primary:       #e6edf3;
   --color-icon-secondary:     #a7b6c4;
   --color-icon-disabled:      #8193a4;
-  --color-icon-accent:        #b3a8ff;
+  --color-icon-accent:        #a8d96e;
 
   /* ── Brand / Accent ───────────────────────────────────────────────── */
-  --color-accent:             #9a8cff;  /* KEMETRA purple */
-  --color-accent-muted:       rgba(154, 140, 255, 0.15);
+  --color-accent:             #9ed36a;  /* KEMETRA green */
+  --color-accent-muted:       rgba(158, 211, 106, 0.15);
   --color-on-accent:          #0a0f14;
 
   /* ── Borders ──────────────────────────────────────────────────────── */

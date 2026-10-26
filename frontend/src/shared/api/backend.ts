@@ -7,7 +7,11 @@ import { Run, type ScenarioRequest } from "@/shared/schemas";
 import { DataError } from "./source";
 
 /** Calls to the FastAPI backend (live source only). No key or secret ever lives here. */
-async function api<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+export async function api<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  init?: RequestInit,
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`/api/${path}`, {

@@ -1,10 +1,7 @@
 ---
 name: Backend consolidation roadmap
-overview: Unify simulation, evaluation, and the HTTP API on `src/cotraffic` as the single backend source of truth; add an RL vs LLM control policy with settings + API wiring; retire the duplicate legacy stack after tests pass; deliver a master architecture MD and align the React dashboard with KEMATRA green/white glass (remove purple cotraffic styling) while preserving the live Mapbox/3D experience from the original shell.
+overview: Unify cotraffic + api as single simulation/metrics source; policy API for RL vs LLM; legacy removal after tests. UI is separate (frontend_benchmark_ui plan + docs/FRONTEND_ROADMAP.md).
 todos:
-  - id: benchmark-ui-next
-    content: "Phase Next — Refactor benchmark + subtabs (overview/agents/live/compare): KEMATRA green/white Astryx glass, remove purple/dark rami shell, wire live backend data"
-    status: pending
   - id: docs-architecture
     content: Write docs/ARCHITECTURE.md + docs/MIGRATION_CHECKLIST.md; fix README.md and frontend/README.md pointers
     status: pending
@@ -15,19 +12,16 @@ todos:
     content: Rewrite api/simulation SimulationSession to drive CoTrafficEnv + make_controller(active policy)
     status: pending
   - id: settings-policy
-    content: Add controlMode/learnedMethod/baselineMethod to settings + SettingsPage; sync with PUT /api/policy
+    content: "Backend only: GET/PUT /api/policy + configs/dashboard_policy.yaml (UI in frontend plan F3)"
     status: pending
   - id: legacy-gate
     content: Add/adjust tests; complete migration checklist; remove environment/, baselines/, old evaluation/, agents/rl stubs
     status: pending
-  - id: theme-kematra
-    content: "Global token pass (after benchmark): ensure all non-map React routes use same light green Astryx overrides"
-    status: pending
-  - id: frontend-entry
-    content: Plan Vite entry switch app.js -> main.tsx after live-map parity port (benchmark no longer depends on benchmark-rami.jsx)
-    status: pending
   - id: ab-runbook
     content: Document and optionally script train/select/evaluate llm_ab + export flow in docs and scripts/reproduce_all.sh
+    status: pending
+  - id: export-llm-metrics
+    content: "Extend export_dashboard_data (or /api/data) with llm_* run metrics for Benchmark LLM monitor tab (frontend plan F6)"
     status: pending
 isProject: false
 ---
@@ -73,7 +67,9 @@ flowchart TB
 
 
 
-**Target:** one backend domain (`cotraffic`) + one thin HTTP layer (`api/`) + one visual system (KEMATRA `[frontend/styles.css](frontend/styles.css)`) + one settings-driven **control policy** (RL learned vs LLM vs baseline) for live runs and scenario launches.
+**Target:** one backend domain (`cotraffic`) + one thin HTTP layer (`api/`) + one settings-driven **control policy** (RL learned vs LLM vs baseline) for live runs and scenario launches.
+
+**Frontend (separate plan):** See **[Frontend benchmark UI plan](frontend_benchmark_ui_05911eba.plan.md)** (Cursor plans) and repo **[docs/FRONTEND_ROADMAP.md](docs/FRONTEND_ROADMAP.md)** (created in frontend F0). Backend plan only defines API contracts the UI calls.
 
 ---
 
@@ -90,45 +86,12 @@ Create `**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**` (primary artifact you 
 | Runbooks           | Train → select → evaluate → export → start API → open dashboard                                                     |
 | A/B protocol       | `[configs/experiments/llm_ab.yaml](configs/experiments/llm_ab.yaml)` + fairness notes (5 s RL vs 30 s LLM interval) |
 | Deprecation        | Legacy paths marked **removed after Phase 3** with checklist                                                        |
-| Frontend           | KEMATRA design tokens vs removed purple theme                                                                       |
+| Frontend           | Link to [docs/FRONTEND_ROADMAP.md](docs/FRONTEND_ROADMAP.md) (not duplicated here)                                  |
 
 
 Add `**[docs/MIGRATION_CHECKLIST.md](docs/MIGRATION_CHECKLIST.md)**` as a gate before deleting legacy code (checkboxes tied to tests below).
 
 Update stale docs in the same pass: `[README.md](README.md)` (point to `cotraffic` + `api/`), `[frontend/README.md](frontend/README.md)` (backend exists; proxy on 8000).
-
----
-
-## Phase Next — Benchmark and subtabs UI reform (immediate priority)
-
-**Goal:** When the operator opens **Benchmark** in the main KEMATRA shell (`[frontend/app.js](frontend/app.js)` → `#benchmarkView`), the four subtabs (Vue d’ensemble, Agents RL, Carte en direct, Analyse comparative) must look like the **main overview dashboard**: green accent (`#7cbd40` / `#70b83a`), white **glassmorphism** cards, Outfit/light surfaces — **not** the current purple/dark cotraffic skin from `[benchmark-rami.jsx](frontend/benchmark-rami.jsx)` (`rami-migrated-shell`, `bg-bg` dark tokens).
-
-**Visual system (single recipe):**
-
-- **Reference UI:** Overview tab in the main dashboard — `[frontend/styles.css](frontend/styles.css)` benchmark block (`.benchmark-card`, `.benchmark-tab.is-active`, green eyebrow) **plus** React `[Panel](frontend/src/shared/ui/panel.tsx)` / `[PageHeader](frontend/src/shared/ui/page-header.tsx)` on `[OverviewPage.tsx](frontend/src/features/overview/OverviewPage.tsx)`.
-- **Component library:** Keep **@astryxdesign/core** (Button, Card, Layout) via `Panel` / `KButton` — do **not** remove Astryx; **re-map tokens** in `[astryx-tokens.css](frontend/src/shared/theme/astryx-tokens.css)` and `[index.css](frontend/src/shared/theme/index.css)` so `--color-accent`, `--color-text-accent`, `--accent`, `--accent-soft` use **green**, surfaces use **white/light glass** (`rgba(255,255,255,.85)`, hairline `#e2e7df` borders), matching `[styles.css](frontend/styles.css)` `:root` (`--green`, white background).
-- **Explicitly remove:** Purple values (`#9a8cff`, `#5b4bd6`, `#b3a8ff`), default **dark** `[data-theme="dark"]` chrome inside the benchmark mount, and the duplicate tab strip styling that fights kematra `.benchmark-tabs`.
-
-**Backend integration (same data as study, no second truth):**
-
-- Benchmark mount must use the same pipeline as the full React app: `[Providers](frontend/src/app/providers.tsx)` + TanStack Query + `[fetchData](frontend/src/shared/api/source.ts)` / `[queries.ts](frontend/src/shared/api/queries.ts)`.
-- Default **live** when entering benchmark (today’s `LiveDataMode` hack in `benchmark-rami.jsx`) becomes explicit UX: respect `[settings.dataSource](frontend/src/features/settings/store.ts)` with a visible badge (mock = exported JSON in `public/data`; live = `GET /api/data/*` via Vite proxy → port 8000).
-- Subtab **Carte en direct**: keep map-specific **dark glass** only over the Mapbox canvas (as in live-map Events tab); analytics/overview/agents stay **light green glass**.
-- Optional in this phase: poll `GET /api/runs` + `GET /api/health` on Agents/Overview footers (no policy API yet — that stays Phase 1 backend).
-
-**Implementation steps (ordered):**
-
-1. **Design tokens first** — Update light theme in `index.css` + `astryx-tokens.css` (green accent, white glass surfaces); set `[charts/tokens.ts](frontend/src/shared/charts/tokens.ts)` accent to green. Force benchmark root to `data-theme="light"` and `data-astryx-theme="kemetra"`.
-2. **Replace embed shell** — Retire `[benchmark-rami.jsx](frontend/benchmark-rami.jsx)` as the long-term pattern; add `[frontend/src/features/benchmark/BenchmarkShell.tsx](frontend/src/features/benchmark/BenchmarkShell.tsx)` (or similar) that:
-   - Renders kematra-aligned subtab nav (reuse CSS classes from `styles.css` **or** Tailwind tokens mirroring them).
-   - Switches among `OverviewPage`, `AgentsPage`, `LiveMapPage`, `AnalyticsPage` without a second Provider tree.
-   - Exports `mountBenchmark(container)` for `app.js` (same integration point, new implementation).
-3. **Restyle subtabs** — Pass on each page: ensure `Shell`-less pages use `Panel`/`ChartCard`/`KpiCard` consistently; fix `[Sidebar](frontend/src/app/layout/Sidebar.tsx)`-style active states to green (`bg-accent-soft` once accent is green). Remove purple from assistant chat bubbles in benchmark context if needed.
-4. **Nav sync** — Wire `[app.js](frontend/app.js)` `benchmarkSubnav` clicks to React tab state (custom event or shared `localStorage` key `kemetra.benchmarkTab`) so sidebar subtabs and in-view tabs stay one source.
-5. **Cleanup** — Remove `rami-migrated-shell` class; audit `[benchmark-live.jsx](frontend/benchmark-live.jsx)` for duplicate fetch logic; delete dead purple CSS in `index.css` `[data-theme="dark"]` **only for benchmark scope** if full app still needs dark elsewhere (document split: *dashboard pages = light*, *map overlay = dark glass*).
-6. **Verify** — Manual: mock mode (no uvicorn) shows same numbers as before; live mode with `uvicorn api.main:app` shows `/api/data/meta` + summary; visual check against main overview dashboard.
-
-**Out of scope for Phase Next (later phases):** cotraffic-backed live sim rewrite (Phase 1.2), RL/LLM policy toggle (Phase 2), deleting `app.js` (frontend-entry todo).
 
 ---
 
@@ -193,25 +156,16 @@ Document that `**python -m cotraffic**` remains the batch/research entry; `**api
 
 ---
 
-## Phase 2 — Settings UI: RL vs LLM vs baseline
+## Phase 2 — Control policy API (backend)
 
-Extend `[frontend/src/features/settings/store.ts](frontend/src/features/settings/store.ts)` and `[schema.ts](frontend/src/features/settings/schema.ts)`:
+Implement server-side policy (see 1.3) and document the contract for the frontend plan **F3**:
 
+- `GET /api/policy` — method, availability flags
+- `PUT /api/policy` — validate against registry; reject missing checkpoints
 
-| Setting          | Purpose                                                   |
-| ---------------- | --------------------------------------------------------- |
-| `dataSource`     | unchanged: `mock` / `live`                                |
-| `controlMode`    | `baseline` | `learned` | `llm`                            |
-| `baselineMethod` | `mp`, `ft`, `act`, … when mode is baseline                |
-| `learnedMethod`  | `coop`, `ind`, `coop_full`, … when mode is learned        |
-| `llmProvider`    | keep for assistant; control LLM uses backend env + policy |
+**UI for RL vs LLM toggle:** frontend plan F3 (`settings/store`, Settings page, i18n). Do not duplicate UI tasks here.
 
-
-On change (live mode only): `PUT /api/policy` then show status from `GET /api/policy`.
-
-i18n: `[frontend/src/shared/i18n/locales/fr.json](frontend/src/shared/i18n/locales/fr.json)` (and en/ar).
-
-**Important:** `llmProvider` in settings today is **assistant-only** (`[api/main.py](api/main.py)` uses Groq for chat). Control LLM uses `[configs/agents/llm.yaml](configs/agents/llm.yaml)` / `COTRAFFIC_LLM_`*. Document both in ARCHITECTURE.md; optionally unify provider selection in Phase 2 if Groq/Ollama paths are aligned.
+**Important:** Assistant `llmProvider` vs control LLM env vars — document both in ARCHITECTURE.md.
 
 ---
 
@@ -239,20 +193,7 @@ Keep **scenario folders** `[scenarios/grid_2x2](scenarios/grid_2x2)` as SUMO ass
 
 ---
 
-## Phase 4 — Frontend: global KEMATRA shell (after Phase Next)
-
-Phase Next covers **benchmark + subtabs**. Phase 4 extends the same token system to the **full React router app** (`[main.tsx](frontend/src/main.tsx)` + `[Shell.tsx](frontend/src/app/layout/Shell.tsx)`) when you switch off the `app.js` entry.
-
-**Entry point strategy (incremental, low risk):**
-
-1. Switch Vite entry from `[index.html](frontend/index.html)` `app.js` → `[main.tsx](frontend/src/main.tsx)` when live-map / modes parity checklist passes.
-2. Port Mapbox + `[sumo-env.js](frontend/sumo-env.js)` into React live/simulation pages with unified `/api/simulation/*`.
-
-Do **not** delete `app.js` until React live map reaches feature parity.
-
----
-
-## Phase 5 — A/B benchmarking workflow (RL vs LLM)
+## Phase 4 — A/B benchmarking workflow (RL vs LLM)
 
 **Batch (study-quality)** — already mostly implemented:
 
@@ -264,10 +205,7 @@ Do **not** delete `app.js` until React live map reaches feature parity.
 
 Document fairness constraints in ARCHITECTURE.md (decision interval, observation mismatch coop vs LLM prompt).
 
-**Interactive (dashboard)** — after Phase 1–2:
-
-- Settings: `learned` vs `llm` → live sim + “New scenario” defaults (`coop` vs `llm` side-by-side via existing `[NewScenario.tsx](frontend/src/features/scenarios/NewScenario.tsx)`)
-- Optional: add `llm` to `[frontend/src/shared/domain/methods.ts](frontend/src/shared/domain/methods.ts)` labels/colors (green family, not purple)
+**Interactive (dashboard)** — after backend Phase 2 + frontend F3 (policy UI).
 
 ---
 
@@ -275,24 +213,24 @@ Document fairness constraints in ARCHITECTURE.md (decision interval, observation
 
 ```mermaid
 flowchart LR
-  P0[Phase0_docs]
-  PNext[PhaseNext_benchmark_UI]
-  P1[Phase1_api_cotraffic_sim]
-  P2[Phase2_policy_settings]
-  P5a[Phase5_batch_AB]
-  P3[Phase3_delete_legacy]
-  P4[Phase4_full_shell]
-  P0 --> PNext
-  PNext --> P1
+  P0[Phase0_backend_docs]
+  F0[Frontend_F0_F1]
+  P1[Phase1_api_sim]
+  P2[Phase2_policy_API]
+  P4[Phase4_batch_AB]
+  P3[Phase3_legacy_delete]
+  F0 --> F2[Frontend_F2_subtabs]
+  P0 --> P1
+  F0 -. parallel .-> P0
   P1 --> P2
-  P2 --> P5a
+  P2 --> P4
   P2 --> P3
-  PNext --> P4
+  P2 --> F3[Frontend_F3_policy_UI]
 ```
 
-**Recommended next sprint:** Phase Next (benchmark UI + integrated backend data) in parallel with a slim Phase 0 (ARCHITECTURE.md frontend section only). Backend Phases 1–2 can follow without blocking the benchmark restyle.
+**Parallel tracks:** Frontend F0–F2 (benchmark UI) does not block backend Phase 1. Frontend F3 waits on policy API.
 
-Phase 5 batch A/B can run in parallel once checkpoints exist, even before legacy deletion.
+Batch A/B (Phase 4) can run once checkpoints exist, independent of legacy deletion.
 
 ---
 
@@ -311,5 +249,5 @@ Phase 5 batch A/B can run in parallel once checkpoints exist, even before legacy
 - Settings toggle persists and drives API policy.
 - `llm_ab` experiment reproducible from docs runbook.
 - Legacy Python stack deleted with passing tests.
-- React UI uses KEMATRA green/white glass; purple accent removed from theme files.
+- Frontend success criteria: see **Frontend benchmark UI plan**.
 

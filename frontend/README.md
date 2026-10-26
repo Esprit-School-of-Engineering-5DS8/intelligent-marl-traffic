@@ -39,19 +39,39 @@ npm run build
 npm run preview
 ```
 
-## Backend integration seam
+## Backend
 
-There is no HTTP backend in this repository yet; the dashboard currently renders demo data. When the Python/TraCI service is added, the expected endpoints are:
+The FastAPI backend lives at `api/` in the repository root. Start it first:
+
+```bash
+# from the repository root
+uvicorn api.main:app --port 8000
+```
+
+Vite proxies `/api` and `/ws` to `http://127.0.0.1:8000` (see `vite.config.js`), so the dev
+server needs no absolute URLs. The dashboard reads exported result files in two modes:
+
+- `mock` — `public/data/*.json`, bundled; no backend needed;
+- `live` — the same files served by `GET /api/data/{path}`.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/simulation/state` | Run state, step, KPIs, junction phases |
-| `POST` | `/api/simulation/start` | Start a scenario / controller |
-| `POST` | `/api/simulation/step` | Advance one simulation step |
-| `POST` | `/api/simulation/pause` | Pause the run |
-| `POST` | `/api/simulation/stop` | Stop and reset the run |
+| `GET` | `/api/health` | liveness |
+| `GET` | `/api/data/{path}` | exported result files (same JSON as `public/data`) |
+| `GET` | `/api/simulation/state` | live run snapshot |
+| `POST` | `/api/simulation/start` \| `pause` \| `resume` \| `step` \| `stop` \| `speed` | live controls |
+| `PUT` | `/api/policy` | active control policy (method + checkpoint) |
 
-The UI expects the response shape documented in the main project README (status, step, KPIs, junctions, vehicles). Map access can also be configured from the console:
+Architecture and the controller catalog: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
+
+### Two entries (migrating)
+
+`index.html` currently loads `app.js` (vanilla control room). The React SPA in `src/`
+(`main.tsx` → `src/app/router.tsx`) is built but not yet the entry; `benchmark-rami.jsx`
+embeds four of its pages inside the benchmark tab. The switch happens once the live map
+reaches parity — see the roadmap in `docs/ARCHITECTURE.md` §7.
+
+Map access can also be configured from the console:
 
 ```js
 KEMATARA.setMapToken('pk.eyJ1...');

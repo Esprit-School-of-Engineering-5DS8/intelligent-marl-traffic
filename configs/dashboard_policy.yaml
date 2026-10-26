@@ -1,0 +1,11 @@
+# Defaults for the dashboard's active control policy.
+# The dashboard may change it at runtime (PUT /api/policy); the change is kept in
+# results/dashboard_policy.json (gitignored) so it survives a backend restart.
+
+live:
+  # Registry name: mp | ft | act | coop | llm | ...
+  method: mp
+  # Network the live demo runs on (configs/networks/<network>.yaml).
+  network: grid4x4
+  # "auto" resolves results/checkpoints/<method>/<network>/seed1.zip.
+  checkpoint: auto

@@ -1,0 +1,69 @@
+/**
+ * Benchmark view entry.
+ *
+ * Renders one React page at a time into `#benchmarkView`. Navigation lives in the
+ * dashboard sidebar (`[data-benchmark-tab]`), so this file has no tab bar of its own —
+ * it replaces the old `benchmark-rami.jsx` shell that duplicated it.
+ *
+ * The KEMETRA visual system comes from the shared tokens, in the same order as
+ * `src/main.tsx`: Astryx base CSS, then its KEMETRA overrides, then the Tailwind theme.
+ */
+import React, { useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/500.css';
+import '@fontsource/ibm-plex-sans/600.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '@astryxdesign/core/astryx.css';
+import './src/shared/theme/astryx-tokens.css';
+import './src/shared/theme/index.css';
+import { Providers } from './src/app/providers.tsx';
+import './src/shared/i18n/index.ts';
+import { useSettings } from './src/features/settings/store.ts';
+import OverviewPage from './src/features/overview/OverviewPage.tsx';
+import AgentsPage from './src/features/agents/AgentsPage.tsx';
+import LiveMapPage from './src/features/live-map/LiveMapPage.tsx';
+import AnalyticsPage from './src/features/analytics/AnalyticsPage.tsx';
+
+const PAGES = {
+  overview: OverviewPage,
+  agents: AgentsPage,
+  live: LiveMapPage,
+  compare: AnalyticsPage,
+};
+
+/** The benchmark pages read the backend, not the bundled export. */
+function LiveDataMode() {
+  const update = useSettings((s) => s.update);
+  useEffect(() => update({ dataSource: 'live' }), [update]);
+  return null;
+}
+
+function View({ tab }) {
+  const Page = PAGES[tab] || OverviewPage;
+  return (
+    <>
+      <LiveDataMode />
+      <Providers>
+        <Page />
+      </Providers>
+    </>
+  );
+}
+
+let root = null;
+
+export function mountBenchmarkView(container, tab = 'overview') {
+  root = createRoot(container);
+  root.render(<View tab={tab} />);
+  return () => {
+    root?.unmount();
+    root = null;
+  };
+}
+
+/** Switch the rendered page; called by the sidebar's benchmark sub-items. */
+export function setBenchmarkTab(tab) {
+  root?.render(<View tab={tab || 'overview'} />);
+}
