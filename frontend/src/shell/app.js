@@ -244,13 +244,13 @@ function scenarioOptionMarkup(key, scenario) {
         </button>`;
 }
 
-/* The live map menu also offers the two headless SUMO grids: they draw the
-   TraCI network on the canvas scene instead of the Mapbox basemap. */
+/* Every menu offers all four scenarios. The two headless SUMO grids are grouped
+   apart because they draw the TraCI network on the canvas scene (and their own 3D
+   environment) instead of the Mapbox basemap, so the layer toggles do not apply. */
 function renderScenarioMenus() {
   scenarioMenus.forEach((menu) => {
-    const isLiveMenu = menu.id === 'livePlaceMenu';
     const places = Object.entries(SCENARIOS).filter(([key]) => !key.startsWith('grid-'));
-    const grids = isLiveMenu ? Object.entries(SCENARIOS).filter(([key]) => key.startsWith('grid-')) : [];
+    const grids = Object.entries(SCENARIOS).filter(([key]) => key.startsWith('grid-'));
     menu.innerHTML = `
       <div class="scenario-menu-head" role="presentation">
         <span>Simulation scenario</span>
