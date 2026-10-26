@@ -1,0 +1,31 @@
+== Situation grid4x4__emergency__peak__s1000__t1600
+   t=1600s trigger=emergency:ev_0
+   phase sides: NS/EW
+   junction phase green_s queue_per_phase peds
+   EMERGENCY ev_0 next: D0(p1,216m) C0(p1,466m) C1(p0,704m) C2(p0,954m)
+   outil 1 : get_intersection_state({"junction": "A0"})
+      résultat : {"junction": "A0", "phase": 1, "phase_sides": ["NS", "EW"], "green_s": 7, "halted_per_phase": [9, 0], "waiting_pedestrians": 0}
+   outil 2 : get_intersection_state({"junction": "A1"})
+      résultat : {"junction": "A1", "phase": 0, "phase_sides": ["NS", "EW"], "green_s": 7, "halted_per_phase": [14, 4], "waiting_pedestrians": 0}
+   outil 3 : get_intersection_state({"junction": "A2"})
+      résultat : {"junction": "A2", "phase": 1, "phase_sides": ["NS", "EW"], "green_s": 12, "halted_per_phase": [13, 1], "waiting_pedestrians": 0}
+   outil 4 : get_intersection_state({"junction": "A3"})
+      résultat : {"junction": "A3", "phase": 1, "phase_sides": ["NS", "EW"], "green_s": 2, "halted_per_phase": [1, 5], "waiting_pedestrians": 0}
+   pas de conseil (answered without calling submit_advice) -> PPO décide seul
+   4 tours du modèle, 50.0 s au total, 7228 tokens lus, 218 écrits
+== Situation grid4x4__emergency__peak__s1000__t1660
+   t=1660s trigger=event-active
+   phase sides: NS/EW
+   junction phase green_s queue_per_phase peds
+   EMERGENCY ev_0 next: C1(p0,10m) C2(p0,260m) C3(p0,510m) B3(p1,758m)
+   outil 1 : get_neighbors({"junction": "A0"})
+      résultat : {"junction": "A0", "neighbours": []}
+   outil 2 : get_neighbors({"junction": "A1"})
+      résultat : {"junction": "A1", "neighbours": []}
+   outil 3 : get_neighbors({"junction": "A2"})
+      résultat : {"junction": "A2", "neighbours": []}
+   outil 4 : get_neighbors({"junction": "A3"})
+      résultat : {"junction": "A3", "neighbours": []}
+   outil 5 : submit_advice({"items": [], "reason": ""})
+   conseil soumis : aucun (abstention)
+   3 tours du modèle, 27.2 s au total, 4828 tokens lus, 129 écrits

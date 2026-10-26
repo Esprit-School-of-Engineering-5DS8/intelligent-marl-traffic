@@ -223,3 +223,68 @@ curl.exe -N -X POST http://localhost:8000/api/assistant/chat -H "Content-Type: a
 - l'ouverture d'un carrefour sur la carte, seulement après un clic ;
 - qu'aucune simulation ne démarre sans backend ni confirmation ;
 - la réponse en anglais quand l'interface est en anglais.
+
+## LLM dans la boucle de décision (validation, environ 15 min)
+
+Le déroulé détaillé, les preuves et les questions probables sont dans
+[VALIDATION_LLM.md](VALIDATION_LLM.md). Convention : gain positif = mieux. Tous les
+chiffres viennent de la graine de validation 1000.
+
+### Préparation (5 minutes avant)
+
+```powershell
+cd G:\pi5eme\cotraffic
+ollama list                                   # qwen2.5:3b doit être présent
+.venv\Scripts\python -m pytest tests\test_llm_settings.py -q    # réglages cohérents
+```
+
+La démo charge elle-même le modèle et le garde en mémoire 30 min (`keep_alive`). Pour
+qu'elle soit fluide, ne pas lancer d'autre calcul pendant la séance.
+
+### 1. Le LLM agit sur les décisions des agents (environ 2 min)
+
+```powershell
+.venv\Scripts\python scripts\llm_demo.py                      # urgences, grille 4x4
+.venv\Scripts\python scripts\llm_demo.py --scenario incident --compare   # + COOP-FULL seul
+.venv\Scripts\python scripts\llm_demo.py --source rules       # sans LLM, si Ollama est absent
+type docs\demo\llm_demo_emergency.txt                         # secours : sortie déjà enregistrée
+```
+
+Pour chaque appel, la démo affiche :
+- la situation envoyée ;
+- le conseil reçu, avec sa latence et l'instant où il agit ;
+- ce que proposeraient les règles.
+
+Puis, pour chaque décision changée : la phase choisie par PPO seul, celle demandée avec le
+conseil, et celle exécutée par le bouclier.
+
+### 2. Réglages et choix du modèle (1 min)
+
+```powershell
+Get-Content configs\llm.yaml
+type results\exploration\llm_benchmark\step2_choice.json
+type results\exploration\llm_benchmark\v2_zero_summary.csv
+```
+
+### 3. Sécurité (1 min)
+
+```powershell
+.venv\Scripts\python -m pytest tests\test_llm_security.py -v    # 10 tests, dont l'attaque contre le bouclier
+.venv\Scripts\python -m pytest tests\test_llm.py -k refused -v   # 12 réponses invalides refusées
+```
+
+### 4. Tool schema (1 min)
+
+```powershell
+.venv\Scripts\python -m pytest tests\test_llm_tools.py -v
+.venv\Scripts\python scripts\llm_tools_demo.py --kind emergency   # environ 1 min, avec le LLM
+type docs\demo\llm_tools_demo.txt                                  # secours
+```
+
+### 5. Résultats (2 min)
+
+```powershell
+type results\exploration\llm_benchmark\v2_tech_summary.csv     # zero / brief / few / vote
+type results\exploration\llm_period\period_summary.csv         # épisodes complets, N = 3, 5, 10 min
+type results\exploration\llm_oracle\oracle_summary.csv         # PPO seul, règles, LLM, placebo, oracle
+```
