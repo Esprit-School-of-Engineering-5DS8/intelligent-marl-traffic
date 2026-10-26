@@ -64,10 +64,14 @@ Files at the centre of it:
 - [x] `docs/FRONTEND_ROADMAP.md` (this file) and `docs/DESIGN_TOKENS.md`
 - [x] `index.css` `--accent` / `--focus` / `--accent-soft` are green, not purple
 - [x] `charts/tokens.ts` accent fallback green; `methods.ts` LLM colour `#7cbd40`
-- [ ] Benchmark mount carries `data-theme="light"` + `data-astryx-theme="kemetra"`
-      (`mountBenchmarkView` currently mounts plain, so the Astryx block below still wins)
-- [ ] `astryx-tokens.css` still declares `color-scheme: dark` and a dark base palette —
-      finish the light KEMETRA mapping there (see DESIGN_TOKENS.md, "Gap")
+- [x] Benchmark mount carries `data-theme="light"` + `data-astryx-theme="kemetra"`, so the
+      benchmark stays light even when the stored dashboard theme is dark
+- [x] `astryx-tokens.css` declares the light KEMETRA palette by default; dark applies only
+      under `[data-theme="dark"]`
+- [x] `.benchmark-view` (the vanilla host element) is painted light explicitly — it used
+      `var(--bg)`, which follows the `<html>` theme and turned the page navy
+- [x] Default settings theme is `light`; the live map keeps its dark canvas by forcing
+      `theme="dark"` on `NetworkMap` while its cards stay light
 
 Do **not** rename the `cotraffic-settings` localStorage key: it would wipe user prefs.
 

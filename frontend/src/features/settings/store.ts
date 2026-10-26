@@ -54,7 +54,8 @@ interface SettingsStore extends Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  theme: "dark",
+  // The KEMETRA design is a light green/white control room; dark is an explicit choice.
+  theme: "light",
   language: "fr",
   timeUnit: "s",
   speedUnit: "kmh",

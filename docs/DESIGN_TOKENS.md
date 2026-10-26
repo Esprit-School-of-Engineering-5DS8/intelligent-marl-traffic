@@ -53,13 +53,14 @@ an icon or a label so colour is not the only signal.
 | `--color-accent` / `-muted` / `-on-accent` | `--accent` / `--accent-soft` / `--accent-ink` |
 | `--radius-*` | `0px` |
 
-Theme switching: `data-theme="light|dark"` on `<html>`; the benchmark mount additionally
-sets `data-astryx-theme="kemetra"`.
+Theme switching: `data-theme="light|dark"` on `<html>`; light is the default. The benchmark
+mount additionally sets `data-theme="light"` + `data-astryx-theme="kemetra"` on its own
+container, and the light block is declared for `[data-theme="light"]` too, so that subtree
+stays light inside a dark page. The dark palette lives only under `[data-theme="dark"]`.
 
-**Gap (F0 remainder):** `astryx-tokens.css` still sets `color-scheme: dark` and a dark base
-palette (`#0a0f14`, `#111921`, `#e6edf3`). The green accents already reach the components,
-but the Astryx surfaces stay dark until that block is rewritten to the light ramp above.
-Dark glass is correct for the live-map canvas only.
+**One dark surface remains by design:** the live-map canvas. `LiveMapPage` paints its map box
+`#0a0f14` and passes `theme="dark"` to `NetworkMap`, so roads and vehicle colours read on
+navy; the cards, header and legend around it use the light tokens.
 
 ## 4. Chart tokens — `frontend/src/shared/charts/tokens.ts`
 

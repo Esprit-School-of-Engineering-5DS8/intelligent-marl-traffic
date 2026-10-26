@@ -85,6 +85,7 @@ export function NetworkMap({
   viewState,
   onViewState,
   label,
+  theme: forcedTheme,
 }: {
   net: NetworkGeometry;
   replay: Replay;
@@ -92,8 +93,11 @@ export function NetworkMap({
   viewState: MapViewState;
   onViewState: (v: MapViewState) => void;
   label: string;
+  /** The map canvas keeps the dark "screen" look even on the light dashboard. */
+  theme?: "dark" | "light";
 }) {
-  const theme = useResolvedTheme();
+  const resolved = useResolvedTheme();
+  const theme = forcedTheme ?? resolved;
   const time = usePlayback((s) => s.time);
   const selected = usePlayback((s) => s.selectedJunction);
   const select = usePlayback((s) => s.selectJunction);

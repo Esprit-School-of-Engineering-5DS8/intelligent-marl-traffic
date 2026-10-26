@@ -1,22 +1,20 @@
 /*
- * ASTRYX TOKEN OVERRIDES — KEMETRA Dark Theme
+ * ASTRYX TOKEN OVERRIDES — KEMETRA (light is the default)
  *
- * Maps KEMETRA's design language onto @astryxdesign/core's CSS variables.
- * Must be imported AFTER @astryxdesign/core/dist/astryx.css.
+ * Maps @astryxdesign/core's CSS variables onto the KEMETRA ramp. Imported before
+ * `index.css`, which owns the palette; this file only mirrors it for Astryx components
+ * and keeps the 0-radius system.
  *
- * Visual reference: Events tab (glassmorphism, 0-radius, dark palette).
- * Scope: Dashboard / Overview / Assistant — NOT live-map or events tab.
+ * Light is the default. Dark applies only where `data-theme="dark"` is set, so a
+ * `data-theme="light"` subtree inside a dark page stays light (the benchmark mount).
  */
 
 :root,
-html,
-body,
-[data-theme="dark"],
-[data-astryx-theme="astryx"],
+[data-theme="light"],
 [data-astryx-theme="kemetra"] {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* ── Radius — hard 0 system-wide to match Events tab reference ──── */
+  /* ── Radius — hard 0 system-wide ─────────────────────────────────── */
   --radius-none:      0px;
   --radius-xs:        0px;
   --radius-sm:        0px;
@@ -27,7 +25,57 @@ body,
   --radius-full:      0px;
   --radius-container: 0px;
 
-  /* ── Core Surfaces ────────────────────────────────────────────────── */
+  /* ── Core surfaces ────────────────────────────────────────────────── */
+  --color-background-body:    #f4f6f8;
+  --color-background-surface: #ffffff;
+  --color-background-card:    rgba(255, 255, 255, 0.85);
+  --color-background-popover: #f0f3f6;
+  --color-background-muted:   #f0f3f6;
+  --color-overlay:            rgba(14, 22, 33, 0.40);
+
+  /* ── Text ─────────────────────────────────────────────────────────── */
+  --color-text-primary:       #0e1621;
+  --color-text-secondary:     #445566;
+  --color-text-disabled:      #5e6d7c;
+  --color-text-accent:        #5f9c2b;
+
+  /* ── Icons ────────────────────────────────────────────────────────── */
+  --color-icon-primary:       #0e1621;
+  --color-icon-secondary:     #445566;
+  --color-icon-disabled:      #5e6d7c;
+  --color-icon-accent:        #5f9c2b;
+
+  /* ── Brand / accent — KEMETRA green ───────────────────────────────── */
+  --color-accent:             #5f9c2b;
+  --color-accent-muted:       #edf6e3;
+  --color-on-accent:          #ffffff;
+
+  /* ── Borders ──────────────────────────────────────────────────────── */
+  --color-border:             #d3dbe3;
+  --color-border-emphasized:  #b5c1cd;
+
+  /* ── Status (traffic states) ──────────────────────────────────────── */
+  --color-success:            #126b3f;
+  --color-success-muted:      #e3f5ec;
+  --color-error:              #a8262a;
+  --color-error-muted:        #fbe5e5;
+  --color-warning:            #8a5208;
+  --color-warning-muted:      #fbefdc;
+  --color-info:               #1e4fae;
+  --color-info-muted:         #e2ecfc;
+
+  /* ── Effects ──────────────────────────────────────────────────────── */
+  --color-shadow:             rgba(14, 22, 33, 0.12);
+  --color-skeleton:           #e5eaef;
+  --color-track:              #d3dbe3;
+  --color-neutral:            rgba(14, 22, 33, 0.04);
+  --color-tint-hover:         #f0f3f6;
+}
+
+/* Dark is opt-in only: an explicit `data-theme="dark"` on <html> or a subtree. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
   --color-background-body:    #0a0f14;
   --color-background-surface: #111921;
   --color-background-card:    rgba(17, 25, 33, 0.80);
@@ -35,36 +83,32 @@ body,
   --color-background-muted:   rgba(255, 255, 255, 0.04);
   --color-overlay:            rgba(10, 15, 20, 0.70);
 
-  /* ── Text ─────────────────────────────────────────────────────────── */
   --color-text-primary:       #e6edf3;
   --color-text-secondary:     #a7b6c4;
   --color-text-disabled:      #8193a4;
   --color-text-accent:        #a8d96e;
 
-  /* ── Icon ─────────────────────────────────────────────────────────── */
   --color-icon-primary:       #e6edf3;
   --color-icon-secondary:     #a7b6c4;
   --color-icon-disabled:      #8193a4;
   --color-icon-accent:        #a8d96e;
 
-  /* ── Brand / Accent ───────────────────────────────────────────────── */
-  --color-accent:             #9ed36a;  /* KEMETRA green */
+  --color-accent:             #9ed36a;
   --color-accent-muted:       rgba(158, 211, 106, 0.15);
   --color-on-accent:          #0a0f14;
 
-  /* ── Borders ──────────────────────────────────────────────────────── */
   --color-border:             #26323f;
   --color-border-emphasized:  #3a4a5a;
 
-  /* ── Status (aligned to traffic states) ──────────────────────────── */
   --color-success:            #38c980;
   --color-success-muted:      rgba(56, 201, 128, 0.15);
   --color-error:              #f06063;
   --color-error-muted:        rgba(240, 96, 99, 0.15);
   --color-warning:            #f2a33a;
   --color-warning-muted:      rgba(242, 163, 58, 0.15);
+  --color-info:               #5b97ff;
+  --color-info-muted:         rgba(91, 151, 255, 0.15);
 
-  /* ── Effects ──────────────────────────────────────────────────────── */
   --color-shadow:             rgba(0, 0, 0, 0.40);
   --color-skeleton:           #1f2b37;
   --color-track:              #26323f;

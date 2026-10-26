@@ -55,6 +55,12 @@ function View({ tab }) {
 let root = null;
 
 export function mountBenchmarkView(container, tab = 'overview') {
+  // The benchmark always renders on the KEMETRA light system, even when the rest of the
+  // dashboard is set to the dark control-room theme: the tokens are re-declared for this
+  // subtree, so no page here inherits the dark palette.
+  container.dataset.theme = 'light';
+  container.dataset.astryxTheme = 'kemetra';
+  container.classList.add('kemetra-light');
   root = createRoot(container);
   root.render(<View tab={tab} />);
   return () => {

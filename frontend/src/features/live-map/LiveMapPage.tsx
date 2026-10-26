@@ -89,20 +89,29 @@ function MapArea({ net, replay }: { net: NetworkGeometry; replay: Replay }) {
       <div className="flex min-w-0 flex-col gap-4">
         <div
           ref={box}
-          className="grid h-[560px] overflow-hidden rounded-lg border border-border bg-bg"
-          style={{ gridTemplateColumns: `repeat(${sides.length}, minmax(0, 1fr))` }}
+          className="grid h-[560px] overflow-hidden rounded-lg border border-border"
+          // The map is the one dark surface of the light dashboard: a navy canvas makes
+          // the vehicle and signal colours readable, everything around it stays light.
+          style={{
+            gridTemplateColumns: `repeat(${sides.length}, minmax(0, 1fr))`,
+            background: "#0a0f14",
+          }}
         >
           {view
             ? sides.map((s) => {
                 const method = replay.sides[s].method;
                 return (
-                  <div key={s} className="relative min-w-0 border-border not-last:border-e">
+                  <div
+                    key={s}
+                    className="relative min-w-0 border-border not-last:border-e"
+                  >
                     <NetworkMap
                       net={net}
                       replay={replay}
                       side={s}
                       viewState={view}
                       onViewState={setView}
+                      theme="dark"
                       label={`${f.methodName(method)} · ${f.networkName(replay.network)}`}
                     />
                     <span

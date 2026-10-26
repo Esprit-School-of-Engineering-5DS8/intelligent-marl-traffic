@@ -4,8 +4,11 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* Design tokens. Surfaces step up in lightness; traffic colours are reserved for traffic
-   states (never for decoration) and always come with an icon or a label. */
-:root {
+   states (never for decoration) and always come with an icon or a label. Light is the
+   default; `[data-theme="light"]` lets a subtree stay light inside a dark page (the
+   benchmark mount does this). */
+:root,
+[data-theme="light"] {
   color-scheme: light;
   --bg: #f4f6f8;
   --surface: #ffffff;

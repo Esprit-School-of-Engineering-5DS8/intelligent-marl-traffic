@@ -5003,7 +5003,14 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 /* ---------------- Live 3D Map ---------------- */
 
-.benchmark-view { min-height: 100%; overflow: auto; background: var(--bg, #f4f6f8); color: var(--text, #171717); }
+.benchmark-view {
+  min-height: 100%;
+  overflow: auto;
+  /* The benchmark is always the KEMETRA light system, even when the React app's stored
+     theme is dark: `--bg`/`--text` resolve against <html>, which the theme setting owns. */
+  background: #f4f6f8;
+  color: #0e1621;
+}
 .benchmark-react-shell { max-width: 1400px; margin: 0 auto; padding: 28px 32px 56px; }
 
 .live-map-view {
