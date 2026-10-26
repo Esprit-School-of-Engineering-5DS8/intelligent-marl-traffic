@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-import api.policy as policy
+from api import policy
 from api.main import app
 
 client = TestClient(app)

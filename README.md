@@ -35,7 +35,7 @@ intelligent-marl-traffic/
 ├── api/                 # FastAPI layer: data, runs, assistant, policy, live simulation
 ├── configs/             # protocol, networks, agents, scenarios, experiments (all parameters)
 ├── tests/               # pytest: API contract + domain checks
-├── scripts/             # export_dashboard_data.py, record_replay.py, reproduce_all.sh
+├── scripts/             # export/replay/reproduce entry points, explore/ research helpers
 ├── frontend/            # Single frontend (Vite)
 │   ├── index.html       #   entry -> src/shell/app.js (control-room shell)
 │   ├── styles.css       #   KEMETRA green/white tokens and layout

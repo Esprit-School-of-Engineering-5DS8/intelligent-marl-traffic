@@ -22,7 +22,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-import api.policy as policy
+from api import policy
 from cotraffic import config
 from cotraffic.controllers.registry import make_controller
 from cotraffic.envs.episodes import evaluation_episode

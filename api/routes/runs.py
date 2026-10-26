@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,8 +19,6 @@ DATA = ROOT / "frontend" / "public" / "data"
 
 router = APIRouter(tags=["runs"])
 runs = RunQueue()
-
-_ = re  # kept for parity with the assistant's word matching
 
 
 def known_methods() -> set[str]:

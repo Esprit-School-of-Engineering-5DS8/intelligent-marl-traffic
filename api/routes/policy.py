@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-import api.policy as policy
+from api import policy
 
 router = APIRouter(tags=["policy"])
 

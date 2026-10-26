@@ -13,13 +13,13 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-from cotraffic import config  # noqa: E402
-from cotraffic.analysis.aggregate import load_raw, summarise  # noqa: E402
-from cotraffic.analysis.style import (  # noqa: E402
+from cotraffic import config
+from cotraffic.analysis.aggregate import load_raw, summarise
+from cotraffic.analysis.style import (
     BASELINE_METHODS,
     DEMAND_ORDER,
     GRID,
@@ -30,7 +30,13 @@ from cotraffic.analysis.style import (  # noqa: E402
     label,
     method_sort_key,
 )
-from cotraffic.paths import FIGURES_DIR, LOGS_DIR, RAW_DIR, SUMMARY_DIR, TRAINING_DIR  # noqa: E402
+from cotraffic.paths import (
+    FIGURES_DIR,
+    LOGS_DIR,
+    RAW_DIR,
+    SUMMARY_DIR,
+    TRAINING_DIR,
+)
 
 LEARNED = ("ind", "coop", "coop_eco05", "coop_eco", "coop_full")
 

@@ -356,9 +356,9 @@ def failure(code: str) -> Finding:
     """One entry of docs/FAILURES.md (title and diagnosis)."""
     text = (DOCS_DIR / "FAILURES.md").read_text(encoding="utf-8")
     code = code.upper().replace(" ", "-")
-    m = re.search(rf"^## {re.escape(code)} - (.+?)$(.*?)(?=^## |\Z)", text, re.M | re.S)
+    m = re.search(rf"^## {re.escape(code)} - (.+?)$(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
     if not m:
-        codes = ", ".join(sorted(set(re.findall(r"^## (F-\d+)", text, re.M))))
+        codes = ", ".join(sorted(set(re.findall(r"^## (F-\d+)", text, re.MULTILINE))))
         return Finding(f"{code} n'existe pas. Entrées : {codes}.", found=False)
     title, body = m.group(1).strip(), m.group(2)
     body = re.sub(r"\s+", " ", body).strip()
