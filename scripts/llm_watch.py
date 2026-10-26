@@ -58,6 +58,15 @@ STEP2 = [
 ]
 
 
+VALIDATION = [
+    Task(
+        "Oracle (validation) et jeu de données LoRA (graines d'entraînement)",
+        "dataset.log",
+        RESULTS_DIR / "exploration" / "llm_lora" / "llm_lora_val.jsonl",
+    ),
+]
+
+
 def minutes(seconds: float) -> str:
     if seconds < 0:
         return "?"
@@ -96,6 +105,13 @@ def show() -> None:
     for i, task in enumerate(STEP2, 1):
         state, detail = status(task)
         print(f"  [{state:^12s}] {i}. {task.label}")
+        if detail:
+            print(f"                 {detail}")
+    print()
+    print("  Validation (partie B)")
+    for task in VALIDATION:
+        state, detail = status(task)
+        print(f"  [{state:^12s}] B6. {task.label}")
         if detail:
             print(f"                 {detail}")
     choice = BENCH / "step2_choice.json"
