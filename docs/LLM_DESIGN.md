@@ -1,9 +1,10 @@
 # Le LLM dans la boucle de décision : conception
 
-Document de conception de la partie « LLM dans la boucle » de CoTraffic. Il est complété à
-chaque étape du travail ; cette version couvre l'étape 1 (audit, architecture, plan). Les
-choix de modèle, d'hyperparamètres et de prompts (étape 2) seront faits sur la graine de
-validation 1000 uniquement.
+Document de conception de la partie « LLM dans la boucle » de CoTraffic, complété à chaque
+étape : audit et architecture (étape 1), choix du modèle, des réglages et des prompts sur la
+graine de validation 1000 uniquement (étape 2, section 8). Convention : **gain positif =
+mieux** (moins d'attente que COOP-FULL seul). Document de validation :
+[VALIDATION_LLM.md](VALIDATION_LLM.md).
 
 ---
 
@@ -18,7 +19,7 @@ validation 1000 uniquement.
 | Bouclier | `apply_shield` entre la demande et le feu ; jaune géré par le modèle du carrefour ; testé de façon exhaustive | Le conseil du LLM passe **avant** le bouclier : il ne peut jamais produire une séquence dangereuse. |
 | libsumo | `simulation.saveState` et `loadState` disponibles | Le jeu de données pour LoRA peut être construit par rollouts courts depuis des états sauvegardés. |
 | LLM local | Ollama 0.40.10, un seul modèle installé : `qwen2.5:3b` (1,9 Go) | Le benchmark de l'étape 2 doit télécharger d'autres candidats. |
-| Machine | Intel i5-1135G7 (4 cœurs, 8 threads), 11,7 Go de RAM, pas de GPU | Inférence CPU uniquement ; fine-tuning sur GPU externe (Colab ou Kaggle). |
+| Machine | Intel i5-1135G7 (4 cœurs, 8 threads), 11,7 Go de RAM, pas de GPU dédié | Ollama exécute le modèle sur la puce graphique intégrée Iris Xe (« 100% GPU » dans `ollama ps`, constaté à l'étape 2) ; fine-tuning sur GPU externe (Colab ou Kaggle). |
 | Durée d'une simulation d'évaluation (sans LLM) | COOP-FULL grille : 88 s (médiane), 207 s (90e centile) ; quartier : 34 s et 69 s | Base pour l'estimation du calcul. |
 | Résultats de référence manquants | COOP-FULL n'a pas été évalué sur `sensor_noise` ni `comm_dropout_*` (seulement IND, COOP, MP) | Il faut ajouter ces runs de référence (15 par cellule, environ 1,5 min chacun). |
 | Tests actuels | 148 tests pytest, 110 tests Vitest, 38 tests Playwright | Tous doivent continuer à passer. |
@@ -55,84 +56,111 @@ l'effet du LLM de l'effet d'une simple perturbation.
 
 ---
 
-## 3. Architecture proposée
+## 3. Architecture et orchestration
 
 ```mermaid
 flowchart TB
-  subgraph SUMO["Simulation SUMO (libsumo, pas de 1 s)"]
+  subgraph SUMO["Simulation SUMO (pas de 1 s)"]
     S[(État du trafic)]
   end
   subgraph STRAT["Niveau stratégique : rare, asynchrone"]
-    D[Détecteur d'événements<br/>ambulance, accident, capteur figé,<br/>pertes de messages, afflux piétons]
-    P[Déclencheur périodique<br/>toutes les N = 5 min]
-    B[Construction du prompt<br/>état compact, données balisées]
-    L[LLM local Ollama<br/>JSON contraint, outils en lecture seule]
-    V[Validation<br/>Pydantic, bornes, limites de fréquence,<br/>carrefours existants]
-    Q[File des conseils<br/>activation à t + latence mesurée,<br/>expiration]
+    D["1. Déclencheur<br/>nouvel événement ou période N = 10 min<br/>au plus 1 appel / 30 s simulées"]
+    O["2. Photographie de la situation<br/>texte compact entre balises &lt;state&gt;"]
+    C{"3. Cache<br/>(optionnel, désactivé)"}
+    L["4. LLM local Ollama, qwen2.5:3b<br/>JSON contraint par schéma<br/>(variante : outils en lecture seule + submit_advice)"]
+    V["5. Validation<br/>taille, Pydantic, bornes,<br/>carrefours et phases existants, délai max 60 s"]
+    Q["6. File des conseils<br/>activation à t + latence mesurée<br/>expiration après 10 à 120 s"]
   end
   subgraph TACT["Niveau tactique : toutes les 5 s"]
-    R[Politique PPO COOP-FULL<br/>logits par phase]
-    X[Biais borné<br/>logit + beta * poids]
+    R["7. Politique PPO COOP-FULL<br/>logits par phase"]
+    X["8. Biais borné<br/>logit + beta (4) × force / 3"]
   end
   subgraph SAFE["Niveau sécurité : dernier mot"]
-    SH[Bouclier<br/>vert min 10 s, max 60 s,<br/>anti-famine 90 s, jaune 3 s]
+    SH["9. Bouclier<br/>vert min 10 s, max 60 s, anti-famine 90 s, jaune 3 s"]
   end
-  S --> D & P
-  D & P --> B --> L --> V
-  V -- valide --> Q
-  V -- invalide ou délai dépassé --> R
+  S --> D --> O --> C
+  C -- "situation déjà vue" --> Q
+  C -- "nouvelle" --> L --> V
+  V -- "valide" --> Q
+  V -- "invalide, trop longue, délai dépassé :<br/>PPO décide seul" --> R
   Q --> X
   S --> R --> X --> SH --> S
-  V -.-> J[(Journal d'audit)]
+  V -.-> J[(Journal d'audit<br/>CallLog, calls/*.jsonl)]
   SH -.-> J
 ```
 
 Principes :
-1. **Le LLM conseille, il ne commande pas.** Sa seule sortie qui agit est `submit_advice` ;
-   elle passe par la validation, puis devient un biais borné sur la politique RL, que le
-   bouclier filtre ensuite.
-2. **Repli sûr** : en cas de délai dépassé, de JSON invalide ou de conseil rejeté, le RL
-   décide seul, exactement comme aujourd'hui.
-3. **Option désactivée par défaut** : un contrôleur `coop_full+llm` (nouveau nom de méthode,
-   nouvelle famille Holm « llm »). Aucun contrôleur ni résultat existant ne change.
+1. **Le LLM conseille, il ne commande pas.** Sa seule sortie qui agit est un conseil (la
+   réponse JSON, ou l'outil `submit_advice`) ; il passe par la validation, devient un biais
+   borné sur la politique RL, et le bouclier filtre ensuite la phase demandée.
+2. **Repli sûr** : en cas de délai dépassé, de JSON invalide, de réponse trop longue ou de
+   conseil rejeté, le RL décide seul, exactement comme sans LLM.
+3. **Aucun résultat existant ne change** : le conseiller est une enveloppe
+   (`AdvisedPolicy`) autour de COOP-FULL, utilisée par les scripts `llm_*` ; ses runs vont
+   dans `results/exploration/`, jamais dans `results/raw`. Son entrée dans la matrice
+   d'évaluation, avec une famille Holm « llm » séparée, est prévue à l'étape 4.
+
+### Flux d'un conseil, pas à pas (où c'est dans le code)
+
+| Étape | Ce qui se passe | Code |
+|---|---|---|
+| 1. Déclencheur | À chaque décision (5 s), un appel part si un événement est nouveau ou si la période N est écoulée, et si aucun appel n'a eu lieu depuis 30 s | `llm/advised.py:104` `_trigger` ; événements `llm/situation.py:109` `events` |
+| 2. Situation | Photographie à l'instant `t` : phase, durée du vert, files par phase, piétons de chaque carrefour, événements ; mise en texte et balisage `<state>` (les balises présentes dans les données sont neutralisées) | `llm/situation.py:89` `observe`, `:44` `to_text` ; `llm/prompts.py:38` `messages`, `:47` `wrap` |
+| 3. Cache (optionnel) | Même situation qu'un appel précédent (mêmes événements, mêmes phases, files par tranches de 5) : le conseil est réutilisé sans appel. Désactivé par défaut | `llm/advised.py:48` `situation_key`, `:134` |
+| 4. Appel au LLM | Ollama local, décodage contraint par le schéma JSON du réseau (carrefours énumérés, bornes), délai maximal 60 s ; variante à outils | `llm/sources.py:67` `LlmSource.advise` ; `llm/client.py:78` `chat` ; `llm/advice.py:45` `schema_for` ; outils `llm/tools.py` |
+| 5. Validation | Réponse de plus de 4 000 caractères refusée avant lecture ; lecture stricte (clés, types, bornes) ; une tentative de correction ; puis contrôle contre le réseau (carrefour et phase existants, un conseil par carrefour) | `llm/sources.py:84` ; `llm/advice.py:79` `parse`, `:125` `check` ; `llm/advised.py:152` |
+| 6. File et délai | Le conseil validé n'agit qu'à `t + latence mesurée` (ou nulle, ou doublée pour l'analyse de sensibilité), pendant sa durée de validité | `llm/advised.py:119` `_delay`, `:157-159` |
+| 7. Activation | À chaque décision : les conseils dont l'heure est venue deviennent actifs, ceux qui ont expiré disparaissent, le plus récent remplace l'ancien sur un carrefour | `llm/advised.py:167` |
+| 8. Biais | PPO calcule ses logits (`:189`, la phase qu'il choisirait seul) ; le conseil ajoute `beta × force / 3` à la phase conseillée (`:195`) ; la phase au plus grand logit est demandée (`:198`) | `llm/advised.py:189-198` |
+| 9. Bouclier | Le bouclier reçoit la phase demandée et garde le dernier mot (vert minimum, maximum, anti-famine, jaune), comme pour tout contrôleur ; puis SUMO avance | `envs/traffic_env.py:190` `apply_shield`, `:194` |
+| 10. Journal | Chaque appel est journalisé : déclencheur, latence, délai, validité, conseil accepté, rejets, tokens | `llm/advised.py` `CallLog` et `summary` ; `results/exploration/llm_period/calls/*.jsonl` |
 
 ### Gestion du temps (latence modélisée honnêtement)
 
 - Au temps simulé `t`, un événement ou le minuteur déclenche un appel ; l'état est
   photographié à `t`.
 - La simulation attend la réponse (pour connaître son contenu), mais le conseil ne
-  s'applique qu'à `t + L`, où `L` est la **latence réelle mesurée de cet appel**, arrondie
-  au pas de décision suivant (5 s). C'est ce qui se passerait si la simulation tournait en
-  temps réel pendant que le LLM réfléchit.
+  s'applique qu'à `t + L`, où `L` est la **latence réelle mesurée de cet appel** ; il agit à
+  la première décision (pas de 5 s) qui suit. C'est ce qui se passerait si la simulation
+  tournait en temps réel pendant que le LLM réfléchit.
 - Chaque conseil a une durée de validité bornée (10 à 120 s) ; il expire ensuite.
-- Un seul appel en cours à la fois, et au plus un appel toutes les 30 s simulées
-  (limite de fréquence).
-- Un cache des situations identiques (même événement, même carrefour, files discrétisées)
-  évite les appels redondants ; chaque utilisation du cache est journalisée.
+- Un seul appel en cours à la fois, et au plus un appel toutes les 30 s simulées.
+- Cache des situations identiques : codé (étape 3 ci-dessus) mais **désactivé** ; sur les
+  63 situations de validation, 4 répètent une situation précédente (6 % des appels). Il
+  n'a pas été évalué.
 
-### Fréquence d'appel : justification de N = 5 minutes
+### Événements détectés (ce que fait le code)
 
-- **Événements** : appel immédiat, à la détection d'une ambulance (au départ, avec sa
-  route), d'un accident (voie arrêtée depuis plus de 60 s), d'un capteur figé à 0 alors que
-  la voie amont est chargée, d'un taux de pertes de messages élevé, ou d'une foule de piétons
-  au-dessus d'un seuil.
-- **Périodique, N = 5 min** :
-  - la demande et les files évoluent à l'échelle de la minute ;
-  - une latence de 6 à 25 s reste inférieure à 10 % de la période, donc le conseil est
-    encore frais quand il s'applique ;
-  - le coût reste borné : 18 appels par épisode de 90 min, plus les événements.
-- N sera confirmé ou ajusté (3, 5 ou 10 min) sur la graine de validation 1000.
+- **Ambulance** : présente dans le réseau, avec les 4 prochains feux de sa route et la phase
+  dont elle a besoin à chacun.
+- **Accident** : pendant la fenêtre de l'accident du scénario (voie bloquée entre deux
+  carrefours).
+- **Capteur en panne** : les voies dont le détecteur lit 0 dans le scénario de capteurs
+  bruités ; le détecteur suppose la panne signalée (il lit l'information du scénario).
+- **Pertes de messages** : dès que des messages entre voisins se perdent, avec le taux.
+- **Foule de piétons** : au moins 3 piétons attendent à un carrefour (seuil choisi sur la
+  validation : 99e centile 2,9).
+
+### Fréquence d'appel : N = 10 min (mesuré sur la validation)
+
+- Les événements déclenchent un appel immédiat ; la période N ne concerne que les appels
+  réguliers.
+- N = 3, 5 et 10 min ont été comparés sur des épisodes complets (graine 1000, 6 scénarios,
+  section 8). Aucune période n'améliore COOP-FULL en moyenne ; 3 min dégrade nettement les
+  piétons (gain −24,8 %). La règle fixée à l'avance retient **10 min** (la plus longue à
+  moins de 0,5 point de la meilleure) : 5 appels réguliers par épisode, plus les
+  événements.
 
 ---
 
 ## 4. Mécanismes d'intervention
 
-| Mécanisme | Faisabilité ici | Décision |
-|---|---|---|
-| 1. Biais d'action (logits PPO) | Simple, continu, bornable (`beta * poids`, poids entre 0 et 1, beta calibré sur la validation) ; laisse le RL arbitrer quand le conseil est faible | **Mécanisme principal** |
-| 4. Coordination (intentions multi-carrefours) | Exprimée comme un ensemble de biais sur plusieurs carrefours avec une fenêtre temporelle : couloir vert le long de la route d'une ambulance, délestage autour d'un accident | **Intégré au mécanisme principal** : c'est là que le LLM apporte ce que le RL local n'a pas |
-| 3. Changement de mode | `coop_full_ev4` existe déjà (poids des urgences doublé) ; le LLM peut l'activer pendant un événement d'urgence | **Second mécanisme comparé** (grille, urgences), sans réentraînement |
-| 2. Masque d'actions | Avec 2 phases, interdire une phase revient à imposer l'autre : le LLM commanderait le feu | Écarté comme mécanisme principal ; gardé comme **ablation** (biais infini) pour mesurer l'intérêt d'un conseil « doux » |
+| Mécanisme | Faisabilité ici | Décision | État |
+|---|---|---|---|
+| 1. Biais d'action (logits PPO) | Simple, continu, bornable (`beta × force / 3`, force 1 à 3, beta calibré sur la validation : 4) ; laisse le RL arbitrer quand le conseil est faible | **Mécanisme principal** | Fait (`llm/advised.py:195`) |
+| 4. Coordination (intentions multi-carrefours) | Exprimée comme un ensemble de biais sur plusieurs carrefours avec une fenêtre temporelle : couloir vert le long de la route d'une ambulance, délestage autour d'un accident | **Intégré au mécanisme principal** | Fait : jusqu'à 4 carrefours par conseil, durée 10 à 120 s |
+| 3. Changement de mode | `coop_full_ev4` existe déjà (poids des urgences doublé) ; le LLM pourrait l'activer pendant un événement d'urgence | Second mécanisme envisagé | **Pas réalisé** |
+| 2. Masque d'actions | Avec 2 phases, interdire une phase revient à imposer l'autre : le LLM commanderait le feu | Écarté comme mécanisme principal ; ablation envisagée (biais infini) | **Pas réalisée** comme ablation ; le test de sécurité utilise un biais de 1000 (`tests/test_llm_security.py`) |
 
 Pourquoi le biais comme mécanisme principal :
 - il garde le RL comme décideur : un conseil faible ne renverse pas une forte préférence du
@@ -145,16 +173,17 @@ Pourquoi le biais comme mécanisme principal :
 
 ## 5. Contrôles et comparaisons prévus
 
-| Contrôleur | Rôle |
-|---|---|
-| COOP-FULL | Référence sans LLM (résultats existants, plus les runs manquants sur capteurs et pertes de messages) |
-| COOP-FULL + LLM zero-shot | Effet du LLM sans exemples |
-| COOP-FULL + LLM few-shot | Effet des exemples (tirés des graines d'entraînement) |
-| COOP-FULL + LLM LoRA | Effet du fine-tuning |
-| COOP-FULL + conseils aléatoires | **Placebo** : même fréquence, mêmes carrefours visés en nombre, même distribution d'amplitude que le LLM zero-shot sur la validation |
-| COOP-FULL + conseiller à règles | **Contrôle recommandé** : les mêmes conseils produits par des règles simples (couloir vert sur la route de l'ambulance, etc.), pour savoir si le LLM apporte plus qu'une heuristique |
-| COOP-FULL + mode urgence (`coop_full_ev4`) choisi par le LLM | Second mécanisme |
-| LLM seul sur un carrefour (type LLMLight) | Facultatif, épisode court : un appel par décision est hors de portée du CPU sur le réseau entier |
+| Contrôleur | Rôle | État (validation, graine 1000) |
+|---|---|---|
+| COOP-FULL | Référence sans LLM (résultats existants, plus les runs manquants sur capteurs et pertes de messages) | Situations et épisodes de validation faits ; runs de test manquants à faire (étape 4) |
+| COOP-FULL + LLM zero-shot | Effet du LLM sans exemples | Fait (6 modèles) |
+| COOP-FULL + LLM few-shot | Effet des exemples (tirés des graines d'entraînement) | Fait (qwen2.5:3b) |
+| COOP-FULL + LLM LoRA | Effet du fine-tuning | Jeu de données et notebook (étape 5) |
+| COOP-FULL + conseils aléatoires | **Placebo** : même fréquence, mêmes carrefours visés en nombre, même distribution d'amplitude que le LLM | Source codée (`RandomSource`) ; mesure : oracle et placebo (section 8) |
+| COOP-FULL + conseiller à règles | **Contrôle** : les mêmes conseils produits par des règles simples (couloir vert sur la route de l'ambulance, etc.), même mécanisme, même fréquence, même latence | Fait |
+| Oracle | Meilleur conseil candidat de chaque situation, choisi après coup par rejeu : borne haute de ce qu'un conseiller peut apporter | Section 8 |
+| COOP-FULL + mode urgence (`coop_full_ev4`) choisi par le LLM | Second mécanisme | Pas réalisé |
+| LLM seul sur un carrefour (type LLMLight) | Facultatif, épisode court | Pas réalisé |
 
 ---
 
