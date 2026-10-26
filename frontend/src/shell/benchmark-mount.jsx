@@ -16,15 +16,15 @@ import '@fontsource/ibm-plex-sans/600.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import '@astryxdesign/core/astryx.css';
-import './src/shared/theme/astryx-tokens.css';
-import './src/shared/theme/index.css';
-import { Providers } from './src/app/providers.tsx';
-import './src/shared/i18n/index.ts';
-import { useSettings } from './src/features/settings/store.ts';
-import OverviewPage from './src/features/overview/OverviewPage.tsx';
-import AgentsPage from './src/features/agents/AgentsPage.tsx';
-import LiveMapPage from './src/features/live-map/LiveMapPage.tsx';
-import AnalyticsPage from './src/features/analytics/AnalyticsPage.tsx';
+import '@/shared/theme/astryx-tokens.css';
+import '@/shared/theme/index.css';
+import { Providers } from '@/app/providers';
+import '@/shared/i18n';
+import { useSettings } from '@/features/settings/store';
+import OverviewPage from '@/features/overview/OverviewPage';
+import AgentsPage from '@/features/agents/AgentsPage';
+import LiveMapPage from '@/features/live-map/LiveMapPage';
+import AnalyticsPage from '@/features/analytics/AnalyticsPage';
 
 const PAGES = {
   overview: OverviewPage,

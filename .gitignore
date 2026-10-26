@@ -55,3 +55,8 @@ latest/
 
 # Screenshots captured during reviews
 screenshots/
+
+# Build caches and local logs
+out/
+.pytest_cache/
+.ruff_cache/

@@ -73,8 +73,10 @@ grep -rn "runner.py" --include="*.py" . | grep -v "docs/"
       (keep the folder if it still holds shared helpers — check imports first)
 - [ ] `agents/rl/*` stubs removed (keep `agents/` only if something imports it)
 - [ ] `scenarios/*/runner.py` removed (SUMO network/route assets stay)
-- [ ] `requirements-rami.txt` / `requirements-backend.txt` reconciled with
-      `requirements.txt`
+- [x] `requirements-rami.txt` / `requirements-backend.txt` merged into `requirements.txt`
+      (runtime) plus `requirements-dev.txt` (pytest, ruff, httpx)
+- [x] `forecasting/` stubs, `out/`, `latest/`, `run.ps1`, `examples/`, the grid scenario
+      folders and stray OSM test files removed
 - [ ] README.md and frontend/README.md point only at `cotraffic` + `api/`
 
 ## 6. Final regression

@@ -13,5 +13,5 @@
     "paths": { "@/*": ["src/*"] },
     "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "benchmark-view.jsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/shell/app.js", "src/shell/benchmark-mount.jsx"]
 }

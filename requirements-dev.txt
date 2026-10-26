@@ -1,0 +1,6 @@
+# Development tooling: tests and linting only.
+-r requirements.txt
+
+pytest==9.1.1
+ruff==0.16.8
+httpx            # FastAPI TestClient transport

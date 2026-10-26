@@ -242,10 +242,12 @@ Fairness constraints to state whenever these numbers are reported:
   but the cards do not. Full mapping: [DESIGN_TOKENS.md](DESIGN_TOKENS.md).
 - **Frontend roadmap:** [FRONTEND_ROADMAP.md](FRONTEND_ROADMAP.md) — benchmark shell,
   subtab pass, policy settings, single Vite entry.
-- **Current entries:** `frontend/index.html` loads `app.js` (vanilla control room). The
-  benchmark tab renders `frontend/benchmark-view.jsx`: one React page at a time, chosen by
-  the sidebar (`[data-benchmark-tab]`), with no duplicate tab bar. **Next:** switch the
-  entry to `src/main.tsx` once the live map reaches parity, then `app.js` retires.
+- **Current entry:** `frontend/index.html` loads `src/shell/app.js` (vanilla control room).
+  The benchmark tab renders `src/shell/benchmark-mount.jsx`: one React page at a time,
+  chosen by the sidebar (`[data-benchmark-tab]`), with no duplicate tab bar. All frontend
+  source lives under `frontend/src/` — `src/app`, `src/features`, `src/shared`, `src/shell`.
+  **Next:** switch the entry to `src/main.tsx` once the live map reaches parity, then
+  `app.js` retires.
 - **Persisted settings:** key `cotraffic-settings` (localStorage). Keep the name when adding
   fields so user preferences survive migrations; bump `version` in the store.
 
@@ -261,15 +263,17 @@ Fairness constraints to state whenever these numbers are reported:
 | `agents/` (incl. `agents/rl/*` stubs) | **removed** | `src/cotraffic/training/train.py` (SB3 PPO) |
 | `scenarios/*/runner.py` | **removed** | `python -m cotraffic episode` |
 | `examples/marl_quickstart.py` | **removed** | `python -m cotraffic episode` |
-| `frontend/benchmark-rami.jsx` | **removed** | `frontend/benchmark-view.jsx` (sidebar-driven React pages) |
+| `frontend/benchmark-rami.jsx` | **removed** | `frontend/src/shell/benchmark-mount.jsx` (sidebar-driven React pages) |
+| `forecasting/` (root stubs), `out/`, `latest/`, `run.ps1`, `examples/` | **removed** | `src/cotraffic/forecasting/`, `scripts/`, `docs/` |
+| `scenarios/grid_2x2`, `scenarios/grid_3x3` | **removed** | `python -m cotraffic networks` from `configs/networks/` |
 | `api/simulation.py` (raw TraCI + SUMO programs) | **replaced** | `CoTrafficEnv` + `make_controller` + `/api/policy` |
 
 Retired-module tests (`test_baselines`, `test_marl_env`, `test_monaco`, `test_multimodal`)
 were replaced by `tests/test_policy_api.py`, which covers the contract the dashboard uses.
 
-Deletion is gated by `docs/MIGRATION_CHECKLIST.md`. Keep SUMO scenario assets
-(`scenarios/grid_2x2`, `scenarios/grid_3x3`) until networks are generated purely from
-`configs/networks/`.
+Deletion is gated by `docs/MIGRATION_CHECKLIST.md`. Grid networks are generated from
+`configs/networks/`; `scenarios/monaco` is kept only as the source of
+`frontend/public/monaco-network.json` (`frontend/scripts/extract_monaco_network.py`).
 
 ---
 

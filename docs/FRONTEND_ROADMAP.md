@@ -26,8 +26,8 @@ dark `bg-bg` — inside the light control room.
 
 ```mermaid
 flowchart TB
-  AppJS["app.js — KEMETRA shell, styles.css green/white"]
-  BenchEmbed["benchmark-view.jsx mount"]
+  AppJS["src/shell/app.js — KEMETRA shell, styles.css green/white"]
+  BenchEmbed["src/shell/benchmark-mount.jsx"]
   ReactPages["Overview | Agents | Live map | Analytics"]
   Theme["index.css + astryx-tokens.css"]
   AppJS --> BenchEmbed
@@ -37,9 +37,10 @@ flowchart TB
 
 Files at the centre of it:
 
-- Embed: [frontend/benchmark-view.jsx](../frontend/benchmark-view.jsx) (replaced
-  `benchmark-rami.jsx`, which mounted its own duplicate tab bar)
-- Host nav: [frontend/app.js](../frontend/app.js) — `#benchmarkView`, sidebar `data-benchmark-tab`
+- Embed: [frontend/src/shell/benchmark-mount.jsx](../frontend/src/shell/benchmark-mount.jsx)
+  (replaced `benchmark-rami.jsx`, which mounted its own duplicate tab bar)
+- Host nav: [frontend/src/shell/app.js](../frontend/src/shell/app.js) — `#benchmarkView`,
+  sidebar `data-benchmark-tab`
 - Reference styling: [frontend/styles.css](../frontend/styles.css) — `.benchmark-*`, `--green`
 - React tokens: [index.css](../frontend/src/shared/theme/index.css),
   [astryx-tokens.css](../frontend/src/shared/theme/astryx-tokens.css)
@@ -77,7 +78,8 @@ Do **not** rename the `cotraffic-settings` localStorage key: it would wipe user 
 
 ### F1 — Benchmark shell
 
-- [x] Single embed (`benchmark-view.jsx`) with `Providers` (QueryClient, i18n, settings)
+- [x] Single embed (`src/shell/benchmark-mount.jsx`) with `Providers` (QueryClient, i18n,
+      settings)
 - [x] No duplicate tab bar: the shell sidebar owns subtab selection
 - [x] `benchmark-rami.jsx` / `benchmark-live.jsx` removed
 - [ ] Promote to `frontend/src/features/benchmark/BenchmarkShell.tsx` with a

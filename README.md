@@ -31,19 +31,28 @@ We use [Eclipse SUMO](https://sumo.dlr.de) as the microscopic traffic simulator 
 
 ```
 intelligent-marl-traffic/
-├── src/cotraffic/       # Domain: env, controllers, training, evaluation, CLI (authoritative)
-├── api/                 # FastAPI adapter for the dashboard (data, runs, assistant, live sim)
+├── src/cotraffic/       # Backend domain: env, controllers, training, evaluation, CLI
+├── api/                 # FastAPI layer: data, runs, assistant, policy, live simulation
 ├── configs/             # protocol, networks, agents, scenarios, experiments (all parameters)
-├── scenarios/           # SUMO assets: grid_2x2, grid_3x3, monaco
-├── scripts/             # export_dashboard_data.py, record_replay.py
-├── frontend/            # KEMETRA dashboard (Vite: index.html + app.js + styles.css)
-├── docs/                # ARCHITECTURE.md, MIGRATION_CHECKLIST.md, Design Thinking
-└── results/             # Auto-generated (gitignored): raw runs, summary, checkpoints
+├── tests/               # pytest: API contract + domain checks
+├── scripts/             # export_dashboard_data.py, record_replay.py, reproduce_all.sh
+├── frontend/            # Single frontend (Vite)
+│   ├── index.html       #   entry -> src/shell/app.js (control-room shell)
+│   ├── styles.css       #   KEMETRA green/white tokens and layout
+│   └── src/
+│       ├── app/         #   React shell: router, nav, providers, theme
+│       ├── features/    #   one folder per page (overview, live-map, agents, ...)
+│       ├── shared/      #   api client, schemas, ui, charts, i18n, theme tokens
+│       └── shell/       #   vanilla shell, Mapbox/3D env, benchmark island mount
+├── docs/                # ARCHITECTURE, DESIGN_TOKENS, FRONTEND_ROADMAP, plans/
+├── scenarios/monaco/    # source for the Monaco map JSON (extract_monaco_network.py)
+├── sumo_files/          # generated SUMO networks (gitignored)
+└── results/             # generated runs, summary, checkpoints (gitignored)
 ```
 
-> Legacy folders (`environment/`, `baselines/`, `evaluation/`, `agents/`) are retired
-> progressively — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
-> [docs/MIGRATION_CHECKLIST.md](docs/MIGRATION_CHECKLIST.md).
+One backend (`src/cotraffic` + `api/`), one frontend (`frontend/`). The retired stacks
+(`environment/`, `baselines/`, `evaluation/`, `agents/`, the Streamlit dashboard, the grid
+scenario runners) are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §8.
 
 ---
 
@@ -58,13 +67,15 @@ intelligent-marl-traffic/
 ```bash
 git clone https://github.com/Esprit-School-of-Engineering-5DS8/intelligent-marl-traffic.git
 cd intelligent-marl-traffic
-pip install -r requirements.txt
+pip install -r requirements.txt       # runtime
+pip install -r requirements-dev.txt   # tests and linting (optional)
+cd frontend && npm install
 ```
 
 ### Run a scenario (cotraffic CLI)
 ```bash
 python -m cotraffic networks --net grid2x2           # build the SUMO network
-python -m cotraffic episode --net grid2x2 --demand medium --steps 600
+python -m cotraffic episode --net grid2x2 --demand medium --seconds 600
 python -m cotraffic evaluate --experiment llm_ab_quick --jobs 1
 python -m cotraffic aggregate && python -m cotraffic tables
 ```

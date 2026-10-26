@@ -1,7 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { mountSumoLiveMap } from './sumo-env.js';
-import { mountBenchmarkView, setBenchmarkTab } from './benchmark-view.jsx';
+import { mountBenchmarkView, setBenchmarkTab } from './benchmark-mount.jsx';
 import { mountGauges } from './gauge.js';
 import { initModes } from './modes/index.js';
 
