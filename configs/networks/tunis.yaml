@@ -1,0 +1,78 @@
+# Tunis — real-world OSM arterial network (Avenue Habib Bourguiba corridor)
+#
+# Built automatically by `python -m cotraffic networks tunis --force`
+# This is the canonical "Phase 2 real-world" network for the project.
+# It corresponds to what was previously named `real_district` but is now
+# given a proper geographic name.
+#
+# Bounding box (WGS84):
+#   Covers Avenue Mohamed V, Avenue Habib Bourguiba and Rue Jean Jaures
+#   — roughly 1.4 km × 1.3 km of central Tunis arterial corridor.
+#
+# To change area: edit osm.bbox (and tls_set/tls_unset), delete
+# sumo_files/tunis/ and run `python -m cotraffic networks tunis --force`.
+
+name: tunis
+kind: osm
+description: >
+  Central Tunis – arterial corridor between Avenue Mohamed V, Avenue Habib
+  Bourguiba and Rue Jean Jaures. Built from OpenStreetMap via Overpass API
+  + netconvert. About 1.4 km × 1.3 km with real signalised junctions.
+
+osm:
+  bbox: [10.176, 36.800, 10.192, 36.812]   # [west, south, east, north], WGS84
+  # Arterial-only: residential streets are unsignalised and would triple the
+  # network size without adding meaningful RL decisions.
+  road_types:
+    - motorway
+    - motorway_link
+    - trunk
+    - trunk_link
+    - primary
+    - primary_link
+    - secondary
+    - secondary_link
+    - tertiary
+    - tertiary_link
+  join_dist_m: 15          # junction clusters closer than this become one junction
+  signal_dist_m: 25        # OSM signal nodes this close to a junction → signalised
+  tls_join_dist_m: 30      # signals this close are controlled together
+  guess_tls: false
+  # OpenStreetMap tags very few signals in Tunis (72 nodes city-wide in Sept 2026;
+  # 3 usable junctions here). We also signalise the key intersections where the two
+  # main avenues meet (OSM node ids below). Verify these on-site (Empathize stage).
+  tls_set: [287863988, 387151797, 5294059357, cluster_1089663256_4940244077, 1089666873]
+  tls_unset: []
+
+pedestrians: true
+# NOTE: Only 4 of the ~112 imported arterial edges have an OSM sidewalk tag.
+# netconvert will guess sidewalks/crossings, but pedestrian scenarios on this
+# network cause simulation instability (see experiment journal F-011).
+unsupported_scenarios: [pedestrians]
+
+padding:
+  lanes_per_side: 3
+  max_phases: 3
+  max_crossings: 4
+
+neighbours:
+  max_distance_m: 500
+
+demand:
+  peak_vehicles_per_hour: 5200   # calibrated against fixed-time control — see docs/EXPERIMENT_JOURNAL.md
+  origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
+  opposite_side_prob: 0.5
+  route_random_factor: 1.3
+
+# Avenue Mohamed V / Avenue Habib Bourguiba through 3 signalised junctions
+bus_lines:
+  - id: L1
+    from_edge: "247165438#0"
+    to_edge: "10641416#0"
+    reverse_from_edge: "577010716#1"
+    reverse_to_edge: "94346392#5"
+
+incident:
+  edge: "94346392#0"      # northbound Avenue Mohamed V, 560 m, 2 vehicle lanes
+  lane: 1                 # rightmost vehicle lane (lane 0 is the sidewalk)
+  position_frac: 0.85     # stopped vehicle just before the stop line

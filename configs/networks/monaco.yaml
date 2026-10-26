@@ -1,0 +1,79 @@
+# Monaco — real-world OSM network (Port Hercule + Monte-Carlo)
+#
+# Built automatically by `python -m cotraffic networks monaco --force`
+# which calls cotraffic.networks.osm.build_osm → netconvert under the hood.
+#
+# Bounding box reference (WGS84):
+#   west 7.4080  east 7.4360
+#   south 43.7280  north 43.7430
+# This covers: Port Hercule, Boulevard Albert 1er, Avenue de la Costa,
+# Avenue de Grande Bretagne, Boulevard du Larvotto and Monte-Carlo Casino area.
+#
+# Road types deliberately kept to arterials only; Monaco has hundreds of tiny
+# alleys and ramps — keeping only primary/secondary/tertiary gives a tractable
+# network of ~30 junctions. Lower types can be added later.
+
+name: monaco
+kind: osm
+description: >
+  Principality of Monaco – central arterial network from Port Hercule to
+  Monte-Carlo. Built from OpenStreetMap via Overpass API + netconvert.
+  Re-build: delete sumo_files/monaco/ then run
+  `python -m cotraffic networks monaco --force`.
+
+osm:
+  bbox: [7.4080, 43.7200, 7.4610, 43.7530]  # Full territory of Monaco, WGS84
+  boundary_polygon: "sumo_files/monaco/monaco_border.txt"
+  road_types:
+    - motorway
+    - motorway_link
+    - trunk
+    - trunk_link
+    - primary
+    - primary_link
+    - secondary
+    - secondary_link
+    - tertiary
+    - tertiary_link
+    - unclassified
+    - residential
+    - living_street
+    - service
+  join_dist_m: 15
+  signal_dist_m: 30
+  tls_join_dist_m: 30
+  guess_tls: true
+  guess_threshold: 69
+  tls_set: []
+  tls_unset: []
+
+pedestrians: true
+# sidewalks and crossings are guessed automatically (sidewalks.guess + crossings.guess)
+# because OSM pedestrian coverage for Monaco is good.
+
+padding:
+  lanes_per_side: 4
+  max_phases: 6
+  max_crossings: 8
+  extra_crossings_unobserved: true
+
+neighbours:
+  max_distance_m: 400      # smaller city — neighbours are closer
+
+demand:
+  peak_vehicles_per_hour: 3800   # placeholder; calibrate after first run
+  origin_side_weights: {west: 1.0, east: 1.0, north: 0.5, south: 1.5}
+  opposite_side_prob: 0.55
+  route_random_factor: 1.2
+
+# Bus line placeholder — fill in real edge IDs from the compiled .net.xml
+# bus_lines:
+#   - id: L1
+#     from_edge: "???"
+#     to_edge: "???"
+
+# Incident placement placeholder — fill in after inspecting the network
+# incident:
+#   edge: "???"
+#   lane: 0
+#   position_frac: 0.75

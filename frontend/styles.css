@@ -5075,11 +5075,30 @@ html.is-sidebar-collapsed .sidebar-collapse {
   inset: 0;
   overflow: hidden;
 }
-.sumo-3d-canvas-wrap { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: #18232c; pointer-events: auto; }
+.sumo-3d-canvas-wrap { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: #e9f0f4; pointer-events: auto; }
 .sumo-3d-canvas,
 .sumo-3d-canvas-wrap canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; min-width: 1px; min-height: 1px; }
-.sumo-3d-canvas-wrap .sumo-3d-canvas { cursor: grab; touch-action: none; }
-.sumo-3d-canvas-wrap .sumo-3d-canvas:active { cursor: grabbing; }
+.sumo-3d-canvas-wrap canvas { cursor: grab; touch-action: none; }
+.sumo-3d-canvas-wrap canvas:active { cursor: grabbing; }
+.sumo-env-note {
+  position: absolute;
+  inset: auto 0 50% 0;
+  margin: 0 auto;
+  width: fit-content;
+  padding: 8px 14px;
+  border: 1px solid rgba(52, 74, 90, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  color: #49606e;
+  font-size: 12px;
+  font-weight: 500;
+}
+/* ------------------------------------------------- 3D SUMO scene chrome */
+
+.live-map-view.is-sumo-3d .live-map-tools { display: none; }
+
+
+.sumo-3d-canvas-wrap:focus-visible { outline: 2px solid rgba(95, 165, 46, 0.5); outline-offset: -4px; }
+
 .live-panels-collapsed .zone-panel,
 .live-panels-collapsed .queue-panel { opacity: 0; pointer-events: none; translate: -110% 0; }
 .live-panels-collapsed .live-bottom-dock > * { opacity: 0; pointer-events: none; translate: 0 160%; }
@@ -5087,30 +5106,63 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-roam-tab { color: #5b7280; }
 .live-roam-mode .live-roam-tab { background: #d6e6ec; color: #234858; }
 
-/* Roam mode keeps the simulation controls centered and matches the frosted
-   glass of the top tabs: translucent white, square corners, no dark chrome. */
+/* Roam mode keeps the simulation controls centered. Its glass follows the
+   panel theme like every other panel, so the timeline is dark chrome by
+   default and only turns to white glass when the light theme is switched on. */
 .live-map-view.live-roam-mode .simulation-timeline {
   left: var(--panel-edge); right: var(--panel-edge); bottom: var(--panel-edge);
   width: auto; transform: none;
+}
+.live-map-view.live-roam-mode.live-panels-light .simulation-timeline {
   background: rgba(255, 255, 255, .2); color: #273238;
   border-color: rgba(255,255,255,.3);
   box-shadow: 0 4px 30px rgba(0,0,0,.1);
   -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
-.live-map-view.live-roam-mode .simulation-timeline strong,
-.live-map-view.live-roam-mode .simulation-timeline span,
-.live-map-view.live-roam-mode .simulation-timeline button { color: #273238; }
-.live-map-view.live-roam-mode .sim-eyebrow { color: #66727a; }
-.live-map-view.live-roam-mode .sim-axis { color: #59656a; }
-.live-map-view.live-roam-mode .sim-chip,
-.live-map-view.live-roam-mode .sim-icon { background: rgba(255,255,255,.34); border-color: rgba(255,255,255,.5); color: #273238; }
-.live-map-view.live-roam-mode .sim-chip:hover,
-.live-map-view.live-roam-mode .sim-icon:hover { background: var(--green); color: var(--lm-accent-ink); }
-.live-map-view.live-roam-mode .sim-badge { background: rgba(38,49,55,.1); color: #3f4c53; }
-.live-map-view.live-roam-mode .sim-badge[data-state="running"] { background: rgba(124,189,64,.22); color: #3f6b22; }
-.live-map-view.live-roam-mode .sim-track { border-color: rgba(38,49,55,.14); background: rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
-.live-map-view.live-roam-mode .sim-profile i { background: rgba(38,49,55,.18); }
+.live-map-view.live-roam-mode.live-panels-light .simulation-timeline strong,
+.live-map-view.live-roam-mode.live-panels-light .simulation-timeline span,
+.live-map-view.live-roam-mode.live-panels-light .simulation-timeline button { color: #273238; }
+.live-map-view.live-roam-mode.live-panels-light .sim-eyebrow { color: #66727a; }
+.live-map-view.live-roam-mode.live-panels-light .sim-axis { color: #59656a; }
+.live-map-view.live-roam-mode.live-panels-light .sim-chip,
+.live-map-view.live-roam-mode.live-panels-light .sim-icon { background: rgba(255,255,255,.34); border-color: rgba(255,255,255,.5); color: #273238; }
+.live-map-view.live-roam-mode.live-panels-light .sim-chip:hover,
+.live-map-view.live-roam-mode.live-panels-light .sim-icon:hover { background: var(--green); color: var(--lm-accent-ink); }
+.live-map-view.live-roam-mode.live-panels-light .sim-badge { background: rgba(38,49,55,.1); color: #3f4c53; }
+.live-map-view.live-roam-mode.live-panels-light .sim-badge[data-state="running"] { background: rgba(124,189,64,.22); color: #3f6b22; }
+.live-map-view.live-roam-mode.live-panels-light .sim-track { border-color: rgba(38,49,55,.14); background: rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
+.live-map-view.live-roam-mode.live-panels-light .sim-profile i { background: rgba(38,49,55,.18); }
+
+/* Dark chrome for the roam timeline. Roam's top bar is the strongest glass in
+   the mode (rgba(15,24,31,.68)), so the timeline uses the same recipe rather
+   than the lighter panel glass that washes out over a bright sky. */
+.live-map-view.live-roam-mode:not(.live-panels-light) .simulation-timeline {
+  background: rgba(15, 24, 31, 0.68);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .simulation-timeline strong,
+.live-map-view.live-roam-mode:not(.live-panels-light) .simulation-timeline span,
+.live-map-view.live-roam-mode:not(.live-panels-light) .simulation-timeline button { color: #f4f8fb; }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-eyebrow { color: rgba(244,248,251,.62); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-axis { color: rgba(244,248,251,.58); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-chip,
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-icon {
+  background: rgba(255,255,255,.12);
+  border-color: rgba(255,255,255,.2);
+  color: #f4f8fb;
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-chip:hover,
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-icon:hover { background: var(--green); color: var(--lm-accent-ink); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-badge { background: rgba(255,255,255,.14); color: #e7f0f6; }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-badge[data-state="running"] { background: rgba(124,189,64,.3); color: #d9f0c7; }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-track {
+  border-color: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-profile i { background: rgba(255,255,255,.22); }
 .live-map-view.live-roam-mode .simulation-timeline .sim-bubble { background: var(--green); color: var(--lm-accent-ink); }
 .live-map-view.live-roam-mode .simulation-timeline .sim-bubble::after { border-top-color: var(--green); }
 .live-map-view.live-roam-mode .live-place-card,
@@ -5140,7 +5192,7 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-map-view .live-tool-group,
 .live-map-view .live-round-btn,
 .live-map-view .live-exit-btn {
-  background: rgba(10, 16, 22, 0.35);
+  background: rgba(10, 16, 22, 0.72);
   color: #f4f8fb;
   border-radius: 16px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
@@ -7379,6 +7431,10 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-layer-menu { right: auto; left: 0; }
 .live-layer-option { display: flex; width: 100%; align-items: center; gap: 9px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: #35362f; text-align: left; cursor: pointer; }
 .live-layer-option:hover, .live-layer-option.is-selected { background: rgba(255,255,255,.7); }
+.live-layer-option[hidden] { display: none; }
+.live-layer-option:disabled { opacity: 0.42; cursor: not-allowed; }
+.live-layer-option:disabled:hover { background: transparent; }
+.live-layer-option:disabled .layer-toggle { opacity: 0.6; }
 .live-layer-option > span:nth-child(2) { display: grid; flex: 1; gap: 2px; }
 .live-layer-option strong { font-size: 11px; font-weight: 600; }
 .live-layer-option small { color: #85847a; font-size: 9px; }
@@ -8478,7 +8534,7 @@ html.is-sidebar-collapsed .sidebar-collapse {
   padding: 8px;
   gap: 10px;
   overflow-y: auto;
-  background: rgba(10, 16, 22, 0.35);
+  background: rgba(10, 16, 22, 0.72);
   border-radius: 16px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(5px);
@@ -10282,6 +10338,19 @@ html.is-sidebar-collapsed .sidebar-collapse {
   font-style: normal;
 }
 
+/* The roam telemetry strip is part of the panel chrome, so it goes dark with
+   the rest of them instead of staying a white card over a dark scene. */
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-strip {
+  background: rgba(15, 24, 31, 0.68);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  color: #f4f8fb;
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat { border-right-color: rgba(255, 255, 255, 0.14); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat span,
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat i { color: rgba(244, 248, 251, 0.62); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat strong { color: #f4f8fb; }
+
 .roam-pills {
   position: absolute;
   top: 77px;
@@ -10312,6 +10381,30 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .roam-pill:hover { background: rgba(255, 255, 255, 0.36); border-color: rgba(255, 255, 255, 0.6); color: #1f2b24; }
 .roam-pill:active { transform: translateY(1px); }
+
+/* Dark chrome for the roam action pills, matching the panel theme. */
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-pill {
+  background: rgba(15, 24, 31, 0.68);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #f4f8fb;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-pill:hover {
+  background: rgba(26, 36, 46, 0.55);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-pill.is-on {
+  background: var(--green);
+  border-color: transparent;
+  color: var(--lm-accent-ink);
+}
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-legend {
+  background: rgba(15, 24, 31, 0.68);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  color: #f4f8fb;
+}
 .roam-pill.is-on { background: var(--green); border-color: transparent; color: var(--lm-accent-ink); }
 .roam-pill:focus-visible { outline: 2px solid rgba(124, 189, 64, 0.8); outline-offset: 2px; }
 
@@ -10800,4 +10893,175 @@ html.is-sidebar-collapsed .sidebar-collapse {
   .tc-before,
   .tc-after,
   .gauge-ghost { transition: none; }
+}
+
+/* --- Mode panels (Optimize, Predict) ---------------------------------------
+   These panels are part of the same live chrome as the rails and the timeline,
+   so they follow the panel theme: dark glass by default, white glass only when
+   the light theme is switched on. */
+.live-map-view:not(.live-panels-light) .mode-panel {
+  background: rgba(15, 24, 31, 0.72);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.34);
+  color: #e8f1f7;
+}
+.live-map-view:not(.live-panels-light) .mp-head {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+.live-map-view:not(.live-panels-light) .mp-eyebrow,
+.live-map-view:not(.live-panels-light) .mp-sub,
+.live-map-view:not(.live-panels-light) .mp-summary-label,
+.live-map-view:not(.live-panels-light) .mp-summary-meta,
+.live-map-view:not(.live-panels-light) .mp-summary-value small,
+.live-map-view:not(.live-panels-light) .mp-card-meta,
+.live-map-view:not(.live-panels-light) .predict-note,
+.live-map-view:not(.live-panels-light) .mp-toggle-copy span { color: rgba(232, 241, 247, 0.6); }
+.live-map-view:not(.live-panels-light) .mp-title,
+.live-map-view:not(.live-panels-light) .mp-summary-value,
+.live-map-view:not(.live-panels-light) .mp-toggle-copy strong { color: #f6fbff; }
+.live-map-view:not(.live-panels-light) .mp-count,
+.live-map-view:not(.live-panels-light) .mp-icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #e8f1f7;
+}
+.live-map-view:not(.live-panels-light) .mp-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.live-map-view:not(.live-panels-light) .mp-summary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.live-map-view:not(.live-panels-light) .mp-summary::before { background: var(--green); }
+
+.live-map-view:not(.live-panels-light) .predict-card,
+.live-map-view:not(.live-panels-light) .mp-card,
+.live-map-view:not(.live-panels-light) .rec {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.live-map-view:not(.live-panels-light) .rec:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.live-map-view:not(.live-panels-light) .rec.is-applied {
+  background: rgba(124, 189, 64, 0.16);
+  border-color: rgba(124, 189, 64, 0.4);
+}
+.live-map-view:not(.live-panels-light) .mp-card-head h3,
+.live-map-view:not(.live-panels-light) .rec-detail,
+.live-map-view:not(.live-panels-light) .rec-kind,
+.live-map-view:not(.live-panels-light) .risk-time,
+.live-map-view:not(.live-panels-light) .predict-key,
+.live-map-view:not(.live-panels-light) .predict-key-meta,
+.live-map-view:not(.live-panels-light) .predict-spark-axis { color: rgba(232, 241, 247, 0.6); }
+.live-map-view:not(.live-panels-light) .rec-title,
+.live-map-view:not(.live-panels-light) .rec-stat b { color: #f6fbff; }
+.live-map-view:not(.live-panels-light) .rec-stat.is-muted b { color: rgba(232, 241, 247, 0.6); }
+.live-map-view:not(.live-panels-light) .rec-stat.is-lead b { color: #c8e6a3; }
+.live-map-view:not(.live-panels-light) .rec-rank {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #e8f1f7;
+}
+.live-map-view:not(.live-panels-light) .rec-impact-row { border-color: rgba(255, 255, 255, 0.1); }
+.live-map-view:not(.live-panels-light) .mp-card-badge {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8f1f7;
+}
+.live-map-view:not(.live-panels-light) .predict-grid div,
+.live-map-view:not(.live-panels-light) .predict-grid dt { color: rgba(232, 241, 247, 0.6); }
+.live-map-view:not(.live-panels-light) .predict-grid dd { color: #f6fbff; }
+.live-map-view:not(.live-panels-light) .predict-grid dd small { color: rgba(232, 241, 247, 0.55); }
+.live-map-view:not(.live-panels-light) .risk-row { border-top-color: rgba(255, 255, 255, 0.09); }
+.live-map-view:not(.live-panels-light) .risk-bar { background: rgba(255, 255, 255, 0.12); }
+.live-map-view:not(.live-panels-light) .risk-delay { color: rgba(232, 241, 247, 0.75); }
+.live-map-view:not(.live-panels-light) .whatif-chip {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #e8f1f7;
+}
+.live-map-view:not(.live-panels-light) .whatif-chip:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.live-map-view:not(.live-panels-light) .whatif-chip.is-on {
+  background: rgba(124, 189, 64, 0.22);
+  border-color: rgba(124, 189, 64, 0.55);
+  color: #d9f0c7;
+}
+.live-map-view:not(.live-panels-light) .predict-line.is-typical { stroke: rgba(255, 255, 255, 0.35); }
+.live-map-view:not(.live-panels-light) .predict-now { stroke: rgba(255, 255, 255, 0.45); }
+.live-map-view:not(.live-panels-light) .predict-peak { stroke: #0d141a; }
+.live-map-view:not(.live-panels-light) .predict-key i.is-typical {
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.45) 0 2px, transparent 2px 4px);
+}
+.live-map-view:not(.live-panels-light) .mp-toggle-row { border-top-color: rgba(255, 255, 255, 0.1); }
+.live-map-view:not(.live-panels-light) .mp-btn {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #e8f1f7;
+}
+.live-map-view:not(.live-panels-light) .mp-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+.live-map-view:not(.live-panels-light) .mp-btn.is-ghost { background: transparent; border-color: transparent; }
+.live-map-view:not(.live-panels-light) .mp-btn.is-apply.is-on,
+.live-map-view:not(.live-panels-light) .mp-btn.is-preview.is-on { border-color: rgba(124, 189, 64, 0.6); color: #ffffff; }
+.live-map-view:not(.live-panels-light) .mp-btn.is-toggle.is-on {
+  background: rgba(124, 189, 64, 0.22);
+  border-color: rgba(124, 189, 64, 0.55);
+  color: #d9f0c7;
+}
+.live-map-view:not(.live-panels-light) .mp-system,
+.live-map-view:not(.live-panels-light) .mp-clock { color: #a9d580; }
+.live-map-view:not(.live-panels-light) .mp-system svg,
+.live-map-view:not(.live-panels-light) .mp-clock svg { color: inherit; }
+.live-map-view:not(.live-panels-light) .rec-stat { color: rgba(232, 241, 247, 0.55); }
+.live-map-view:not(.live-panels-light) .rec-stat.is-lead { color: rgba(200, 230, 163, 0.8); }
+
+/* The status chip and the traffic counter sit inside dark glass in this theme,
+   so they need dark-glass fills instead of the light-theme tints. */
+.live-map-view:not(.live-panels-light) .live-status {
+  background: rgba(124, 189, 64, 0.2);
+  border-color: rgba(124, 189, 64, 0.45);
+  color: #cbe9a6;
+}
+.live-map-view:not(.live-panels-light) .live-status i {
+  background: #8ecb5a;
+  box-shadow: 0 0 0 2px rgba(142, 203, 90, 0.18);
+}
+.live-map-view:not(.live-panels-light) .live-traffic-pill b {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f4f8fb;
+}
+
+/* Remaining light-theme chips inside the Optimize/Predict panels. These carry
+   their own tinted fills, so they need a dark-glass equivalent too. */
+.live-map-view:not(.live-panels-light) .rec-kind {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(232, 241, 247, 0.75);
+}
+.live-map-view:not(.live-panels-light) .rec-stat.is-muted {
+  background: rgba(255, 255, 255, 0.08);
+}
+.live-map-view:not(.live-panels-light) .rec-meter {
+  background: rgba(255, 255, 255, 0.14);
+}
+.live-map-view:not(.live-panels-light) .rec-impact-row > span:first-child,
+.live-map-view:not(.live-panels-light) .mp-foot-note {
+  color: rgba(232, 241, 247, 0.5);
+}
+.live-map-view:not(.live-panels-light) .rec.is-previewing {
+  background: rgba(124, 189, 64, 0.14);
+  border-color: rgba(124, 189, 64, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }

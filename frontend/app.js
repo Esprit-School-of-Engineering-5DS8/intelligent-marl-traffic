@@ -1,11 +1,15 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { mountSumoLiveMap } from './sumo-live-map.js';
+import { mountSumoLiveMap } from './sumo-env.js';
 import { mountRamiBenchmark } from './benchmark-rami.jsx';
 import { mountGauges } from './gauge.js';
 import { initModes } from './modes/index.js';
 
 const $ = (id) => document.getElementById(id);
+// Declared up here because applyScenarioChrome() runs during module evaluation and
+// reaches setMapLayerVisibility(), which reads liveMap long before the live-map
+// section below would otherwise initialise it (temporal dead zone crash).
+let liveMap = null;
 const FOCUS = [-97.7264, 30.2653];
 const DEFAULT_ZOOM = 13.5;
 const TOKEN_KEY = 'kematara.mapboxToken';
@@ -292,8 +296,30 @@ function toggleScenarioMenu(trigger) {
   setScenarioMenuOpen(menu, willOpen);
 }
 
+/* The grid scenarios render their own 3D environment, so the Mapbox-only
+   layer toggles have nothing to act on there. */
+function syncLayerMenuAvailability() {
+  const grid = ['grid-2x2', 'grid-3x3'].includes(activeScenario);
+  document.querySelectorAll('[data-map-layer]').forEach((option) => {
+    const layer = option.dataset.mapLayer;
+    if (layer === 'basemap') {
+      option.disabled = grid;
+      option.classList.toggle('is-disabled', grid);
+      option.setAttribute('aria-disabled', String(grid));
+      option.title = grid ? 'Automatically disabled — the 3D grid uses its own environment' : '';
+      // When switching to a grid scenario, force-hide the basemap layer
+      if (grid) {
+        option.setAttribute('aria-checked', 'false');
+        option.classList.remove('is-selected');
+        setMapLayerVisibility('basemap', false);
+      }
+    }
+  });
+}
+
 function applyScenarioChrome() {
   const scenario = getScenario();
+  syncLayerMenuAvailability();
   const siteTitle = $('siteTitle');
   if (siteTitle) siteTitle.textContent = scenario.title;
   const liveScenarioName = $('liveScenarioName');
@@ -367,6 +393,24 @@ async function loadLiveWeather() {
   }
 }
 
+/* Moving between the two grids must not leave the previous run's vehicles on
+   the new network: if something is already live, restart it on this grid. */
+function retargetSimulation(name) {
+  const grid = ['grid-2x2', 'grid-3x3'].includes(name) ? name : null;
+  const live = latestSimulationState;
+  if (!grid || !live) return;
+  if (!['running', 'paused', 'starting'].includes(live.status)) return;
+  if (live.scenario === grid) return;
+  simulationFetch('/api/simulation/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scenario: grid, speed: simulationSpeed })
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((state) => state && updateSimulationState(state))
+    .catch(() => {});
+}
+
 function setScenario(name, { announce = true } = {}) {
   if (!SCENARIOS[name]) return;
   activeScenario = name;
@@ -385,6 +429,7 @@ function setScenario(name, { announce = true } = {}) {
   }
   refreshLiveMapScenario();
   loadSimulationNetwork(activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2');
+  retargetSimulation(activeScenario);
 
   document.dispatchEvent(new CustomEvent('sumo:scenariochange', {
     detail: { scenario: activeScenario, ...scenario }
@@ -1173,7 +1218,6 @@ if (token) {
 
 const LIVE_FOCUS = [-97.7325, 30.2663];
 const LIVE_VIEW = { center: LIVE_FOCUS, zoom: 16.05, pitch: 58, bearing: -26 };
-let liveMap = null;
 let sumo3d = null;
 let liveMap3dOn = true;
 let liveSceneMarkers = [];
@@ -1256,6 +1300,7 @@ simulationTrack?.addEventListener('pointerdown', () => simulationTrack.classList
 let simulationSocket = null;
 let simulationSpeed = 1;
 let latestSimulationState = null;
+let simulationSeeded = false;
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
 const SIMULATION_BOUNDS = {
   'grid-2x2': { west: -97.7245, east: -97.7192, south: 30.2649, north: 30.2704, width: 400, height: 400 },
@@ -1334,6 +1379,40 @@ document.getElementById('simulationPlay')?.addEventListener('click', async (even
     showToast('Simulation service is offline.');
   }
 });
+
+/* The 3D scene's own SUMO strip: start / pause / single-step / speed. */
+async function handleSumoSceneAction(action, extra = {}) {
+  const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+  const status = simulationStatus?.dataset.state;
+  const post = async (path, body) => {
+    connectSimulationSocket();
+    try {
+      const response = await simulationFetch(
+        path,
+        body
+          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+          : { method: 'POST' }
+      );
+      if (!response.ok) throw new Error(`simulation ${response.status}`);
+      updateSimulationState(await response.json());
+    } catch {
+      showToast('Simulation service is offline.');
+    }
+  };
+
+  if (action === 'start') return post('/api/simulation/start', { scenario, speed: simulationSpeed });
+  if (action === 'pause') {
+    return post(status === 'paused' ? '/api/simulation/resume' : '/api/simulation/pause');
+  }
+  if (action === 'step') return post('/api/simulation/step', { scenario, count: 1 });
+  if (action === 'speed') {
+    simulationSpeed = Number(extra.speed) || 1;
+    const chip = document.getElementById('simulationSpeed');
+    if (chip) chip.textContent = `${simulationSpeed}×`;
+    return post('/api/simulation/speed', { scenario, speed: simulationSpeed });
+  }
+  return undefined;
+}
 
 function connectSimulationSocket() {
   if (simulationSocket || !window.WebSocket) return;
@@ -1721,6 +1800,7 @@ function initLiveMap() {
   if (!container) return;
   const sumoScene = $('sumo3dScene');
   if (['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
+    container.closest('.live-map-view')?.classList.add('is-sumo-3d');
     container.hidden = true;
     container.style.display = 'none';
     if (liveMap) liveMap.getContainer().style.display = 'none';
@@ -1731,19 +1811,33 @@ function initLiveMap() {
       sumoScene.style.display = 'block';
       sumoScene.classList.add('is-grid-mode');
       const gridState = { ...(latestSimulationState || {}), scenario: activeScenario, vehicles: latestSimulationState?.vehicles || [] };
+      /* A run may already be live, so pick up the stream and one snapshot
+         instead of waiting for the operator to press Start again. */
+      connectSimulationSocket();
+      if (!simulationSeeded) {
+        simulationSeeded = true;
+        simulationFetch('/api/simulation/state')
+          .then((response) => (response.ok ? response.json() : null))
+          .then((sim) => sim && updateSimulationState(sim))
+          .catch(() => { simulationSeeded = false; });
+      }
       if (sumo3d?.scenario && sumo3d.scenario !== activeScenario) { sumo3d.destroy?.(); sumo3d = null; }
-      sumo3d ||= mountSumoLiveMap(sumoScene, gridState);
+      sumo3d ||= mountSumoLiveMap(sumoScene, gridState, { onSimAction: handleSumoSceneAction });
       sumo3d.update(gridState);
       window.requestAnimationFrame(() => sumo3d?.update({ ...gridState, scenario: activeScenario }));
     }
     return;
   }
+  container.closest('.live-map-view')?.classList.remove('is-sumo-3d');
   container.hidden = false;
   container.style.display = '';
   if (liveMap) liveMap.getContainer().style.display = '';
   const vignette = document.querySelector('.live-map-vignette');
   if (vignette) vignette.style.display = '';
   if (sumoScene) { sumoScene.hidden = true; sumoScene.style.display = 'none'; sumoScene.classList.remove('is-grid-mode'); }
+  /* Leaving a grid tears the WebGL scene down instead of keeping it mounted
+     off-screen, so its render loop and the map tools stay with the map. */
+  if (sumo3d) { sumo3d.destroy?.(); sumo3d = null; }
   if (liveMap) {
     liveMap.resize();
     return;
@@ -1815,11 +1909,18 @@ function resetLiveMapView() {
 
 document.querySelectorAll('[data-live-map-action]').forEach((button) => {
   button.addEventListener('click', () => {
+    const action = button.dataset.liveMapAction;
+    /* In a SUMO grid the same buttons drive the 3D environment's camera. */
+    if (sumo3d && ['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
+      if (action === 'zoom-in') sumo3d.zoomIn();
+      if (action === 'zoom-out') sumo3d.zoomOut();
+      if (action === 'reset') sumo3d.reset();
+      return;
+    }
     if (!liveMap) {
       showLiveMapFallback('Connect a Mapbox token to use the live map.');
       return;
     }
-    const action = button.dataset.liveMapAction;
     if (action === 'zoom-in') liveMap.zoomIn({ duration: 420 });
     if (action === 'zoom-out') liveMap.zoomOut({ duration: 420 });
     if (action === 'reset') resetLiveMapView();
@@ -1937,28 +2038,27 @@ document.querySelectorAll('[data-map-style]').forEach((option) => {
 
 function setMapLayerVisibility(layerName, enabled) {
   if (!liveMap) return;
+  if (layerName === 'basemap') {
+    liveMap.getStyle().layers.forEach((layer) => {
+      if (!layer.id.startsWith('live-')) liveMap.setLayoutProperty(layer.id, 'visibility', enabled ? 'visible' : 'none');
+    });
+  }
   if (layerName === 'sumo-road') {
     ['live-sumo-road', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route'].forEach((id) => {
       if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
     });
   }
-  if (layerName === 'mapbox-layout') {
-    ['live-mapbox-layout', 'live-cross-route'].forEach((id) => {
+  if (layerName === 'vehicles') {
+    // Toggle vehicle / model layers produced by the SUMO live feed
+    ['live-vehicles', 'live-vehicle-labels', 'live-vehicle-models'].forEach((id) => {
       if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
-    });
-  }
-  if (layerName === 'fog' && liveMap.getLayer('live-fog')) {
-    liveMap.setLayoutProperty('live-fog', 'visibility', enabled ? 'visible' : 'none');
-  }
-  if (layerName === 'basemap') {
-    liveMap.getStyle().layers.forEach((layer) => {
-      if (!layer.id.startsWith('live-')) liveMap.setLayoutProperty(layer.id, 'visibility', enabled ? 'visible' : 'none');
     });
   }
 }
 
 document.querySelectorAll('[data-map-layer]').forEach((option) => {
   option.addEventListener('click', () => {
+    if (option.disabled) return;
     const enabled = option.getAttribute('aria-checked') !== 'true';
     option.setAttribute('aria-checked', String(enabled));
     option.classList.toggle('is-selected', enabled);

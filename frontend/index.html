@@ -579,10 +579,9 @@
                   <button type="button" class="live-tool" data-live-action="layers" aria-label="Map geographic layers" title="Geographic layers" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-layers"/></svg></button>
                   <div class="live-style-menu live-layer-menu" role="menu" aria-label="Geographic layers" hidden>
                     <span class="live-style-menu-title">Map layers</span>
-                    <button type="button" class="live-layer-option is-selected" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Buildings, labels and streets</small></span></button>
-                    <button type="button" class="live-layer-option is-selected" data-map-layer="mapbox-layout" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Strict 2×2 / 3×3 grid</strong><small>Only the selected simulation grid</small></span></button>
-                    <button type="button" class="live-layer-option is-selected" data-map-layer="sumo-road" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>SUMO road layout</strong><small>Projected onto the selected Mapbox streets</small></span></button>
-                    <button type="button" class="live-layer-option" data-map-layer="fog" role="menuitemcheckbox" aria-checked="false"><span class="layer-toggle"></span><span><strong>Fog of war</strong><small>Hide context outside the network</small></span></button>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="true" aria-disabled="false" title=""><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Buildings, labels and streets</small></span></button>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="sumo-road" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>SUMO road layout</strong><small>Netconvert network projected on the map</small></span></button>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="vehicles" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Vehicles</strong><small>Live vehicle models from simulation</small></span></button>
                   </div>
                 </div>
                 <div class="live-style-picker">

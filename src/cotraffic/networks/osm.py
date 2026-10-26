@@ -55,6 +55,13 @@ def build_osm(cfg: dict[str, Any], protocol: dict[str, Any], net_file: Path) -> 
     if not osm_file.is_file():
         download_osm(osm["bbox"], osm_file)
     west, south, east, north = osm["bbox"]
+    geo_boundary = f"{west},{south},{east},{north}"
+    if osm.get("boundary_polygon"):
+        poly_p = Path(osm["boundary_polygon"])
+        if not poly_p.is_absolute():
+            poly_p = Path.cwd() / poly_p
+        if poly_p.is_file():
+            geo_boundary = poly_p.read_text().strip()
     cmd = [
         binary("netconvert"),
         "--osm-files",
@@ -64,7 +71,7 @@ def build_osm(cfg: dict[str, Any], protocol: dict[str, Any], net_file: Path) -> 
         "--keep-edges.by-type",
         ",".join(f"highway.{t}" for t in osm["road_types"]),
         "--keep-edges.in-geo-boundary",
-        f"{west},{south},{east},{north}",
+        geo_boundary,
         "--keep-edges.components",
         "1",
         "--remove-edges.isolated",

@@ -194,6 +194,7 @@ def list_runs() -> list[dict[str, Any]]:
 class SimulationRequest(BaseModel):
     scenario: Literal["grid-2x2", "grid-3x3"]
     speed: float = Field(default=1, ge=0.25, le=20)
+    count: int = Field(default=1, ge=1, le=600)
 
 
 @app.get("/api/simulation/state")
@@ -222,6 +223,10 @@ def simulation_resume() -> dict[str, Any]: return session.resume()
 
 @app.post("/api/simulation/stop")
 def simulation_stop() -> dict[str, Any]: return session.stop()
+
+
+@app.post("/api/simulation/step")
+def simulation_step(request: SimulationRequest) -> dict[str, Any]: return session.step(request.count)
 
 
 @app.post("/api/simulation/speed")
