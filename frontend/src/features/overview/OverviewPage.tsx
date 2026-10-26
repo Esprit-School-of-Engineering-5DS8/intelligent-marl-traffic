@@ -120,7 +120,7 @@ function Overview({
           {t("overview.kpis")} · {f.methodName(controller)}
         </h2>
         {methods.includes(controller) ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
             {kpis.map((m) => (
               <KpiCard
                 key={m}
