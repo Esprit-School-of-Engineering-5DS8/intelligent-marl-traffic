@@ -1,0 +1,73 @@
+# Settings of the LLM advisor (the LLM in the agents' decision loop). This file is the
+# single place where they are set: scripts/llm_demo.py, scripts/llm_period.py and the
+# defaults of src/cotraffic/llm read it (tests/test_llm_settings.py checks that the code
+# defaults match). Every value was chosen on validation seed 1000 only, or is a bound.
+# Gains below: positive = better (less waiting than COOP-FULL alone).
+# Measurements: results/exploration/llm_benchmark/ (63 validation situations, 300 s replays).
+
+model:
+  name: qwen2.5:3b
+  # Why: among the 6 models benchmarked (0.5B to 3.8B), the best mean gain (+0.29 %) of
+  # those with >= 95 % valid JSON and a p95 latency <= 20 s (v2_zero_summary.csv). The
+  # gain is within noise: the choice rule was fixed before the results (scripts/llm_step2.py).
+  # Licence: Qwen Research (non-commercial use).
+  quantization: Q4_K_M
+  # Why: the Ollama default for this tag (1.9 GB in memory, runs on the integrated GPU).
+  # Not tuned: a lighter quantisation would cut latency but was not measured.
+  keep_alive: 30m
+  # Why: the model stays loaded between calls (one every few minutes); reloading costs
+  # several seconds that would count as latency.
+
+sampling:
+  temperature: 0.0
+  # Why: greedy decoding, so a situation always gets the same advice (reproducible runs).
+  # Sampling (0.7) was only used for self-consistency, which was not retained.
+  top_p: 1.0      # no nucleus truncation (no effect at temperature 0)
+  top_k: 1        # greedy, consistent with temperature 0
+  repeat_penalty: 1.0
+  # Why: neutral; JSON legitimately repeats tokens (brackets, junction names).
+  seed: 0         # Ollama sampling seed, fixed and logged
+  num_ctx: 4096
+  # Why: the zero-shot prompt is at most 829 tokens and the answer at most 75, so 2048
+  # would be enough (few-shot needs 4096: prompt up to 2804 tokens). 4096 is the value of
+  # the validation runs that chose the technique and the period N: kept for consistency.
+  # The context size slightly changes the numerics on the GPU, hence the answers: the same
+  # setting gave +0.29 % with 2048 and +0.15 % with 4096, a measure of the noise.
+  num_predict: 96
+  # Why: answers use 30 tokens on average, 75 at most; the cap is never reached and stops
+  # a runaway answer.
+  timeout_s: 60
+  # Why: p95 latency is 11.7 s and the maximum 19 s; past 60 s the advice would be stale,
+  # so the call is dropped and PPO decides alone (fallback).
+
+prompt:
+  version: advisor-v2
+  technique: zero
+  # Why: gain +0.15 % (zero) against -0.18 % (brief) and +0.08 % (few) with the same model
+  # and beta (v2_tech_summary.csv); zero is also the fastest (p50 8.2 s).
+  vote: 1
+  # Why: self-consistency over 3 sampled answers gave +0.02 % for a p95 latency of 24.6 s
+  # (v2_vote_summary.csv): not better, three times slower.
+  vote_temperature: 0.7  # only used when vote > 1
+
+advisor:
+  beta: 4.0
+  # Why: logit bias of an advice at strength 3. The PPO margin between phases has a median
+  # of 3.3: beta 2 can flip 27 % of the decisions, beta 4 63 %, beta 8 92 %. Beta 8 hurts
+  # (gain -1.2 % with qwen2.5:1.5b, worse than PPO alone in 60 % of situations); beta 4 is
+  # the strongest bias that does not hurt on average (beta_v1_summary.csv, v2_zero_summary.csv).
+  period_s: 600
+  # Why: periodic call every N seconds (events call at once). Full validation episodes, 6
+  # scenarios (results/exploration/llm_period/period_summary.csv), mean gain on waiting:
+  # N = 3 min -5.1 % (pedestrians -24.8 %: advice too often disturbs them), 5 min -0.06 %,
+  # 10 min -0.38 %. No period improves on COOP-FULL alone; the rule fixed in advance takes
+  # the longest period within 0.5 points of the best: 10 min (5 periodic calls per episode).
+  min_gap_s: 30
+  # Why: rate limit, at most one call every 30 simulated seconds whatever the events.
+  latency: measured
+  # Why: an advice applies only after the time the model really took to answer (honest
+  # modelling); zero and double are kept for the sensitivity analysis.
+  cache: false
+  # Why: off. Reusing the advice of an identical situation (same events, same phases, queues
+  # in bins of 5 vehicles) saves a call: 4 of the 63 validation situations repeat an earlier
+  # one (6 % of the calls). Not evaluated in the runs, hence off.

@@ -12,6 +12,7 @@ At each decision (every 5 s):
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass, field
 from typing import Any
@@ -21,7 +22,7 @@ import numpy as np
 from cotraffic.controllers.base import Controller
 from cotraffic.llm.advice import check
 from cotraffic.llm.situation import observe
-from cotraffic.llm.sources import AdviceSource
+from cotraffic.llm.sources import AdviceSource, SourceReply
 
 
 @dataclass
@@ -36,10 +37,22 @@ class Active:
 
 @dataclass
 class AdvisorConfig:
-    beta: float = 2.0  # largest logit bias (weight 1)
-    period_s: float = 300.0  # periodic call (5 min)
+    # values and justification: configs/llm.yaml (advisor section)
+    beta: float = 4.0  # largest logit bias (weight 1)
+    period_s: float = 600.0  # periodic call (10 min)
     min_gap_s: float = 30.0  # rate limit between two calls
     latency: str = "measured"  # measured | zero | double | fixed:<seconds>
+    cache: bool = False  # reuse the advice of an identical situation (situation_key)
+
+
+def situation_key(situation) -> tuple:
+    """Situations that get the same advice from the cache: same events, and per junction
+    the same phase and the same queues in bins of 5 vehicles (capped at 20 or more)."""
+    junctions = tuple(
+        (j.id, j.phase, tuple(min(int(q) // 5, 4) for q in j.queues)) for j in situation.junctions
+    )
+    events = tuple(sorted(json.dumps(e, sort_keys=True) for e in situation.events))
+    return junctions, events
 
 
 @dataclass
@@ -74,6 +87,7 @@ class AdvisedPolicy(Controller):
         self.pending: list[Active] = []
         self.biased_decisions = 0
         self.changed_decisions = 0
+        self.advised_now: dict[str, tuple[int, int, Active]] = {}
 
     # ---------------------------------------------------------------- lifecycle
     def reset(self, env) -> None:
@@ -84,6 +98,7 @@ class AdvisedPolicy(Controller):
         self._last_call = -math.inf
         self._next_periodic = 0.0
         self._seen: set[str] = set()
+        self._cache: dict[tuple, Any] = {}
 
     # ---------------------------------------------------------------- triggers
     def _trigger(self, env, situation_events: list[dict[str, Any]]) -> str | None:
@@ -116,7 +131,15 @@ class AdvisedPolicy(Controller):
     def _ask(self, env, trigger: str) -> None:
         now = env.now
         situation = observe(env, trigger)
-        reply = self.source.advise(situation)
+        key = situation_key(situation) if self.cfg.cache else None
+        if key is not None and key in self._cache:
+            # same situation as an earlier call: its advice again, no model call
+            reply = SourceReply(self._cache[key], 0.0, {"cache": True})
+        else:
+            self.source.prepare(env)
+            reply = self.source.advise(situation)
+            if key is not None and reply.advice is not None:
+                self._cache[key] = reply.advice
         self._last_call = now
         if trigger == "periodic" or now >= self._next_periodic:
             self._next_periodic = now + self.cfg.period_s
@@ -165,13 +188,20 @@ class AdvisedPolicy(Controller):
         logits = logits.numpy().copy()
         plain = logits.argmax(axis=1)
         index = {a: i for i, a in enumerate(agents)}
+        biased: dict[str, Active] = {}
         for a in self.active:
             i = index.get(a.junction)
             if i is not None and a.phase < logits.shape[1]:
                 logits[i, a.phase] += self.cfg.beta * a.weight
                 self.biased_decisions += 1
+                biased[a.junction] = a
         chosen = logits.argmax(axis=1)
         self.changed_decisions += int((chosen != plain).sum())
+        # what the advice did at this decision: (phase without advice, phase requested,
+        # active advice), read by the demo; the shield decides afterwards in env.step
+        self.advised_now = {
+            j: (int(plain[index[j]]), int(chosen[index[j]]), a) for j, a in biased.items()
+        }
         return {a: int(chosen[i]) for a, i in index.items()}
 
     def summary(self) -> dict[str, Any]:
@@ -183,6 +213,7 @@ class AdvisedPolicy(Controller):
             if self.calls
             else math.nan,
             "llm_fallbacks": sum(not c.valid for c in self.calls),
+            "llm_cache_hits": sum(bool(c.meta.get("cache")) for c in self.calls),
             "llm_items_accepted": sum(c.accepted for c in self.calls),
             "llm_items_rejected": sum(len(c.rejected) for c in self.calls),
             "llm_latency_p50_s": float(np.median(lat)) if lat else 0.0,

@@ -18,20 +18,23 @@ DEFAULT_URL = "http://localhost:11434"
 
 @dataclass(frozen=True)
 class Options:
-    """Inference settings (chosen on validation seed 1000, docs/LLM_DESIGN.md section 6)."""
+    """Inference settings. The values and their justification are in configs/llm.yaml
+    (llm.settings reads it; the defaults here match it, see tests/test_llm_settings.py)."""
 
     temperature: float = 0.0
     top_p: float = 1.0
     top_k: int = 1
     repeat_penalty: float = 1.0
-    num_ctx: int = 2048
-    num_predict: int = 120
+    num_ctx: int = 4096
+    num_predict: int = 96
     seed: int = 0
     timeout_s: float = 60.0
+    keep_alive: str = "30m"
 
     def ollama(self) -> dict[str, Any]:
         d = asdict(self)
         d.pop("timeout_s")
+        d.pop("keep_alive")
         return d
 
 
@@ -42,6 +45,14 @@ class Reply:
     prompt_tokens: int
     output_tokens: int
     done_reason: str
+
+
+@dataclass
+class ToolReply:
+    message: dict[str, Any]  # role, content, tool_calls
+    latency_s: float
+    prompt_tokens: int
+    output_tokens: int
 
 
 class LLMError(RuntimeError):
@@ -69,7 +80,7 @@ class Ollama:
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "keep_alive": "30m",
+            "keep_alive": self.options.keep_alive,
             "options": self.options.ollama(),
         }
         if schema is not None:
@@ -88,6 +99,27 @@ class Ollama:
             prompt_tokens=int(out.get("prompt_eval_count") or 0),
             output_tokens=int(out.get("eval_count") or 0),
             done_reason=str(out.get("done_reason") or ""),
+        )
+
+    def chat_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ToolReply:
+        """One model turn with function calling: the reply may hold ``tool_calls``."""
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "tools": tools,
+            "stream": False,
+            "keep_alive": self.options.keep_alive,
+            "options": self.options.ollama(),
+        }
+        if self.model.startswith("qwen3"):
+            body["think"] = False
+        start = time.perf_counter()
+        out = self._post("/api/chat", body, self.options.timeout_s)
+        return ToolReply(
+            message=out.get("message") or {},
+            latency_s=time.perf_counter() - start,
+            prompt_tokens=int(out.get("prompt_eval_count") or 0),
+            output_tokens=int(out.get("eval_count") or 0),
         )
 
     def warm_up(self) -> None:

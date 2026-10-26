@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pandas as pd
 
@@ -26,7 +26,8 @@ from cotraffic.evaluation.runner import run_episode
 from cotraffic.llm.advised import AdvisedPolicy, AdvisorConfig
 from cotraffic.llm.client import Ollama, Options
 from cotraffic.llm.progress import Progress
-from cotraffic.llm.prompts import DEFAULT_VERSION, load
+from cotraffic.llm.prompts import load
+from cotraffic.llm.settings import load_settings
 from cotraffic.llm.sources import llm_source
 from cotraffic.paths import CHECKPOINTS_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS
@@ -35,6 +36,7 @@ from cotraffic.utils.io import write_row
 OUT = RESULTS_DIR / "exploration" / "llm_period"
 SCENARIOS = ["incident", "emergency", "sensor_noise", "comm_dropout_30", "pedestrians", "normal"]
 NETWORK, DEMAND = "grid4x4", "peak"
+HIGHER_IS_BETTER = {"throughput_per_h"}
 METRICS = [
     "mean_waiting_time",
     "mean_travel_time",
@@ -120,9 +122,10 @@ def summarise(rows: list[dict]) -> pd.DataFrame:
     for r in df[df.method == "coop_full_llm"].itertuples():
         b = base.loc[r.scenario]
         row = {"scenario": r.scenario, "period_s": r.period_s}
-        for m in METRICS:
+        for m in METRICS:  # gains against COOP-FULL alone: positive = better
             if m in df and pd.notna(getattr(r, m)) and pd.notna(b[m]):
-                row[f"{m}_change_%"] = round(100 * (getattr(r, m) - b[m]) / max(abs(b[m]), 1e-9), 2)
+                change = 100 * (getattr(r, m) - b[m]) / max(abs(b[m]), 1e-9)
+                row[f"gain_{m}_%"] = round(change if m in HIGHER_IS_BETTER else -change, 2)
         row.update(
             {
                 "llm_calls": r.llm_calls,
@@ -137,34 +140,66 @@ def summarise(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(out).sort_values(["scenario", "period_s"])
 
 
+def saved_rows(replace_tag: str = "") -> list[dict]:
+    """Rows of the saved episodes (untagged runs); an episode also run with
+    ``replace_tag`` (e.g. replayed after an incident) is taken from that run."""
+    rows: dict[tuple, dict] = {}
+    for path in sorted((OUT / "raw").glob("*.csv")):
+        row = pd.read_csv(path).iloc[0].to_dict()
+        method, _, rest = row["run_id"].partition("__")
+        tag = method.split("-", 2)[2] if method.count("-") >= 2 else ""
+        if tag not in ("", replace_tag):
+            continue
+        key = (row["method"], row["scenario"], row.get("period_s", 0))
+        if tag == "" and key in rows:
+            continue
+        rows[key] = row
+    return list(rows.values())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model", required=True)
-    parser.add_argument("--technique", default="zero")
-    parser.add_argument("--prompt", default=DEFAULT_VERSION)
-    parser.add_argument("--beta", type=float, required=True)
+    settings = load_settings()  # defaults: configs/llm.yaml
+    parser.add_argument("--model", default=settings.model)
+    parser.add_argument("--technique", default=settings.technique)
+    parser.add_argument("--prompt", default=settings.prompt_version)
+    parser.add_argument("--beta", type=float, default=settings.advisor.beta)
     parser.add_argument("--periods", nargs="+", type=float, default=[180.0, 300.0, 600.0])
-    parser.add_argument("--vote", type=int, default=1, help="self-consistency: k samples")
-    parser.add_argument("--vote-temperature", type=float, default=0.7)
-    parser.add_argument("--latency", default="measured")
+    parser.add_argument("--vote", type=int, default=settings.vote, help="self-consistency")
+    parser.add_argument("--vote-temperature", type=float, default=settings.vote_temperature)
+    parser.add_argument("--latency", default=settings.advisor.latency)
     parser.add_argument("--seed", type=int, default=1000)
     parser.add_argument("--scenarios", nargs="+", default=SCENARIOS)
-    parser.add_argument("--num-predict", type=int, default=96)
-    parser.add_argument("--num-ctx", type=int, default=2048)
+    parser.add_argument("--num-predict", type=int, default=settings.options.num_predict)
+    parser.add_argument("--num-ctx", type=int, default=settings.options.num_ctx)
     parser.add_argument("--jobs", type=int, default=3, help="workers for the no-advice runs")
     parser.add_argument("--tag", default="")
+    parser.add_argument("--summary-only", action="store_true", help="table from saved runs")
+    parser.add_argument("--reuse-baselines", action="store_true")
+    parser.add_argument("--replace-tag", default="", help="with --summary-only")
     args = parser.parse_args()
+    if args.summary_only:
+        table = summarise(saved_rows(args.replace_tag))
+        table.to_csv(OUT / "period_summary.csv", index=False)
+        print(table.to_string(index=False))
+        return
     if args.seed in TEST_SEEDS:
         raise SystemExit("test seeds are never used to tune anything")
 
-    options = Options(num_predict=args.num_predict, num_ctx=args.num_ctx)
+    options = replace(settings.options, num_predict=args.num_predict, num_ctx=args.num_ctx)
     progress = Progress("episodes", len(args.scenarios) * (1 + len(args.periods)))
     rows = []
     # without the LLM, episodes can run in parallel; never at the same time as LLM calls
-    with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        for row in pool.map(baseline, [(s, args.seed) for s in args.scenarios]):
-            rows.append(row)
+    if args.reuse_baselines:  # runs without advice already saved: read, not run again
+        for s in args.scenarios:
+            path = OUT / "raw" / f"coop_full-noadvice__{NETWORK}__{s}__{DEMAND}__s{args.seed}.csv"
+            rows.append(pd.read_csv(path).iloc[0].to_dict())
             progress.tick()
+    else:
+        with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+            for row in pool.map(baseline, [(s, args.seed) for s in args.scenarios]):
+                rows.append(row)
+                progress.tick()
     Ollama(args.model, options).warm_up()
     for scenario in args.scenarios:
         for period in args.periods:

@@ -5,6 +5,7 @@
         [--horizon 300] [--jobs 3] [--set validation] [--tag name] [--no-rollouts]
     python scripts/llm_benchmark.py --reuse-calls models_zero --models qwen2.5:1.5b \
         --betas 4 8 --tag beta_v1      # replay advice already obtained, no model call
+    python scripts/llm_benchmark.py --summary-only --tag v2_zero   # tables from saved rows
 
 Phase 1, calls: every model answers every situation (latency, valid JSON, tokens, memory,
 digest, quantisation, licence). Phase 2, quality: each advice is replayed from the
@@ -205,28 +206,35 @@ SITUATIONS_PATHS: dict[str, Path] = {}
 
 
 def relative(scores: pd.DataFrame, label: str, beta: float) -> pd.DataFrame:
-    """Per situation: waiting change in % and EV stop change in s, against no advice."""
+    """Per situation: waiting change in % and EV stop change in s, against no advice. Every
+    situation counts: without a replay (no advice, or no valid answer) the policy acts
+    alone, which is a change of 0."""
     base = scores[scores.label == "none"].set_index("situation")
     s = scores[(scores.label == label) & (scores.beta == beta)].set_index("situation")
-    out = pd.DataFrame(index=s.index)
-    out["kind"] = s["kind"]
-    out["waiting_%"] = (
+    out = pd.DataFrame(index=base.index)
+    out["kind"] = base["kind"]
+    waiting = (
         100
         * (s.waiting_veh_s - base.loc[s.index, "waiting_veh_s"])
         / base.loc[s.index, "waiting_veh_s"].clip(lower=1)
     )
-    out["ev_s"] = s.ev_stopped_s - base.loc[s.index, "ev_stopped_s"]
-    out["changed"] = s.changed
+    out["waiting_%"] = waiting.reindex(base.index).fillna(0.0)
+    ev = s.ev_stopped_s - base.loc[s.index, "ev_stopped_s"]
+    out["ev_s"] = ev.reindex(base.index).fillna(0.0)
+    out["changed"] = s.changed.reindex(base.index).fillna(0)
+    out["advised"] = base.index.isin(s.index)
     return out
 
 
 def quality(rel: pd.DataFrame) -> dict:
+    """Gains against PPO alone: positive = better (less waiting, fewer EV stops)."""
     return {
-        "n_scored": len(rel),
-        "waiting_change_%": round(rel["waiting_%"].mean(), 2),
+        "n_situations": len(rel),
+        "n_advised": int(rel.advised.sum()),
+        "gain_waiting_%": round(-rel["waiting_%"].mean(), 2),
         "better_than_none_%": round(100 * (rel["waiting_%"] < -0.01).mean(), 0),
         "worse_than_none_%": round(100 * (rel["waiting_%"] > 0.01).mean(), 0),
-        "ev_stopped_change_s": round(rel.ev_s.mean(), 1),
+        "gain_ev_stopped_s": round(-rel.ev_s.mean(), 1),
         "changed_decisions": round(rel.changed.mean(), 1),
     }
 
@@ -283,6 +291,36 @@ def by_kind(scores: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
+def resummarise(tag: str, calls_tag: str | None = None) -> None:
+    """Summary and per-kind tables again from the saved calls and replays of ``tag``
+    (``calls_tag``: the run whose calls ``tag`` replayed, if any)."""
+    calls = pd.read_csv(OUT / f"{calls_tag or tag}_calls.csv", keep_default_na=False)
+    infos = pd.read_csv(OUT / f"{calls_tag or tag}_models.csv", keep_default_na=False)
+    scores = pd.read_csv(OUT / f"{tag}_scores.csv", keep_default_na=False)
+    calls = calls[(calls.model + "|" + calls.technique).isin(set(scores.label))]
+    for col in ("valid", "first_valid"):
+        calls[col] = calls[col].astype(str) == "True"
+    for col in ("latency_s", "output_tokens", "items"):
+        calls[col] = pd.to_numeric(calls[col])
+    for col in ("waiting_veh_s", "ev_stopped_s", "changed"):
+        scores[col] = pd.to_numeric(scores[col])
+    if "beta" not in scores:  # rows written before betas were recorded: one beta, 2
+        scores["beta"] = 2.0
+    scores["beta"] = pd.to_numeric(scores["beta"])
+    if "kind" not in scores:
+        for p in sorted((SITUATIONS / "validation").glob("*.json")):
+            SITUATIONS_PATHS[p.stem] = p
+        kinds = {
+            sid: kind_of(Stored.load(SITUATIONS_PATHS[sid])) for sid in scores.situation.unique()
+        }
+        scores["kind"] = scores.situation.map(kinds)
+    by_kind(scores).to_csv(OUT / f"{tag}_by_kind.csv", index=False)
+    table = summarise(calls, infos, scores)
+    table.to_csv(OUT / f"{tag}_summary.csv", index=False)
+    with pd.option_context("display.width", 250, "display.max_columns", 30):
+        print(table.to_string(index=False))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--models", nargs="+", default=None)
@@ -301,7 +339,11 @@ def main() -> None:
     parser.add_argument("--tag", default="bench")
     parser.add_argument("--reuse-calls", default=None, help="tag of a run whose calls to replay")
     parser.add_argument("--no-rollouts", action="store_true")
+    parser.add_argument("--summary-only", action="store_true", help="recompute the tables")
     args = parser.parse_args()
+    if args.summary_only:
+        resummarise(args.tag, args.reuse_calls)
+        return
 
     items = situations(args.set, args.limit)
     for p in sorted((SITUATIONS / args.set).glob("*.json")):

@@ -10,13 +10,15 @@ The choices between tasks follow rules fixed before the results are seen, on val
 seed 1000 only, and are written to results/exploration/llm_benchmark/step2_choice.json:
 
 * model and beta: among the (model, beta) pairs of the zero-shot benchmark with at least
-  95 % valid JSON and a p95 latency of at most 20 s, the lowest mean change of waiting;
+  95 % valid JSON and a p95 latency of at most 20 s, the highest mean gain on waiting;
   within 0.05 points of it, the lowest p50 latency;
 * technique (zero, brief, few): the same rule on the chosen model and beta;
-* self-consistency (vote over 3 answers): kept only if it lowers the mean change of
+* self-consistency (vote over 3 answers): kept only if it raises the mean gain on
   waiting and its p95 latency stays at most 45 s;
-* period N: the lowest mean change of waiting over the scenarios; within 0.5 points of
+* period N: the highest mean gain on waiting over the scenarios; within 0.5 points of
   it, the longest period (fewer calls).
+
+Gains are against COOP-FULL alone: positive = better (less waiting).
 
 These rules pick the best value even when differences are within noise: the report says
 so, and step 4 tests the chosen setting on the test seeds against the placebo.
@@ -69,9 +71,9 @@ def task(name: str, script: str, args: list[str], output: Path) -> None:
 
 
 def best(rows: pd.DataFrame, tie: float, by: str) -> pd.Series:
-    """Lowest mean waiting change; within ``tie`` points of it, the lowest ``by``."""
-    top = rows["waiting_change_%"].min()
-    near = rows[rows["waiting_change_%"] <= top + tie]
+    """Highest mean gain on waiting; within ``tie`` points of it, the lowest ``by``."""
+    top = rows["gain_waiting_%"].max()
+    near = rows[rows["gain_waiting_%"] >= top - tie]
     return near.sort_values(by).iloc[0]
 
 
@@ -97,14 +99,15 @@ def main() -> None:
     )
 
     zero = pd.read_csv(BENCH / "v2_zero_summary.csv")
-    llm = zero[(zero.technique == "zero") & zero["waiting_change_%"].notna()]
+    llm = zero[(zero.technique == "zero") & zero["gain_waiting_%"].notna()]
     ok = llm[(llm["json_valid_%"] >= 95) & (llm["latency_p95_s"] <= 20)]
     pick = best(ok if len(ok) else llm, 0.05, "latency_p50_s")
     choice = {
         "model": pick.model,
         "beta": float(pick.beta),
-        "zero_waiting_change_%": float(pick["waiting_change_%"]),
-        "rule": "model and beta: valid >= 95 %, p95 <= 20 s, lowest waiting change",
+        "zero_gain_waiting_%": float(pick["gain_waiting_%"]),
+        "rule": "model and beta: valid >= 95 %, p95 <= 20 s, highest gain on waiting",
+        "convention": "gain > 0 = better than COOP-FULL alone",
     }
     save(choice)
     model, beta = choice["model"], f"{choice['beta']:g}"
@@ -117,10 +120,10 @@ def main() -> None:
         BENCH / "v2_tech_summary.csv",
     )
     tech = pd.read_csv(BENCH / "v2_tech_summary.csv")
-    tech = tech[(tech.model == model) & tech["waiting_change_%"].notna()]
+    tech = tech[(tech.model == model) & tech["gain_waiting_%"].notna()]
     pick = best(tech, 0.05, "latency_p50_s")
     choice.update(
-        {"technique": pick.technique, "technique_waiting_change_%": float(pick["waiting_change_%"])}
+        {"technique": pick.technique, "technique_gain_waiting_%": float(pick["gain_waiting_%"])}
     )
     save(choice)
     technique = choice["technique"]
@@ -133,15 +136,14 @@ def main() -> None:
         BENCH / "v2_vote_summary.csv",
     )
     vote = pd.read_csv(BENCH / "v2_vote_summary.csv")
-    vote = vote[(vote.model == model) & vote["waiting_change_%"].notna()].iloc[0]
+    vote = vote[(vote.model == model) & vote["gain_waiting_%"].notna()].iloc[0]
     keep = (
-        vote["waiting_change_%"] < choice["technique_waiting_change_%"]
-        and vote["latency_p95_s"] <= 45
+        vote["gain_waiting_%"] > choice["technique_gain_waiting_%"] and vote["latency_p95_s"] <= 45
     )
     choice.update(
         {
             "vote": 3 if keep else 1,
-            "vote_waiting_change_%": float(vote["waiting_change_%"]),
+            "vote_gain_waiting_%": float(vote["gain_waiting_%"]),
             "vote_latency_p95_s": float(vote["latency_p95_s"]),
         }
     )
@@ -156,9 +158,9 @@ def main() -> None:
     )
     period = pd.read_csv(RESULTS_DIR / "exploration" / "llm_period" / "period_summary.csv")
     per_n = (
-        period.groupby("period_s")["mean_waiting_time_change_%"]
+        period.groupby("period_s")["gain_mean_waiting_time_%"]
         .mean()
-        .rename("waiting_change_%")
+        .rename("gain_waiting_%")
         .reset_index()
     )
     per_n["minus_period"] = -per_n.period_s
@@ -166,7 +168,7 @@ def main() -> None:
     choice.update(
         {
             "period_s": float(pick.period_s),
-            "period_waiting_change_%": round(float(pick["waiting_change_%"]), 2),
+            "period_gain_waiting_%": round(float(pick["gain_waiting_%"]), 2),
             "done": f"{datetime.now():%Y-%m-%d %H:%M}",
         }
     )

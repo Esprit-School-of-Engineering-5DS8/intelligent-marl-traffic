@@ -219,6 +219,21 @@ def test_latency_modes_for_the_sensitivity_analysis(run_policy):
         assert policy.calls[0].delay_s == expected
 
 
+def test_the_cache_reuses_the_advice_of_an_identical_situation(run_policy):
+    class Counting(FixedSource):
+        asked = 0
+
+        def advise(self, situation):
+            Counting.asked += 1
+            return super().advise(situation)
+
+    advice = parse('{"a":[["A0",1,3,20]],"r":""}')
+    cfg = AdvisorConfig(period_s=10, min_gap_s=0, latency="zero", cache=True)
+    policy, out = run_policy(Counting(advice, 5.0), cfg, [0, 5, 10, 15, 20])
+    assert Counting.asked == 1 and len(policy.calls) == 3  # one model call, two cache hits
+    assert policy.summary()["llm_cache_hits"] == 2 and policy.calls[1].latency_s == 0.0
+
+
 def test_no_valid_advice_means_the_policy_alone(run_policy):
     class Broken(AdviceSource):
         def advise(self, situation):
