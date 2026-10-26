@@ -1,0 +1,4 @@
+model,digest,size_bytes,parameters,quantization,family,license,memory_gb,technique,prompt
+qwen2.5-0.5b-instruct-base,,,0.5B,fp16,qwen2,Apache License,,base,advisor-v2/zero
+qwen2.5-0.5b-instruct-lora,,,0.5B,fp16,qwen2,Apache License,,lora,advisor-v2/zero
+qwen2.5-0.5b-instruct-prompt_tuning,,,0.5B,fp16,qwen2,Apache License,,prompt_tuning,advisor-v2/zero

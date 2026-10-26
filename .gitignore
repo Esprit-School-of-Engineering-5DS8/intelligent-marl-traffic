@@ -32,3 +32,8 @@ results/forecasting/tmp/
 
 # Personal notes
 COMMANDES.md
+
+# LoRA / prompt-tuning outputs from Kaggle: adapters are large (tens of MB) and the data
+# folder repeats results/exploration/llm_lora; the CSV results and the model provenance stay
+results/exploration/llm_benchmark/results/adapter_*
+results/exploration/llm_benchmark/results/data/

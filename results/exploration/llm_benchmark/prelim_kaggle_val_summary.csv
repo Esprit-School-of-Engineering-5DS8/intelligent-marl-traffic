@@ -1,0 +1,5 @@
+model,technique,params,quant,memory_gb,licence,latency_p50_s,latency_p95_s,json_first_try_%,json_valid_%,output_tokens,advice_items,beta,n_situations,n_advised,gain_waiting_%,better_than_none_%,worse_than_none_%,gain_ev_stopped_s,changed_decisions
+qwen2.5-0.5b-instruct-base,base,0.5B,fp16,,Apache License,4.0,4.0,0.0,0.0,33.0,0.0,4.0,63,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-lora,lora,0.5B,fp16,,Apache License,4.0,4.0,98.0,98.0,17.0,0.7,4.0,63,14,0.01,6.0,10.0,0.1,1.6
+qwen2.5-0.5b-instruct-prompt_tuning,prompt_tuning,0.5B,fp16,,Apache License,4.0,4.0,100.0,100.0,14.0,0.5,4.0,63,13,0.04,11.0,6.0,-0.4,1.3
+rules (control),-,,,,,,,,,,,4.0,63,63,-0.09,16.0,25.0,-0.1,2.6
