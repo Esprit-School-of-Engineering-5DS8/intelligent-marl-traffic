@@ -1,0 +1,25 @@
+label,beta,kind,n_situations,n_advised,gain_waiting_%,better_than_none_%,worse_than_none_%,gain_ev_stopped_s,changed_decisions
+rules,4.0,all,63,63,-0.09,16.0,25.0,-0.1,2.6
+rules,4.0,any event,40,40,-0.01,22.0,35.0,-0.1,3.4
+rules,4.0,detector_fault,7,7,0.1,29.0,14.0,-0.0,1.9
+rules,4.0,emergency,7,7,0.71,43.0,43.0,-0.7,7.3
+rules,4.0,incident,8,8,-0.3,38.0,62.0,-0.0,6.0
+rules,4.0,message_loss,7,7,-0.0,0.0,0.0,-0.0,0.4
+rules,4.0,none,23,23,-0.23,4.0,9.0,-0.0,1.2
+rules,4.0,pedestrians,11,11,-0.35,9.0,45.0,-0.0,2.1
+qwen2.5-0.5b-instruct-lora|lora,4.0,all,63,8,0.05,5.0,3.0,-0.2,0.8
+qwen2.5-0.5b-instruct-lora|lora,4.0,any event,40,8,0.08,8.0,5.0,-0.2,1.3
+qwen2.5-0.5b-instruct-lora|lora,4.0,detector_fault,7,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-lora|lora,4.0,emergency,7,7,0.45,43.0,29.0,-1.4,7.4
+qwen2.5-0.5b-instruct-lora|lora,4.0,incident,8,1,-0.0,0.0,0.0,-0.0,0.1
+qwen2.5-0.5b-instruct-lora|lora,4.0,message_loss,7,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-lora|lora,4.0,none,23,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-lora|lora,4.0,pedestrians,11,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,all,63,13,-0.09,6.0,8.0,-0.1,0.9
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,any event,40,13,-0.14,10.0,12.0,-0.1,1.4
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,detector_fault,7,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,emergency,7,4,-0.28,0.0,29.0,-0.7,2.1
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,incident,8,6,-0.29,25.0,25.0,-0.0,2.9
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,message_loss,7,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,none,23,0,-0.0,0.0,0.0,-0.0,0.0
+qwen2.5-0.5b-instruct-prompt_tuning|prompt_tuning,4.0,pedestrians,11,3,-0.1,18.0,9.0,-0.0,1.6

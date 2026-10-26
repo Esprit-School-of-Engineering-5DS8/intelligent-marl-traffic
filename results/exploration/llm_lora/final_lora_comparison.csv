@@ -1,0 +1,5 @@
+technique,json_valid_%,abstention_%,agreement_%,advice_recall_%,false_advice_%,t4_latency_s,trainable_params,train_minutes
+always_abstain,100,100,76,0,0,0.0,0.0,0.0
+base,0,0,0,0,0,1.03,0.0,0.0
+lora,100,87,67,17,12,0.82,8798208.0,8.5
+prompt_tuning,100,79,65,11,15,0.57,17920.0,10.3

@@ -1,0 +1,190 @@
+model,digest,technique,prompt,situation,kind,trigger,latency_s,attempts,valid,first_valid,items,advice,prompt_tokens,output_tokens,error
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1200,message_loss,,4.0,1,False,False,0,,736,29,"{""a"":[[""A0"", ""NS"", 30, 1200]],""r"":""MESSAGE LOSS between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1500,message_loss,,4.0,1,False,False,0,,734,29,"{""a"":[[""A0"", ""NS/EW"", 30, 10]],""r"":""MESSAGE LOSS between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1800,message_loss,,4.0,1,False,False,0,,734,29,"{""a"":[[""A0"", ""NS/EW"", 30, 10]],""r"":""MESSAGE LOSS between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t2100,message_loss,,4.0,1,False,False,0,,737,29,"{""a"":[[""A0"", ""NS/EW"", 30, 10]],""r"":""MESSAGE LOSS between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t2400,message_loss,,4.0,1,False,False,0,,734,29,"{""a"":[[""A0"", ""NS/EW"", 30, 10]],""r"":""MESSAGE LOSS between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t600,message_loss,,4.0,1,False,False,0,,739,28,"{""a"":[[""A0"", ""NS"", 30, 120]],""r"":""Message loss between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t900,message_loss,,4.0,1,False,False,0,,734,28,"{""a"":[[""A0"", ""NS"", 30, 200]],""r"":""Message loss between neighbours""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1200,none,,4.0,1,False,False,0,,732,27,"{""a"":[[""A0"", ""NS/EW"", 3, 1200]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1500,none,,4.0,1,False,False,0,,732,25,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1600,emergency,,4.0,1,False,False,0,,780,77,"{""a"":[[""D0"", ""p1"", ""216"", ""10-120""]], ""r"": ""Emergency vehicle next junctions: D0(p1,216m) C0(p1,466m) C1(p0,704m) C2(p0,954m)""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1660,emergency,,4.0,1,False,False,0,,773,38,"{""a"":[[""C1"", ""p0"", ""2"", ""260""]], ""r"": ""Emergency vehicle needs green phase 2 for the next junction.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1665,emergency,,4.0,1,False,False,0,,829,96,"{""a"":[[""C2(p0,234m)"", ""C3(p0,484m)"", ""B3(p1,733m)"", ""A3(p1,983m)""], [""A0(p0,167m)"", ""A1(p0,417m)"", ""A2(p0,667m)"", ""A3(p0,917m)""]], ""r"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1720,emergency,,4.0,1,False,False,0,,796,45,"{""a"":[[""C3"", ""p0"", ""3"", ""14m""]], ""r"": ""Emergency vehicle needs to go to C3 (phase p0, distance 14m)""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1800,none,,4.0,1,False,False,0,,729,32,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs green phase 1.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2090,emergency,,4.0,1,False,False,0,,777,27,"{""a"":[[""D3"", ""p0"", ""2"", ""167m""]], ""r"":""emergency""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2120,emergency,,4.0,1,False,False,0,,754,39,"{""a"":[{""phase"":""NS"",""queue_per_phase"":2,""peds"":5},{""phase"":""EW"",""queue_per_phase"":3,""peds"":5}],""r"":""emergency""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2150,emergency,,4.0,1,False,False,0,,752,33,"{""a"":[[""D1"", ""NS/EW"", 3, 17]],""r"":""emergency vehicle needs green phase 17m""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2420,none,,4.0,1,False,False,0,,725,35,"{""a"":[[""A0"", ""NS/EW"", 3, 2]],""r"":""Emergency vehicle needs to be guided to the next green phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t600,none,,4.0,1,False,False,0,,730,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__emergency__peak__s1000__t900,none,,4.0,1,False,False,0,,728,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1200,incident,,4.0,1,False,False,0,,743,26,"{""a"":[[""B1"", ""C1"", 3, 1200]],""r"":""incident""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1260,incident,,4.0,1,False,False,0,,748,26,"{""a"":[[""B1"", ""C1"", 3, 120]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1320,incident,,4.0,1,False,False,0,,744,26,"{""a"":[[""B1"", ""C1"", 3, 120]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1380,incident,,4.0,1,False,False,0,,746,25,"{""a"":[[""B1"", ""C1"", 3, 10]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1440,incident,,4.0,1,False,False,0,,749,26,"{""a"":[[""B1"", ""p1"", 3, 120]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1500,incident,,4.0,1,False,False,0,,753,26,"{""a"":[[""B1"", ""p1"", 3, 120]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1560,incident,,4.0,1,False,False,0,,746,26,"{""a"":[[""B1"", ""p1"", 3, 120]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1620,incident,,4.0,1,False,False,0,,748,26,"{""a"":[[""B1"", ""p1"", 3, 120]],""r"":""INCIDENT""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t1800,none,,4.0,1,False,False,0,,733,25,"{""a"":[[""A0"", ""NS/EW"", 3, 10]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t2100,none,,4.0,1,False,False,0,,731,35,"{""a"":[[""A0"", ""NS/EW"", 3, 10]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t2400,none,,4.0,1,False,False,0,,732,35,"{""a"":[[""A0"", ""NS/EW"", 3, 17]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t600,none,,4.0,1,False,False,0,,725,36,"{""a"":[[""A0"", ""NS/EW"", 3, 10]],""r"":""Emergency vehicle needs to be guided to the next green phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__incident__peak__s1000__t900,none,,4.0,1,False,False,0,,722,31,"{""a"":[[""A0"", ""NS/EW"", 3, 2]],""r"":""Emergency vehicle needs to be handled immediately.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t1200,none,,4.0,1,False,False,0,,732,27,"{""a"":[[""A0"", ""NS/EW"", 3, 1200]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t1500,none,,4.0,1,False,False,0,,732,25,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t1800,none,,4.0,1,False,False,0,,728,25,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t2100,none,,4.0,1,False,False,0,,728,32,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be handled immediately.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t2400,none,,4.0,1,False,False,0,,726,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t600,none,,4.0,1,False,False,0,,730,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__normal__peak__s1000__t900,none,,4.0,1,False,False,0,,728,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1100,pedestrians,,4.0,1,False,False,0,,742,29,"{""a"":[[""A0"", ""NS/EW"", 3, 10]],""r"":""pedestrians:A2""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1200,none,,4.0,1,False,False,0,,725,27,"{""a"":[[""A0"", ""NS/EW"", 3, 1200]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1445,pedestrians,,4.0,1,False,False,0,,747,29,"{""a"":[[""A3"", ""NS/EW"", 3, 10]],""r"":""pedestrians:A3""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1500,none,,4.0,1,False,False,0,,732,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1530,pedestrians,,4.0,1,False,False,0,,746,27,"{""a"":[[""D2"", ""p1"", 4, 10]],""r"":""pedestrian crowd""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1655,pedestrians,,4.0,1,False,False,0,,748,29,"{""a"":[[""C1"", ""NS/EW"", 3, 10]],""r"":""pedestrians:C1""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1800,none,,4.0,1,False,False,0,,732,25,"{""a"":[[""A0"", ""NS/EW"", 3, 10]],""r"":""urgent""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1830,pedestrians,,4.0,1,False,False,0,,744,28,"{""a"":[[""C2"", ""NS/EW"", 3, 12]],""r"":""pedestrian crowd""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2100,pedestrians,,4.0,1,False,False,0,,749,34,"{""a"":[[""A0"", ""NS"", 3, 120]],""r"":""Emergency vehicle needs to be diverted to phase 1.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2235,pedestrians,,4.0,1,False,False,0,,750,28,"{""a"":[[""D1"", ""p1"", 3, 10]],""r"":""pedestrians:D1""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2400,pedestrians,,4.0,1,False,False,0,,748,32,"{""a"":[[""C1"", ""NS/EW"", 3, 120]],""r"":""PEDESTRIAN CROWD""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2495,pedestrians,,4.0,1,False,False,0,,746,29,"{""a"":[[""B2"", ""NS/EW"", 3, 10]],""r"":""pedestrians:B2""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t600,none,,4.0,1,False,False,0,,728,32,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be handled immediately.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t740,pedestrians,,4.0,1,False,False,0,,740,30,"{""a"":[[""C0"", ""NS/EW"", 3, 120]],""r"":""pedestrians:C0""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t790,pedestrians,,4.0,1,False,False,0,,741,29,"{""a"":[[""B0"", ""NS/EW"", 3, 10]],""r"":""pedestrians:B0""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t900,none,,4.0,1,False,False,0,,727,35,"{""a"":[[""A0"", ""NS/EW"", 3, 12]],""r"":""Emergency vehicle needs to be guided to the next phase.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1200,detector_fault,,4.0,1,False,False,0,,809,28,"{""a"":[[""A0"", ""NS"", 3, 1200]],""r"":""No junction qualifies.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1500,detector_fault,,4.0,1,False,False,0,,813,33,"{""a"":[[""A0"", ""NS"", 3, 120]],""r"":""Emergency vehicle needs green phase for the next junction.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1800,detector_fault,,4.0,1,False,False,0,,810,31,"{""a"":[[""A0"", ""NS"", 3, 120]],""r"":""Emergency vehicle needs green phase 1.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t2100,detector_fault,,4.0,1,False,False,0,,808,22,"{""a"":[[""A0"", ""NS"", 3, 7]],""r"":""incident""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t2400,detector_fault,,4.0,1,False,False,0,,806,30,"{""a"":[[""A0"", ""NS"", 3, 17]],""r"":""Emergency vehicle needs green phase 1.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t600,detector_fault,,4.0,1,False,False,0,,811,31,"{""a"":[[""A0"", ""NS"", 3, 120]],""r"":""Emergency vehicle needs green phase 1.""}"
+qwen2.5-0.5b-instruct-base,,base,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t900,detector_fault,,4.0,1,False,False,0,,809,72,"{""a"":[[""A0"", ""NS"", 3, 120], [""A1"", ""NS"", 3, 120], [""A2"", ""NS"", 3, 120], [""A3"", ""NS"", 3, 120]],""r"":""No junction qualifies.""}"
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1200,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",736,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1500,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1800,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t2100,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",737,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t2400,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t600,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",739,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t900,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1200,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1500,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1600,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""D0"", ""p"": 1, ""w"": 1.0, ""s"": 60}, {""j"": ""C0"", ""p"": 1, ""w"": 1.0, ""s"": 60}, {""j"": ""C1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""B1"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",780,53,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1660,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""C2"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""C3"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""B3"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",773,53,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1665,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""C2"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""C3"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""B3"", ""p"": 1, ""w"": 1.0, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 1.0, ""s"": 60}], ""r"": """"}",829,53,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1720,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""C3"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""B3"", ""p"": 1, ""w"": 1.0, ""s"": 60}, {""j"": ""A3"", ""p"": 1, ""w"": 1.0, ""s"": 60}, {""j"": ""D3"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",796,53,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",729,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2090,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""D3"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""D2"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""D1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""ev_2"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",777,54,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2120,emergency,,4.0,1,True,True,3,"{""a"": [{""j"": ""D1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""D0"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""D2"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",754,42,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2150,emergency,,4.0,1,True,True,3,"{""a"": [{""j"": ""D1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""D0"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""D2"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",752,42,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2420,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",725,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",730,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__emergency__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1200,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",743,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1260,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",748,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1320,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",744,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1380,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1440,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""D2"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",749,30,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1500,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",753,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1560,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1620,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",748,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",733,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t2100,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",731,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t2400,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",725,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__incident__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",722,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t1200,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t1500,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t2100,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t2400,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",726,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",730,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__normal__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1100,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",742,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1200,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",725,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1445,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",747,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1500,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1530,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1655,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",748,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1830,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",744,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2100,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",749,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2235,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",750,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2400,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",748,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2495,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t740,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",740,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t790,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",741,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",727,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1200,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",809,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1500,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",813,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1800,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",810,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t2100,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",808,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t2400,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",806,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t600,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",811,8,
+qwen2.5-0.5b-instruct-lora,,lora,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t900,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",809,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1200,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",736,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1500,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t1800,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t2100,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",737,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t2400,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t600,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",739,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__comm_dropout_30__peak__s1000__t900,message_loss,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",734,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1200,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1500,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1600,emergency,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",780,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1660,emergency,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",773,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1665,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""C2"", ""p"": 1, ""w"": 0.6667, ""s"": 60}, {""j"": ""A0"", ""p"": 0, ""w"": 0.3333, ""s"": 30}, {""j"": ""A1"", ""p"": 0, ""w"": 0.3333, ""s"": 30}, {""j"": ""A2"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",829,53,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1720,emergency,,4.0,1,True,True,3,"{""a"": [{""j"": ""C3"", ""p"": 1, ""w"": 0.6667, ""s"": 60}, {""j"": ""B3"", ""p"": 1, ""w"": 0.6667, ""s"": 60}, {""j"": ""A3"", ""p"": 1, ""w"": 0.6667, ""s"": 60}], ""r"": """"}",796,42,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",729,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2090,emergency,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",777,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2120,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""D1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 0.3333, ""s"": 30}, {""j"": ""A1"", ""p"": 0, ""w"": 0.3333, ""s"": 30}, {""j"": ""A2"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",754,53,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2150,emergency,,4.0,1,True,True,4,"{""a"": [{""j"": ""D1"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""A0"", ""p"": 0, ""w"": 0.3333, ""s"": 30}, {""j"": ""A1"", ""p"": 1, ""w"": 0.3333, ""s"": 30}, {""j"": ""A2"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",752,53,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t2420,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",725,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",730,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__emergency__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1200,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 1, ""w"": 0.6667, ""s"": 60}, {""j"": ""B1"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",743,31,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1260,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",748,31,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1320,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""B1"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",744,31,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1380,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",746,31,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1440,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",749,31,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1500,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",753,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1560,incident,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1620,incident,,4.0,1,True,True,2,"{""a"": [{""j"": ""C1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",748,31,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",733,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t2100,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",731,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t2400,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",725,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__incident__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",722,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t1200,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t1500,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t2100,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t2400,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",726,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",730,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__normal__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1100,pedestrians,,4.0,1,True,True,4,"{""a"": [{""j"": ""A2"", ""p"": 0, ""w"": 0.6667, ""s"": 30}, {""j"": ""A0"", ""p"": 0, ""w"": 0.6667, ""s"": 30}, {""j"": ""B2"", ""p"": 1, ""w"": 0.6667, ""s"": 30}, {""j"": ""D2"", ""p"": 0, ""w"": 0.6667, ""s"": 30}], ""r"": """"}",742,53,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1200,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",725,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1445,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",747,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1500,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1530,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1655,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",748,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1800,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",732,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t1830,pedestrians,,4.0,1,True,True,4,"{""a"": [{""j"": ""C2"", ""p"": 0, ""w"": 1.0, ""s"": 60}, {""j"": ""A0"", ""p"": 0, ""w"": 0.3333, ""s"": 30}, {""j"": ""B1"", ""p"": 1, ""w"": 0.3333, ""s"": 30}, {""j"": ""B3"", ""p"": 0, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",744,53,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2100,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",749,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2235,pedestrians,,4.0,1,True,True,4,"{""a"": [{""j"": ""D1"", ""p"": 0, ""w"": 0.6667, ""s"": 60}, {""j"": ""A0"", ""p"": 1, ""w"": 0.3333, ""s"": 30}, {""j"": ""B1"", ""p"": 1, ""w"": 0.3333, ""s"": 30}, {""j"": ""B2"", ""p"": 1, ""w"": 0.3333, ""s"": 30}], ""r"": """"}",750,53,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2400,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",748,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t2495,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",746,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t600,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",728,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t740,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",740,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t790,pedestrians,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",741,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__pedestrians__peak__s1000__t900,none,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",727,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1200,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",809,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1500,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",813,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t1800,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",810,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t2100,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",808,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t2400,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",806,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t600,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",811,8,
+qwen2.5-0.5b-instruct-prompt_tuning,,prompt_tuning,advisor-v2/zero,grid4x4__sensor_noise__peak__s1000__t900,detector_fault,,4.0,1,True,True,0,"{""a"": [], ""r"": """"}",809,8,

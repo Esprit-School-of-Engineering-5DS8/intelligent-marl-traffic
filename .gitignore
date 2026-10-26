@@ -37,3 +37,6 @@ COMMANDES.md
 # folder repeats results/exploration/llm_lora; the CSV results and the model provenance stay
 results/exploration/llm_benchmark/results/adapter_*
 results/exploration/llm_benchmark/results/data/
+
+# final LoRA / prompt-tuning adapters (Kaggle): kept locally, out of git
+results/exploration/llm_lora/*.zip

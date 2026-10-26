@@ -41,7 +41,10 @@ fichiers sont dans [VALIDATION_LLM.md](VALIDATION_LLM.md).
 - Avec des abstentions majoritaires dans l'entraînement et seulement 15 pas
   d'optimisation, LoRA a appris exactement cela.
 - **La correction** : rééquilibrer l'entraînement, faire plus de pas, et mesurer le rappel
-  des conseils et les faux conseils. Il retrouve alors 27 % des conseils attendus.
+  des conseils et les faux conseils.
+- **Le résultat sur le lot final** (169 exemples) : LoRA retrouve 17 % des conseils
+  attendus, avec 12 % de faux conseils. Il conseille surtout pendant les urgences, mais
+  son gain dans SUMO reste de +0,05 %.
 - **La leçon** : l'accord avec l'étiquette ne prouve rien, seul l'effet dans SUMO compte.
 
 **6. Quelle différence entre LoRA, prompt tuning et prompt engineering ?**
@@ -113,8 +116,9 @@ fichiers sont dans [VALIDATION_LLM.md](VALIDATION_LLM.md).
 - Non, pas encore. Les écarts de validation (±0,3 % sur les situations, ±3 % sur un
   épisode) sont du même ordre que le bruit : une même configuration varie déjà de 0,15
   point entre deux réglages de contexte.
-- LoRA et prompt tuning sont préliminaires : la validation ne compte que 8 situations
-  étiquetées « conseil » dans le lot préliminaire, et 15 dans le lot final.
+- LoRA et prompt tuning sont préliminaires (+0,05 % et −0,09 % dans SUMO) : la validation
+  ne compte que 15 situations étiquetées « conseil » dans le lot final, et 8 dans le lot
+  préliminaire.
 - La suite est l'évaluation pré-enregistrée sur les graines de test 0 à 4 : 15 runs par
   scénario, avec placebo, règles et oracle, et des tests de Mann-Whitney corrigés par Holm.
   Elle demande environ 24 à 28 h de calcul.

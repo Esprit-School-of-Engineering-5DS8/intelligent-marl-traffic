@@ -1,0 +1,2 @@
+model,digest,size_bytes,parameters,quantization,family,license,memory_gb,technique,prompt
+qwen2.5-0.5b-instruct-base,,,0.5B,fp16,qwen2,Apache License,,base,advisor-v2/zero

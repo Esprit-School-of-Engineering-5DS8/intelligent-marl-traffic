@@ -1,10 +1,10 @@
 controller,gain_waiting_%,latency_s,source,note,json_valid_%,abstention_%,advice_recall_%,false_advice_%,latency_where
 PPO seul (COOP-FULL),0.0,,référence,aucun conseil,,,,,
 Toujours s'abstenir,0.0,,référence triviale,,100.0,100.0,0.0,0.0,
-Règles,-0.17,,llm_oracle/oracle_summary.csv,étiquettes construites à partir des règles : rappel de 100 % par construction,100.0,11.0,100.0,87.0,
-Placebo (moyenne de 3 tirages),0.09,,llm_oracle/oracle_summary.csv,"conseils au hasard, même amplitude que le LLM",100.0,0.0,11.0,100.0,
-LLM zero-shot qwen2.5:3b,0.16,8.2,llm_benchmark/v2_tech_calls.csv ; llm_oracle/oracle_summary.csv,latence Ollama locale (p50),100.0,0.0,14.0,100.0,local
+Règles,-0.17,,llm_oracle/oracle_summary.csv,étiquettes construites à partir des règles : rappel de 100 % par construction,100.0,11.0,100.0,85.0,
+Placebo (moyenne de 3 tirages),0.09,,llm_oracle/oracle_summary.csv,"conseils au hasard, même amplitude que le LLM",100.0,0.0,9.0,100.0,
+LLM zero-shot qwen2.5:3b,0.16,8.2,llm_benchmark/v2_tech_calls.csv ; llm_oracle/oracle_summary.csv,latence Ollama locale (p50),100.0,0.0,17.0,100.0,local
 "Oracle (meilleur candidat, après coup)",1.09,,llm_oracle/oracle_summary.csv,borne haute,,,,,
-"Base 0,5B (sans entraînement)",-0.0,1.01,llm_benchmark/results/lora_comparison.csv ; prelim_kaggle_val_summary.csv,préliminaire : 69 exemples d'entraînement ; latence sur GPU T4,0.0,0.0,0.0,0.0,T4
-"LoRA 0,5B",0.01,1.03,llm_benchmark/results/lora_comparison.csv ; prelim_kaggle_val_summary.csv,préliminaire : 69 exemples d'entraînement ; latence sur GPU T4,98.0,76.0,27.0,16.0,T4
-"Prompt tuning 0,5B",0.04,0.55,llm_benchmark/results/lora_comparison.csv ; prelim_kaggle_val_summary.csv,préliminaire : 69 exemples d'entraînement ; latence sur GPU T4,100.0,79.0,9.0,16.0,T4
+"Base 0,5B (sans entraînement)",-0.0,1.03,final_lora_comparison.csv ; final_kaggle_val_summary.csv,préliminaire : 169 exemples d'entraînement ; latence sur GPU T4,0.0,0.0,0.0,0.0,T4
+"LoRA 0,5B",0.05,0.82,final_lora_comparison.csv ; final_kaggle_val_summary.csv,préliminaire : 169 exemples d'entraînement ; latence sur GPU T4,100.0,87.0,17.0,12.0,T4
+"Prompt tuning 0,5B",-0.09,0.57,final_lora_comparison.csv ; final_kaggle_val_summary.csv,préliminaire : 169 exemples d'entraînement ; latence sur GPU T4,100.0,79.0,11.0,15.0,T4

@@ -13,9 +13,11 @@ contraire :
 - les graines de test 0 à 4 n'ont servi à rien régler, et l'évaluation sur ces graines
   reste à faire (section 7).
 
-**LoRA et prompt tuning sont préliminaires.** La validation qui a servi à les mesurer ne
-compte que **8 situations étiquetées « conseil » sur 63** (lot préliminaire), et 15 sur 63
-dans le lot final.
+**LoRA et prompt tuning sont préliminaires.**
+- Le lot final : 169 exemples d'entraînement (graines 100001 à 100003), et une validation
+  qui ne compte que **15 situations étiquetées « conseil » sur 63**.
+- Le lot préliminaire, qui a servi à tester le notebook : 69 exemples d'entraînement, et
+  **8 situations « conseil » sur 63** en validation.
 
 Autres documents :
 - [VISITE_DU_CODE.md](VISITE_DU_CODE.md) : le parcours du code devant le prof ;
@@ -52,8 +54,8 @@ pourquoi, et liste ce qui a été essayé.
 | 3. Hyperparamètres | Un seul fichier (inférence, beta, période N, délai, cache, vote), lu par le code, chaque valeur justifiée par une mesure | `configs/llm.yaml` ; `src/cotraffic/llm/settings.py:29` | `Get-Content configs\llm.yaml` | `test_code_defaults_match_the_settings_file`, `test_settings_are_complete_and_bounded`. beta 8 : −1,2 % (`beta_v1_summary.csv`) ; N = 3 min : −5,0 % (`period_summary.csv`) | **FAIT** |
 | 4. Prompt engineering | Prompt versionné (v1, v2) ; zero, brief, few-shot (exemples des graines d'entraînement) ; vote sur 3 réponses ; sortie JSON contrainte par schéma | `configs/prompts/advisor-v2.yaml` ; `src/cotraffic/llm/prompts.py:23-82` ; `scripts/llm_fewshot.py:121` ; `src/cotraffic/llm/sources.py:103` (vote) ; `src/cotraffic/llm/advice.py:45` (schéma) | `type results\exploration\llm_benchmark\v2_tech_summary.csv` | `test_prompt_versions_and_techniques`, `test_self_consistency_keeps_majority_items_only`. v1 → v2 : JSON valide de 67 à 100 % (3B) ; zero +0,15 %, brief −0,18 %, few +0,08 %, vote +0,02 % | **FAIT** |
 | 5. Tool schema | 5 outils en lecture seule et `submit_advice` ; JSON Schema strict ; validation Pydantic ; budget d'appels | `src/cotraffic/llm/tools.py:120-262` ; `src/cotraffic/llm/sources.py:152` (`ToolLlmSource`) | `pytest tests\test_llm_tools.py -v` (5 s) ; `python scripts\llm_tools_demo.py` (1 min) | 12 tests. Essai réel : 27 à 50 s par conseil (`docs/demo/llm_tools_demo.txt`) | **FAIT**, non retenu (trop lent) |
-| 6. Fine-tuning LoRA | Jeu de données par rejeu (graines d'entraînement), rééquilibrage, hyperparamètres, notebook Kaggle et Colab, rejeu SUMO des prédictions | `scripts/llm_dataset.py:158-191` (étiquettes) ; `notebooks/llm_lora_colab.ipynb`, sections 4, 5 et 8 | `type results\exploration\llm_benchmark\results\lora_comparison.csv` | Lot préliminaire : rappel 27 %, faux conseils 16 %, **gain dans SUMO +0,01 %** (`prelim_kaggle_val_summary.csv`) | **PARTIEL** : préliminaire ; le lot final est à entraîner |
-| 7. Prompt tuning | Soft prompt PEFT (20 jetons virtuels), mêmes données, comparé à LoRA et au prompt engineering | `notebooks/llm_lora_colab.ipynb`, sections 9 et 10 | même fichier que la ligne 6 | Rappel 9 %, faux conseils 16 %, **gain dans SUMO +0,04 %** | **PARTIEL** : préliminaire |
+| 6. Fine-tuning LoRA | Jeu de données par rejeu (graines d'entraînement), rééquilibrage, hyperparamètres, notebook Kaggle et Colab, rejeu SUMO des prédictions | `scripts/llm_dataset.py:158-191` (étiquettes) ; `notebooks/llm_lora_colab.ipynb`, sections 4, 5 et 8 | `type results\exploration\llm_lora\final_lora_comparison.csv` | Lot final (169 exemples) : rappel 17 %, faux conseils 12 %, **gain dans SUMO +0,05 %** (`final_kaggle_val_summary.csv`) | **PARTIEL** : préliminaire (peu d'exemples, 15 situations « conseil » en validation) |
+| 7. Prompt tuning | Soft prompt PEFT (20 jetons virtuels), mêmes données, comparé à LoRA et au prompt engineering | `notebooks/llm_lora_colab.ipynb`, sections 9 et 10 | même fichier que la ligne 6 | Lot final : rappel 11 %, faux conseils 15 %, **gain dans SUMO −0,09 %** | **PARTIEL** : préliminaire |
 | 8. Évaluation | Protocole de rejeux appariés ; épisodes complets ; contrôles placebo, règles, oracle ; pré-enregistrement ; statistiques prévues (Mann-Whitney, Holm) | `src/cotraffic/llm/rollout.py:168` ; `scripts/llm_dataset.py:129` (oracle) ; `scripts/llm_period.py` ; `docs/LLM_PREREGISTRATION.md` | `python scripts\llm_results_table.py` (1 min) | Oracle +1,09 %, LLM +0,16 %, placebo +0,09 %, règles −0,17 % (`llm_oracle/oracle_summary.csv`) | **PARTIEL** : validation seulement ; graines de test et tests statistiques non lancés |
 | 9. Sécurité | Lecture stricte et bornée ; taille maximale ; délai et repli ; données jamais traitées comme instructions ; outils en lecture seule ; bouclier final | `src/cotraffic/llm/advice.py:79` et `:125` ; `src/cotraffic/llm/sources.py:34` et `:84` ; `src/cotraffic/llm/client.py:73` ; `src/cotraffic/llm/prompts.py:47` | `pytest tests\test_llm_security.py -v` (20 s) | 10 tests adverses. Attaque avec un biais de 1000 : vert le plus court 13 s pour un minimum de 10 s, sur 100 verts | **FAIT** |
 | 10. Orchestration | Déclencheurs, file d'attente, délai égal à la latence réelle, expiration, limite de fréquence, cache (désactivé), journal d'audit, schéma Mermaid | `src/cotraffic/llm/advised.py:104-198` ; `:48` (cache) ; `docs/LLM_DESIGN.md:59-100` (schéma), section 3 (flux pas à pas) | `type results\exploration\llm_period\calls\coop_full_llm-N600__grid4x4__emergency__peak__s1000.jsonl` | `test_latency_modes_for_the_sensitivity_analysis`, `test_the_cache_reuses_the_advice_of_an_identical_situation` | **FAIT** |
@@ -119,18 +121,18 @@ pourquoi, et liste ce qui a été essayé.
 - **L'entraînement.** LoRA apprend de petites matrices de rang 16 sans toucher les poids
   du modèle. Les exemples de conseil sont suréchantillonnés, car les abstentions sont
   majoritaires.
-- **Le premier essai** a montré le piège de la classe majoritaire (section 4.2) ; après
-  correction, LoRA retrouve 27 % des conseils attendus.
-- **Le juge final** est le rejeu dans SUMO : +0,01 % sur le lot préliminaire, donc pas de
-  gain.
+- **Le premier essai** a montré le piège de la classe majoritaire (section 3.2).
+- **Sur le lot final**, LoRA conseille dans 8 situations seulement, dont 7 urgences ; il
+  retrouve 17 % des conseils attendus, avec 12 % de faux conseils.
+- **Le juge final** est le rejeu dans SUMO : +0,05 %, donc pas de gain mesurable.
 
 **7. Le prompt tuning.**
 - On n'apprend que 20 vecteurs placés devant le prompt (17 920 paramètres) ; le modèle
   reste figé.
 - C'est l'inverse du prompt engineering : on optimise le prompt par gradient au lieu de
   l'écrire à la main.
-- Sur les mêmes données, il apprend moins que LoRA (rappel 9 % contre 27 %), et son effet
-  dans SUMO est nul (+0,04 %).
+- Sur les mêmes données, il apprend moins que LoRA (rappel 11 % contre 17 %), et son effet
+  dans SUMO est légèrement négatif (−0,09 %).
 
 **8. L'évaluation.**
 - **Deux niveaux, sur la validation :**
@@ -175,25 +177,28 @@ résultats (copie : `results/exploration/llm_summary/validation_table.csv`).
 
 Ce qu'il mesure :
 - **le gain sur l'attente**, sur les 63 situations, rejouées 5 min depuis le même instantané ;
-- **le rappel et les faux conseils**, par rapport aux étiquettes du lot préliminaire :
-  **8 situations « conseil » et 55 « abstention »**.
+- **le rappel et les faux conseils**, par rapport aux étiquettes de validation du lot
+  final : **15 situations « conseil » et 48 « abstention »**.
+
+Les modèles 0,5B sont ceux entraînés sur le lot final (169 exemples). Le même tableau sur
+le lot préliminaire s'obtient avec `--set prelim` (section 3.2).
 
 | Contrôleur | Gain sur l'attente | JSON valide | Abstention | Rappel des conseils | Faux conseils | Latence |
 |---|---|---|---|---|---|---|
 | PPO seul (COOP-FULL) | 0,00 % | – | – | – | – | – |
 | Toujours s'abstenir | 0,00 % | 100 % | 100 % | 0 % | 0 % | – |
-| Règles | −0,17 % | 100 % | 11 % | 100 % | 87 % | – |
-| Placebo (moyenne de 3 tirages) | +0,09 % | 100 % | 0 % | 11 % | 100 % | – |
-| LLM zero-shot qwen2.5:3b | +0,16 % | 100 % | 0 % | 14 % | 100 % | 8,2 s (local) |
+| Règles | −0,17 % | 100 % | 11 % | 100 % | 85 % | – |
+| Placebo (moyenne de 3 tirages) | +0,09 % | 100 % | 0 % | 9 % | 100 % | – |
+| LLM zero-shot qwen2.5:3b | +0,16 % | 100 % | 0 % | 17 % | 100 % | 8,2 s (local) |
 | Oracle (meilleur candidat, après coup) | +1,09 % | – | – | – | – | – |
 | Base 0,5B (sans entraînement) | 0,00 % | 0 % | 0 % | 0 % | 0 % | 1,0 s (T4) |
-| LoRA 0,5B (préliminaire) | +0,01 % | 98 % | 76 % | 27 % | 16 % | 1,0 s (T4) |
-| Prompt tuning 0,5B (préliminaire) | +0,04 % | 100 % | 79 % | 9 % | 16 % | 0,6 s (T4) |
+| LoRA 0,5B (préliminaire, lot final) | +0,05 % | 100 % | 87 % | 17 % | 12 % | 0,8 s (T4) |
+| Prompt tuning 0,5B (préliminaire, lot final) | −0,09 % | 100 % | 79 % | 11 % | 15 % | 0,6 s (T4) |
 
 Comment le lire :
 - **Règles et placebo** répondent instantanément, mais leurs conseils sont appliqués après
-  8,2 s, la latence médiane du LLM, comme le LLM. Leur rappel de 100 % est obtenu par
-  construction : les étiquettes du lot préliminaire viennent des règles.
+  8,2 s, la latence médiane du LLM, comme le LLM. Le rappel de 100 % des règles est obtenu
+  par construction : les étiquettes sont des conseils de la famille des règles.
 - **L'oracle** choisit après coup, pour chaque situation, le meilleur des candidats :
   aucun conseil, règles à la force 1, 2 ou 3, 3 tirages du placebo, LLM. C'est une borne
   haute : la marge de ce qu'un conseiller peut gagner ici est d'environ 1 %.
@@ -206,17 +211,23 @@ Comment le lire :
   d'Ollama pour le même modèle (4,0 s). Le modèle de base n'a pas de décodage contraint
   sur Kaggle, d'où ses 0 % de JSON valide ; avec Ollama, le même modèle en a 100 %.
 
-### 3.2 Le piège de la classe majoritaire (LoRA, premier essai)
+### 3.2 LoRA et prompt tuning : les trois essais, et le piège de la classe majoritaire
 
-Les deux essais sur Kaggle, tous deux sur le lot préliminaire, avec Qwen2.5-0.5B :
+Trois essais sur Kaggle, avec Qwen2.5-0.5B. Les essais 1 et 2 portent sur le lot
+préliminaire (69 exemples ; 8 situations « conseil » en validation), l'essai 3 sur le
+lot final (169 exemples ; 15 situations « conseil »). Chaque lot a sa propre référence
+« toujours s'abstenir » :
 
 | Essai | Technique | JSON valide | Abstention | Accord | Rappel | Faux conseils | Gain dans SUMO |
 |---|---|---|---|---|---|---|---|
-| Référence | Toujours s'abstenir | 100 % | 100 % | **87 %** | 0 % | 0 % | 0 % |
+| Référence, lot préliminaire | Toujours s'abstenir | 100 % | 100 % | **87 %** | 0 % | 0 % | 0 % |
 | 1 (15 pas) | LoRA | 100 % | 100 % | **87 %** | 0 % | 0 % | 0 % (déduit : aucun conseil émis) |
 | 1 | Prompt tuning | 71 % | 71 % | 67 % | 0 % | 0 % | 0 % (déduit : aucun conseil émis) |
 | 2 (rééquilibré, 126 pas) | LoRA | 98 % | 76 % | 71 % | 27 % | 16 % | +0,01 % |
 | 2 | Prompt tuning | 100 % | 79 % | 73 % | 9 % | 16 % | +0,04 % |
+| Référence, lot final | Toujours s'abstenir | 100 % | 100 % | **76 %** | 0 % | 0 % | 0 % |
+| **3 (lot final)** | **LoRA** | 100 % | 87 % | 67 % | 17 % | 12 % | **+0,05 %** |
+| **3 (lot final)** | **Prompt tuning** | 100 % | 79 % | 65 % | 11 % | 15 % | **−0,09 %** |
 
 - **Ce qui s'est passé au premier essai.** 55 des 63 situations de validation ont pour
   étiquette l'abstention. Répondre « rien » à tout donne donc 87 % d'accord, et LoRA n'avait
@@ -230,6 +241,14 @@ Les deux essais sur Kaggle, tous deux sur le lot préliminaire, avec Qwen2.5-0.5
     conseils.
 - **Le résultat.** Au deuxième essai, LoRA conseille dans 14 situations et retrouve 27 %
   des conseils attendus, mais son effet dans SUMO reste nul.
+- **Le lot final (essai 3).**
+  - Plus prudent : 87 % d'abstentions, 12 % de faux conseils.
+  - Il ne conseille que dans 8 situations, dont les 7 urgences de la validation, avec un
+    gain de +0,45 % sur ces 7 urgences et de +0,05 % au total.
+  - Le prompt tuning donne −0,09 %.
+  - Tous deux ont un accord inférieur à la référence triviale (67 % et 65 % contre 76 %).
+  - Ces écarts sont de l'ordre du bruit, sur très peu de situations : 7 urgences, et
+    15 situations « conseil ».
 - **La leçon** : l'accord avec une étiquette ne mesure pas l'utilité. On compare toujours à
   la référence triviale, et on juge sur l'effet réel dans SUMO.
 
@@ -319,11 +338,11 @@ Une seule graine par case : un écart de ±3 % n'est pas significatif. L'épisod
     inverse de celle dont l'ambulance a besoin (voir la démo).
 - **Le changement de mode n'est pas réalisé**, ni l'ablation par masque d'actions.
 - **LoRA et prompt tuning sont préliminaires.**
-  - Le lot préliminaire ne compte que 69 exemples d'entraînement.
-  - Sa validation ne compte que 8 situations étiquetées « conseil » ; le lot final en
-    compte 15.
+  - Le lot final ne compte que 169 exemples d'entraînement, et sa validation seulement
+    15 situations étiquetées « conseil » (8 dans le lot préliminaire).
   - Les étiquettes sont bruitées : le meilleur de quelques candidats sur 5 min.
-  - Le lot final (169 exemples) reste à entraîner.
+  - Un seul petit modèle (0,5B) ; le 1,5B n'a pas été essayé.
+  - Résultat : LoRA +0,05 %, prompt tuning −0,09 %, dans le bruit.
 - **Biais en faveur des règles à l'étape 2.** Dans le benchmark de l'étape 2, les règles
   ont été rejouées sans délai. C'est corrigé dans l'oracle et dans l'évaluation
   pré-enregistrée (8,2 s pour tous).
@@ -341,7 +360,7 @@ Une seule graine par case : un écart de ±3 % n'est pas significatif. L'épisod
 | Lot | Fichiers | Exemples | Graines | Étiquettes | Rôle |
 |---|---|---|---|---|---|
 | Préliminaire | `results/exploration/llm_lora/preliminary/` | 69 entraînement (42 abstentions, 27 conseils) ; 63 validation (**55 abstentions, 8 conseils**) | 100001 (entraînement), 1000 (validation) | Rejeux sans délai ; validation : règles ou abstention | Test du notebook ; chiffres de la section 3 |
-| **Final** | `results/exploration/llm_lora/` | **169 entraînement (119 abstentions, 50 conseils)** ; 63 validation (**48 abstentions, 15 conseils**) | 100001 à 100003 (entraînement), 1000 (validation) | Rejeux avec le même délai pour tous (8,2 s) ; meilleur candidat, ou abstention sous 0,25 % | **Résultats à présenter**, après l'exécution sur Kaggle |
+| **Final** | `results/exploration/llm_lora/` | **169 entraînement (119 abstentions, 50 conseils)** ; 63 validation (**48 abstentions, 15 conseils**) | 100001 à 100003 (entraînement), 1000 (validation) | Rejeux avec le même délai pour tous (8,2 s) ; meilleur candidat, ou abstention sous 0,25 % | **Résultats présentés** (sections 3.1 et 3.2) ; sorties dans `llm_lora/final_*` et `llm_benchmark/final_*` |
 
 Les graines d'entraînement servent uniquement à l'entraînement, et la graine 1000
 uniquement à la mesure. Les graines de test 0 à 4 ne sont pas utilisées.
@@ -369,8 +388,9 @@ uniquement à la mesure. Les graines de test 0 à 4 ne sont pas utilisées.
 
 ## 7. Prochaines étapes
 
-1. **Entraîner le lot final** (LoRA et prompt tuning, 0,5B puis 1,5B si nécessaire), puis
-   rejouer ses prédictions dans SUMO.
+1. **LoRA plus solide** : essayer Qwen2.5-1.5B, plus d'exemples (d'autres graines
+   d'entraînement), et des étiquettes moins bruitées (rejeux plus longs). Le lot final
+   (0,5B, 169 exemples) ne donne pas de gain mesurable.
 2. **Évaluation sur les graines de test 0 à 4**, comme le prévoit
    `docs/LLM_PREREGISTRATION.md`.
    - Contrôleurs : COOP-FULL seul, + LLM, + placebo, + règles (même latence pour tous), et

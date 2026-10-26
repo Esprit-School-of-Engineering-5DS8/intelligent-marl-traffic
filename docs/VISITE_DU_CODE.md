@@ -130,5 +130,7 @@ ligne (par exemple `advised.py:189`).
   - section 9 : le prompt tuning ;
   - section 10 : la comparaison.
 - **Dire** : « Au premier essai, LoRA s'abstenait partout : ses 87 % d'accord n'étaient que
-  la part des abstentions. Après rééquilibrage, il retrouve 27 % des conseils attendus.
-  C'est préliminaire : la validation ne compte que 8 situations de conseil. »
+  la part des abstentions. Après rééquilibrage, sur le lot final de 169 exemples, il
+  retrouve 17 % des conseils attendus, surtout pendant les urgences, mais son gain dans
+  SUMO n'est que de +0,05 %. C'est préliminaire : la validation ne compte que 15
+  situations de conseil. »

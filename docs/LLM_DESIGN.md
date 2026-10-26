@@ -178,7 +178,7 @@ Pourquoi le biais comme mécanisme principal :
 | COOP-FULL | Référence sans LLM (résultats existants, plus les runs manquants sur capteurs et pertes de messages) | Situations et épisodes de validation faits ; runs de test manquants à faire (étape 4) |
 | COOP-FULL + LLM zero-shot | Effet du LLM sans exemples | Fait (6 modèles) |
 | COOP-FULL + LLM few-shot | Effet des exemples (tirés des graines d'entraînement) | Fait (qwen2.5:3b) |
-| COOP-FULL + LLM LoRA | Effet du fine-tuning | Préliminaire (0,5B, lot de 69 exemples) : gain +0,01 % dans SUMO ; lot final de 169 exemples à entraîner ([VALIDATION_LLM.md](VALIDATION_LLM.md), 3.2) |
+| COOP-FULL + LLM LoRA | Effet du fine-tuning | Préliminaire (0,5B, lot final de 169 exemples) : gain +0,05 % dans SUMO, prompt tuning −0,09 % ([VALIDATION_LLM.md](VALIDATION_LLM.md), 3.2) |
 | COOP-FULL + conseils aléatoires | **Placebo** : même fréquence, mêmes carrefours visés en nombre, même distribution d'amplitude que le LLM | Mesuré sur la validation : +0,09 % (3 tirages, même délai de 8,2 s que le LLM) |
 | COOP-FULL + conseiller à règles | **Contrôle** : les mêmes conseils produits par des règles simples (couloir vert sur la route de l'ambulance, etc.), même mécanisme, même fréquence, même latence | Fait |
 | Oracle | Meilleur conseil candidat de chaque situation, choisi après coup par rejeu : borne haute de ce qu'un conseiller peut apporter | Mesuré sur la validation : +1,09 %, dont une part due à la chance (un tirage du placebo est le meilleur dans 21 situations sur 63) |

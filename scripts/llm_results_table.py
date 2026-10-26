@@ -1,17 +1,21 @@
 """The validation results of the LLM work in one table, computed from the result files.
 
-    python scripts/llm_results_table.py
+    python scripts/llm_results_table.py                 # final dataset (default)
+    python scripts/llm_results_table.py --set prelim    # preliminary dataset
 
 Seed 1000 (63 validation situations, 300 s replays from the same snapshot). Gain on
 waiting: positive = better than PPO alone. Recall and false advice are measured against
-the labels of results/exploration/llm_lora/preliminary/llm_lora_val.jsonl, the ones the
-Kaggle notebook used: 8 situations labelled with an advice, 55 with abstention (the rules'
-advice when it gains at least 0.25 %, else abstention). Writes
-results/exploration/llm_summary/validation_table.csv and prints a Markdown table.
+the validation labels of the dataset the Kaggle notebook was run on:
+* final (results/exploration/llm_lora/llm_lora_val.jsonl): 15 situations labelled with
+  an advice, 48 with abstention; models trained on 169 examples (seeds 100001-100003);
+* prelim (llm_lora/preliminary/): 8 with an advice, 55 with abstention; 69 examples.
+Writes results/exploration/llm_summary/validation_table[_prelim].csv and prints a
+Markdown table.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -27,7 +31,22 @@ from cotraffic.llm.sources import RuleSource  # noqa: E402
 from cotraffic.paths import RESULTS_DIR  # noqa: E402
 
 EXPL = RESULTS_DIR / "exploration"
-LABELS = EXPL / "llm_lora" / "preliminary" / "llm_lora_val.jsonl"
+SETS = {
+    "final": {
+        "labels": EXPL / "llm_lora" / "llm_lora_val.jsonl",
+        "kaggle": EXPL / "llm_lora" / "final_lora_comparison.csv",
+        "replay": EXPL / "llm_benchmark" / "final_kaggle_val_summary.csv",
+        "note": "préliminaire : 169 exemples d'entraînement ; latence sur GPU T4",
+        "out": "validation_table.csv",
+    },
+    "prelim": {
+        "labels": EXPL / "llm_lora" / "preliminary" / "llm_lora_val.jsonl",
+        "kaggle": EXPL / "llm_benchmark" / "results" / "lora_comparison.csv",
+        "replay": EXPL / "llm_benchmark" / "prelim_kaggle_val_summary.csv",
+        "note": "préliminaire : 69 exemples d'entraînement ; latence sur GPU T4",
+        "out": "validation_table_prelim.csv",
+    },
+}
 SITUATIONS = RESULTS_DIR / "tmp" / "llm" / "situations" / "validation"
 OUT = EXPL / "llm_summary"
 
@@ -59,8 +78,11 @@ def measures(preds: dict[str, set | None], gold: dict[str, set]) -> dict:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--set", choices=list(SETS), default="final")
+    conf = SETS[parser.parse_args().set]
     gold = {}
-    for line in LABELS.read_text(encoding="utf-8").splitlines():
+    for line in conf["labels"].read_text(encoding="utf-8").splitlines():
         ex = json.loads(line)
         gold[ex["id"]] = pairs_of_wire(ex["messages"][-1]["content"])
     n_advice = sum(bool(g) for g in gold.values())
@@ -142,12 +164,8 @@ def main() -> None:
             "note": "borne haute",
         }
     )
-    kaggle = pd.read_csv(EXPL / "llm_benchmark" / "results" / "lora_comparison.csv").set_index(
-        "technique"
-    )
-    replay = pd.read_csv(EXPL / "llm_benchmark" / "prelim_kaggle_val_summary.csv").set_index(
-        "technique"
-    )
+    kaggle = pd.read_csv(conf["kaggle"]).set_index("technique")
+    replay = pd.read_csv(conf["replay"]).set_index("technique")
     for tech, name in (
         ("base", "Base 0,5B (sans entraînement)"),
         ("lora", "LoRA 0,5B"),
@@ -165,14 +183,13 @@ def main() -> None:
                 "false_advice_%": int(k["false_advice_%"]),
                 "latency_s": float(k["t4_latency_s"]),
                 "latency_where": "T4",
-                "source": "llm_benchmark/results/lora_comparison.csv ; "
-                "prelim_kaggle_val_summary.csv",
-                "note": "préliminaire : 69 exemples d'entraînement ; latence sur GPU T4",
+                "source": f"{conf['kaggle'].name} ; {conf['replay'].name}",
+                "note": conf["note"],
             }
         )
     table = pd.DataFrame(rows)
     OUT.mkdir(parents=True, exist_ok=True)
-    table.to_csv(OUT / "validation_table.csv", index=False)
+    table.to_csv(OUT / conf["out"], index=False)
     print(f"{len(gold)} validation situations, {n_advice} labelled with an advice\n")
 
     def fmt(v, unit="%"):
