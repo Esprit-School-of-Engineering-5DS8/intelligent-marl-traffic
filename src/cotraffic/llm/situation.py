@@ -41,7 +41,7 @@ class Situation:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-    def to_text(self) -> str:
+    def to_text(self) -> str:  # [Exigence 4] la situation résumée en texte pour le prompt
         """One header, one line per junction, one line per event."""
         layouts = sorted({"/".join(j.phases) for j in self.junctions})
         lines = [f"t={int(self.time)}s trigger={self.trigger}"]
@@ -86,7 +86,7 @@ def phase_for_link(inter, link_index: int) -> int | None:
     return None
 
 
-def observe(env, trigger: str) -> Situation:
+def observe(env, trigger: str) -> Situation:  # [Exigence 4] ce que le LLM voit de la simulation
     meas = env.meas
     junctions = []
     for tid, inter in env.intersections.items():

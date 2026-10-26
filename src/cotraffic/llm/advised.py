@@ -36,7 +36,7 @@ class Active:
 
 
 @dataclass
-class AdvisorConfig:
+class AdvisorConfig:  # [Exigence 3] beta, période N, délai (configs/llm.yaml)
     # values and justification: configs/llm.yaml (advisor section)
     beta: float = 4.0  # largest logit bias (weight 1)
     period_s: float = 600.0  # periodic call (10 min)
@@ -45,7 +45,7 @@ class AdvisorConfig:
     cache: bool = False  # reuse the advice of an identical situation (situation_key)
 
 
-def situation_key(situation) -> tuple:
+def situation_key(situation) -> tuple:  # [Exigence 10] clé du cache (désactivé)
     """Situations that get the same advice from the cache: same events, and per junction
     the same phase and the same queues in bins of 5 vehicles (capped at 20 or more)."""
     junctions = tuple(
@@ -56,7 +56,7 @@ def situation_key(situation) -> tuple:
 
 
 @dataclass
-class CallLog:
+class CallLog:  # [Exigence 10] journal d'audit de chaque appel au LLM
     call: int
     time: float
     trigger: str
@@ -102,7 +102,7 @@ class AdvisedPolicy(Controller):
 
     # ---------------------------------------------------------------- triggers
     def _trigger(self, env, situation_events: list[dict[str, Any]]) -> str | None:
-        now = env.now
+        now = env.now  # [Exigence 10] déclencheurs : nouvel événement, ou période N
         if now - self._last_call < self.cfg.min_gap_s:
             return None
         for e in situation_events:
@@ -116,7 +116,7 @@ class AdvisedPolicy(Controller):
             return "periodic"
         return None
 
-    def _delay(self, latency: float) -> float:
+    def _delay(self, latency: float) -> float:  # [Exigence 10] délai = latence mesurée
         mode = self.cfg.latency
         if mode == "measured":
             return latency
@@ -128,7 +128,7 @@ class AdvisedPolicy(Controller):
             return float(mode.split(":", 1)[1])
         raise ValueError(f"unknown latency mode {mode!r}")
 
-    def _ask(self, env, trigger: str) -> None:
+    def _ask(self, env, trigger: str) -> None:  # [Exigence 10] appel, validation, file d'attente
         now = env.now
         situation = observe(env, trigger)
         key = situation_key(situation) if self.cfg.cache else None
@@ -163,7 +163,7 @@ class AdvisedPolicy(Controller):
     def act(self, env, obs: dict[str, Any]) -> dict[str, int]:
         import torch
 
-        now = env.now
+        now = env.now  # [Exigence 10] activation et expiration des conseils
         ready = [a for a in self.pending if a.start <= now]
         self.pending = [a for a in self.pending if a.start > now]
         self.active = [a for a in self.active + ready if a.end > now]
@@ -186,16 +186,16 @@ class AdvisedPolicy(Controller):
         with torch.no_grad():
             logits = policy.get_distribution(policy.obs_to_tensor(batch)[0]).distribution.logits
         logits = logits.numpy().copy()
-        plain = logits.argmax(axis=1)
+        plain = logits.argmax(axis=1)  # [Exigence 1] la phase que PPO choisirait seul
         index = {a: i for i, a in enumerate(agents)}
         biased: dict[str, Active] = {}
         for a in self.active:
             i = index.get(a.junction)
             if i is not None and a.phase < logits.shape[1]:
-                logits[i, a.phase] += self.cfg.beta * a.weight
+                logits[i, a.phase] += self.cfg.beta * a.weight  # [Exigence 1] biais du LLM
                 self.biased_decisions += 1
                 biased[a.junction] = a
-        chosen = logits.argmax(axis=1)
+        chosen = logits.argmax(axis=1)  # [Exigence 1] décision après le conseil
         self.changed_decisions += int((chosen != plain).sum())
         # what the advice did at this decision: (phase without advice, phase requested,
         # active advice), read by the demo; the shield decides afterwards in env.step

@@ -70,7 +70,7 @@ def task(name: str, script: str, args: list[str], output: Path) -> None:
     say(f"{name}: done")
 
 
-def best(rows: pd.DataFrame, tie: float, by: str) -> pd.Series:
+def best(rows: pd.DataFrame, tie: float, by: str) -> pd.Series:  # [Exigence 2] règle de choix
     """Highest mean gain on waiting; within ``tie`` points of it, the lowest ``by``."""
     top = rows["gain_waiting_%"].max()
     near = rows[rows["gain_waiting_%"] >= top - tie]
@@ -98,7 +98,7 @@ def main() -> None:
         BENCH / "v2_zero_summary.csv",
     )
 
-    zero = pd.read_csv(BENCH / "v2_zero_summary.csv")
+    zero = pd.read_csv(BENCH / "v2_zero_summary.csv")  # [Exigence 2] choix du modèle
     llm = zero[(zero.technique == "zero") & zero["gain_waiting_%"].notna()]
     ok = llm[(llm["json_valid_%"] >= 95) & (llm["latency_p95_s"] <= 20)]
     pick = best(ok if len(ok) else llm, 0.05, "latency_p50_s")
@@ -119,7 +119,7 @@ def main() -> None:
         + ["--num-predict", "96", "--betas", beta, "--jobs", "6", "--tag", "v2_tech"],
         BENCH / "v2_tech_summary.csv",
     )
-    tech = pd.read_csv(BENCH / "v2_tech_summary.csv")
+    tech = pd.read_csv(BENCH / "v2_tech_summary.csv")  # [Exigence 4] choix de la technique
     tech = tech[(tech.model == model) & tech["gain_waiting_%"].notna()]
     pick = best(tech, 0.05, "latency_p50_s")
     choice.update(
@@ -135,7 +135,7 @@ def main() -> None:
         + ["--num-predict", "96", "--betas", beta, "--jobs", "6", "--tag", "v2_vote"],
         BENCH / "v2_vote_summary.csv",
     )
-    vote = pd.read_csv(BENCH / "v2_vote_summary.csv")
+    vote = pd.read_csv(BENCH / "v2_vote_summary.csv")  # [Exigence 4] vote retenu ou non
     vote = vote[(vote.model == model) & vote["gain_waiting_%"].notna()].iloc[0]
     keep = (
         vote["gain_waiting_%"] > choice["technique_gain_waiting_%"] and vote["latency_p95_s"] <= 45
@@ -163,7 +163,7 @@ def main() -> None:
         .rename("gain_waiting_%")
         .reset_index()
     )
-    per_n["minus_period"] = -per_n.period_s
+    per_n["minus_period"] = -per_n.period_s  # [Exigence 3] choix de la période N
     pick = best(per_n, 0.5, "minus_period")
     choice.update(
         {

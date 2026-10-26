@@ -47,7 +47,7 @@ def walk(schema):
             yield from walk(value)
 
 
-def test_schemas_are_strict_and_enumerate_what_exists():
+def test_schemas_are_strict_and_enumerate_what_exists():  # [Exigence 5]
     tools = {t["function"]["name"]: t["function"]["parameters"] for t in tool_schemas(context())}
     assert set(tools) == {*READ_ONLY, SUBMIT}
     for params in tools.values():
@@ -71,7 +71,7 @@ def test_schemas_are_strict_and_enumerate_what_exists():
         (SUBMIT, "not json"),
     ],
 )
-def test_invalid_tool_calls_are_refused(name, arguments):
+def test_invalid_tool_calls_are_refused(name, arguments):  # [Exigences 5 et 9]
     with pytest.raises(ValueError):
         validate_call(name, arguments)
 
@@ -121,7 +121,7 @@ def advise(client):
     return source.advise(context().situation)
 
 
-def test_the_model_reads_then_submits_and_only_submit_acts():
+def test_the_model_reads_then_submits_and_only_submit_acts():  # [Exigence 5]
     client = ScriptedClient(
         [call("get_ev_route", ev_id="ev_0")],
         [call(SUBMIT, items=[{"junction": "B1", "phase": 1, "strength": 3, "seconds": 60}])],
@@ -136,7 +136,7 @@ def test_the_model_reads_then_submits_and_only_submit_acts():
     ]
 
 
-def test_an_unknown_tool_is_refused_and_reported_to_the_model():
+def test_an_unknown_tool_is_refused_and_reported_to_the_model():  # [Exigences 5 et 9]
     client = ScriptedClient(
         [call("set_traffic_light", junction="A0", state="GGGG")],
         [call(SUBMIT, items=[])],

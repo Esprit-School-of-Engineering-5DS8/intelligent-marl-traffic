@@ -238,6 +238,7 @@ span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 
 <li><a href="#partie-2-le-déroulé-de-la-présentation-15-minutes">Partie 2 : le déroulé de la présentation (15 minutes)</a></li>
 <li><a href="#partie-3-tableau-récapitulatif">Partie 3 : tableau récapitulatif</a></li>
 <li><a href="#partie-4-les-limites-et-les-prochaines-étapes">Partie 4 : les limites et les prochaines étapes</a></li>
+<li><a href="#annexe-les-commentaires-exigence-n-dans-le-code">Annexe : les commentaires [Exigence N] dans le code</a></li>
 <li><a href="#lexique">Lexique</a></li>
 </ul>
 </div>
@@ -251,7 +252,8 @@ première fois qu'il apparaît, et un lexique se trouve à la fin.</p>
 <ul>
 <li><strong>convention : gain positif = mieux</strong>, c'est-à-dire moins d'attente que sans LLM ;</li>
 <li>chaque chiffre cite le fichier d'où il vient ;</li>
-<li>chaque <code>fichier:ligne</code> a été vérifié dans le code au commit <code>6481f68</code> ;</li>
+<li>chaque <code>fichier:ligne</code> a été vérifié dans le code. Les commentaires <code># [Exigence N]</code>
+    ajoutés ensuite sont en fin de ligne et n'ont décalé aucune ligne ;</li>
 <li>tous les résultats viennent de la <strong>graine de validation 1000</strong>. Une graine est le numéro
     qui fixe le hasard d'une simulation : même graine, même trafic. Les graines de test 0 à 4
     n'ont pas encore été utilisées.</li>
@@ -317,6 +319,12 @@ exact qui répond à la demande de la prof</strong>, en un ou plusieurs extraits
     guide, à la place des commentaires d'origine en anglais ;</li>
 <li>une ligne <code># …</code> signale des lignes sautées.</li>
 </ul>
+<p><strong>Dans le code lui-même</strong>, chaque endroit qui réalise une demande de la prof porte un petit
+commentaire en fin de ligne, par exemple <code># [Exigence 1] biais du LLM</code>. La liste complète
+est dans l'annexe, à la fin du guide. Pour les afficher tous :</p>
+<div class="codehilite"><pre><span></span><code><span class="n">git</span> <span class="n">grep</span> <span class="n">-n</span> <span class="o">-F</span> <span class="s2">"[Exigence"</span> <span class="p">--</span> <span class="n">src</span> <span class="n">scripts</span> <span class="n">configs</span> <span class="n">tests</span> <span class="n">notebooks</span>
+</code></pre></div>
+
 <h3 id="exigence-1-le-llm-intervient-dans-la-décision-des-agents-pour-améliorer-leurs-scores">Exigence 1 : le LLM intervient dans la décision des agents, pour améliorer leurs scores</h3>
 <p><strong>a. Explication simple.</strong></p>
 <ul>
@@ -2008,6 +2016,151 @@ toutes les 3 min, les piétons perdent 24,8 %.</p>
 <li>Réaliser le changement de mode pendant les urgences, puisque LoRA a appris à intervenir
       surtout à ces moments-là.</li>
 </ol>
+<hr />
+<h2 id="annexe-les-commentaires-exigence-n-dans-le-code">Annexe : les commentaires [Exigence N] dans le code</h2>
+<p>Chaque endroit du code qui réalise une demande de la prof porte un petit commentaire en
+fin de ligne, <code># [Exigence N] ...</code>. Les commentaires sont en fin de ligne pour ne décaler
+aucune ligne : tous les <code>fichier:ligne</code> de ce guide restent justes. Pour les afficher tous :</p>
+<div class="codehilite"><pre><span></span><code><span class="n">git</span> <span class="n">grep</span> <span class="n">-n</span> <span class="o">-F</span> <span class="s2">"[Exigence"</span> <span class="p">--</span> <span class="n">src</span> <span class="n">scripts</span> <span class="n">configs</span> <span class="n">tests</span> <span class="n">notebooks</span>
+</code></pre></div>
+
+<p>Dans VS Code : Ctrl+Shift+F, puis chercher <code>[Exigence</code>. Pour ouvrir une ligne :
+<code>code --goto &lt;fichier&gt;:&lt;ligne&gt;</code>.</p>
+<p>Liste complète, générée à partir du code : 89 commentaires. Un commentaire qui
+cite deux exigences apparaît dans les deux listes.</p>
+<p><strong>Exigence 1 : le LLM dans la décision des agents</strong></p>
+<ul>
+<li><code>src/cotraffic/envs/traffic_env.py:187</code> : phase demandée par PPO, biaisée par le LLM</li>
+<li><code>src/cotraffic/llm/advice.py:39</code> : au plus 4 carrefours par conseil (couloir vert)</li>
+<li><code>src/cotraffic/llm/advised.py:189</code> : la phase que PPO choisirait seul</li>
+<li><code>src/cotraffic/llm/advised.py:195</code> : biais du LLM</li>
+<li><code>src/cotraffic/llm/advised.py:198</code> : décision après le conseil</li>
+<li><code>scripts/llm_demo.py:79</code> : démo : les décisions changées par le LLM</li>
+<li><code>tests/test_llm.py:207</code> : test <code>test_weak_advice_does_not_overturn_a_clear_preference</code></li>
+</ul>
+<p><strong>Exigence 2 : le LLM choisi</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/client.py:16</code> : modèle local : rien ne sort</li>
+<li><code>src/cotraffic/llm/client.py:79</code> : requête au modèle choisi, via Ollama</li>
+<li><code>src/cotraffic/llm/sources.py:58</code> : appel au LLM, repli si réponse invalide</li>
+<li><code>scripts/llm_benchmark.py:82</code> : appels aux modèles, par technique</li>
+<li><code>scripts/llm_step2.py:73</code> : règle de choix</li>
+<li><code>scripts/llm_step2.py:101</code> : choix du modèle</li>
+<li><code>configs/llm.yaml:8</code> : le LLM choisi</li>
+</ul>
+<p><strong>Exigence 3 : les hyperparamètres</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/advised.py:39</code> : beta, période N, délai (configs/llm.yaml)</li>
+<li><code>src/cotraffic/llm/client.py:20</code> : hyperparamètres envoyés à Ollama (configs/llm.yaml)</li>
+<li><code>src/cotraffic/llm/settings.py:29</code> : lit configs/llm.yaml</li>
+<li><code>scripts/llm_period.py:71</code> : épisode complet avec le LLM</li>
+<li><code>scripts/llm_step2.py:166</code> : choix de la période N</li>
+<li><code>configs/llm.yaml:21</code> : hyperparamètres d'inférence</li>
+<li><code>configs/llm.yaml:53</code> : force du biais et rythme des appels</li>
+<li><code>tests/test_llm_settings.py:9</code> : test <code>test_code_defaults_match_the_settings_file</code></li>
+</ul>
+<p><strong>Exigence 4 : le prompt engineering</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/advice.py:45</code> : schéma JSON imposé à la réponse du LLM</li>
+<li><code>src/cotraffic/llm/client.py:87</code> : sortie contrainte par le schéma JSON</li>
+<li><code>src/cotraffic/llm/prompts.py:38</code> : messages au LLM</li>
+<li><code>src/cotraffic/llm/prompts.py:47</code> : situation balisée <code>&lt;state&gt;</code> (anti-injection)</li>
+<li><code>src/cotraffic/llm/situation.py:44</code> : la situation résumée en texte pour le prompt</li>
+<li><code>src/cotraffic/llm/situation.py:89</code> : ce que le LLM voit de la simulation</li>
+<li><code>src/cotraffic/llm/sources.py:103</code> : self-consistency (vote sur k réponses)</li>
+<li><code>scripts/llm_benchmark.py:82</code> : appels aux modèles, par technique</li>
+<li><code>scripts/llm_fewshot.py:121</code> : choix des exemples few-shot</li>
+<li><code>scripts/llm_step2.py:122</code> : choix de la technique</li>
+<li><code>scripts/llm_step2.py:138</code> : vote retenu ou non</li>
+<li><code>configs/llm.yaml:43</code> : prompt et technique retenus</li>
+<li><code>configs/prompts/advisor-v2.yaml:9</code> : le prompt</li>
+<li><code>configs/prompts/advisor-v2.yaml:39</code> : techniques comparées : zero, brief, few</li>
+<li><code>tests/test_llm.py:125</code> : test <code>test_self_consistency_keeps_majority_items_only</code></li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 7</code> : référence : le modèle de base avec le prompt zero-shot</li>
+</ul>
+<p><strong>Exigence 5 : le tool schema</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/client.py:106</code> : requête avec les outils (function calling)</li>
+<li><code>src/cotraffic/llm/sources.py:152</code> : appels d'outils, puis submit_advice</li>
+<li><code>src/cotraffic/llm/tools.py:46</code> : arguments stricts (Pydantic)</li>
+<li><code>src/cotraffic/llm/tools.py:69</code> : arguments de submit_advice</li>
+<li><code>src/cotraffic/llm/tools.py:95</code> : copie de la situation : les outils ne modifient rien</li>
+<li><code>src/cotraffic/llm/tools.py:162</code> : le tool schema</li>
+<li><code>src/cotraffic/llm/tools.py:214</code> : submit_advice : le seul outil qui agit</li>
+<li><code>src/cotraffic/llm/tools.py:252</code> : validation</li>
+<li><code>tests/test_llm_tools.py:50</code> : test <code>test_schemas_are_strict_and_enumerate_what_exists</code></li>
+<li><code>tests/test_llm_tools.py:74</code> : test <code>test_invalid_tool_calls_are_refused</code></li>
+<li><code>tests/test_llm_tools.py:124</code> : test <code>test_the_model_reads_then_submits_and_only_submit_acts</code></li>
+<li><code>tests/test_llm_tools.py:139</code> : test <code>test_an_unknown_tool_is_refused_and_reported_to_the_model</code></li>
+</ul>
+<p><strong>Exigence 6 : LoRA</strong></p>
+<ul>
+<li><code>scripts/llm_dataset.py:75</code> : candidats rejoués</li>
+<li><code>scripts/llm_dataset.py:158</code> : l'étiquette apprise par LoRA</li>
+<li><code>scripts/llm_dataset.py:164</code> : jeu de données LoRA (JSONL)</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 4</code> : réglages (hyperparamètres) de LoRA et du prompt tuning</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 5</code> : mise en forme et rééquilibrage (piège de la classe majoritaire)</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 6</code> : mesures : rappel, faux conseils, référence « toujours s'abstenir »</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 8</code> : fine-tuning LoRA</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 10</code> : comparaison avec la référence triviale</li>
+</ul>
+<p><strong>Exigence 7 : le prompt tuning</strong></p>
+<ul>
+<li><code>notebooks/llm_lora_colab.ipynb, section 4</code> : réglages (hyperparamètres) de LoRA et du prompt tuning</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 6</code> : mesures : rappel, faux conseils, référence « toujours s'abstenir »</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 9</code> : prompt tuning</li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 10</code> : comparaison avec la référence triviale</li>
+</ul>
+<p><strong>Exigence 8 : l'évaluation</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/rollout.py:168</code> : rejeu apparié : même instantané, avec ou sans conseil</li>
+<li><code>src/cotraffic/llm/rollout.py:183</code> : repart du même instantané</li>
+<li><code>src/cotraffic/llm/sources.py:265</code> : contrôle : conseiller à règles</li>
+<li><code>src/cotraffic/llm/sources.py:321</code> : contrôle : placebo (conseils au hasard)</li>
+<li><code>scripts/llm_benchmark.py:172</code> : rejeu de chaque conseil dans SUMO</li>
+<li><code>scripts/llm_dataset.py:112</code> : gain en %, positif = mieux</li>
+<li><code>scripts/llm_dataset.py:130</code> : placebo, règles, LLM et oracle</li>
+<li><code>scripts/llm_period.py:71</code> : épisode complet avec le LLM</li>
+<li><code>scripts/llm_results_table.py:84</code> : tableau final de la validation (graine 1000)</li>
+<li><code>tests/test_llm.py:116</code> : test <code>test_placebo_has_the_requested_amplitude_and_is_seeded</code></li>
+<li><code>notebooks/llm_lora_colab.ipynb, section 6</code> : mesures : rappel, faux conseils, référence « toujours s'abstenir »</li>
+</ul>
+<p><strong>Exigence 9 : la sécurité</strong></p>
+<ul>
+<li><code>src/cotraffic/envs/shield.py:90</code> : bouclier : vert min, anti-famine, vert max</li>
+<li><code>src/cotraffic/envs/traffic_env.py:191</code> : apply_shield ci-dessus : dernier mot</li>
+<li><code>src/cotraffic/llm/advice.py:31</code> : bornes revérifiées par Pydantic</li>
+<li><code>src/cotraffic/llm/advice.py:79</code> : lecture stricte de la réponse</li>
+<li><code>src/cotraffic/llm/advice.py:125</code> : contrôle réseau</li>
+<li><code>src/cotraffic/llm/client.py:73</code> : timeout</li>
+<li><code>src/cotraffic/llm/prompts.py:47</code> : situation balisée <code>&lt;state&gt;</code> (anti-injection)</li>
+<li><code>src/cotraffic/llm/sources.py:58</code> : appel au LLM, repli si réponse invalide</li>
+<li><code>src/cotraffic/llm/sources.py:77</code> : serveur absent ou délai dépassé</li>
+<li><code>src/cotraffic/llm/sources.py:84</code> : réponse trop longue -&gt; refusée</li>
+<li><code>src/cotraffic/llm/tools.py:46</code> : arguments stricts (Pydantic)</li>
+<li><code>src/cotraffic/llm/tools.py:252</code> : validation</li>
+<li><code>configs/prompts/advisor-v2.yaml:9</code> : lignes 15-16 : données != consignes</li>
+<li><code>tests/test_llm.py:49</code> : test <code>test_invalid_advice_is_refused</code></li>
+<li><code>tests/test_llm_security.py:54</code> : injection</li>
+<li><code>tests/test_llm_security.py:67</code> : test <code>test_a_model_that_obeys_the_injection_gets_nothing_through</code></li>
+<li><code>tests/test_llm_security.py:90</code> : test <code>test_malformed_or_out_of_bounds_answers_fall_back_to_the_policy</code></li>
+<li><code>tests/test_llm_security.py:95</code> : test <code>test_an_oversized_answer_is_refused_before_parsing</code></li>
+<li><code>tests/test_llm_security.py:122</code> : timeout</li>
+<li><code>tests/test_llm_security.py:159</code> : attaque contre le bouclier</li>
+<li><code>tests/test_llm_tools.py:74</code> : test <code>test_invalid_tool_calls_are_refused</code></li>
+<li><code>tests/test_llm_tools.py:139</code> : test <code>test_an_unknown_tool_is_refused_and_reported_to_the_model</code></li>
+</ul>
+<p><strong>Exigence 10 : l'orchestration</strong></p>
+<ul>
+<li><code>src/cotraffic/llm/advised.py:48</code> : clé du cache (désactivé)</li>
+<li><code>src/cotraffic/llm/advised.py:59</code> : journal d'audit de chaque appel au LLM</li>
+<li><code>src/cotraffic/llm/advised.py:105</code> : déclencheurs : nouvel événement, ou période N</li>
+<li><code>src/cotraffic/llm/advised.py:119</code> : délai = latence mesurée</li>
+<li><code>src/cotraffic/llm/advised.py:131</code> : appel, validation, file d'attente</li>
+<li><code>src/cotraffic/llm/advised.py:166</code> : activation et expiration des conseils</li>
+<li><code>configs/llm.yaml:53</code> : force du biais et rythme des appels</li>
+<li><code>tests/test_llm.py:195</code> : test <code>test_advice_applies_only_after_its_latency_and_expires</code></li>
+</ul>
 <hr />
 <h2 id="lexique">Lexique</h2>
 <table>

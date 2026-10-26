@@ -13,11 +13,11 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from typing import Any
 
-DEFAULT_URL = "http://localhost:11434"
+DEFAULT_URL = "http://localhost:11434"  # [Exigence 2] modèle local : rien ne sort
 
 
 @dataclass(frozen=True)
-class Options:
+class Options:  # [Exigence 3] hyperparamètres envoyés à Ollama (configs/llm.yaml)
     """Inference settings. The values and their justification are in configs/llm.yaml
     (llm.settings reads it; the defaults here match it, see tests/test_llm_settings.py)."""
 
@@ -70,13 +70,13 @@ class Ollama:
             self.url + path, json.dumps(body).encode("utf-8"), {"Content-Type": "application/json"}
         )
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
+            with urllib.request.urlopen(req, timeout=timeout) as response:  # [Exigence 9] timeout
                 return json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as err:
             raise LLMError(f"{self.model}: {err}") from err
 
     def chat(self, messages: list[dict[str, str]], schema: dict[str, Any] | None = None) -> Reply:
-        body: dict[str, Any] = {
+        body: dict[str, Any] = {  # [Exigence 2] requête au modèle choisi, via Ollama
             "model": self.model,
             "messages": messages,
             "stream": False,
@@ -84,7 +84,7 @@ class Ollama:
             "options": self.options.ollama(),
         }
         if schema is not None:
-            body["format"] = schema
+            body["format"] = schema  # [Exigence 4] sortie contrainte par le schéma JSON
         if self.model.startswith("qwen3"):
             body["think"] = False  # no hidden reasoning: it would multiply the latency
         start = time.perf_counter()
@@ -103,7 +103,7 @@ class Ollama:
 
     def chat_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ToolReply:
         """One model turn with function calling: the reply may hold ``tool_calls``."""
-        body: dict[str, Any] = {
+        body: dict[str, Any] = {  # [Exigence 5] requête avec les outils (function calling)
             "model": self.model,
             "messages": messages,
             "tools": tools,

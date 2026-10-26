@@ -184,11 +184,11 @@ class CoTrafficEnv(ParallelEnv):
             for aid, inter in self.intersections.items():
                 if inter.in_yellow:
                     continue
-                requested = (
+                requested = (  # [Exigence 1] phase demandée par PPO, biaisée par le LLM
                     int(actions[aid]) if actions is not None and aid in actions else inter.phase
                 )
                 decision = apply_shield(requested, self._shield_state(inter, now), self.shield_cfg)
-                self.stats["decisions"] += 1
+                self.stats["decisions"] += 1  # [Exigence 9] apply_shield ci-dessus : dernier mot
                 if decision.reason is not None:
                     self.stats[decision.reason] += 1
                 switched = inter.switch(decision.phase, now)

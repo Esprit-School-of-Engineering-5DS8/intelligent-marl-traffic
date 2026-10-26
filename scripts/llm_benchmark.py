@@ -79,7 +79,7 @@ def model_info(client: Ollama) -> dict:
     return info
 
 
-def call_phase(
+def call_phase(  # [Exigences 2 et 4] appels aux modèles, par technique
     items,
     models,
     techniques,
@@ -169,7 +169,7 @@ def _score(task):
     }
 
 
-def score_phase(
+def score_phase(  # [Exigence 8] rejeu de chaque conseil dans SUMO
     items, calls: pd.DataFrame, horizon: float, betas: list[float], jobs: int, run: dict
 ) -> pd.DataFrame:
     paths = {s.id: str(SITUATIONS_PATHS[s.id]) for s in items}

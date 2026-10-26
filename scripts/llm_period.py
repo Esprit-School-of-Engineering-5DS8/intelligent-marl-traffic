@@ -68,7 +68,7 @@ def baseline(task) -> dict:
 
 
 def advised(scenario: str, seed: int, period: float, args, options: Options) -> dict:
-    client = Ollama(args.model, options)
+    client = Ollama(args.model, options)  # [Exigences 3 et 8] épisode complet avec le LLM
     prompt = load(args.prompt, args.technique)
     cfg = AdvisorConfig(beta=args.beta, period_s=period, latency=args.latency)
     source, label = llm_source(

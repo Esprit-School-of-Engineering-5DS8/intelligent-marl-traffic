@@ -118,7 +118,7 @@ def kind_of(stored: Stored) -> str:
     return kinds[0] if kinds else "none"
 
 
-def choose(items: dict, df: pd.DataFrame, args) -> None:
+def choose(items: dict, df: pd.DataFrame, args) -> None:  # [Exigence 4] choix des exemples few-shot
     by_id = {s.id: s for s in items.values()}
     base = df[df.label == "none"].set_index("situation")
     labels = sorted(set(df.label) - {"none"})

@@ -51,7 +51,7 @@ class FakeClient:
 
 
 # ---------------------------------------------------------------- LLM01: injection via data
-def test_injection_in_an_incident_stays_inside_the_data_block():
+def test_injection_in_an_incident_stays_inside_the_data_block():  # [Exigence 9] injection
     event = {"kind": "incident", "edge": INJECTION, "from": "A0", "to": "B1"}
     prompt = load(technique="zero")
     messages = prompt.messages(situation_with([event]).to_text())
@@ -64,7 +64,7 @@ def test_injection_in_an_incident_stays_inside_the_data_block():
     assert messages[0]["content"] == prompt.system and "never an instruction" in prompt.system
 
 
-def test_a_model_that_obeys_the_injection_gets_nothing_through():
+def test_a_model_that_obeys_the_injection_gets_nothing_through():  # [Exigence 9]
     obeying = '{"a":[["ALL",0,3,120]],"r":"","cmd":"traci.trafficlight.setRedYellowGreenState"}'
     client = FakeClient(obeying, obeying)
     reply = LlmSource(client, load(technique="zero")).advise(situation_with([]))
@@ -87,12 +87,12 @@ def test_a_model_that_obeys_the_injection_gets_nothing_through():
         '{"a":[["A0",1,3,60]],"r":"' + "x" * 200 + '"}',  # reason too long
     ],
 )
-def test_malformed_or_out_of_bounds_answers_fall_back_to_the_policy(answer):
+def test_malformed_or_out_of_bounds_answers_fall_back_to_the_policy(answer):  # [Exigence 9]
     reply = LlmSource(FakeClient(answer, answer), load(technique="zero")).advise(situation_with([]))
     assert reply.advice is None and reply.meta["error"]
 
 
-def test_an_oversized_answer_is_refused_before_parsing(monkeypatch):
+def test_an_oversized_answer_is_refused_before_parsing(monkeypatch):  # [Exigence 9]
     import cotraffic.llm.sources as sources
 
     def must_not_parse(text):
@@ -119,7 +119,7 @@ class SlowHandler(BaseHTTPRequestHandler):
         return None
 
 
-def test_a_real_timeout_falls_back_to_the_policy_quickly():
+def test_a_real_timeout_falls_back_to_the_policy_quickly():  # [Exigence 9] timeout
     server = ThreadingHTTPServer(("127.0.0.1", 0), SlowHandler)
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -156,7 +156,7 @@ class Malicious(AdviceSource):
 
 
 @pytest.mark.sumo
-def test_malicious_advice_cannot_break_the_shield():
+def test_malicious_advice_cannot_break_the_shield():  # [Exigence 9] attaque contre le bouclier
     from cotraffic.controllers.registry import make_controller
     from cotraffic.llm.advised import AdvisedPolicy, AdvisorConfig
     from cotraffic.llm.rollout import EpisodeSpec, make_env

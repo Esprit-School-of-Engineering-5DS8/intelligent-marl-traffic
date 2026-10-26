@@ -28,7 +28,7 @@ def weight_of(strength: int) -> float:
     return round(strength / 3, 4)
 
 
-class Item(BaseModel):
+class Item(BaseModel):  # [Exigence 9] bornes revérifiées par Pydantic
     model_config = ConfigDict(extra="forbid")
     j: str = Field(min_length=1, max_length=16)
     p: int = Field(ge=0, le=MAX_PHASE)
@@ -36,13 +36,13 @@ class Item(BaseModel):
     s: int = Field(ge=MIN_VALID_S, le=MAX_VALID_S)
 
 
-class Advice(BaseModel):
+class Advice(BaseModel):  # [Exigence 1] au plus 4 carrefours par conseil (couloir vert)
     model_config = ConfigDict(extra="forbid")
     a: list[Item] = Field(default_factory=list, max_length=MAX_ITEMS)
     r: str = Field(default="", max_length=MAX_REASON)
 
 
-def schema_for(
+def schema_for(  # [Exigence 4] schéma JSON imposé à la réponse du LLM
     junctions: list[str], max_phase: int, reason_max: int = MAX_REASON
 ) -> dict[str, Any]:
     """JSON Schema of the wire format for one network (constrained decoding). A technique
@@ -76,7 +76,7 @@ class AdviceError(ValueError):
     """The text is not a valid advice (malformed JSON, wrong shape or out-of-bounds values)."""
 
 
-def parse(text: str) -> Advice:
+def parse(text: str) -> Advice:  # [Exigence 9] lecture stricte de la réponse
     """Wire format -> Advice. Every bound is checked again here: constrained decoding is a
     help, never a guarantee the code relies on."""
     try:
@@ -122,7 +122,7 @@ class Checked:
     rejected: list[str] = field(default_factory=list)
 
 
-def check(advice: Advice, n_phases: dict[str, int]) -> Checked:
+def check(advice: Advice, n_phases: dict[str, int]) -> Checked:  # [Exigence 9] contrôle réseau
     """Keep items naming an existing junction and phase; one item per junction (the
     strongest), zero weights dropped."""
     out = Checked()

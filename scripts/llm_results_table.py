@@ -81,7 +81,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--set", choices=list(SETS), default="final")
     conf = SETS[parser.parse_args().set]
-    gold = {}
+    gold = {}  # [Exigence 8] tableau final de la validation (graine 1000)
     for line in conf["labels"].read_text(encoding="utf-8").splitlines():
         ex = json.loads(line)
         gold[ex["id"]] = pairs_of_wire(ex["messages"][-1]["content"])

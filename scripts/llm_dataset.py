@@ -72,7 +72,7 @@ def placebo() -> RandomSource:
 
 
 def candidates(stored: Stored, with_placebo: bool, source: RandomSource) -> dict[str, Advice]:
-    rules = RuleSource().advise(stored.situation).advice
+    rules = RuleSource().advise(stored.situation).advice  # [Exigence 6] candidats rejoués
     out: dict[str, Advice] = {}
     if rules.a:
         out["rules"] = rules
@@ -109,7 +109,7 @@ def replay(sets: dict[str, list[Path]], args, source: RandomSource) -> pd.DataFr
     return df
 
 
-def gains(df: pd.DataFrame) -> pd.DataFrame:
+def gains(df: pd.DataFrame) -> pd.DataFrame:  # [Exigence 8] gain en %, positif = mieux
     """One row per situation, one column per candidate: gain in % (missing = 0)."""
     base = df[df.label == "none"].set_index("situation")
     out = pd.DataFrame(index=base.index)
@@ -127,7 +127,7 @@ def gains(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def oracle_tables(val: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    llm = pd.read_csv(BENCH / "v2_tech_scores.csv")
+    llm = pd.read_csv(BENCH / "v2_tech_scores.csv")  # [Exigence 8] placebo, règles, LLM et oracle
     llm = gains(llm[llm.label.isin(["none", LLM_LABEL])])
     val = val.copy()
     val["llm"] = llm[LLM_LABEL].reindex(val.index).fillna(0.0)
@@ -155,13 +155,13 @@ def oracle_tables(val: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return pd.DataFrame(rows), choice.value_counts().rename_axis("best").reset_index()
 
 
-def label_of(row: pd.Series, min_gain: float) -> str:
+def label_of(row: pd.Series, min_gain: float) -> str:  # [Exigence 6] l'étiquette apprise par LoRA
     cols = [c for c in STRUCTURED if c in row and row[c] >= min_gain]
     return max(cols, key=lambda c: row[c]) if cols else "abstain"
 
 
 def write_dataset(name: str, paths: list[Path], g: pd.DataFrame, args) -> pd.DataFrame:
-    prompt = load(args.prompt_version, "zero")
+    prompt = load(args.prompt_version, "zero")  # [Exigence 6] jeu de données LoRA (JSONL)
     rows, lines = [], []
     for p in paths:
         s = Stored.load(p)

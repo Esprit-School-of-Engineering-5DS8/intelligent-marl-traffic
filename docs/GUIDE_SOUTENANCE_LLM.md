@@ -8,7 +8,8 @@ première fois qu'il apparaît, et un lexique se trouve à la fin.
 
 - **convention : gain positif = mieux**, c'est-à-dire moins d'attente que sans LLM ;
 - chaque chiffre cite le fichier d'où il vient ;
-- chaque `fichier:ligne` a été vérifié dans le code au commit `6481f68` ;
+- chaque `fichier:ligne` a été vérifié dans le code. Les commentaires `# [Exigence N]`
+  ajoutés ensuite sont en fin de ligne et n'ont décalé aucune ligne ;
 - tous les résultats viennent de la **graine de validation 1000**. Une graine est le numéro
   qui fixe le hasard d'une simulation : même graine, même trafic. Les graines de test 0 à 4
   n'ont pas encore été utilisées.
@@ -83,6 +84,14 @@ exact qui répond à la demande de la prof**, en un ou plusieurs extraits (d1, d
 - le code est copié tel quel. Seuls les commentaires `#` en français ont été ajoutés pour ce
   guide, à la place des commentaires d'origine en anglais ;
 - une ligne `# …` signale des lignes sautées.
+
+**Dans le code lui-même**, chaque endroit qui réalise une demande de la prof porte un petit
+commentaire en fin de ligne, par exemple `# [Exigence 1] biais du LLM`. La liste complète
+est dans l'annexe, à la fin du guide. Pour les afficher tous :
+
+```powershell
+git grep -n -F "[Exigence" -- src scripts configs tests notebooks
+```
 
 ### Exigence 1 : le LLM intervient dans la décision des agents, pour améliorer leurs scores
 
@@ -1501,6 +1510,156 @@ ollama list                                                   # qwen2.5:3b doit 
 4. Réaliser le changement de mode pendant les urgences, puisque LoRA a appris à intervenir
    surtout à ces moments-là.
 
+---
+
+## Annexe : les commentaires [Exigence N] dans le code
+
+Chaque endroit du code qui réalise une demande de la prof porte un petit commentaire en
+fin de ligne, `# [Exigence N] ...`. Les commentaires sont en fin de ligne pour ne décaler
+aucune ligne : tous les `fichier:ligne` de ce guide restent justes. Pour les afficher tous :
+
+```powershell
+git grep -n -F "[Exigence" -- src scripts configs tests notebooks
+```
+
+Dans VS Code : Ctrl+Shift+F, puis chercher `[Exigence`. Pour ouvrir une ligne :
+`code --goto <fichier>:<ligne>`.
+
+Liste complète, générée à partir du code : 89 commentaires. Un commentaire qui
+cite deux exigences apparaît dans les deux listes.
+
+**Exigence 1 : le LLM dans la décision des agents**
+
+- `src/cotraffic/envs/traffic_env.py:187` : phase demandée par PPO, biaisée par le LLM
+- `src/cotraffic/llm/advice.py:39` : au plus 4 carrefours par conseil (couloir vert)
+- `src/cotraffic/llm/advised.py:189` : la phase que PPO choisirait seul
+- `src/cotraffic/llm/advised.py:195` : biais du LLM
+- `src/cotraffic/llm/advised.py:198` : décision après le conseil
+- `scripts/llm_demo.py:79` : démo : les décisions changées par le LLM
+- `tests/test_llm.py:207` : test `test_weak_advice_does_not_overturn_a_clear_preference`
+
+**Exigence 2 : le LLM choisi**
+
+- `src/cotraffic/llm/client.py:16` : modèle local : rien ne sort
+- `src/cotraffic/llm/client.py:79` : requête au modèle choisi, via Ollama
+- `src/cotraffic/llm/sources.py:58` : appel au LLM, repli si réponse invalide
+- `scripts/llm_benchmark.py:82` : appels aux modèles, par technique
+- `scripts/llm_step2.py:73` : règle de choix
+- `scripts/llm_step2.py:101` : choix du modèle
+- `configs/llm.yaml:8` : le LLM choisi
+
+**Exigence 3 : les hyperparamètres**
+
+- `src/cotraffic/llm/advised.py:39` : beta, période N, délai (configs/llm.yaml)
+- `src/cotraffic/llm/client.py:20` : hyperparamètres envoyés à Ollama (configs/llm.yaml)
+- `src/cotraffic/llm/settings.py:29` : lit configs/llm.yaml
+- `scripts/llm_period.py:71` : épisode complet avec le LLM
+- `scripts/llm_step2.py:166` : choix de la période N
+- `configs/llm.yaml:21` : hyperparamètres d'inférence
+- `configs/llm.yaml:53` : force du biais et rythme des appels
+- `tests/test_llm_settings.py:9` : test `test_code_defaults_match_the_settings_file`
+
+**Exigence 4 : le prompt engineering**
+
+- `src/cotraffic/llm/advice.py:45` : schéma JSON imposé à la réponse du LLM
+- `src/cotraffic/llm/client.py:87` : sortie contrainte par le schéma JSON
+- `src/cotraffic/llm/prompts.py:38` : messages au LLM
+- `src/cotraffic/llm/prompts.py:47` : situation balisée `<state>` (anti-injection)
+- `src/cotraffic/llm/situation.py:44` : la situation résumée en texte pour le prompt
+- `src/cotraffic/llm/situation.py:89` : ce que le LLM voit de la simulation
+- `src/cotraffic/llm/sources.py:103` : self-consistency (vote sur k réponses)
+- `scripts/llm_benchmark.py:82` : appels aux modèles, par technique
+- `scripts/llm_fewshot.py:121` : choix des exemples few-shot
+- `scripts/llm_step2.py:122` : choix de la technique
+- `scripts/llm_step2.py:138` : vote retenu ou non
+- `configs/llm.yaml:43` : prompt et technique retenus
+- `configs/prompts/advisor-v2.yaml:9` : le prompt
+- `configs/prompts/advisor-v2.yaml:39` : techniques comparées : zero, brief, few
+- `tests/test_llm.py:125` : test `test_self_consistency_keeps_majority_items_only`
+- `notebooks/llm_lora_colab.ipynb, section 7` : référence : le modèle de base avec le prompt zero-shot
+
+**Exigence 5 : le tool schema**
+
+- `src/cotraffic/llm/client.py:106` : requête avec les outils (function calling)
+- `src/cotraffic/llm/sources.py:152` : appels d'outils, puis submit_advice
+- `src/cotraffic/llm/tools.py:46` : arguments stricts (Pydantic)
+- `src/cotraffic/llm/tools.py:69` : arguments de submit_advice
+- `src/cotraffic/llm/tools.py:95` : copie de la situation : les outils ne modifient rien
+- `src/cotraffic/llm/tools.py:162` : le tool schema
+- `src/cotraffic/llm/tools.py:214` : submit_advice : le seul outil qui agit
+- `src/cotraffic/llm/tools.py:252` : validation
+- `tests/test_llm_tools.py:50` : test `test_schemas_are_strict_and_enumerate_what_exists`
+- `tests/test_llm_tools.py:74` : test `test_invalid_tool_calls_are_refused`
+- `tests/test_llm_tools.py:124` : test `test_the_model_reads_then_submits_and_only_submit_acts`
+- `tests/test_llm_tools.py:139` : test `test_an_unknown_tool_is_refused_and_reported_to_the_model`
+
+**Exigence 6 : LoRA**
+
+- `scripts/llm_dataset.py:75` : candidats rejoués
+- `scripts/llm_dataset.py:158` : l'étiquette apprise par LoRA
+- `scripts/llm_dataset.py:164` : jeu de données LoRA (JSONL)
+- `notebooks/llm_lora_colab.ipynb, section 4` : réglages (hyperparamètres) de LoRA et du prompt tuning
+- `notebooks/llm_lora_colab.ipynb, section 5` : mise en forme et rééquilibrage (piège de la classe majoritaire)
+- `notebooks/llm_lora_colab.ipynb, section 6` : mesures : rappel, faux conseils, référence « toujours s'abstenir »
+- `notebooks/llm_lora_colab.ipynb, section 8` : fine-tuning LoRA
+- `notebooks/llm_lora_colab.ipynb, section 10` : comparaison avec la référence triviale
+
+**Exigence 7 : le prompt tuning**
+
+- `notebooks/llm_lora_colab.ipynb, section 4` : réglages (hyperparamètres) de LoRA et du prompt tuning
+- `notebooks/llm_lora_colab.ipynb, section 6` : mesures : rappel, faux conseils, référence « toujours s'abstenir »
+- `notebooks/llm_lora_colab.ipynb, section 9` : prompt tuning
+- `notebooks/llm_lora_colab.ipynb, section 10` : comparaison avec la référence triviale
+
+**Exigence 8 : l'évaluation**
+
+- `src/cotraffic/llm/rollout.py:168` : rejeu apparié : même instantané, avec ou sans conseil
+- `src/cotraffic/llm/rollout.py:183` : repart du même instantané
+- `src/cotraffic/llm/sources.py:265` : contrôle : conseiller à règles
+- `src/cotraffic/llm/sources.py:321` : contrôle : placebo (conseils au hasard)
+- `scripts/llm_benchmark.py:172` : rejeu de chaque conseil dans SUMO
+- `scripts/llm_dataset.py:112` : gain en %, positif = mieux
+- `scripts/llm_dataset.py:130` : placebo, règles, LLM et oracle
+- `scripts/llm_period.py:71` : épisode complet avec le LLM
+- `scripts/llm_results_table.py:84` : tableau final de la validation (graine 1000)
+- `tests/test_llm.py:116` : test `test_placebo_has_the_requested_amplitude_and_is_seeded`
+- `notebooks/llm_lora_colab.ipynb, section 6` : mesures : rappel, faux conseils, référence « toujours s'abstenir »
+
+**Exigence 9 : la sécurité**
+
+- `src/cotraffic/envs/shield.py:90` : bouclier : vert min, anti-famine, vert max
+- `src/cotraffic/envs/traffic_env.py:191` : apply_shield ci-dessus : dernier mot
+- `src/cotraffic/llm/advice.py:31` : bornes revérifiées par Pydantic
+- `src/cotraffic/llm/advice.py:79` : lecture stricte de la réponse
+- `src/cotraffic/llm/advice.py:125` : contrôle réseau
+- `src/cotraffic/llm/client.py:73` : timeout
+- `src/cotraffic/llm/prompts.py:47` : situation balisée `<state>` (anti-injection)
+- `src/cotraffic/llm/sources.py:58` : appel au LLM, repli si réponse invalide
+- `src/cotraffic/llm/sources.py:77` : serveur absent ou délai dépassé
+- `src/cotraffic/llm/sources.py:84` : réponse trop longue -> refusée
+- `src/cotraffic/llm/tools.py:46` : arguments stricts (Pydantic)
+- `src/cotraffic/llm/tools.py:252` : validation
+- `configs/prompts/advisor-v2.yaml:9` : lignes 15-16 : données != consignes
+- `tests/test_llm.py:49` : test `test_invalid_advice_is_refused`
+- `tests/test_llm_security.py:54` : injection
+- `tests/test_llm_security.py:67` : test `test_a_model_that_obeys_the_injection_gets_nothing_through`
+- `tests/test_llm_security.py:90` : test `test_malformed_or_out_of_bounds_answers_fall_back_to_the_policy`
+- `tests/test_llm_security.py:95` : test `test_an_oversized_answer_is_refused_before_parsing`
+- `tests/test_llm_security.py:122` : timeout
+- `tests/test_llm_security.py:159` : attaque contre le bouclier
+- `tests/test_llm_tools.py:74` : test `test_invalid_tool_calls_are_refused`
+- `tests/test_llm_tools.py:139` : test `test_an_unknown_tool_is_refused_and_reported_to_the_model`
+
+**Exigence 10 : l'orchestration**
+
+- `src/cotraffic/llm/advised.py:48` : clé du cache (désactivé)
+- `src/cotraffic/llm/advised.py:59` : journal d'audit de chaque appel au LLM
+- `src/cotraffic/llm/advised.py:105` : déclencheurs : nouvel événement, ou période N
+- `src/cotraffic/llm/advised.py:119` : délai = latence mesurée
+- `src/cotraffic/llm/advised.py:131` : appel, validation, file d'attente
+- `src/cotraffic/llm/advised.py:166` : activation et expiration des conseils
+- `configs/llm.yaml:53` : force du biais et rythme des appels
+- `tests/test_llm.py:195` : test `test_advice_applies_only_after_its_latency_and_expires`
 ---
 
 ## Lexique

@@ -43,7 +43,7 @@ SUBMIT = "submit_advice"
 
 
 # ---------------------------------------------------------------- arguments (Pydantic)
-class _Strict(BaseModel):
+class _Strict(BaseModel):  # [Exigences 5 et 9] arguments stricts (Pydantic)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -66,7 +66,7 @@ class AdviceItemArgs(_Strict):
     seconds: int = Field(ge=MIN_VALID_S, le=MAX_VALID_S)
 
 
-class SubmitArgs(_Strict):
+class SubmitArgs(_Strict):  # [Exigence 5] arguments de submit_advice
     items: list[AdviceItemArgs] = Field(default_factory=list, max_length=MAX_ITEMS)
     reason: str = Field(default="", max_length=MAX_REASON)
 
@@ -92,7 +92,7 @@ ARGS: dict[str, type[_Strict]] = {
 
 # ---------------------------------------------------------------- read-only snapshot
 @dataclass
-class ToolContext:
+class ToolContext:  # [Exigence 5] copie de la situation : les outils ne modifient rien
     """What the tools can read: a copy of the situation, taken when the call starts."""
 
     situation: Situation
@@ -159,7 +159,7 @@ def run_tool(ctx: ToolContext, name: str, args: BaseModel) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- JSON Schemas
-def tool_schemas(ctx: ToolContext) -> list[dict[str, Any]]:
+def tool_schemas(ctx: ToolContext) -> list[dict[str, Any]]:  # [Exigence 5] le tool schema
     """Tool definitions for the model (Ollama /api/chat ``tools``), strict schemas."""
     junction = {"type": "string", "enum": ctx.junction_ids()}
     max_phase = max(len(j.phases) for j in ctx.situation.junctions) - 1
@@ -211,7 +211,7 @@ def tool_schemas(ctx: ToolContext) -> list[dict[str, Any]]:
             {"junction": junction},
             ["junction"],
         ),
-        tool(
+        tool(  # [Exigence 5] submit_advice : le seul outil qui agit
             SUBMIT,
             "Submit the advice (the only tool that acts). Empty items if nothing needs advice.",
             {
@@ -249,7 +249,7 @@ class ToolCall:
     error: str = ""
 
 
-def validate_call(name: str, arguments: Any) -> BaseModel:
+def validate_call(name: str, arguments: Any) -> BaseModel:  # [Exigences 5 et 9] validation
     """Arguments of a tool call, validated; raises ValueError when refused."""
     if name not in ARGS:
         raise ValueError(f"unknown tool {name!r}: only {', '.join(ARGS)} exist")

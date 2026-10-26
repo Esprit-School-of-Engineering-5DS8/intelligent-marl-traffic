@@ -76,7 +76,7 @@ class Watched(AdviceSource):
         return self.source.advise(situation)
 
 
-class DemoPolicy(AdvisedPolicy):
+class DemoPolicy(AdvisedPolicy):  # [Exigence 1] démo : les décisions changées par le LLM
     def __init__(self, base, source: Watched, cfg: AdvisorConfig, out: Out, show_all: bool):
         super().__init__(base, source, cfg)
         self.watched = source

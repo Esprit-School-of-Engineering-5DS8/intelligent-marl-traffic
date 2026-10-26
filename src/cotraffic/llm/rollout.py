@@ -165,7 +165,7 @@ class Score:
     changed: int
 
 
-def score(
+def score(  # [Exigence 8] rejeu apparié : même instantané, avec ou sans conseil
     env: CoTrafficEnv,
     base,
     stored: Stored,
@@ -180,7 +180,7 @@ def score(
     cfg = AdvisorConfig(beta=beta, period_s=1e9, min_gap_s=1e9, latency="measured")
     policy = AdvisedPolicy(base, source, cfg)
     policy.reset(env)
-    obs = restore(env, stored.snapshot)
+    obs = restore(env, stored.snapshot)  # [Exigence 8] repart du même instantané
     if advice is not None:
         policy._ask(env, "replay")  # the advice under test, issued at the snapshot time
     policy._last_call = env.now  # no other call during the rollout

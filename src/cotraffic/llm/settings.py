@@ -26,7 +26,7 @@ class LlmSettings:
     advisor: AdvisorConfig
 
 
-def load_settings(path: Path = CONFIG) -> LlmSettings:
+def load_settings(path: Path = CONFIG) -> LlmSettings:  # [Exigence 3] lit configs/llm.yaml
     cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
     model, sampling, prompt, advisor = cfg["model"], cfg["sampling"], cfg["prompt"], cfg["advisor"]
     options = Options(

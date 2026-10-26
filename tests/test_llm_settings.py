@@ -6,7 +6,7 @@ from cotraffic.llm.prompts import load
 from cotraffic.llm.settings import load_settings
 
 
-def test_code_defaults_match_the_settings_file():
+def test_code_defaults_match_the_settings_file():  # [Exigence 3]
     settings = load_settings()
     assert Options() == settings.options
     assert AdvisorConfig() == settings.advisor

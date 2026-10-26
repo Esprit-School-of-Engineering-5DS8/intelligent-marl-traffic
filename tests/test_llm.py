@@ -46,7 +46,7 @@ def test_wire_format_round_trip():
         '{"a":[],"r":"' + "x" * 500 + '"}',  # reason too long
     ],
 )
-def test_invalid_advice_is_refused(text):
+def test_invalid_advice_is_refused(text):  # [Exigence 9]
     with pytest.raises(AdviceError):
         parse(text)
 
@@ -113,7 +113,7 @@ def test_rules_serve_a_clearly_neglected_queue_only():
     assert [(i.j, i.p) for i in advice.a] == [("A0", 1)]
 
 
-def test_placebo_has_the_requested_amplitude_and_is_seeded():
+def test_placebo_has_the_requested_amplitude_and_is_seeded():  # [Exigence 8]
     src = RandomSource(counts=[2], weights=[0.4], validities=[30])
     src.reset(3)
     first = src.advise(situation([])).advice
@@ -122,7 +122,7 @@ def test_placebo_has_the_requested_amplitude_and_is_seeded():
     assert len(first.a) == 2 and {i.w for i in first.a} == {0.4} and {i.s for i in first.a} == {30}
 
 
-def test_self_consistency_keeps_majority_items_only():
+def test_self_consistency_keeps_majority_items_only():  # [Exigence 4]
     class Broken(AdviceSource):
         def advise(self, situation):
             return SourceReply(None, 4.0, {"error": "invalid"})
@@ -192,7 +192,7 @@ def run_policy(monkeypatch):
     return run
 
 
-def test_advice_applies_only_after_its_latency_and_expires(run_policy):
+def test_advice_applies_only_after_its_latency_and_expires(run_policy):  # [Exigence 10]
     advice = parse('{"a":[["A0",1,3,20]],"r":""}')
     source = FixedSource(advice, latency_s=12.0)
     cfg = AdvisorConfig(beta=2.0, period_s=1000, min_gap_s=1000)
@@ -204,7 +204,7 @@ def test_advice_applies_only_after_its_latency_and_expires(run_policy):
     assert policy.calls[0].delay_s == 12.0 and policy.summary()["llm_changed_decisions"] == 4
 
 
-def test_weak_advice_does_not_overturn_a_clear_preference(run_policy):
+def test_weak_advice_does_not_overturn_a_clear_preference(run_policy):  # [Exigence 1]
     advice = parse('{"a":[["A0",1,1,60]],"r":""}')
     cfg = AdvisorConfig(beta=2.0, period_s=1000, min_gap_s=1000, latency="zero")
     _, out = run_policy(FixedSource(advice), cfg, [0, 5])

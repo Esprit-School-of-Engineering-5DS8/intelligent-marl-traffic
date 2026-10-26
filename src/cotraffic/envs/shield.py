@@ -87,7 +87,7 @@ def apply_shield(requested: int, state: ShieldState, cfg: ShieldConfig) -> Shiel
     ``phase_demand[p]`` is the demand that phase ``p`` would serve beyond what the
     current phase already serves; it picks the target when the shield must switch.
     """
-    current = state.current_phase
+    current = state.current_phase  # [Exigence 9] bouclier : vert min, anti-famine, vert max
     reason: str | None = None
     if not 0 <= requested < state.n_phases:
         requested, reason = current, INVALID

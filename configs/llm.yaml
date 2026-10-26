@@ -5,7 +5,7 @@
 # Gains below: positive = better (less waiting than COOP-FULL alone).
 # Measurements: results/exploration/llm_benchmark/ (63 validation situations, 300 s replays).
 
-model:
+model:  # [Exigence 2] le LLM choisi
   name: qwen2.5:3b
   # Why: among the 6 models benchmarked (0.5B to 3.8B), the best mean gain (+0.29 %) of
   # those with >= 95 % valid JSON and a p95 latency <= 20 s (v2_zero_summary.csv). The
@@ -18,7 +18,7 @@ model:
   # Why: the model stays loaded between calls (one every few minutes); reloading costs
   # several seconds that would count as latency.
 
-sampling:
+sampling:  # [Exigence 3] hyperparamètres d'inférence
   temperature: 0.0
   # Why: greedy decoding, so a situation always gets the same advice (reproducible runs).
   # Sampling (0.7) was only used for self-consistency, which was not retained.
@@ -40,7 +40,7 @@ sampling:
   # Why: p95 latency is 11.7 s and the maximum 19 s; past 60 s the advice would be stale,
   # so the call is dropped and PPO decides alone (fallback).
 
-prompt:
+prompt:  # [Exigence 4] prompt et technique retenus
   version: advisor-v2
   technique: zero
   # Why: gain +0.15 % (zero) against -0.18 % (brief) and +0.08 % (few) with the same model
@@ -50,7 +50,7 @@ prompt:
   # (v2_vote_summary.csv): not better, three times slower.
   vote_temperature: 0.7  # only used when vote > 1
 
-advisor:
+advisor:  # [Exigences 3 et 10] force du biais et rythme des appels
   beta: 4.0
   # Why: logit bias of an advice at strength 3. The PPO margin between phases has a median
   # of 3.3: beta 2 can flip 27 % of the decisions, beta 4 63 %, beta 8 92 %. Beta 8 hurts

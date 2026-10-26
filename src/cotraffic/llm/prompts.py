@@ -35,7 +35,7 @@ class Prompt:
         ).hexdigest()[:8]
         return f"{self.version}/{self.technique}/{digest}"
 
-    def messages(self, state_text: str) -> list[dict[str, str]]:
+    def messages(self, state_text: str) -> list[dict[str, str]]:  # [Exigence 4] messages au LLM
         msgs = [{"role": "system", "content": self.system}]
         for state, advice in self.examples:
             msgs.append({"role": "user", "content": wrap(state)})
@@ -44,7 +44,7 @@ class Prompt:
         return msgs
 
 
-def wrap(state_text: str) -> str:
+def wrap(state_text: str) -> str:  # [Exigences 4 et 9] situation balisée <state> (anti-injection)
     # tags inside the data are neutralised so that data cannot close the block
     clean = state_text.replace("<state>", "(state)").replace("</state>", "(/state)")
     return f"<state>\n{clean}\n</state>"
