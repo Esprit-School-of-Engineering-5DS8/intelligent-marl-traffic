@@ -237,8 +237,11 @@ Fairness constraints to state whenever these numbers are reported:
   Outfit font. This is the KEMETRA visual language.
 - **Design tokens (React):** `frontend/src/shared/theme/index.css` (KEMETRA palette mapped
   onto Tailwind) and `frontend/src/shared/theme/astryx-tokens.css`
-  (`@astryxdesign/core` CSS variables, 0-radius, dark glass). **Planned:** green accents
-  instead of the purple `#5b4bd6` / `#9a8cff`.
+  (`@astryxdesign/core` CSS variables, 0-radius). The purple `#5b4bd6` / `#9a8cff` accents
+  are gone; `astryx-tokens.css` still carries a dark base palette, which the live map wants
+  but the cards do not. Full mapping: [DESIGN_TOKENS.md](DESIGN_TOKENS.md).
+- **Frontend roadmap:** [FRONTEND_ROADMAP.md](FRONTEND_ROADMAP.md) — benchmark shell,
+  subtab pass, policy settings, single Vite entry.
 - **Current entries:** `frontend/index.html` loads `app.js` (vanilla control room). The
   benchmark tab renders `frontend/benchmark-view.jsx`: one React page at a time, chosen by
   the sidebar (`[data-benchmark-tab]`), with no duplicate tab bar. **Next:** switch the
