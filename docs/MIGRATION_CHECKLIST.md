@@ -30,11 +30,14 @@
 - [ ] `PUT /api/policy {"method": "coop", "network": "grid4x4"}` → 200 when the checkpoint
       exists, `422` when it does not.
 - [ ] `PUT /api/policy {"method": "nope"}` → `422` (unknown method).
-- [ ] `POST /api/simulation/start` with `method=mp` → snapshots carry `simulationTime`,
-      `vehicles`, `status`.
-- [ ] `POST /api/simulation/start` with `method=llm` and no key → falls back to MP, run
-      still completes (document the reason in the response/log).
-- [ ] `POST /api/simulation/start` with a learned method without checkpoint → `422`.
+- [ ] `PUT /api/policy {"method": "mp", "network": "grid4x4"}` then
+      `POST /api/simulation/start {"scenario": "grid-2x2"}` → snapshots carry `simulationTime`,
+      `vehicles`, `signals`, `status`; `step` accepts an empty body while paused.
+- [ ] A learned method whose checkpoint exists only for `grid4x4` → the 2x2 live run returns
+      `422` (the checkpoint must match the network that runs, not the settings selection).
+- [ ] `PUT /api/policy {"method": "llm"}` with no key → accepted, marked `degraded`, and the
+      live run still completes on the Max-Pressure fallback.
+- [ ] `PUT /api/policy {"method": "coop", "network": "grid2x2"}` (no checkpoint) → `422`.
 
 ## 3. Frontend contract
 

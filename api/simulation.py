@@ -143,9 +143,13 @@ class SimulationSession:
         if scenario not in SCENARIOS:
             raise ValueError("only grid-2x2 and grid-3x3 support live simulation")
         active = policy.current()
-        method, network = active["method"], active["network"]
-        if not active["available"]:
-            raise ValueError(active["reason"] or f"{method} is not available")
+        method, network = active["method"], SCENARIOS[scenario]
+        # The checkpoint must match the network that actually runs, not the one the settings
+        # page was last pointed at: a grid4x4 policy on the 2x2 grid would mis-shape the
+        # observations the trained controller expects.
+        ready, reason = policy.availability(method, network)
+        if not ready:
+            raise ValueError(reason or f"{method} is not available")
         checkpoint = policy.checkpoint_path(method, network)
         self.stop()
         self.stop_event.clear()
@@ -155,6 +159,7 @@ class SimulationSession:
                 {
                     "status": "starting",
                     "scenario": scenario,
+                    "network": network,
                     "simulationTime": 0,
                     "speed": speed,
                     "method": method,

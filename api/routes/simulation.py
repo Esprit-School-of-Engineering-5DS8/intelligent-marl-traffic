@@ -54,8 +54,9 @@ def simulation_stop() -> dict[str, Any]:
 
 
 @router.post("/api/simulation/step")
-def simulation_step(request: SimulationRequest) -> dict[str, Any]:
-    return session.step(request.count)
+def simulation_step(request: SimulationRequest | None = None) -> dict[str, Any]:
+    """Advance a paused run; the body is optional (one decision by default)."""
+    return session.step(request.count if request else 1)
 
 
 @router.post("/api/simulation/speed")
