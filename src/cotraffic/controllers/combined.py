@@ -60,11 +60,18 @@ class TeamGuide:
 
     def summary(self) -> dict[str, Any]:
         m = self.team.metrics()
-        return {"guide_preemptions": self.team.preemptions, "guide_calls": m["llm_team_calls"]}
+        return {
+            "guide_preemptions": self.team.preemptions,
+            "guide_calls": m.get("llm_team_calls", 0),
+        }
 
 
 class EvRuleGuide:
     name = "ev_rule"
+
+    def __init__(self) -> None:
+        self.active: set[str] = set()
+        self.preemptions = 0
 
     def reset(self, env) -> None:
         self.range_m = float(env.protocol["baselines"]["ev_preemption_range_m"])
@@ -89,11 +96,14 @@ class GuidedPolicy(Controller):
 
     needs_observations = True
 
-    def __init__(self, base, guide, mode: str = "bias", beta: float = 4.0) -> None:
+    def __init__(self, base, guide, mode: str = "bias", beta: float | None = 4.0) -> None:
         super().__init__()
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}")
-        self.base, self.guide, self.mode, self.beta = base, guide, mode, float(beta)
+        if mode == "bias" and beta is None:
+            raise ValueError("a bias guide needs beta")
+        self.base, self.guide, self.mode = base, guide, mode
+        self.beta = float(beta) if beta is not None else 0.0  # unused when switching
         self.agent_cfg = base.agent_cfg
         tag = f"bias{beta:g}" if mode == "bias" else "switch"
         self.name = f"{base.name}+{guide.name}-{tag}"

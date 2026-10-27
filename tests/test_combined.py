@@ -65,11 +65,15 @@ def test_bias_moves_the_decision_only_when_beta_beats_the_logit_gap():
 
 
 def test_switch_takes_the_guided_phase_at_guided_junctions_only():
-    policy = GuidedPolicy(FixedLogits(LOGITS), FixedGuide({"A0": 1, "Z9": 0}), "switch")
+    # switching needs no beta (the evaluation passes None)
+    policy = GuidedPolicy(FixedLogits(LOGITS), FixedGuide({"A0": 1, "Z9": 0}), "switch", None)
     assert policy.act(None, OBS) == {"A0": 1, "B0": 1}
     assert policy.summary()["guide_mode"] == "switch" and policy.changed_decisions == 1
+    assert policy.summary()["beta"] == ""
     with pytest.raises(ValueError):
         GuidedPolicy(FixedLogits(LOGITS), FixedGuide({}), "vote")
+    with pytest.raises(ValueError):
+        GuidedPolicy(FixedLogits(LOGITS), FixedGuide({}), "bias", None)
 
 
 def test_team_guide_guides_only_during_its_preemption_windows():
