@@ -78,19 +78,17 @@ class LLMAgent:
         self.max_retries = int(max_retries)
         self.max_tokens = int(max_tokens)
 
+    def snapshot_for_prompt(self, snapshot: Mapping[str, Any]) -> Mapping[str, Any]:
+        return snapshot
+
     def build_user_message(
         self,
         t: float,
         snapshot: Mapping[str, Any],
         blackboard: Iterable[Any] = (),
     ) -> str:
-        context: dict[str, Any] = {"blackboard": []}
-        for message in blackboard:
-            context["blackboard"].append(
-                message.to_dict() if hasattr(message, "to_dict") else dict(message)
-            )
         return json.dumps(
-            {"tick": t, "snapshot": snapshot, "context": context},
+            {"tick": t, "snapshot": self.snapshot_for_prompt(snapshot)},
             ensure_ascii=False,
             sort_keys=True,
             default=str,

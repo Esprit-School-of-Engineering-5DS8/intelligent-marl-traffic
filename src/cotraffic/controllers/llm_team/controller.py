@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from cotraffic import config
@@ -77,11 +78,13 @@ class LLMTeamController(Controller):
             "emergency": int(tokens.get("emergency", 500)),
             "pedestrian": int(tokens.get("pedestrian", 300)),
         }
+        snapshot_cfg = dict(cfg.get("snapshot") or {})
+        pricing_cfg = dict(cfg.get("pricing") or {})
         self.supervisor_cfg = SupervisorConfig(
             delta_s=float(supervisor_cfg.get("delta_s", 30.0)),
             quiet_delta_s=float(supervisor_cfg.get("quiet_delta_s", 60.0)),
-            congested_delta_s=float(supervisor_cfg.get("congested_delta_s", 15.0)),
-            ev_replan_s=float(supervisor_cfg.get("ev_replan_s", 10.0)),
+            congested_delta_s=float(supervisor_cfg.get("congested_delta_s", 20.0)),
+            ev_replan_s=float(supervisor_cfg.get("ev_replan_s", 60.0)),
             pedestrian_interval_s=float(supervisor_cfg.get("pedestrian_interval_s", 30.0)),
             feedback_ttl_s=float(supervisor_cfg.get("feedback_ttl_s", 60.0)),
             max_calls=self.max_calls,
@@ -92,9 +95,25 @@ class LLMTeamController(Controller):
             base_effort=str(supervisor_cfg.get("base_effort", "")),
             escalate_effort=str(supervisor_cfg.get("escalate_effort", "low")),
             ev_event_triggers=bool(supervisor_cfg.get("ev_event_triggers", True)),
-            ev_event_min_gap_s=float(supervisor_cfg.get("ev_event_min_gap_s", 3.0)),
+            ev_event_min_gap_s=float(supervisor_cfg.get("ev_event_min_gap_s", 5.0)),
+            ev_eta_thresholds=tuple(
+                float(value)
+                for value in supervisor_cfg.get("ev_eta_thresholds") or ()
+            ),
             ped_trigger_wait_s=float(supervisor_cfg.get("ped_trigger_wait_s", 20.0)),
-            ped_event_min_gap_s=float(supervisor_cfg.get("ped_event_min_gap_s", 5.0)),
+            ped_event_min_gap_s=float(supervisor_cfg.get("ped_event_min_gap_s", 20.0)),
+            ped_group_min_gap_s=float(
+                supervisor_cfg.get("ped_group_min_gap_s", 30.0)
+            ),
+            parallel=bool(supervisor_cfg.get("parallel", True)),
+            parallel_workers=int(supervisor_cfg.get("parallel_workers", 3)),
+            max_alerts=int(snapshot_cfg.get("max_alerts", 5)),
+            max_blackboard_messages=int(snapshot_cfg.get("max_blackboard", 6)),
+            ev_horizon_s=float(snapshot_cfg.get("ev_horizon_s", 60.0)),
+            ev_lookahead=int(snapshot_cfg.get("ev_lookahead", 3)),
+            price_input_per_1m=float(pricing_cfg.get("input_per_1m", 0.0)),
+            price_output_per_1m=float(pricing_cfg.get("output_per_1m", 0.0)),
+            price_cached_per_1m=float(pricing_cfg.get("cached_per_1m", 0.0)),
         )
         self._client = client
         self._client_error: str | None = None
@@ -119,6 +138,7 @@ class LLMTeamController(Controller):
             "llm_team_directives": 0,
             "llm_team_guard_events": 0,
             "llm_team_last_error": "",
+            "llm_team_wall_time_s": 0.0,
         }
         self._supervisor = None
         if self._client is None:
@@ -167,6 +187,7 @@ class LLMTeamController(Controller):
             neighbors=neighbors,
             pedestrian_trigger=True,
             network=str(getattr(env, "network", "")),
+            phase_maps=self._phase_maps,
         )
         self._detector = QueueAlertDetector()
 
@@ -183,28 +204,32 @@ class LLMTeamController(Controller):
         pedestrians = build_pedestrians(env, self._phase_maps)
         new_alerts = self._detector.update(states, now)
         active_alerts = [alert.to_dict() for alert in self._detector.active(now)]
+        force_roles = ["operator"] if new_alerts else []
+        if new_alerts and evs:
+            force_roles.append("emergency")
+        started = time.perf_counter()
         try:
-            if self._supervisor.should_run(now, states, evs, active_alerts, pedestrians) or new_alerts:
-                force_roles = ("operator",) if new_alerts else ()
-                results = self._supervisor.run(
-                    now,
-                    states,
-                    evs,
-                    active_alerts,
-                    force_roles,
-                    pedestrians,
+            results = self._supervisor.tick(
+                now,
+                states,
+                evs,
+                active_alerts,
+                pedestrians,
+                tuple(force_roles),
+            )
+            for result in results:
+                self._layer.install(result.accepted, now)
+                self._metrics["llm_team_directives"] += len(result.accepted)
+                self.preemptions += sum(
+                    1 for directive in result.accepted if directive.type == "preempt"
                 )
-                for result in results:
-                    self._layer.install(result.accepted, now)
-                    self._metrics["llm_team_directives"] += len(result.accepted)
-                    self.preemptions += sum(
-                        1 for directive in result.accepted if directive.type == "preempt"
-                    )
         except Exception as error:  # noqa: BLE001 - the team must degrade, not crash
             self._metrics["llm_team_last_error"] = f"{type(error).__name__}: {error}"[:200]
             self._metrics["llm_team_fallbacks"] = (
                 self._metrics.get("llm_team_fallbacks", 0) + 1
             )
+        finally:
+            self._metrics["llm_team_wall_time_s"] += time.perf_counter() - started
         actions: dict[str, int] = {}
         for tid, inter in env.intersections.items():
             state = states.get(tid) or {}
@@ -216,21 +241,14 @@ class LLMTeamController(Controller):
         return actions
 
     def metrics(self) -> dict[str, Any]:
-        stats = self._supervisor.stats if self._supervisor is not None else {}
+        team = self._supervisor.metrics() if self._supervisor is not None else {}
+        wall = float(self._metrics.get("llm_team_wall_time_s", 0.0))
         return {
             **self._metrics,
-            "llm_team_calls": int(stats.get("calls", 0)),
-            "llm_team_operator_calls": int(stats.get("operator_calls", 0)),
-            "llm_team_emergency_calls": int(stats.get("emergency_calls", 0)),
-            "llm_team_pedestrian_calls": int(stats.get("pedestrian_calls", 0)),
-            "llm_team_fallbacks": int(stats.get("fallbacks", 0))
+            **team,
+            "llm_team_fallbacks": int(team.get("llm_team_fallbacks", 0))
             + int(self._metrics.get("llm_team_fallbacks", 0)),
-            "llm_team_retries": int(stats.get("retries", 0)),
-            "llm_team_escalated": int(stats.get("escalated", 0)),
-            "llm_team_tokens_in": int(stats.get("tokens_in", 0)),
-            "llm_team_tokens_out": int(stats.get("tokens_out", 0)),
-            "llm_team_tokens_cached": int(stats.get("tokens_cached", 0)),
-            "llm_team_tokens_reasoning": int(stats.get("tokens_reasoning", 0)),
+            "llm_team_wall_time_s": round(wall, 3),
         }
 
 

@@ -1,0 +1,12 @@
+name: llm_team_speed
+description: >-
+  One-seed smoke matrix for LLM team speed work. Run with
+  COTRAFFIC_LLM_BACKEND=mock before spending tokens.
+
+quick: true
+seeds: [0]
+cells:
+  - network: grid3x3
+    methods: [mp, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency, incident, pedestrians]

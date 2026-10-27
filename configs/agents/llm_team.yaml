@@ -22,15 +22,30 @@ tokens:
 supervisor:
   delta_s: 30
   quiet_delta_s: 60
-  congested_delta_s: 15
-  ev_replan_s: 10
-  pedestrian_interval_s: 30
+  congested_delta_s: 20
+  ev_replan_s: 60
+  pedestrian_interval_s: 60
   feedback_ttl_s: 60
   quiet_queue_threshold: 8
   congested_queue_threshold: 15
   base_effort: none
   escalate_effort: low
   ev_event_triggers: true
-  ev_event_min_gap_s: 3
+  ev_event_min_gap_s: 5
+  ev_eta_thresholds: []
   ped_trigger_wait_s: 20
-  ped_event_min_gap_s: 5
+  ped_event_min_gap_s: 20
+  ped_group_min_gap_s: 30
+  parallel: true
+  parallel_workers: 3
+
+snapshot:
+  max_alerts: 5
+  max_blackboard: 6
+  ev_horizon_s: 60
+  ev_lookahead: 3
+
+pricing:
+  input_per_1m: 0.0
+  output_per_1m: 0.0
+  cached_per_1m: 0.0

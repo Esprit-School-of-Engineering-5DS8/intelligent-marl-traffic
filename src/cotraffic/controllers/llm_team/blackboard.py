@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -55,6 +56,30 @@ class Blackboard:
     def active(self, t: float) -> list[BlackboardMessage]:
         self.prune(t)
         return list(self._messages)
+
+    def compact(self, t: float, max_messages: int = 6) -> list[BlackboardMessage]:
+        """Latest unique messages, with one feedback entry per role."""
+        self.prune(t)
+        if max_messages <= 0:
+            return []
+        seen: set[tuple[Any, ...]] = set()
+        kept: list[BlackboardMessage] = []
+        for message in reversed(self._messages):
+            if message.kind == "arbiter_result":
+                key: tuple[Any, ...] = (message.kind, message.source)
+            else:
+                key = (
+                    message.kind,
+                    message.source,
+                    json.dumps(message.payload, sort_keys=True, default=str),
+                )
+            if key in seen:
+                continue
+            seen.add(key)
+            kept.append(message)
+            if len(kept) >= max_messages:
+                break
+        return list(reversed(kept))
 
     def of_kind(self, kind: str, t: float) -> list[BlackboardMessage]:
         return [m for m in self.active(t) if m.kind == kind]

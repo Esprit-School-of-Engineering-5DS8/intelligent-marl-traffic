@@ -48,6 +48,21 @@ class PedestrianAgent(LLMAgent):
         self.surge_wait_s = float(surge_wait_s)
         self.rule_fallback = bool(rule_fallback)
 
+    def snapshot_for_prompt(self, snapshot: Mapping[str, Any]) -> Mapping[str, Any]:
+        view = dict(snapshot)
+        view.pop("evs", None)
+        tls_ids = {
+            str(state.get("tls", ""))
+            for state in snapshot.get("pedestrians") or ()
+            if state.get("tls")
+        }
+        view["intersections"] = {
+            tls_id: state
+            for tls_id, state in (snapshot.get("intersections") or {}).items()
+            if tls_id in tls_ids
+        }
+        return view
+
     @staticmethod
     def _groups(snapshot: Mapping[str, Any]) -> dict[GroupKey, dict[str, Any]]:
         groups: dict[GroupKey, dict[str, Any]] = {}

@@ -56,6 +56,7 @@ class EmergencyAgent(LLMAgent):
         self.rule_fallback = bool(rule_fallback)
         self._tracked: dict[CorridorKey, dict[str, Any]] = {}
         self._plan: dict[CorridorKey, dict[str, Any]] = {}
+        self._last_maintain_signature: tuple[Any, ...] = ()
 
     def _axis_for(self, tls_id: Any, link_index: Any) -> str | None:
         phase_map = self.phase_maps.get(str(tls_id))
@@ -102,31 +103,21 @@ class EmergencyAgent(LLMAgent):
             "corridor": corridor,
         }
 
-    def build_user_message(
-        self,
-        t: float,
-        snapshot: Mapping[str, Any],
-        blackboard: Iterable[Any] = (),
-    ) -> str:
-        import json
-
+    def snapshot_for_prompt(self, snapshot: Mapping[str, Any]) -> Mapping[str, Any]:
         enriched: dict[str, Any] = dict(snapshot)
         enriched["lead_time_s"] = self.lead_time_s
-        enriched["evs"] = [
-            self._ev_view(ev, snapshot) for ev in (snapshot.get("evs") or ())
-        ]
-        context = {
-            "blackboard": [
-                message.to_dict() if hasattr(message, "to_dict") else dict(message)
-                for message in (blackboard or ())
-            ]
+        views = [self._ev_view(ev, snapshot) for ev in (snapshot.get("evs") or ())]
+        enriched["evs"] = views
+        corridor_tls = {
+            row.get("tls") for view in views for row in view.get("corridor") or ()
         }
-        return json.dumps(
-            {"tick": t, "snapshot": enriched, "context": context},
-            ensure_ascii=False,
-            sort_keys=True,
-            default=str,
-        )
+        enriched["intersections"] = {
+            tls_id: state
+            for tls_id, state in (snapshot.get("intersections") or {}).items()
+            if tls_id in corridor_tls
+        }
+        enriched.pop("pedestrians", None)
+        return enriched
 
     def _corridor_index(
         self, snapshot: Mapping[str, Any]
@@ -302,6 +293,133 @@ class EmergencyAgent(LLMAgent):
             scheduled.extend(placed)
         return scheduled
 
+    def _plan_requests(
+        self, t: float, corridor: Mapping[CorridorKey, dict[str, Any]]
+    ) -> dict[CorridorKey, dict[str, Any]]:
+        requests: dict[CorridorKey, dict[str, Any]] = {}
+        for key, plan in sorted(self._plan.items()):
+            info, eta = self._lookup(key, corridor, t)
+            if info is None or eta <= 0.0 or eta > self.max_eta_s:
+                continue
+            start_abs = max(t, plan["start_abs"])
+            latest_start = t + self._lead_limit(eta, info.get("queue_needed"))
+            if latest_start < start_abs:
+                start_abs = max(t, latest_start)
+            end_abs = min(
+                max(plan["end_abs"], t + eta + self.release_margin_s),
+                start_abs + MAX_HOLD_S,
+            )
+            request = {
+                "tls": key[1],
+                "type": "preempt",
+                "phase": plan["phase"],
+                "phase_index": plan.get("phase_index"),
+                "ev": key[0],
+                "eta_s": round(eta, 1),
+                "start_in_s": round(max(0.0, start_abs - t), 1),
+                "hold_s": round(max(0.0, end_abs - start_abs), 1),
+                "ttl_s": MAX_TTL_S,
+                "_from_plan": True,
+            }
+            if request["phase_index"] is None:
+                request.pop("phase_index")
+            requests[key] = request
+        return requests
+
+    def _release_passed(
+        self,
+        t: float,
+        requests: Mapping[CorridorKey, dict[str, Any]],
+        releases: dict[CorridorKey, dict[str, Any]],
+        active_evs: Iterable[str],
+    ) -> None:
+        for key, plan in sorted(self._plan.items()):
+            if key in requests or key in releases:
+                continue
+            tracked = self._tracked.get(key)
+            if tracked is None:
+                if plan["end_abs"] <= t:
+                    releases[key] = self._release_directive(key, plan)
+                continue
+            eta = _as_float(tracked.get("eta_s")) - (t - tracked["seen"])
+            if eta <= 0.0 or (
+                t - tracked["seen"] > self.grace_s and key[0] not in active_evs
+            ):
+                releases[key] = self._release_directive(key, plan)
+
+    def _commit_plan(
+        self,
+        scheduled: Iterable[Mapping[str, Any]],
+        releases: Mapping[CorridorKey, dict[str, Any]],
+        t: float,
+    ) -> None:
+        new_plan: dict[CorridorKey, dict[str, Any]] = {}
+        for entry in scheduled:
+            new_plan[entry["key"]] = {
+                "phase": entry["phase"],
+                "tls": entry["tls"],
+                "phase_index": entry.get("phase_index"),
+                "start_abs": entry["start_abs"],
+                "end_abs": entry["end_abs"],
+                "hold": entry["hold"],
+            }
+        for key, plan in self._plan.items():
+            if key not in new_plan and key not in releases and plan["end_abs"] > t:
+                new_plan[key] = plan
+        self._plan = new_plan
+
+    def maintain(self, t: float, snapshot: Mapping[str, Any]) -> AgentCall | None:
+        """Update the persisted schedule without an LLM call."""
+        if not self._plan:
+            return None
+        corridor = self._corridor_index(snapshot)
+        active_evs = {ev.get("id") for ev in (snapshot.get("evs") or ())}
+        for key, info in corridor.items():
+            self._tracked[key] = {**info, "seen": t}
+        requests = self._plan_requests(t, corridor)
+        releases: dict[CorridorKey, dict[str, Any]] = {}
+        self._release_passed(t, requests, releases, active_evs)
+        notes: list[str] = []
+        scheduled = self._schedule(t, requests, notes)
+        self._commit_plan(scheduled, releases, t)
+        directives = [
+            entry["directive"] for entry in sorted(scheduled, key=lambda e: e["key"])
+        ]
+        directives.extend(releases[key] for key in sorted(releases))
+        if not directives:
+            return None
+        signature = tuple(
+            sorted(
+                (
+                    "window",
+                    entry["tls"],
+                    entry["key"][0],
+                    entry["phase"],
+                    entry.get("phase_index"),
+                    round(entry["start_abs"], 1),
+                    round(entry["end_abs"], 1),
+                )
+                for entry in scheduled
+            )
+        ) + tuple(sorted(("release", key[1], key[0]) for key in releases))
+        if signature == self._last_maintain_signature:
+            return None
+        self._last_maintain_signature = signature
+        return AgentCall(
+            role="emergency",
+            envelope={
+                "directives": directives,
+                "alerts": [],
+                "explanation": "code-side schedule maintenance",
+            },
+            review={
+                "source": "code",
+                "notes": notes,
+                "n_directives": len(directives),
+                "releases": sorted(key[1] for key in releases),
+            },
+        )
+
     def review(self, t: float, snapshot: Mapping[str, Any], call: AgentCall) -> AgentCall:
         notes: list[str] = []
         corridor = self._corridor_index(snapshot)
@@ -331,32 +449,8 @@ class EmergencyAgent(LLMAgent):
                 notes.append(f"dropped preempt for non-corridor pair {key}")
 
         requests: dict[CorridorKey, dict[str, Any]] = dict(incoming)
-        for key, plan in sorted(self._plan.items()):
-            if key in requests:
-                continue
-            info, eta = self._lookup(key, corridor, t)
-            if info is None or eta <= 0.0 or eta > self.max_eta_s:
-                continue
-            start_abs = max(t, plan["start_abs"])
-            end_abs = min(
-                max(plan["end_abs"], t + eta + self.release_margin_s),
-                start_abs + MAX_HOLD_S,
-            )
-            request = {
-                "tls": key[1],
-                "type": "preempt",
-                "phase": plan["phase"],
-                "phase_index": plan.get("phase_index"),
-                "ev": key[0],
-                "eta_s": round(eta, 1),
-                "start_in_s": round(max(0.0, start_abs - t), 1),
-                "hold_s": round(max(0.0, end_abs - start_abs), 1),
-                "ttl_s": MAX_TTL_S,
-                "_from_plan": True,
-            }
-            if request["phase_index"] is None:
-                request.pop("phase_index")
-            requests[key] = request
+        for key, request in self._plan_requests(t, corridor).items():
+            requests.setdefault(key, request)
 
         fallback_added = 0
         if call.failed or not requests:
@@ -372,34 +466,10 @@ class EmergencyAgent(LLMAgent):
                     requests[key] = fixed
                     fallback_added += 1
 
-        for key, plan in sorted(self._plan.items()):
-            if key in requests or key in releases:
-                continue
-            tracked = self._tracked.get(key)
-            if tracked is None:
-                if plan["end_abs"] <= t:
-                    releases[key] = self._release_directive(key, plan)
-                continue
-            eta = _as_float(tracked.get("eta_s")) - (t - tracked["seen"])
-            if eta <= 0.0 or (t - tracked["seen"] > self.grace_s and key[0] not in active_evs):
-                releases[key] = self._release_directive(key, plan)
-                self._plan.pop(key, None)
+        self._release_passed(t, requests, releases, active_evs)
 
         scheduled = self._schedule(t, requests, notes)
-        new_plan: dict[CorridorKey, dict[str, Any]] = {}
-        for entry in scheduled:
-            new_plan[entry["key"]] = {
-                "phase": entry["phase"],
-                "tls": entry["tls"],
-                "phase_index": entry.get("phase_index"),
-                "start_abs": entry["start_abs"],
-                "end_abs": entry["end_abs"],
-                "hold": entry["hold"],
-            }
-        for key, plan in self._plan.items():
-            if key not in new_plan and key not in releases and plan["end_abs"] > t:
-                new_plan[key] = plan
-        self._plan = new_plan
+        self._commit_plan(scheduled, releases, t)
 
         source = "llm"
         if fallback_added and (call.failed or not incoming):

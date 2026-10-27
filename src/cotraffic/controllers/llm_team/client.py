@@ -14,7 +14,7 @@ from typing import Any, Protocol
 from cotraffic.assistant.llm import LLMUnavailableError
 from cotraffic.llm.providers import BaseProvider, LLMResult
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 
 class TeamError(RuntimeError):

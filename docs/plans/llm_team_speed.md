@@ -1,6 +1,6 @@
 # LLM team port and speed plan
 
-Status: Phase 1 done at `ad5a8b3`; Phase 2 next
+Status: Phase 2 done in this branch; Phase 3 next
 
 Base: `integration` at `b908238`  
 Working branch: `feat/llm-team-speed`  
@@ -250,31 +250,49 @@ Phase 1 speed baseline (mock, 600 s quick episodes):
 - grid3x3 emergency: 69 calls, 29 Emergency.
 - grid3x3 pedestrians: 159 calls, 113 Pedestrian. This is the main Phase 2 coalescing target.
 
-### Phase 2: speed
+### Phase 2: speed (done)
 
-Already in place after Phase 1:
+Delivered:
 
-- OpenCode Go accepts `reasoning_effort`; usage parsing exposes reasoning and cached tokens.
-- Per-role `max_tokens` are 300 / 500 / 300.
-- `configs/agents/llm_team.yaml` sets `base_effort: none` and `escalate_effort: low`.
-- Replay cache has a versioned key and a lock.
-- `metrics()` already reports calls, per-role calls, retries, fallbacks, tokens and guard events.
+- Emergency schedule persistence per `(EV, TLS)`; `EmergencyAgent.maintain()` extends, shrinks and releases windows in code between LLM calls.
+- Event-driven Emergency cadence with a 60 s safety replan; `(EV, TLS)` changes and conflicting EV phases trigger off-cadence calls.
+- Pedestrian event coalescing: threshold crossings only, 20 s global gap, 30 s per-TLS gap.
+- Operator congestion is decoupled from pedestrian waits and blackboard agent alerts.
+- Prompt compaction: one blackboard copy, capped messages and alerts, hot-EV filter (60 s horizon), three TLS per EV, role-specific snapshot views.
+- Parallel role calls with `ThreadPoolExecutor` and fixed apply order Operator, Emergency, Pedestrian.
+- Thread-local provider usage so concurrent calls cannot misattribute tokens.
+- Per-role and aggregate latency mean/p50/p90, skipped calls, code updates, releases, wall time and estimated cost in `metrics()`.
+- Replay cache version bumped to 2 after the prompt changes.
 
-Still to do:
+Phase 2 evidence:
 
-- Emergency schedule persistence per `(EV, TLS)` and code-side release and extension.
-- Event coalescing, especially pedestrian groups and EV cadence.
-- Prompt compaction and deduplication of blackboard context.
-- Parallel role calls with a fixed apply order.
-- Latency percentiles, skipped calls, wall time and estimated cost.
-- One real grid3x3 seed, then replay, then normal and incident checks.
+- `pytest tests -q`: 119 passed.
+- `ruff check` on the LLM team and provider files: clean.
+- `llm_team_ab_quick` with the mock backend: 4 of 4 runs passed, 20 calls on grid2x2 and grid3x3 normal.
+- Mock `llm_team_speed`, grid3x3, seed 0, 600 s episodes:
+  - normal: 20 Operator calls, 0 fallbacks.
+  - incident: 20 Operator calls, 0 fallbacks.
+  - emergency: 42 calls, 28 Operator and 14 Emergency, 44 code updates, 14 releases, 0 fallbacks.
+  - pedestrians: 48 calls, 21 Operator and 27 Pedestrian, 0 fallbacks.
+  - Every grid3x3 cell is at or below the 50-call target.
+- Mock KPIs:
+  - normal and incident match Max-Pressure exactly.
+  - emergency EV travel time 110.3 s to 81.3 s and EV delay 42.8 s to 13.7 s; mean car travel time 118.8 s to 120.0 s.
+  - pedestrians mean wait 20.2 s to 13.8 s and p95 wait 120 s to 91 s; mean car travel time 123.6 s to 124.2 s.
+- One real grid3x3 normal seed with `COTRAFFIC_LLM_MAX_CALLS=60`:
+  - 21 Operator calls, 0 retries, 0 fallbacks, 0 reasoning tokens.
+  - 45,840 input tokens, about 2.2k per call; 1,448 output tokens; 14,336 cached tokens.
+  - Wall time 43.6 s; latency mean 1.99 s, p50 2.01 s, p90 2.60 s.
+- Strict replay of that seed: same 21 calls and token totals, 0 fallbacks, 1.5 s simulation wall.
 
-Acceptance:
+Deviations from the first draft:
 
-- One real grid3x3 seed completes.
-- Calls and input tokens match the targets above.
-- Invalid JSON and fallback rates are no worse than the old team.
-- No regression on normal and incident cells.
+- `pedestrian_interval_s` is 60, not 30, to meet the call target; threshold events still fire at 20 s of wait.
+- `congested_delta_s` is 20, not 15.
+- `ev_eta_thresholds` is empty by default; the schedule is maintained in code instead of replanning on ETA steps.
+- Pricing defaults to 0, so `llm_team_estimated_cost_usd` reports 0 until the `pricing` block is filled.
+
+Phase 2 acceptance: met.
 
 Phase 2 preflight:
 
@@ -339,6 +357,7 @@ src/cotraffic/envs/ev.py
 configs/agents/llm_team.yaml
 configs/experiments/llm_team_ab.yaml
 configs/experiments/llm_team_ab_quick.yaml
+configs/experiments/llm_team_speed.yaml
 tests/conftest.py
 tests/test_llm_team_schemas.py
 tests/test_llm_team_arbiter.py
@@ -375,6 +394,14 @@ Mock run:
 PYTHONPATH=src COTRAFFIC_LLM_BACKEND=mock \
 ~/.venvs/sumo/bin/python -m cotraffic evaluate \
   --experiment llm_team_ab_quick --jobs 1 --force
+```
+
+Mock speed matrix (normal, emergency, incident, pedestrians):
+
+```bash
+PYTHONPATH=src COTRAFFIC_LLM_BACKEND=mock \
+~/.venvs/sumo/bin/python -m cotraffic evaluate \
+  --experiment llm_team_speed --jobs 1 --force
 ```
 
 One real seed, with a hard call guard:
@@ -424,9 +451,9 @@ Rules:
 
 ## 13. Fresh session start
 
-Read this file first. Then implement Phase 2 only.
+Read this file first. Phase 2 is done; implement Phase 3 only.
 
-Start from `ad5a8b3` on `feat/llm-team-speed`. Do not redo Phase 1.
+Start from the Phase 2 commit on `feat/llm-team-speed`. Do not redo Phase 1 or 2.
 
 Rules:
 
@@ -443,12 +470,11 @@ Rules:
 - Run `pytest tests -q` and the mock matrix before spending tokens.
 - One real seed, inspect calls/tokens/fallbacks, then replay.
 
-Phase 2 first steps:
+Phase 3 first steps:
 
-1. Add Emergency schedule persistence and code-side release and extension.
-2. Coalesce EV events with a 3 to 5 s debounce and pedestrian group events.
-3. Compact the snapshot: one blackboard copy, capped messages and alerts, hot-EV filter, next 2 to 3 TLS.
-4. Run due roles concurrently with a fixed Operator, Emergency, Pedestrian apply order.
-5. Add latency mean/p50/p90, skipped calls, wall time and estimated cost to metrics.
-6. Verify with mock and replay, then one real grid3x3 seed, then normal and incident.
+1. Run `real_district` normal, emergency and incident with a call guard and `--jobs 1`.
+2. Compare `mp`, simple `llm` and `llm_team` on the same seed.
+3. Check wall time under 5 minutes fresh and replay under 10 seconds.
+4. Do not run pedestrians on `real_district`.
+5. Report honest metrics and record any missed target.
 - Commit only after tests and mock pass.

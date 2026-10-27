@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -63,9 +64,24 @@ class BaseProvider:
         self.timeout_s = float(timeout_s)
         self.attempts = max(1, int(attempts))
         self.min_interval_s = max(0.0, float(min_interval_s))
-        self.reasoning_effort = ""
+        self._local = threading.local()
         self._last_request_at: float | None = None
-        self._last_usage: dict[str, int | None] = {}
+
+    @property
+    def reasoning_effort(self) -> str:
+        return getattr(self._local, "reasoning_effort", "")
+
+    @reasoning_effort.setter
+    def reasoning_effort(self, value: str | None) -> None:
+        self._local.reasoning_effort = value or ""
+
+    @property
+    def _last_usage(self) -> dict[str, int | None]:
+        return getattr(self._local, "last_usage", {})
+
+    @_last_usage.setter
+    def _last_usage(self, value: dict[str, int | None]) -> None:
+        self._local.last_usage = value
 
     def _throttle(self) -> None:
         if self.min_interval_s <= 0:

@@ -10,6 +10,10 @@ from cotraffic.controllers.ev_preemption import phase_for
 from cotraffic.controllers.pedestrian_rule import longest_waits
 
 ETA_MIN_SPEED_M_S = 1.0
+EV_HORIZON_S = 60.0
+EV_LOOKAHEAD = 3
+MAX_ALERTS = 5
+MAX_BLACKBOARD = 6
 
 
 @dataclass(frozen=True)
@@ -241,8 +245,16 @@ def _intersection(
     return entry
 
 
-def _ev(ev: Any) -> dict[str, Any]:
+def _hot_ev(
+    ev: Any, horizon_s: float = EV_HORIZON_S, lookahead: int = EV_LOOKAHEAD
+) -> dict[str, Any] | None:
     speed = float(getattr(ev, "speed_m_s", 0.0))
+    rows = list(getattr(ev, "next_tls", ()) or ())[: max(1, int(lookahead))]
+    if not rows:
+        return None
+    etas = [float(row.distance_m) / max(speed, ETA_MIN_SPEED_M_S) for row in rows]
+    if min(etas) > horizon_s:
+        return None
     return {
         "id": getattr(ev, "veh_id", ""),
         "edge": getattr(ev, "edge_id", ""),
@@ -255,7 +267,7 @@ def _ev(ev: Any) -> dict[str, Any]:
                 "eta_s": _eta_s(float(upcoming.distance_m), speed),
                 "signal": getattr(upcoming, "signal", ""),
             }
-            for upcoming in getattr(ev, "next_tls", ())
+            for upcoming in rows
         ],
     }
 
@@ -288,11 +300,23 @@ def build_snapshot(
     blackboard: Iterable[Any] = (),
     pedestrians: Iterable[Any] = (),
     network: str = "",
+    max_alerts: int = MAX_ALERTS,
+    max_messages: int = MAX_BLACKBOARD,
+    ev_horizon_s: float = EV_HORIZON_S,
+    ev_lookahead: int = EV_LOOKAHEAD,
 ) -> dict[str, Any]:
     neighbor_map = neighbors or {}
     messages = [
         message.to_dict() if hasattr(message, "to_dict") else dict(message)
         for message in (blackboard or ())
+    ][-max(0, int(max_messages)) :]
+    alert_rows = [dict(alert) for alert in (alerts or ())][-max(0, int(max_alerts)) :]
+    ev_rows = [
+        row
+        for row in (
+            _hot_ev(ev, float(ev_horizon_s), int(ev_lookahead)) for ev in (evs or ())
+        )
+        if row is not None
     ]
     snapshot: dict[str, Any] = {
         "t": round(float(t), 1),
@@ -302,8 +326,8 @@ def build_snapshot(
             tls_id: _intersection(states[tls_id], neighbor_map.get(tls_id))
             for tls_id in sorted(states)
         },
-        "alerts": [dict(alert) for alert in (alerts or ())],
-        "evs": [_ev(ev) for ev in (evs or ())],
+        "alerts": alert_rows,
+        "evs": ev_rows,
         "blackboard": messages,
     }
     pedestrian_states = [_pedestrian(state) for state in (pedestrians or ())]

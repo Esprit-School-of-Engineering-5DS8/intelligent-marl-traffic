@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
+
+from test_llm_team_controller import make_intersection
 
 from cotraffic.controllers.llm_team.agent import LLMAgent
 from cotraffic.controllers.llm_team.arbiter import Arbiter
@@ -13,7 +17,7 @@ from cotraffic.controllers.llm_team.client import (
     TeamError,
     TeamResponse,
 )
-from cotraffic.controllers.llm_team.snapshot import PedestrianState
+from cotraffic.controllers.llm_team.snapshot import PedestrianState, build_phase_map
 from cotraffic.controllers.llm_team.supervisor import Supervisor, SupervisorConfig
 from cotraffic.envs.ev import EVState, UpcomingTLS
 
@@ -46,6 +50,7 @@ def make_supervisor(
     config=None,
     pedestrian=False,
     network="testnet",
+    phase_maps=None,
 ):
     if pedestrian and "pedestrian" not in roles:
         roles = tuple(roles) + ("pedestrian",)
@@ -60,6 +65,7 @@ def make_supervisor(
         config=config or SupervisorConfig(delta_s=30.0, ev_replan_s=10.0),
         pedestrian_trigger=pedestrian,
         network=network,
+        phase_maps=phase_maps,
     )
 
 
@@ -96,13 +102,13 @@ def test_emergency_runs_on_ev_cadence():
     assert supervisor.should_run(10.0, STATES, evs)
 
 
-def _ev(veh_id="ev_0", distance_m=200.0, speed=10.0):
+def _ev(veh_id="ev_0", distance_m=200.0, speed=10.0, link=0):
     return EVState(
         veh_id,
         "edge",
         "edge_0",
         speed,
-        (UpcomingTLS("A", 0, distance_m, "r"),),
+        (UpcomingTLS("A", link, distance_m, "r"),),
     )
 
 
@@ -113,13 +119,21 @@ def test_ev_events_trigger_off_cadence():
     supervisor.run(0.0, STATES, [ev])
     assert supervisor.stats["emergency_calls"] == 1
 
+    assert supervisor.should_run(6.0, STATES, [_ev(distance_m=140.0)]) is False
+    assert supervisor.should_run(6.0, STATES, [_ev("ev_1", 180.0)]) is True
+    supervisor.run(6.0, STATES, [_ev("ev_1", 180.0)])
+    assert supervisor.stats["emergency_calls"] == 2
+    assert supervisor.should_run(7.0, STATES, [_ev("ev_1", 180.0)]) is False
+
+
+def test_ev_eta_thresholds_still_work_when_configured():
+    config = SupervisorConfig(ev_eta_thresholds=(15.0,), ev_event_min_gap_s=3.0)
+    supervisor = make_supervisor(config=config)
+    supervisor.run(0.0, STATES, [_ev(distance_m=200.0)])
+    assert supervisor.stats["emergency_calls"] == 1
     assert supervisor.should_run(4.0, STATES, [_ev(distance_m=140.0)]) is True
     supervisor.run(4.0, STATES, [_ev(distance_m=140.0)])
     assert supervisor.stats["emergency_calls"] == 2
-
-    assert supervisor.should_run(8.0, STATES, [_ev("ev_1", 180.0)]) is True
-    supervisor.run(8.0, STATES, [_ev("ev_1", 180.0)])
-    assert supervisor.should_run(9.0, STATES, [_ev("ev_1", 180.0)]) is False
 
 
 def test_ev_events_can_be_disabled():
@@ -141,7 +155,28 @@ def test_pedestrian_runs_on_data_and_events():
     supervisor.run(0.0, STATES, (), (), (), [ped])
     assert supervisor.stats["pedestrian_calls"] == 1
     assert supervisor.should_run(1.0, STATES, (), (), [ped]) is False
-    assert supervisor.should_run(8.0, STATES, (), (), [_ped("B", "EW")]) is True
+    assert supervisor.should_run(8.0, STATES, (), (), [_ped("B", "EW")]) is False
+    assert supervisor.should_run(21.0, STATES, (), (), [_ped("B", "EW")]) is True
+
+
+def test_pedestrian_short_wait_groups_do_not_trigger():
+    supervisor = make_supervisor(pedestrian=True)
+    assert supervisor.should_run(0.0, STATES, (), (), [_ped(max_wait=8.0)]) is True
+    supervisor.run(0.0, STATES, (), (), (), [_ped(max_wait=8.0)])
+    assert supervisor.stats["pedestrian_calls"] == 1
+    assert (
+        supervisor.should_run(21.0, STATES, (), (), [_ped("B", "EW", max_wait=8.0)])
+        is False
+    )
+
+
+def test_pedestrian_group_gap_blocks_repeated_thresholds():
+    supervisor = make_supervisor(pedestrian=True)
+    ped = _ped(max_wait=21.0)
+    supervisor.run(0.0, STATES, (), (), (), [ped])
+    assert supervisor.stats["pedestrian_calls"] == 1
+    assert supervisor.should_run(21.0, STATES, (), (), [ped]) is False
+    assert supervisor.should_run(31.0, STATES, (), (), [ped]) is True
 
 
 def test_pedestrian_does_not_run_without_data_or_trigger():
@@ -155,13 +190,19 @@ def test_pedestrian_does_not_run_without_data_or_trigger():
     assert disabled.should_run(1.0, STATES, (), (), [_ped()]) is False
 
 
-def test_classify_congested_on_long_pedestrian_wait():
+def test_pedestrian_wait_does_not_escalate_operator_cadence():
     supervisor = make_supervisor(pedestrian=True)
     assert (
         supervisor.classify(0.0, STATES, pedestrians=[_ped(max_wait=25.0)])
-        == "congested"
+        == "quiet"
     )
-    assert supervisor.classify(0.0, STATES, pedestrians=[_ped(max_wait=8.0)]) == "quiet"
+    assert (
+        supervisor._effort_for(
+            "quiet", "pedestrian", pedestrians=[_ped(max_wait=25.0)]
+        )
+        == "low"
+    )
+    assert supervisor._effort_for("quiet", "operator") == ""
 
 
 def test_client_failure_falls_back_to_empty_envelope(tmp_path):
@@ -273,8 +314,8 @@ def test_cadence_tiers():
 
     congested = make_supervisor()
     congested.run(0.0, CONGESTED_STATES)
-    assert congested.should_run(14.0, CONGESTED_STATES) is False
-    assert congested.should_run(15.0, CONGESTED_STATES) is True
+    assert congested.should_run(19.0, CONGESTED_STATES) is False
+    assert congested.should_run(20.0, CONGESTED_STATES) is True
 
 
 def test_classify_tiers():
@@ -323,3 +364,97 @@ def test_agent_alerts_reach_blackboard(tmp_path):
     alerts = supervisor.blackboard.of_kind("spillback", 0.0)
     assert len(alerts) == 1
     assert alerts[0].to_dict()["where"] == "A1A0"
+
+
+def test_parallel_roles_are_concurrent_and_applied_in_order():
+    class ConcurrentClient:
+        model = "concurrent"
+
+        def __init__(self):
+            self.active = 0
+            self.peak = 0
+            self.lock = threading.Lock()
+
+        def complete(self, system, user, schema, effort=None, max_tokens=700):
+            with self.lock:
+                self.active += 1
+                self.peak = max(self.peak, self.active)
+            time.sleep(0.05)
+            with self.lock:
+                self.active -= 1
+            return TeamResponse(parsed={"directives": [], "alerts": [], "explanation": ""})
+
+    client = ConcurrentClient()
+    agents = {
+        role: LLMAgent(role, client)
+        for role in ("operator", "emergency", "pedestrian")
+    }
+    supervisor = Supervisor(
+        agents=agents,
+        arbiter=Arbiter(TLS),
+        config=SupervisorConfig(parallel_workers=3),
+        pedestrian_trigger=True,
+    )
+    results = supervisor.run(0.0, STATES, [_ev()], (), (), [_ped()])
+    assert [result.role for result in results] == [
+        "operator",
+        "emergency",
+        "pedestrian",
+    ]
+    assert client.peak >= 2
+
+
+def test_metrics_report_latency_tokens_cost_and_skips():
+    class TokenClient:
+        model = "token"
+
+        def complete(self, system, user, schema, effort=None, max_tokens=700):
+            return TeamResponse(
+                parsed={"directives": [], "alerts": [], "explanation": ""},
+                latency_s=0.1,
+                tokens_in=10,
+                tokens_out=5,
+                tokens_cached=2,
+                tokens_reasoning=1,
+            )
+
+    supervisor = make_supervisor()
+    supervisor.agents["operator"] = LLMAgent("operator", TokenClient())
+    config = SupervisorConfig(
+        price_input_per_1m=1.0,
+        price_output_per_1m=2.0,
+        price_cached_per_1m=0.5,
+    )
+    supervisor.config = config
+    supervisor.run(0.0, STATES)
+    supervisor.tick(1.0, STATES)
+    metrics = supervisor.metrics()
+    assert metrics["llm_team_calls"] == 1
+    assert metrics["llm_team_latency_p50_s"] == 0.1
+    assert metrics["llm_team_operator_tokens_in"] == 10
+    assert metrics["llm_team_operator_tokens_reasoning"] == 1
+    assert metrics["llm_team_skipped_calls"] >= 1
+    assert metrics["llm_team_estimated_cost_usd"] == 0.000019
+
+
+def test_conflicting_ev_phases_trigger_off_cadence():
+    phase_map = build_phase_map(make_intersection("A", 2))
+    supervisor = make_supervisor(phase_maps={"A": phase_map})
+    ev0 = _ev("ev0", link=0)
+    ev1 = _ev("ev1", link=1)
+    supervisor.run(0.0, STATES, [ev0, _ev("ev1", link=0)])
+    assert supervisor.stats["emergency_calls"] == 1
+    assert supervisor.should_run(6.0, STATES, [ev0, ev1]) is True
+    supervisor.run(6.0, STATES, [ev0, ev1])
+    assert supervisor.stats["emergency_calls"] == 2
+
+
+def test_blackboard_compaction_dedupes_feedback_and_alerts():
+    board = Blackboard()
+    board.post_message("arbiter_result", "arbiter", 0.0, payload={"n": 1})
+    board.post_message("arbiter_result", "arbiter", 1.0, payload={"n": 2})
+    board.post_message("spillback", "operator", 2.0, payload={"where": "A"})
+    board.post_message("spillback", "operator", 3.0, payload={"where": "A"})
+    active = board.compact(4.0, max_messages=6)
+    assert [message.kind for message in active] == ["arbiter_result", "spillback"]
+    assert active[0].payload == {"n": 2}

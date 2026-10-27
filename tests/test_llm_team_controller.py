@@ -242,3 +242,42 @@ def test_replay_client_round_trip_and_strict_miss(tmp_path):
 
     with pytest.raises(TeamError, match="cache miss"):
         reader.complete("system", "other", {"type": "object"}, max_tokens=12)
+
+
+def test_controller_maintains_emergency_plan_without_extra_call():
+    from cotraffic.envs.ev import EVState, UpcomingTLS
+
+    env = FakeEnv()
+    env.ev_states = [
+        EVState("ev0", "edge", "lane", 10.0, (UpcomingTLS("B0", 2, 20.0, "r"),))
+    ]
+    client = MockClient(
+        lambda system, user, schema: {
+            "directives": [
+                {
+                    "tls": "B0",
+                    "type": "preempt",
+                    "phase": "NS",
+                    "ev": "ev0",
+                    "start_in_s": 0,
+                    "hold_s": 10,
+                    "ttl_s": 20,
+                }
+            ],
+            "alerts": [],
+            "explanation": "test",
+        }
+    )
+    controller = LLMTeamController(client=client, max_calls=10)
+    controller.reset(env)
+    controller.act(env, {})
+    assert len(client.calls) == 2
+
+    env.now = 5.0
+    env.ev_states = [
+        EVState("ev0", "edge", "lane", 10.0, (UpcomingTLS("B0", 2, 10.0, "r"),))
+    ]
+    controller.act(env, {})
+    metrics = controller.metrics()
+    assert len(client.calls) == 2
+    assert metrics["llm_team_code_updates"] == 1

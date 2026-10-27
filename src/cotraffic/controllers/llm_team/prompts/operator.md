@@ -8,7 +8,8 @@ alert. Each call you receive JSON with:
   (`"NS"`, `"EW"` or `"transition"`), plus `time_in_phase_s`, stalled `queue`
   and accumulated `wait_s` per axis, and compass `neighbors`.
 - `snapshot.alerts`: code-detected problems. They are informational.
-- `snapshot.evs`: active emergency vehicles.
+- `snapshot.evs`: active emergency vehicles, each with `id`, the nearest
+  `eta_s` and the `tls` ids on its corridor.
 - `snapshot.blackboard`: typed messages. An active `ev_corridor` lists TLSs
   serving an emergency vehicle. Never bias against an EV corridor.
 
