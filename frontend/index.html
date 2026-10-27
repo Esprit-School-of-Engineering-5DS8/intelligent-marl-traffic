@@ -331,7 +331,8 @@
             </div>
             <div class="map-offline" id="mapOffline" hidden>
               <strong>Live map offline</strong>
-              <span>Add a Mapbox token to enable the street view.</span>
+              <span id="mapOfflineMessage">Add a Mapbox token to enable the street view.</span>
+              <button type="button" class="map-connect" id="mapConnect" hidden>Connect Mapbox</button>
             </div>
           </div>
         </section>
@@ -837,9 +838,13 @@
           <span class="live-map-fallback-icon"><svg class="ico"><use href="#i-layers"/></svg></span>
           <strong>3D map unavailable</strong>
           <span id="liveMapFallbackMessage">Add a valid Mapbox token to enable the live 3D environment.</span>
-          <div class="live-map-token-form" style="display:flex; gap:8px; margin-top:14px; width:100%; max-width:280px;">
-            <input type="password" id="liveMapTokenInput" placeholder="pk.eyJ1…" style="flex:1; border:1px solid #dce2d8; border-radius:8px; padding:7px 10px; font-size:12px; background:#fff; outline:none;" autocomplete="off">
-            <button type="button" id="liveMapTokenSave" style="border:none; border-radius:8px; background:#7cbd40; color:#fff; font-weight:600; padding:7px 12px; cursor:pointer; font-size:12px;">Save</button>
+          <div class="live-map-token-form" id="liveMapTokenForm">
+            <input type="password" id="liveMapTokenInput" placeholder="pk.eyJ1…" autocomplete="off">
+            <button type="button" id="liveMapTokenSave">Save</button>
+          </div>
+          <div class="live-map-fallback-actions">
+            <button type="button" id="liveMapSkip" class="live-map-fallback-btn">Skip for now</button>
+            <button type="button" id="liveMapConnect" class="live-map-fallback-btn is-primary" hidden>Connect Mapbox</button>
           </div>
         </div>
       </main>

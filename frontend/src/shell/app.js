@@ -13,6 +13,7 @@ let liveMap = null;
 const FOCUS = [-97.7264, 30.2653];
 const DEFAULT_ZOOM = 13.5;
 const TOKEN_KEY = 'kematara.mapboxToken';
+const SKIP_KEY = 'kematara.mapboxSkipped';
 const SCENARIO_KEY = 'sumo.scenario';
 
 const SCENARIOS = {
@@ -145,6 +146,30 @@ function resolveToken() {
     || '';
 }
 
+function mapSkipped() {
+  return localStorage.getItem(SKIP_KEY) === '1';
+}
+
+function markMapSkipped() {
+  const offline = $('mapOffline');
+  if (offline) offline.hidden = false;
+  const message = $('mapOfflineMessage');
+  if (message) message.textContent = 'Street map disabled. Grid simulation and benchmark still work.';
+  const connect = $('mapConnect');
+  if (connect) connect.hidden = false;
+  if (liveMap) {
+    liveMap.remove();
+    liveMap = null;
+  }
+}
+
+function markMapAvailable() {
+  const connect = $('mapConnect');
+  if (connect) connect.hidden = true;
+  const message = $('mapOfflineMessage');
+  if (message) message.textContent = 'Add a Mapbox token to enable the street view.';
+}
+
 function showTokenPanel(message) {
   const panel = $('tokenPanel');
   if (!panel) return;
@@ -181,6 +206,7 @@ function buildMap(token) {
   if (!container) return;
   container.innerHTML = '';
   setOffline(false);
+  markMapAvailable();
 
   const scenario = getScenario();
   map = new mapboxgl.Map({
@@ -204,7 +230,7 @@ function buildMap(token) {
 
   map.on('error', (event) => {
     const message = String(event?.error?.message || '');
-    if (/token|401|unauthorized|not authorized/i.test(message)) {
+    if (!mapSkipped() && /token|401|unauthorized|not authorized/i.test(message)) {
       showTokenPanel(message);
       setOffline(true);
     }
@@ -220,7 +246,13 @@ function resetMapView() {
 document.querySelectorAll('[data-map-action]').forEach((button) => {
   button.addEventListener('click', () => {
     if (!map) {
-      showTokenPanel('Connect a Mapbox token to use the map.');
+      if (mapSkipped()) {
+        showToast('Street map is disabled.', {
+          action: { label: 'Connect Mapbox', onClick: () => showTokenPanel() }
+        });
+      } else {
+        showTokenPanel('Connect a Mapbox token to use the map.');
+      }
       return;
     }
     const action = button.dataset.mapAction;
@@ -1191,17 +1223,28 @@ $('tokenSave')?.addEventListener('click', () => {
     return;
   }
   localStorage.setItem(TOKEN_KEY, value);
+  localStorage.removeItem(SKIP_KEY);
   hideTokenPanel();
   buildMap(value);
 });
 
 $('tokenSkip')?.addEventListener('click', () => {
+  localStorage.setItem(SKIP_KEY, '1');
   hideTokenPanel();
   setOffline(true);
+  markMapSkipped();
+});
+
+$('mapConnect')?.addEventListener('click', () => {
+  showTokenPanel();
 });
 
 const token = resolveToken();
-if (token) {
+if (mapSkipped()) {
+  hideTokenPanel();
+  setOffline(true);
+  markMapSkipped();
+} else if (token) {
   buildMap(token);
 } else {
   showTokenPanel();
@@ -1553,18 +1596,64 @@ function getLiveScenarioView() {
   };
 }
 
+function liveMapDisabledMessage() {
+  return '3D map disabled. Switch to a SUMO grid scenario to run the live simulation without Mapbox.';
+}
+
+function applyLiveMapTokenUi(showForm = !mapSkipped()) {
+  const form = $('liveMapTokenForm');
+  if (form) form.hidden = !showForm;
+  const skip = $('liveMapSkip');
+  if (skip) skip.hidden = !showForm;
+  const connect = $('liveMapConnect');
+  if (connect) connect.hidden = showForm;
+}
+
 function showLiveMapFallback(message) {
   const fallback = $('liveMapFallback');
   if (!fallback) return;
   fallback.hidden = false;
   const copy = $('liveMapFallbackMessage');
-  if (copy) copy.textContent = message || 'The 3D environment could not be loaded.';
+  if (copy) {
+    copy.textContent = message || (mapSkipped()
+      ? liveMapDisabledMessage()
+      : 'The 3D environment could not be loaded.');
+  }
+  applyLiveMapTokenUi();
 }
 
 function hideLiveMapFallback() {
   const fallback = $('liveMapFallback');
   if (fallback) fallback.hidden = true;
 }
+
+$('liveMapSkip')?.addEventListener('click', () => {
+  localStorage.setItem(SKIP_KEY, '1');
+  hideTokenPanel();
+  setOffline(true);
+  markMapSkipped();
+  showLiveMapFallback(liveMapDisabledMessage());
+});
+
+$('liveMapConnect')?.addEventListener('click', () => {
+  applyLiveMapTokenUi(true);
+  const copy = $('liveMapFallbackMessage');
+  if (copy) copy.textContent = 'Add a valid Mapbox token to enable the live 3D environment.';
+  $('liveMapTokenInput')?.focus();
+});
+
+$('liveMapTokenSave')?.addEventListener('click', () => {
+  const val = $('liveMapTokenInput')?.value.trim();
+  if (!val) return;
+  localStorage.setItem(TOKEN_KEY, val);
+  localStorage.removeItem(SKIP_KEY);
+  hideTokenPanel();
+  markMapAvailable();
+  buildMap(val);
+  hideLiveMapFallback();
+  if (liveMap) { liveMap.remove(); liveMap = null; }
+  ensureLiveMap();
+});
 
 function addLiveMapMarker(lngLat, className, html) {
   if (!liveMap) return;
@@ -1886,6 +1975,7 @@ function initLiveMap() {
     container.closest('.live-map-view')?.classList.add('is-sumo-3d');
     container.hidden = true;
     container.style.display = 'none';
+    hideLiveMapFallback();
     if (liveMap) liveMap.getContainer().style.display = 'none';
     const vignette = document.querySelector('.live-map-vignette');
     if (vignette) vignette.style.display = 'none';
@@ -1926,6 +2016,11 @@ function initLiveMap() {
     return;
   }
 
+  if (mapSkipped()) {
+    showLiveMapFallback(liveMapDisabledMessage());
+    return;
+  }
+
   const token = resolveToken();
   if (!token) {
     showLiveMapFallback('Add a Mapbox token to enable the live environment.');
@@ -1957,15 +2052,6 @@ function initLiveMap() {
     if (/token|401|403|unauthorized|not authorized|NetworkError|failed to fetch/i.test(message)) {
       showLiveMapFallback(message || 'Mapbox token invalid or network error.');
     }
-  });
-
-  $('liveMapTokenSave')?.addEventListener('click', () => {
-    const val = $('liveMapTokenInput')?.value.trim();
-    if (!val) return;
-    localStorage.setItem(TOKEN_KEY, val);
-    hideLiveMapFallback();
-    if (liveMap) { liveMap.remove(); liveMap = null; }
-    ensureLiveMap();
   });
 
   window.setTimeout(() => liveMap?.resize(), 80);
@@ -2001,7 +2087,7 @@ document.querySelectorAll('[data-live-map-action]').forEach((button) => {
       return;
     }
     if (!liveMap) {
-      showLiveMapFallback('Connect a Mapbox token to use the live map.');
+      showLiveMapFallback(mapSkipped() ? liveMapDisabledMessage() : 'Connect a Mapbox token to use the live map.');
       return;
     }
     if (action === 'zoom-in') liveMap.zoomIn({ duration: 420 });
@@ -3033,7 +3119,9 @@ window.SUMO = {
   setMapToken(value) {
     if (!value) return;
     localStorage.setItem(TOKEN_KEY, value);
+    localStorage.removeItem(SKIP_KEY);
     hideTokenPanel();
+    markMapAvailable();
     buildMap(value);
   },
   focus() {
