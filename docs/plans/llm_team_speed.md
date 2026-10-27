@@ -1,6 +1,6 @@
 # LLM team port and speed plan
 
-Status: Phase 2 done at `8c0e252`; Phase 3 next
+Status: Phase 3 done at `d922480`; Phase 4 next
 
 Base: `integration` at `b908238`  
 Working branch: `feat/llm-team-speed`  
@@ -301,7 +301,7 @@ Phase 2 preflight:
 - Start with mock, then one tiny real call, then one real seed.
 - Inspect the decision log and metrics before running more seeds.
 
-### Phase 3: Tunisia
+### Phase 3: Tunisia (done)
 
 - Run `real_district` normal, emergency and incident.
 - Compare `max_pressure`, simple `llm` and `llm_team`.
@@ -313,6 +313,69 @@ Acceptance:
 - Replay under 10 seconds.
 - Report honest metrics.
 
+Phase 3 evidence:
+
+- Config: `configs/experiments/llm_team_tunisia.yaml`, seeds 0 to 2, medium demand,
+  normal, emergency and incident, `ssm: true`.
+- `real_district` built with 7 signalised TLS. All green phases map to a valid NS or
+  EW axis and every EV approach link resolves to a valid phase. One junction has 3
+  green phases and is handled as two NS groups plus one EW group.
+- `pytest tests -q`: 121 passed at `d922480`.
+- Full mock matrix: 18 runs for `mp` and `llm_team`, 0 failed, 91 to 110 team calls
+  per full episode.
+- Real matrix: 27 runs, 0 failed. Team results were frozen at `9336ec8-dirty` after
+  the `max_tokens` change; the committed config is `d4a7038` and matches the run.
+  All simple `llm` runs are at `d922480`.
+
+Team totals across 9 runs:
+
+- 869 calls, 843 Operator and 26 Emergency, 4 fallbacks and 8 retries.
+- 1,789,277 input tokens, 68,622 output tokens, 1,277,440 cached and 13,260
+  reasoning tokens.
+- Fresh wall time 158.8 to 215.4 s per run. One emergency seed reused probe cache and
+  reports 16.0 s; its separate fresh probe took 223.4 s. Both are below 5 minutes.
+- Strict replay: 8.0 to 9.1 s per run, 76.3 s for all 9 runs. Calls, tokens and every
+  KPI match the fresh rows exactly. The 4 original provider failures reproduce as
+  strict replay cache misses, so replay also has 4 fallbacks.
+
+Simple `llm` totals across 9 runs:
+
+- 1,620 calls, 1,620 successful, 1 partial decision, 0 fallbacks.
+- 1,493,458 prompt tokens and 30,805 completion tokens.
+- Fresh wall time 264.0 to 277.5 s per run.
+
+Mean KPIs over 3 seeds:
+
+| scenario | method | travel s | wait s | throughput/h | EV travel s | EV delay s |
+|---|---|---:|---:|---:|---:|---:|
+| normal | mp | 109.27 | 8.86 | 3719 | | |
+| normal | llm | 119.42 | 16.36 | 3721 | | |
+| normal | llm_team | 109.01 | 8.65 | 3720 | | |
+| emergency | mp | 109.46 | 9.01 | 3723 | 91.57 | 22.36 |
+| emergency | llm | 118.27 | 15.40 | 3732 | 98.12 | 28.71 |
+| emergency | llm_team | 108.90 | 8.61 | 3728 | 90.99 | 21.87 |
+| incident | mp | 109.18 | 8.97 | 3719 | | |
+| incident | llm | 119.52 | 16.45 | 3718 | | |
+| incident | llm_team | 108.77 | 8.65 | 3719 | | |
+
+Findings:
+
+- `llm_team` matches or slightly beats Max-Pressure on all three scenarios. The gain is
+  small and not robust: it wins all 3 normal seeds and 2 of 3 incident seeds, but the
+  emergency EV delay improves only on seed 0 and worsens on seeds 1 and 2.
+- Simple `llm` is consistently worse than Max-Pressure on travel time and waiting time.
+  Its throughput is unchanged, so the extra delay is not from lost demand.
+- The team's 4 fallbacks are on low-effort emergency ticks. Raising `max_tokens` from
+  300/500/300 to 600/900/500 cut failures from 13 to 4. Further reruns were stopped to
+  avoid more paid calls, so the frozen v2 rows keep those 4 fallbacks.
+- Simple `llm` needed a separate fix: it now requests `reasoning_effort: none` and
+  validates phases against each intersection's real phase count instead of the padded
+  action space. Before the fix it produced empty or truncated responses on 7 of 23
+  calls.
+
+Phase 3 acceptance: met, with the 4 team fallbacks and the replay cache misses
+reported above.
+
 ### Phase 4: Monaco stress test
 
 - One seed only.
@@ -322,6 +385,10 @@ Acceptance:
 
 - Target: under 10 minutes per seed fresh, no more than 50 calls, no more than 8k input tokens per call.
 - If the target is missed, record the bottleneck instead of hiding it.
+
+Phase 3 measured 91 to 110 team calls per full `real_district` episode, so Monaco
+will likely miss the 50-call target unless the cadence or event coalescing changes.
+Record the miss or reduce calls before the run.
 
 ### Phase 5: expose
 
@@ -358,6 +425,7 @@ configs/agents/llm_team.yaml
 configs/experiments/llm_team_ab.yaml
 configs/experiments/llm_team_ab_quick.yaml
 configs/experiments/llm_team_speed.yaml
+configs/experiments/llm_team_tunisia.yaml
 tests/conftest.py
 tests/test_llm_team_schemas.py
 tests/test_llm_team_arbiter.py
@@ -371,13 +439,16 @@ Modify:
 
 ```
 src/cotraffic/llm/providers.py
+src/cotraffic/controllers/llm.py
 src/cotraffic/controllers/registry.py
 src/cotraffic/envs/observations.py
 src/cotraffic/envs/traffic_env.py
+configs/agents/llm.yaml
 api/policy.py
 configs/dashboard_policy.yaml
 requirements-dev.txt
 .env.example
+tests/test_llm_controller.py
 ```
 
 ## 11. Runbook
@@ -451,9 +522,9 @@ Rules:
 
 ## 13. Fresh session start
 
-Read this file first. Phase 2 is done; implement Phase 3 only.
+Read this file first. Phase 3 is done; implement Phase 4 only.
 
-Start from the Phase 2 commit on `feat/llm-team-speed`. Do not redo Phase 1 or 2.
+Start from `d922480` on `feat/llm-team-speed`. Do not redo Phases 1 to 3.
 
 Rules:
 
@@ -470,11 +541,12 @@ Rules:
 - Run `pytest tests -q` and the mock matrix before spending tokens.
 - One real seed, inspect calls/tokens/fallbacks, then replay.
 
-Phase 3 first steps:
+Phase 4 first steps:
 
-1. Run `real_district` normal, emergency and incident with a call guard and `--jobs 1`.
-2. Compare `mp`, simple `llm` and `llm_team` on the same seed.
-3. Check wall time under 5 minutes fresh and replay under 10 seconds.
-4. Do not run pedestrians on `real_district`.
-5. Report honest metrics and record any missed target.
-- Commit only after tests and mock pass.
+1. Run Monaco on one seed with `llm_team` and a call guard, using `--jobs 1`.
+2. Mock and replay first. Do not start a paid Monaco run blind.
+3. Check fresh wall time, calls, input tokens per call and fallbacks.
+4. Target: under 10 minutes fresh, no more than 50 calls, no more than 8k input
+   tokens per call. Phase 3 measured 91 to 110 calls per full episode, so expect the
+   call target to need a cadence change or an honest miss.
+5. Record the bottleneck and commit only after tests and mock pass.
