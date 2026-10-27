@@ -1,6 +1,6 @@
 # LLM team port and speed plan
 
-Status: Phase 2 done in this branch; Phase 3 next
+Status: Phase 2 done at `8c0e252`; Phase 3 next
 
 Base: `integration` at `b908238`  
 Working branch: `feat/llm-team-speed`  
