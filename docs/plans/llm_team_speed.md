@@ -1,6 +1,7 @@
 # LLM team port and speed plan
 
-Status: ready for implementation  
+Status: Phase 1 done at `ad5a8b3`; Phase 2 next
+
 Base: `integration` at `b908238`  
 Working branch: `feat/llm-team-speed`  
 Scope: port the three-role LLM team onto the integration backend and make it fast enough for tonight.
@@ -212,7 +213,7 @@ Done in this branch:
 - old stash and old branch removed
 - this plan committed
 
-### Phase 1: port core
+### Phase 1: port core (done at `ad5a8b3`)
 
 - Add the `llm_team` package, OpenCode Go provider, Mock and Replay providers.
 - Register `llm_team`.
@@ -226,11 +227,47 @@ Acceptance:
 - `llm_team` is selectable through the registry and API policy.
 - No TraCI in the LLM package.
 
+Evidence recorded on `ad5a8b3`:
+
+- `pytest tests -q`: 108 passed.
+- `llm_team_ab_quick` with `COTRAFFIC_LLM_BACKEND=mock`: 4 of 4 runs passed, grid2x2 and grid3x3, 0 API calls.
+- Extra mock smoke runs completed for `emergency` and `pedestrians` on grid3x3.
+- `llm_team` is in `METHODS`, the API catalog and the registry.
+- The package has no `import traci` or `from traci`.
+
+Phase 1 deviations and additions:
+
+- Added `src/cotraffic/envs/ev.py` and `env.ev_states` so per-EV corridors stay out of the LLM package.
+- Added lane waiting time to `Measurements` and pedestrian wait sums to `CoTrafficEnv`.
+- Ported `detector.py` for supervisor alerts.
+- Added `llm_team_ab_quick.yaml`, `tests/conftest.py` and `tests/test_llm_team_roles.py`.
+- `requirements-dev.txt` now uses `httpx2` for the Starlette TestClient.
+- The local `~/.venvs/sumo` install is not editable, so CLI runs need `PYTHONPATH=src`.
+
+Phase 1 speed baseline (mock, 600 s quick episodes):
+
+- grid3x3 normal: 20 Operator calls.
+- grid3x3 emergency: 69 calls, 29 Emergency.
+- grid3x3 pedestrians: 159 calls, 113 Pedestrian. This is the main Phase 2 coalescing target.
+
 ### Phase 2: speed
 
-- Reasoning off routine and low on conflict.
-- Schedule persistence, event coalescing, prompt compaction, parallel roles.
-- Add metrics.
+Already in place after Phase 1:
+
+- OpenCode Go accepts `reasoning_effort`; usage parsing exposes reasoning and cached tokens.
+- Per-role `max_tokens` are 300 / 500 / 300.
+- `configs/agents/llm_team.yaml` sets `base_effort: none` and `escalate_effort: low`.
+- Replay cache has a versioned key and a lock.
+- `metrics()` already reports calls, per-role calls, retries, fallbacks, tokens and guard events.
+
+Still to do:
+
+- Emergency schedule persistence per `(EV, TLS)` and code-side release and extension.
+- Event coalescing, especially pedestrian groups and EV cadence.
+- Prompt compaction and deduplication of blackboard context.
+- Parallel role calls with a fixed apply order.
+- Latency percentiles, skipped calls, wall time and estimated cost.
+- One real grid3x3 seed, then replay, then normal and incident checks.
 
 Acceptance:
 
@@ -238,6 +275,13 @@ Acceptance:
 - Calls and input tokens match the targets above.
 - Invalid JSON and fallback rates are no worse than the old team.
 - No regression on normal and incident cells.
+
+Phase 2 preflight:
+
+- Verify the OpenCode key in `.env`.
+- The controller reads `COTRAFFIC_LLM_MAX_CALLS` and `COTRAFFIC_LLM_TIMEOUT`; the legacy `LLM_MAX_CALLS` and `LLM_TIMEOUT_S` names are not read yet.
+- Start with mock, then one tiny real call, then one real seed.
+- Inspect the decision log and metrics before running more seeds.
 
 ### Phase 3: Tunisia
 
@@ -280,20 +324,28 @@ src/cotraffic/controllers/llm_team/
   blackboard.py
   arbiter.py
   directive_layer.py
+  detector.py
   schemas.py
   agent.py
+  client.py
+  roles/__init__.py
   roles/operator.py
   roles/emergency.py
   roles/pedestrian.py
   prompts/operator.md
   prompts/emergency.md
   prompts/pedestrian.md
+src/cotraffic/envs/ev.py
 configs/agents/llm_team.yaml
 configs/experiments/llm_team_ab.yaml
+configs/experiments/llm_team_ab_quick.yaml
+tests/conftest.py
 tests/test_llm_team_schemas.py
 tests/test_llm_team_arbiter.py
+tests/test_llm_team_directive_layer.py
 tests/test_llm_team_supervisor.py
 tests/test_llm_team_controller.py
+tests/test_llm_team_roles.py
 ```
 
 Modify:
@@ -301,33 +353,39 @@ Modify:
 ```
 src/cotraffic/llm/providers.py
 src/cotraffic/controllers/registry.py
+src/cotraffic/envs/observations.py
+src/cotraffic/envs/traffic_env.py
 api/policy.py
 configs/dashboard_policy.yaml
+requirements-dev.txt
+.env.example
 ```
 
 ## 11. Runbook
 
-Use the existing SUMO environment:
+The local venv is not editable, so prefix CLI commands with `PYTHONPATH=src`.
 
 ```bash
-~/.venvs/sumo/bin/python -m pytest tests -q
+PYTHONPATH=src ~/.venvs/sumo/bin/python -m pytest tests -q
 ```
 
 Mock run:
 
 ```bash
-COTRAFFIC_LLM_BACKEND=mock \
+PYTHONPATH=src COTRAFFIC_LLM_BACKEND=mock \
 ~/.venvs/sumo/bin/python -m cotraffic evaluate \
-  --experiment llm_team_ab_quick --jobs 1
+  --experiment llm_team_ab_quick --jobs 1 --force
 ```
 
-One real seed:
+One real seed, with a hard call guard:
 
 ```bash
+PYTHONPATH=src \
 COTRAFFIC_LLM_BACKEND=opencode \
 COTRAFFIC_LLM_PROVIDER=opencode \
 COTRAFFIC_LLM_BASE_URL=https://opencode.ai/zen/go/v1 \
 COTRAFFIC_LLM_MODEL=deepseek-v4.1-flash \
+COTRAFFIC_LLM_MAX_CALLS=60 \
 ~/.venvs/sumo/bin/python -m cotraffic evaluate \
   --experiment llm_team_ab_quick --jobs 1
 ```
@@ -335,10 +393,15 @@ COTRAFFIC_LLM_MODEL=deepseek-v4.1-flash \
 Strict replay:
 
 ```bash
-COTRAFFIC_LLM_BACKEND=replay \
+PYTHONPATH=src COTRAFFIC_LLM_BACKEND=replay \
 ~/.venvs/sumo/bin/python -m cotraffic evaluate \
   --experiment llm_team_ab_quick --jobs 1
 ```
+
+Legacy `.env` note: the OpenCode provider reads `LLM_API_KEY`, `LLM_BASE_URL`,
+`LLM_MODEL` and `LLM_EXTRA_HEADERS` when the `COTRAFFIC_LLM_*` names are absent.
+The controller does not yet read legacy `LLM_MAX_CALLS` or `LLM_TIMEOUT_S`;
+use the `COTRAFFIC_*` names for those.
 
 Rules:
 
@@ -361,7 +424,9 @@ Rules:
 
 ## 13. Fresh session start
 
-Read this file first. Then implement Phase 1 only.
+Read this file first. Then implement Phase 2 only.
+
+Start from `ad5a8b3` on `feat/llm-team-speed`. Do not redo Phase 1.
 
 Rules:
 
@@ -372,5 +437,18 @@ Rules:
 - Use integration's environment, shield, registry and metrics.
 - Keep code compact and comments limited.
 - No em dashes in code, docs or commit messages.
-- Run tests and the mock run before reporting back.
+- Mock and replay before any real seed.
+- Use `--jobs 1` for every LLM run.
+- Do not run two SUMO batches concurrently.
+- Run `pytest tests -q` and the mock matrix before spending tokens.
+- One real seed, inspect calls/tokens/fallbacks, then replay.
+
+Phase 2 first steps:
+
+1. Add Emergency schedule persistence and code-side release and extension.
+2. Coalesce EV events with a 3 to 5 s debounce and pedestrian group events.
+3. Compact the snapshot: one blackboard copy, capped messages and alerts, hot-EV filter, next 2 to 3 TLS.
+4. Run due roles concurrently with a fixed Operator, Emergency, Pedestrian apply order.
+5. Add latency mean/p50/p90, skipped calls, wall time and estimated cost to metrics.
+6. Verify with mock and replay, then one real grid3x3 seed, then normal and incident.
 - Commit only after tests and mock pass.
