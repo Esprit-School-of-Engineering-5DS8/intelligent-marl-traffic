@@ -21,7 +21,7 @@ from cotraffic.assistant.scenario import plan_demo
 router = APIRouter(tags=["assistant"])
 groq = GroqClient()
 
-NETWORKS = ("grid4x4", "real_district")
+NETWORKS = ("grid3x3", "tunis")
 EVENTS = ("emergency", "pedestrians", "incident", "buses")
 RUN_WORDS = re.compile(r"\b(lance|lancer|simule|simuler|run|démarre|demarre)\b", re.IGNORECASE)
 
@@ -40,7 +40,7 @@ def proposed_run(question: str, llm) -> dict[str, Any] | None:
     """A run the user may confirm, read from a demonstration request; never started here."""
     plan = plan_demo(question, llm)
     spec = plan.spec
-    network = "real_district" if spec.network.startswith("real_district") else "grid4x4"
+    network = "tunis" if spec.network.startswith("tunis") else "grid3x3"
     demand = spec.demand if spec.demand in ("low", "medium", "peak") else "peak"
     return {
         "name": "runScenario",
@@ -84,7 +84,7 @@ async def answer(req: ChatRequest) -> AsyncIterator[str]:
             yield sse({"type": "source", "file": source.strip()})
     q = reply.query
     if q.junction:
-        network = q.network if q.network in NETWORKS else "grid4x4"
+        network = q.network if q.network in NETWORKS else "grid3x3"
         call = {"name": "focusIntersection", "args": {"network": network, "junction": q.junction}}
         yield sse({"type": "tool_call", "id": "focus", "call": call})
     elif len(q.methods) >= 2 and q.network and q.scenario and q.demand and q.metric:

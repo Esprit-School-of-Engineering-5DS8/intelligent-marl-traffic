@@ -10,5 +10,12 @@ call_interval_s: 30
 timeout_s: 30
 attempts: 2
 max_tokens: 700
-max_calls: 0
+# Per-episode call budget. A normal evaluation episode runs ~20 min of simulation and is
+# asked once every call_interval_s, so it needs ~40 calls; 48 leaves headroom for a longer
+# episode and still caps a runaway one. Reaching the cap no longer degrades silently: the
+# controller records llm_budget_hit=1 / llm_status=budget and the aggregate drops the cell
+# from the LLM tables (see results/summary/llm_health.csv). Cost of a full episode is
+# roughly max_calls x prompt tokens; lower it with COTRAFFIC_LLM_MAX_CALLS for a cheaper
+# run, and raise call_interval_s to cut calls rather than results.
+max_calls: 48
 fallback: mp

@@ -3,31 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, field_validator
 
+from api.policy import METHODS, NETWORKS
 from api.runs import RunQueue
 from cotraffic.controllers.registry import LEARNED
 from cotraffic.paths import default_checkpoint
-
-ROOT = Path(__file__).resolve().parents[2]
-DATA = ROOT / "frontend" / "public" / "data"
 
 router = APIRouter(tags=["runs"])
 runs = RunQueue()
 
 
 def known_methods() -> set[str]:
-    meta = DATA / "meta.json"
-    return set(json.loads(meta.read_text(encoding="utf-8"))["methods"]) if meta.exists() else set()
+    """Every controller the registry can build (the single source of truth)."""
+    return set(METHODS)
 
 
 class ScenarioRequest(BaseModel):
-    network: Literal["grid4x4", "real_district"]
+    network: str
     demand: Literal["low", "medium", "peak"]
     events: list[Literal["emergency", "pedestrians", "incident", "buses"]] = Field(
         default_factory=list
@@ -35,6 +32,20 @@ class ScenarioRequest(BaseModel):
     seed: int = Field(ge=0, le=999)
     left: str
     right: str
+
+    @field_validator("network")
+    @classmethod
+    def known_network(cls, network: str) -> str:
+        if network not in NETWORKS:
+            raise ValueError(f"unknown network {network}")
+        return network
+
+    @field_validator("left", "right")
+    @classmethod
+    def known_method(cls, method: str) -> str:
+        if method not in METHODS:
+            raise ValueError(f"unknown controller {method}")
+        return method
 
     @field_validator("right")
     @classmethod
@@ -51,10 +62,7 @@ def list_runs() -> list[dict[str, Any]]:
 
 @router.post("/api/runs", status_code=201)
 def create_run(req: ScenarioRequest) -> dict[str, Any]:
-    methods = known_methods()
     for method in (req.left, req.right):
-        if methods and method not in methods:
-            raise HTTPException(422, f"unknown controller {method}")
         if method in LEARNED and not default_checkpoint(method, req.network).exists():
             raise HTTPException(422, f"no trained {method} model for {req.network}")
     return runs.submit(req.model_dump())

@@ -17,15 +17,21 @@ from typing import Any
 
 import yaml
 
-from cotraffic.controllers.registry import BASELINES, LEARNED, LLM
+from cotraffic import config
+from cotraffic.controllers.registry import BASELINES, LEARNED as CORE_LEARNED, LLM
 from cotraffic.paths import RESULTS_DIR, default_checkpoint
+from cotraffic.recipes import list_recipes
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_CONFIG = ROOT / "configs" / "dashboard_policy.yaml"
 POLICY_STATE = RESULTS_DIR / "dashboard_policy.json"
 
+_TRAINABLE_RECIPES = tuple(
+    r["id"] for r in list_recipes() if r.get("trainable") and r["id"] != "base"
+)
+LEARNED = tuple(dict.fromkeys((*CORE_LEARNED, *_TRAINABLE_RECIPES)))
 METHODS = BASELINES + LEARNED + LLM
-NETWORKS = ("grid2x2", "grid3x3", "grid4x4", "real_district")
+NETWORKS = tuple(config.available("networks"))
 LABELS = {
     "ft": "Fixed-time",
     "act": "Actuated",
@@ -39,8 +45,19 @@ LABELS = {
     "coop_eco05": "COOP eco (λ=0.5)",
     "coop_full": "COOP full",
     "dqn": "DQN",
+    "coop_ev": "COOP + EV",
+    "coop_ped": "COOP + Pedestrian",
+    "coop_ev_ped": "COOP + EV + Pedestrian",
+    "ind_ev_ped": "IND + EV + Pedestrian",
     "llm": "LLM controller",
 }
+LABELS.update(
+    {
+        recipe["id"]: recipe.get("label", recipe["id"])
+        for recipe in list_recipes()
+        if recipe["id"] not in LABELS
+    }
+)
 
 _lock = threading.RLock()
 
@@ -52,10 +69,10 @@ def _defaults() -> dict[str, Any]:
         data = {}
     live = data.get("live") or {}
     method = str(live.get("method", "mp"))
-    network = str(live.get("network", "grid4x4"))
+    network = str(live.get("network", "grid3x3"))
     return {
         "method": method if method in METHODS else "mp",
-        "network": network if network in NETWORKS else "grid4x4",
+        "network": network if network in NETWORKS else "grid3x3",
         "checkpoint": str(live.get("checkpoint", "auto")),
     }
 

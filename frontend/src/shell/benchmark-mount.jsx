@@ -25,8 +25,12 @@ import OverviewPage from '@/features/overview/OverviewPage';
 import AgentsPage from '@/features/agents/AgentsPage';
 import LiveMapPage from '@/features/live-map/LiveMapPage';
 import AnalyticsPage from '@/features/analytics/AnalyticsPage';
+import CatalogScenariosPage from '@/features/scenarios/CatalogScenariosPage';
+import TrainingPage from '@/features/training/TrainingPage';
 
 const PAGES = {
+  scenarios: CatalogScenariosPage,
+  training: TrainingPage,
   overview: OverviewPage,
   agents: AgentsPage,
   live: LiveMapPage,
@@ -54,7 +58,7 @@ function View({ tab }) {
 
 let root = null;
 
-export function mountBenchmarkView(container, tab = 'overview') {
+export function mountBenchmarkView(container, tab = 'scenarios') {
   // The benchmark always renders on the KEMETRA light system, even when the rest of the
   // dashboard is set to the dark control-room theme: the tokens are re-declared for this
   // subtree, so no page here inherits the dark palette.
@@ -71,5 +75,5 @@ export function mountBenchmarkView(container, tab = 'overview') {
 
 /** Switch the rendered page; called by the sidebar's benchmark sub-items. */
 export function setBenchmarkTab(tab) {
-  root?.render(<View tab={tab || 'overview'} />);
+  root?.render(<View tab={tab || 'scenarios'} />);
 }

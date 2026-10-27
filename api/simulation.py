@@ -17,6 +17,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import pyproj
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -31,15 +33,46 @@ from cotraffic.networks.build import ensure_network
 from cotraffic.paths import RESULTS_DIR
 
 # The dashboard's scenario ids → cotraffic network names (configs/networks/<name>.yaml).
-SCENARIOS = {"grid-2x2": "grid2x2", "grid-3x3": "grid3x3"}
+# The grids are synthetic (no geography of their own), the OSM networks are real.
+SCENARIOS = {
+    "grid-2x2": "grid2x2",
+    "grid-3x3": "grid3x3",
+    "monaco": "monaco",
+    "tunis": "tunis",
+}
 DEMAND = "medium"
 
-# Where the (normalised) network extents are drawn on the map. The exact figures matter
-# less than the fact that roads and vehicles share the same projection.
-GEO_BOUNDS = {
+# Where the synthetic grids are drawn: a plausible Austin block, so roads and vehicles share
+# a projection. Real networks use the CRS in their own ``<location>`` tag (see
+# ``_geo_projection``).
+GRID_BOUNDS = {
     "grid-2x2": {"west": -97.7245, "east": -97.7192, "south": 30.2649, "north": 30.2704},
     "grid-3x3": {"west": -97.7262, "east": -97.7168, "south": 30.2649, "north": 30.2712},
 }
+
+_osm_bounds: dict[str, dict[str, float]] = {}
+
+
+def _bounds(scenario: str) -> dict[str, float]:
+    """Fallback map extent: the Austin block for grids, the configured bbox otherwise."""
+    if scenario in GRID_BOUNDS:
+        return GRID_BOUNDS[scenario]
+    network = SCENARIOS[scenario]
+    if network not in _osm_bounds:
+        west, south, east, north = config.load("networks", network)["osm"]["bbox"]
+        _osm_bounds[network] = {"west": west, "south": south, "east": east, "north": north}
+    return _osm_bounds[network]
+
+
+def _xy(pair: str) -> tuple[float, float] | None:
+    """Parse a SUMO shape point; nets built in 3D (MoSTScenario) carry x,y,z."""
+    parts = pair.split(",")
+    if len(parts) < 2:
+        return None
+    try:
+        return float(parts[0]), float(parts[1])
+    except ValueError:
+        return None
 
 
 def _net_file(scenario: str) -> Path:
@@ -56,19 +89,44 @@ def _extent(scenario: str) -> tuple[float, float, float, float]:
             continue
         for lane in edge.findall("lane"):
             for pair in (lane.get("shape") or "").split():
-                try:
-                    x, y = (float(value) for value in pair.split(",", 1))
-                except (ValueError, TypeError):
+                point = _xy(pair)
+                if point is None:
                     continue
-                xs.append(x)
-                ys.append(y)
+                xs.append(point[0])
+                ys.append(point[1])
     if not xs or not ys:
         return (0.0, 1.0, 0.0, 1.0)
     return (min(xs), max(xs), min(ys), max(ys))
 
 
+@lru_cache(maxsize=4)
+def _geo_projection(scenario: str) -> tuple[pyproj.Proj, tuple[float, float]] | None:
+    """The network's projected CRS and SUMO's net offset, or ``None`` for a synthetic grid.
+
+    Real networks are built in a projected CRS (UTM zone 32 for both Monaco and Tunis) and
+    SUMO stores their coordinates shifted by ``netOffset``. The net's ``<location>`` tag
+    names that CRS, so inverting it is what puts the roads on the basemap. Stretching the
+    network's bounding box onto the geographic extent instead ignores the meridian
+    convergence and the true scale, which rotated and shifted Monaco by over a kilometre.
+    """
+    location = ET.parse(_net_file(scenario)).getroot().find("location")
+    if location is None:
+        return None
+    params = location.get("projParameter", "!")
+    if params in ("", "!"):
+        return None
+    x_off, y_off = (float(value) for value in (location.get("netOffset") or "0,0").split(",")[:2])
+    return pyproj.Proj(projparams=params), (x_off, y_off)
+
+
 def _project(scenario: str, x: float, y: float) -> list[float]:
-    bounds = GEO_BOUNDS[scenario]
+    """SUMO network coordinates (x, y) → WGS84 [longitude, latitude]."""
+    projection = _geo_projection(scenario)
+    if projection is not None:
+        proj, (x_off, y_off) = projection
+        longitude, latitude = proj(x - x_off, y - y_off, inverse=True)
+        return [round(longitude, 7), round(latitude, 7)]
+    bounds = _bounds(scenario)
     min_x, max_x, min_y, max_y = _extent(scenario)
     span_x = max(max_x - min_x, 1e-6)
     span_y = max(max_y - min_y, 1e-6)
@@ -91,11 +149,10 @@ def network_geojson(scenario: str) -> dict[str, Any]:
         for lane in edge.findall("lane"):
             points = []
             for pair in (lane.get("shape") or "").split():
-                try:
-                    x, y = (float(value) for value in pair.split(",", 1))
-                except (ValueError, TypeError):
+                point = _xy(pair)
+                if point is None:
                     continue
-                points.append(_project(scenario, x, y))
+                points.append(_project(scenario, *point))
             if len(points) >= 2:
                 features.append(
                     {
@@ -141,11 +198,11 @@ class SimulationSession:
 
     def start(self, scenario: str, speed: float = 1) -> dict[str, Any]:
         if scenario not in SCENARIOS:
-            raise ValueError("only grid-2x2 and grid-3x3 support live simulation")
+            raise ValueError(f"{scenario} is not a live scenario")
         active = policy.current()
         method, network = active["method"], SCENARIOS[scenario]
         # The checkpoint must match the network that actually runs, not the one the settings
-        # page was last pointed at: a grid4x4 policy on the 2x2 grid would mis-shape the
+        # page was last pointed at: a grid3x3 policy on the 2x2 grid would mis-shape the
         # observations the trained controller expects.
         ready, reason = policy.availability(method, network)
         if not ready:
@@ -297,6 +354,7 @@ class SimulationSession:
                 compute_observations=controller.needs_observations,
                 protocol=protocol,
             )
+            env.run_id = f"live-{scenario}-{time.strftime('%Y%m%d-%H%M%S')}"
             obs, _ = env.reset(seed=0)
             controller.reset(env)
             with self.lock:

@@ -1,0 +1,68 @@
+name: rl_c1322994
+observation:
+  neighbours: true
+  emergency: true
+  pedestrians: true
+  buses: true
+  forecast: false
+reward:
+  person_weighted: true
+  co2: 0.5
+  ev: 2.0
+  ped: 0.5
+  clip: 5.0
+  base: wait
+ppo:
+  learning_rate: 0.0003
+  n_steps: 256
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  net_arch:
+  - 64
+  - 64
+training:
+  total_timesteps: 500000
+  checkpoint_every: 50000
+  progress_every_s: 15
+  demand_levels:
+  - low
+  - medium
+  - peak
+  - rush_profile
+  scenarios:
+  - emergency
+  - pedestrians
+  - buses
+  quick_timesteps: 3000
+validation:
+  seeds:
+  - 1000
+  demands:
+  - medium
+  - peak
+  last_checkpoints: 4
+description: 'The single RL traffic agent. All situations are active by default —
+  cooperation between intersections (neighbours), emergency vehicles, pedestrians,
+  buses — with the matching runtime overlays and reward terms. Every knob (situations,
+  hyperparameters, reward) is configurable in the Entraînement editor; each saved
+  configuration becomes its own profile (rl_<hash>) with its own checkpoint, so nothing
+  is spread across hard-coded variant names.
+
+  '
+algorithm: ppo
+runtime:
+  overlays:
+  - id: ev_preemption
+    priority: 100
+  - id: pedestrian_service
+    priority: 90
+  - id: mp_fallback
+    priority: 10
+llm: null
+label: Traffic RL

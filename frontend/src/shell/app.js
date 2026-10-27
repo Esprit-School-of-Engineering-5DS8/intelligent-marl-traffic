@@ -101,10 +101,10 @@ const SCENARIOS = {
     place: 'Tunis',
     zone: 'Tunis',
     queuedRoad: 'Tunis · Westbound',
-    mapCenter: [10.1815, 36.8065],
-    mapZoom: 12.8,
-    liveCenter: [10.1815, 36.8065],
-    liveZoom: 15.1,
+    mapCenter: [10.197, 36.806],
+    mapZoom: 12.9,
+    liveCenter: [10.197, 36.806],
+    liveZoom: 13.4,
     // Avenue Jean Jaurès corridor, Tunis.
     route: [
       [10.17761, 36.80653], [10.17751, 36.80637], [10.17745, 36.80618], [10.17748, 36.80584],
@@ -135,7 +135,7 @@ function getScenario() {
 
 let map = null;
 let benchmarkMounted = false;
-let benchmarkTab = 'overview';
+let benchmarkTab = 'scenarios';
 let mapFocusMarker = null;
 
 function resolveToken() {
@@ -297,23 +297,20 @@ function toggleScenarioMenu(trigger) {
   setScenarioMenuOpen(menu, willOpen);
 }
 
-/* The grid scenarios render their own 3D environment, so the Mapbox-only
-   layer toggles have nothing to act on there. */
+/* The Mapbox basemap is disabled product-wide: the live map shows only our SUMO road
+   layout (netconvert network) plus the simulation layers on a plain dark canvas.
+   Keep the menu item visible but inert so the choice is explained, not just missing. */
 function syncLayerMenuAvailability() {
-  const grid = ['grid-2x2', 'grid-3x3'].includes(activeScenario);
   document.querySelectorAll('[data-map-layer]').forEach((option) => {
     const layer = option.dataset.mapLayer;
     if (layer === 'basemap') {
-      option.disabled = grid;
-      option.classList.toggle('is-disabled', grid);
-      option.setAttribute('aria-disabled', String(grid));
-      option.title = grid ? 'Automatically disabled — the 3D grid uses its own environment' : '';
-      // When switching to a grid scenario, force-hide the basemap layer
-      if (grid) {
-        option.setAttribute('aria-checked', 'false');
-        option.classList.remove('is-selected');
-        setMapLayerVisibility('basemap', false);
-      }
+      option.disabled = true;
+      option.classList.add('is-disabled');
+      option.setAttribute('aria-disabled', 'true');
+      option.title = 'Disabled — only the SUMO road layout is shown';
+      option.setAttribute('aria-checked', 'false');
+      option.classList.remove('is-selected');
+      setMapLayerVisibility('basemap', false);
     }
   });
 }
@@ -412,7 +409,7 @@ function retargetSimulation(name) {
     .catch(() => {});
 }
 
-function setScenario(name, { announce = true } = {}) {
+function setScenario(name, { announce = true, retarget = true } = {}) {
   if (!SCENARIOS[name]) return;
   activeScenario = name;
   try {
@@ -429,8 +426,8 @@ function setScenario(name, { announce = true } = {}) {
     mapFocusMarker?.setLngLat(scenario.mapCenter);
   }
   refreshLiveMapScenario();
-  loadSimulationNetwork(activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2');
-  retargetSimulation(activeScenario);
+  loadSimulationNetwork(activeScenario);
+  if (retarget) retargetSimulation(activeScenario);
 
   document.dispatchEvent(new CustomEvent('sumo:scenariochange', {
     detail: { scenario: activeScenario, ...scenario }
@@ -1133,6 +1130,11 @@ document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((link
   });
 });
 
+document.addEventListener('sumo:open-training', () => {
+  setBenchmarkNavOpen(true);
+  document.querySelector('#benchmarkSubnav [data-benchmark-tab="training"]')?.click();
+});
+
 liveLinks.forEach((link) => {
   link.addEventListener('click', () => selectLiveTab(link.dataset.liveTab || ''));
 });
@@ -1443,6 +1445,20 @@ document.getElementById('simulationSpeed')?.addEventListener('click', async (eve
     showToast('Simulation service is offline.');
   }
 });
+
+/* A scenario card starts the backend run, then hands the target scenario and the
+   initial snapshot to the vanilla live map without reloading the shell. */
+document.addEventListener('sumo:launch-scenario', (event) => {
+  const name = event.detail?.scenario;
+  if (!SCENARIOS[name]) return;
+  selectLiveTab('events');
+  window.setTimeout(() => {
+    setScenario(name, { announce: false, retarget: false });
+    if (event.detail?.state) updateSimulationState(event.detail.state);
+  }, 80);
+  connectSimulationSocket();
+  showToast(`Live simulation started on ${SCENARIOS[name].label}.`);
+});
 let activeMapStyle = 'light';
 
 const MAP_STYLES = {
@@ -1698,7 +1714,7 @@ function buildLiveMapScene() {
     });
   }
   if (liveMap.getLayer('live-sumo-road')) liveMap.setLayoutProperty('live-sumo-road', 'visibility', 'visible');
-  loadSimulationNetwork(activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2');
+  loadSimulationNetwork(activeScenario);
   refreshSimulationVehicles(latestSimulationState);
 
   if (!liveMap.getSource('live-fog')) {
@@ -1858,6 +1874,8 @@ function initLiveMap() {
   liveMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
   liveMap.on('load', () => {
     hideLiveMapFallback();
+    // Basemap stays hidden product-wide; re-apply after the style is ready.
+    syncLayerMenuAvailability();
     buildLiveMapScene();
     document.dispatchEvent(new CustomEvent('sumo:livemapready'));
   });

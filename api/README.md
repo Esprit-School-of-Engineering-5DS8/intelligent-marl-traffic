@@ -33,7 +33,7 @@ needs no absolute URLs.
 
 `GET /api/policy` returns the active method, its label, whether it can run here (checkpoint
 present, LLM key configured) and the catalog the UI renders. `PUT /api/policy` accepts
-`{"method": "coop", "network": "grid4x4"}` and answers `422` when the method is unknown or
+`{"method": "coop", "network": "grid3x3"}` and answers `422` when the method is unknown or
 has no checkpoint. Defaults live in `configs/dashboard_policy.yaml`; the last choice is
 persisted to `results/dashboard_policy.json` (gitignored).
 
@@ -55,5 +55,5 @@ curl -s localhost:8000/api/health
 curl -s localhost:8000/api/data/meta
 curl -s localhost:8000/api/policy
 curl -s -X PUT localhost:8000/api/policy -H 'Content-Type: application/json' \
-     -d '{"method":"coop","network":"grid4x4"}'
+     -d '{"method":"coop","network":"grid3x3"}'
 ```

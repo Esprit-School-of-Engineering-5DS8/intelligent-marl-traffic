@@ -1,0 +1,10 @@
+name: ind_ev_ped
+extends: ind
+label: IND + EV + Pedestrian
+description: Independent PPO with EV preemption and pedestrian service overlays.
+runtime:
+  overlays:
+    - id: ev_preemption
+      range_m: 200
+    - id: pedestrian_service
+      wait_s: 30

@@ -1,0 +1,27 @@
+name: rl
+label: Traffic RL
+description: >
+  The single RL traffic agent. All situations are active by default — cooperation
+  between intersections (neighbours), emergency vehicles, pedestrians, buses — with
+  the matching runtime overlays and reward terms. Every knob (situations,
+  hyperparameters, reward) is configurable in the Entraînement editor; each saved
+  configuration becomes its own profile (rl_<hash>) with its own checkpoint, so
+  nothing is spread across hard-coded variant names.
+extends: base
+observation:
+  neighbours: true
+  emergency: true
+  pedestrians: true
+  buses: true
+reward:
+  person_weighted: true
+  co2: 0.5
+  ev: 2.0
+  ped: 0.5
+runtime:
+  overlays:
+    - {id: ev_preemption}
+    - {id: pedestrian_service}
+    - {id: mp_fallback}
+training:
+  scenarios: [emergency, pedestrians, buses]

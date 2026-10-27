@@ -20,6 +20,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { Events } from "./Events";
 import { JunctionPanel } from "./JunctionPanel";
 import { Legend } from "./Legend";
+import LiveControl from "./LiveControl";
 import { NetworkMap } from "./NetworkMap";
 import { fitView, type MapViewState } from "./view";
 
@@ -35,6 +36,7 @@ export default function LiveMapPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title={t("pages.liveMap.title")} description={t("pages.liveMap.description")} />
+      <LiveControl />
       <QueryState query={meta} height={60}>
         {(m) =>
           m.replays.length ? (

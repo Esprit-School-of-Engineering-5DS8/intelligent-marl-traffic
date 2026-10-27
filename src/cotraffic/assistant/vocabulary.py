@@ -26,11 +26,10 @@ METHODS: list[tuple[str, tuple[str, ...]]] = [
     ("ft", (r"\bft\b", r"feux? fixes?", r"temps fixe", r"fixed[ -]time", r"webster")),
 ]
 NETWORKS: list[tuple[str, tuple[str, ...]]] = [
-    ("real_district_ped", (r"real_district_ped", r"quartier avec (des )?trottoirs")),
-    ("grid8x8", (r"8 ?x ?8", r"grid8", r"64 carrefours", r"grande grille")),
-    ("grid2x2", (r"2 ?x ?2", r"grid2")),
-    ("grid4x4", (r"4 ?x ?4", r"grid4", r"\bgrille\b", r"\bgrid\b")),
-    ("real_district", (r"quartier", r"tunis", r"district", r"reel")),
+    ("grid2x2", (r"2 ?x ?2", r"grid2", r"petite grille")),
+    ("grid3x3", (r"3 ?x ?3", r"grid3", r"grille", r"grid")),
+    ("monaco", (r"monaco", r"monte[ -]?carlo", r"principaute")),
+    ("tunis", (r"tunis", r"quartier", r"district", r"reel", r"corridor")),
 ]
 SCENARIOS: list[tuple[str, tuple[str, ...]]] = [
     ("comm_dropout_50", (r"50 ?% (des )?messages", r"comm[ -_]?dropout[ -_]?50")),
@@ -77,10 +76,9 @@ METRIC_FR = {
 HIGHER_IS_BETTER = {"throughput_per_h"}
 NETWORK_FR = {
     "grid2x2": "la grille 2×2",
-    "grid4x4": "la grille 4×4",
-    "grid8x8": "la grille 8×8",
-    "real_district": "le quartier de Tunis",
-    "real_district_ped": "le quartier de Tunis avec trottoirs",
+    "grid3x3": "la grille 3×3",
+    "monaco": "le réseau de Monaco",
+    "tunis": "le corridor de Tunis",
 }
 SCENARIO_FR = {
     "normal": "trafic normal",

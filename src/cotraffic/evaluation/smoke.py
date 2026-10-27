@@ -25,7 +25,7 @@ def check(name: str):
 def _networks() -> str:
     from cotraffic.networks.build import ensure_network
 
-    return ", ".join(ensure_network(n).name for n in ("grid2x2", "grid4x4", "grid8x8"))
+    return ", ".join(ensure_network(n).name for n in ("grid2x2", "grid3x3", "monaco"))
 
 
 @check("random_episode")
@@ -95,19 +95,19 @@ def _quick(
     return row
 
 
-@check("real_district")
-def _real_district() -> str:
+@check("tunis")
+def _tunis() -> str:
     from cotraffic.networks.build import ensure_network
 
-    ensure_network("real_district")
+    ensure_network("tunis")
     # no pedestrians on the district: its OpenStreetMap import has almost no sidewalks
     # (FAILURES F-011); evaluation refuses that scenario there
-    row = _quick("mp", "real_district", ["incident", "emergency", "buses"])
+    row = _quick("mp", "tunis", ["incident", "emergency", "buses"])
     assert row["ev_count"] > 0 and row["bus_count"] > 0 and row["incident_start"] != ""
     return f"7 signals, incident + emergency + buses: travel time {row['mean_travel_time']:.0f}s"
 
 
-@check("scenarios_grid4x4")
+@check("scenarios_grid3x3")
 def _scenarios() -> str:
     from cotraffic.controllers.random_policy import RandomPolicy
     from cotraffic.evaluation.quick import FULL_OBSERVATION
@@ -120,13 +120,13 @@ def _scenarios() -> str:
         "buses": lambda r: r["bus_count"] > 0,
     }
     for scenario, ok in checks.items():
-        row = _quick("mp", "grid4x4", [scenario])
+        row = _quick("mp", "grid3x3", [scenario])
         assert ok(row), f"scenario {scenario} had no effect: {row}"
     for scenario in ("sensor_noise", "comm_dropout_30"):
         ctrl = RandomPolicy()
         ctrl.agent_cfg = FULL_OBSERVATION
         ctrl.needs_observations = True
-        row = _quick("random", "grid4x4", [scenario], controller=ctrl)
+        row = _quick("random", "grid3x3", [scenario], controller=ctrl)
     assert row["messages_lost"] > 0, "comm dropout lost no message"
     return f"{len(checks) + 2} scenarios"
 
@@ -135,7 +135,7 @@ def _scenarios() -> str:
 def _baselines() -> str:
     parts = []
     for method in ("ft", "act", "mp", "ev_rule"):
-        row = _quick(method, "grid4x4", ["emergency"], demand="peak")
+        row = _quick(method, "grid3x3", ["emergency"], demand="peak")
         parts.append(f"{method} {row['mean_travel_time']:.0f}s")
     return ", ".join(parts)
 
@@ -216,8 +216,8 @@ def _assistant() -> str:
     reply = ask("Quel est le meilleur contrôleur à la pointe sur la grille ?", llm=None)
     assert reply.finding.found and reply.finding.table is not None, reply.text
     plan = plan_demo("MP contre COOP-FULL à Tunis avec un accident et des piétons", llm=None)
-    assert plan.spec.network == "real_district_ped" and "--follow-incident" in plan.command
-    return f"best on grid4x4 peak: {reply.finding.table.iloc[0, 0]}; demo: {plan.spec.network}"
+    assert plan.spec.network == "tunis" and "--follow-incident" in plan.command
+    return f"best on grid3x3 peak: {reply.finding.table.iloc[0, 0]}; demo: {plan.spec.network}"
 
 
 @check("dashboard")

@@ -12,24 +12,24 @@ JOBS=${JOBS:-2}
 export LIBSUMO_AS_TRACI=1
 
 $PY -m cotraffic networks --all
-for net in grid4x4 real_district; do
+for net in grid3x3 tunis; do
   [ -f "configs/reward_norm/$net.yaml" ] || $PY -m cotraffic calibrate --net "$net"
 done
 # inflow forecasting (Tier 2) and the Ridge model used by the forecast agent (Tier 3)
-[ -f results/forecasting/ridge_grid4x4.json ] || $PY -m cotraffic forecast --net grid4x4
+[ -f results/forecasting/ridge_grid3x3.json ] || $PY -m cotraffic forecast --net grid3x3
 
 if [ "${TRAIN:-0}" = "1" ]; then
   for agent in ind coop coop_eco05 coop_eco coop_full coop_forecast; do
     for seed in 1 2 3; do
-      [ -f "results/checkpoints/$agent/grid4x4/seed$seed.zip" ] || $PY -m cotraffic train --agent "$agent" --net grid4x4 --seed "$seed"
+      [ -f "results/checkpoints/$agent/grid3x3/seed$seed.zip" ] || $PY -m cotraffic train --agent "$agent" --net grid3x3 --seed "$seed"
     done
   done
   for agent in coop_full_ev1 coop_full_ev4; do  # sensitivity: one training run each
-    [ -f "results/checkpoints/$agent/grid4x4/seed1.zip" ] || $PY -m cotraffic train --agent "$agent" --net grid4x4 --seed 1
+    [ -f "results/checkpoints/$agent/grid3x3/seed1.zip" ] || $PY -m cotraffic train --agent "$agent" --net grid3x3 --seed 1
   done
   for agent in ind coop coop_full; do
     for seed in 1 2 3; do
-      [ -f "results/checkpoints/$agent/real_district/seed$seed.zip" ] || $PY -m cotraffic train --agent "$agent" --net real_district --seed "$seed"
+      [ -f "results/checkpoints/$agent/tunis/seed$seed.zip" ] || $PY -m cotraffic train --agent "$agent" --net tunis --seed "$seed"
     done
   done
   $PY -m cotraffic select --jobs "$JOBS"
@@ -39,8 +39,8 @@ $PY -m cotraffic evaluate --experiment full_matrix --jobs "$JOBS"
 $PY -m cotraffic evaluate --experiment sensitivity --jobs "$JOBS"
 $PY -m cotraffic aggregate
 # feature importance (figure 12): training run t1 of each variant, test seeds 0-4
-[ -f results/summary/importance_coop_full_grid4x4.csv ] || $PY -m cotraffic explain --agent coop_full --net grid4x4 --demand peak --scenarios emergency
-[ -f results/summary/importance_coop_grid4x4.csv ] || $PY -m cotraffic explain --agent coop --net grid4x4 --demand peak --scenarios normal
+[ -f results/summary/importance_coop_full_grid3x3.csv ] || $PY -m cotraffic explain --agent coop_full --net grid3x3 --demand peak --scenarios emergency
+[ -f results/summary/importance_coop_grid3x3.csv ] || $PY -m cotraffic explain --agent coop --net grid3x3 --demand peak --scenarios normal
 $PY -m cotraffic figures
 $PY -m cotraffic tables
 

@@ -62,16 +62,20 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
 
 def cmd_train(args: argparse.Namespace) -> int:
     _libsumo_default()
+    from cotraffic.recipes import load_recipe
     from cotraffic.training.train import train
 
+    name = args.recipe or args.agent
+    recipe = load_recipe(name)
     folder = train(
-        args.agent,
+        recipe.get("name", name),
         args.net,
         args.seed,
         quick=args.quick,
         resume=not args.restart,
         total_timesteps=args.timesteps,
         threads=args.threads,
+        recipe=recipe,
     )
     print(f"training run: {folder}")
     return 0
@@ -262,7 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_episode)
 
     p = sub.add_parser("calibrate-demand", help="sweep the peak demand rate (tuning seeds)")
-    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--net", default="grid3x3")
     p.add_argument("--scales", type=float, nargs="+", default=[1.0, 1.5, 2.0])
     p.add_argument("--methods", nargs="+", default=["ft"])
     p.add_argument("--seeds", type=int, nargs="+", default=[5001])
@@ -271,12 +275,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_calibrate_demand)
 
     p = sub.add_parser("calibrate", help="reward normalisation constants from baseline runs")
-    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--net", default="grid3x3")
     p.set_defaults(func=cmd_calibrate)
 
-    p = sub.add_parser("train", help="train one learned variant (PPO, parameter sharing)")
-    p.add_argument("--agent", default="coop", help="config in configs/agents")
-    p.add_argument("--net", default="grid4x4")
+    p = sub.add_parser("train", help="train one learned recipe (PPO, parameter sharing)")
+    p.add_argument("--agent", default="coop", help="recipe/preset name (configs/recipes or agents)")
+    p.add_argument("--recipe", default=None, help="recipe name or path (overrides --agent)")
+    p.add_argument("--net", default="grid3x3")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--quick", action="store_true", help="a few thousand steps, for smoke tests")
     p.add_argument("--timesteps", type=int, default=None, help="override total agent steps")
@@ -294,7 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("validate", help="compare variants on validation seeds (design choices)")
     p.add_argument("--agents", nargs="+", required=True)
     p.add_argument("--baselines", nargs="*", default=["mp"])
-    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--net", default="grid3x3")
     p.add_argument("--seed", type=int, default=1, help="training seed of the runs")
     p.add_argument("--jobs", type=int, default=2)
     p.set_defaults(func=cmd_validate)
@@ -320,7 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_aggregate)
 
     p = sub.add_parser("forecast", help="inflow forecasting: dataset, models, scores")
-    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--net", default="grid3x3")
     p.add_argument("--seeds", type=int, default=4, help="runs per demand level")
     p.add_argument("--jobs", type=int, default=2)
     p.add_argument("--rebuild", action="store_true")
@@ -328,7 +333,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("explain", help="decision log and feature-group importance of a policy")
     p.add_argument("--agent", default="coop_full")
-    p.add_argument("--net", default="grid4x4")
+    p.add_argument("--net", default="grid3x3")
     p.add_argument(
         "--checkpoint", default=None, help="default: results/checkpoints/<agent>/<net>/seed1.zip"
     )

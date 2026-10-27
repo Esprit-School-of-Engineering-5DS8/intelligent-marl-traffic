@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from cotraffic.assistant.llm import LLMUnavailableError, validate
+from cotraffic.llm.trace import LLMTracer, context_window
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -51,12 +52,14 @@ class BaseProvider:
         timeout_s: float = 30.0,
         attempts: int = 2,
         min_interval_s: float = 0.0,
+        tracer: LLMTracer | None = None,
     ) -> None:
         self.model = model
         self.api_key = api_key
         self.timeout_s = float(timeout_s)
         self.attempts = max(1, int(attempts))
         self.min_interval_s = max(0.0, float(min_interval_s))
+        self.tracer = tracer
         self._last_request_at: float | None = None
 
     def _throttle(self) -> None:
@@ -131,15 +134,31 @@ class BaseProvider:
         ]
         last = ""
         last_error: LLMUnavailableError | None = None
-        for _ in range(self.attempts):
+        window = context_window(self.model)
+        for attempt in range(1, self.attempts + 1):
             started = time.perf_counter()
+            prompt_snapshot = [dict(message) for message in history]
             try:
                 text, prompt_tokens, completion_tokens = self._complete(
                     history, max_tokens, schema
                 )
             except LLMUnavailableError as error:
+                latency_ms = 1000.0 * (time.perf_counter() - started)
                 last_error = error
                 message = str(error)
+                self._trace(
+                    {
+                        "attempt": attempt,
+                        "provider": self.name,
+                        "model": self.model,
+                        "messages": prompt_snapshot,
+                        "schema": dict(schema),
+                        "latency_ms": round(latency_ms, 2),
+                        "error": self._redact(message),
+                        "valid": False,
+                        "context_window_tokens": window,
+                    }
+                )
                 if any(code in message for code in ("HTTP 401", "HTTP 403", "HTTP 429")):
                     raise
                 last = message
@@ -155,13 +174,39 @@ class BaseProvider:
                 continue
             latency_ms = 1000.0 * (time.perf_counter() - started)
             last_error = None
+            value: dict[str, Any] | None = None
+            problems: list[str] = []
             try:
-                value = json.loads(text)
+                parsed = json.loads(text)
             except ValueError:
                 last = f"not JSON: {text[:80]!r}"
             else:
-                problems = validate(value, schema)
+                if isinstance(parsed, dict):
+                    value = parsed
+                    problems = validate(value, schema)
+                else:
+                    problems = ["response is not a JSON object"]
                 if not problems:
+                    self._trace(
+                        {
+                            "attempt": attempt,
+                            "provider": self.name,
+                            "model": self.model,
+                            "messages": prompt_snapshot,
+                            "schema": dict(schema),
+                            "raw_response": text,
+                            "parsed": value,
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": (prompt_tokens or 0) + (completion_tokens or 0),
+                            "latency_ms": round(latency_ms, 2),
+                            "context_window_tokens": window,
+                            "context_utilisation": round(
+                                ((prompt_tokens or 0) + (completion_tokens or 0)) / window, 4
+                            ),
+                            "valid": True,
+                        }
+                    )
                     return LLMResult(
                         value,
                         text,
@@ -170,6 +215,27 @@ class BaseProvider:
                         completion_tokens,
                     )
                 last = "; ".join(problems[:3])
+            self._trace(
+                {
+                    "attempt": attempt,
+                    "provider": self.name,
+                    "model": self.model,
+                    "messages": prompt_snapshot,
+                    "schema": dict(schema),
+                    "raw_response": text,
+                    "parsed": value,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": (prompt_tokens or 0) + (completion_tokens or 0),
+                    "latency_ms": round(latency_ms, 2),
+                    "context_window_tokens": window,
+                    "context_utilisation": round(
+                        ((prompt_tokens or 0) + (completion_tokens or 0)) / window, 4
+                    ),
+                    "valid": False,
+                    "validation_error": last,
+                }
+            )
             history += [
                 {"role": "assistant", "content": text},
                 {
@@ -183,6 +249,10 @@ class BaseProvider:
         if last_error is not None:
             raise last_error
         raise LLMUnavailableError(f"invalid structured output ({last})")
+
+    def _trace(self, event: dict[str, Any]) -> None:
+        if self.tracer is not None:
+            self.tracer.record(event)
 
 
 class GroqProvider(BaseProvider):
@@ -277,6 +347,7 @@ def make_provider(
     model: str | None = None,
     timeout_s: float | None = None,
     attempts: int = 2,
+    tracer: LLMTracer | None = None,
 ) -> BaseProvider:
     """Build the configured provider, or raise ``LLMUnavailableError`` with a clear message."""
     name = (provider or os.environ.get("COTRAFFIC_LLM_PROVIDER") or "groq").lower()
@@ -287,11 +358,11 @@ def make_provider(
         if not key:
             raise LLMUnavailableError("GROQ_API_KEY is not configured")
         chosen = model or os.environ.get("GROQ_MODEL") or DEFAULT_GROQ_MODEL
-        return GroqProvider(chosen, key, timeout, attempts, min_interval)
+        return GroqProvider(chosen, key, timeout, attempts, min_interval, tracer)
     if name == "gemini":
         key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
         if not key:
             raise LLMUnavailableError("GEMINI_API_KEY is not configured")
         chosen = model or os.environ.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
-        return GeminiProvider(chosen, key, timeout, attempts, min_interval)
+        return GeminiProvider(chosen, key, timeout, attempts, min_interval, tracer)
     raise LLMUnavailableError(f"unknown LLM provider {name!r} (expected groq or gemini)")

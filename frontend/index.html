@@ -100,6 +100,8 @@
         <div class="nav-group" data-nav-group="benchmark">
           <button class="nav-item nav-parent" data-nav="Benchmark" aria-expanded="false" aria-controls="benchmarkSubnav"><svg class="ico"><use href="#i-activity"/></svg><span>Benchmark</span><svg class="ico nav-caret"><use href="#i-chevron"/></svg></button>
           <div class="nav-submenu" id="benchmarkSubnav" aria-hidden="true">
+            <button type="button" class="nav-subitem is-active" data-benchmark-tab="scenarios">Scénarios</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="training">Entraînement</button>
             <button type="button" class="nav-subitem" data-benchmark-tab="agents">Agents RL</button>
             <button type="button" class="nav-subitem" data-benchmark-tab="live">Carte en direct</button>
             <button type="button" class="nav-subitem" data-benchmark-tab="compare">Analyse comparative</button>
@@ -569,7 +571,7 @@
                   <button type="button" class="live-tool" data-live-action="layers" aria-label="Map geographic layers" title="Geographic layers" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-layers"/></svg></button>
                   <div class="live-style-menu live-layer-menu" role="menu" aria-label="Geographic layers" hidden>
                     <span class="live-style-menu-title">Map layers</span>
-                    <button type="button" class="live-layer-option is-selected" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="true" aria-disabled="false" title=""><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Buildings, labels and streets</small></span></button>
+                    <button type="button" class="live-layer-option is-disabled" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="false" aria-disabled="true" disabled title="Disabled — only the SUMO road layout is shown"><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Disabled — only the SUMO road layout is shown</small></span></button>
                     <button type="button" class="live-layer-option is-selected" data-map-layer="sumo-road" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>SUMO road layout</strong><small>Netconvert network projected on the map</small></span></button>
                     <button type="button" class="live-layer-option is-selected" data-map-layer="vehicles" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Vehicles</strong><small>Live vehicle models from simulation</small></span></button>
                   </div>

@@ -1,0 +1,8 @@
+name: coop_ev
+extends: coop
+label: COOP + EV preemption
+description: Cooperative PPO with an emergency-vehicle preemption overlay active in training and evaluation.
+runtime:
+  overlays:
+    - id: ev_preemption
+      range_m: 200

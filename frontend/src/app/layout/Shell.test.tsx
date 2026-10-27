@@ -24,7 +24,7 @@ describe("application shell", () => {
       "aria-current",
       "page",
     );
-    expect(document.title).toBe("Paramètres - CoTraffic");
+    expect(document.title).toBe("Paramètres - KEMETRA");
   });
 
   it("shows a not-found page for an unknown address", async () => {

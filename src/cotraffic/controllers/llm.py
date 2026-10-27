@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -20,6 +21,7 @@ from cotraffic.controllers.base import Controller
 from cotraffic.controllers.classical import MaxPressure
 from cotraffic.envs.observations import phase_pressures
 from cotraffic.llm.providers import BaseProvider, make_provider
+from cotraffic.llm.trace import LLMTracer
 
 LOGGER = logging.getLogger("cotraffic.llm")
 
@@ -83,6 +85,8 @@ class LLMController(Controller):
         self._logged_unavailable = False
         self._logged_max_calls = False
         self._metrics: dict[str, Any] = {}
+        self._tracer: LLMTracer | None = None
+        self._trace_summary_written = False
 
     def reset(self, env) -> None:
         self._last_actions = {}
@@ -91,6 +95,17 @@ class LLMController(Controller):
         self._failures = 0
         self._logged_unavailable = False
         self._logged_max_calls = False
+        run_id = str(
+            getattr(env, "run_id", None)
+            or f"adhoc-{time.strftime('%Y%m%d-%H%M%S')}"
+        )
+        self._tracer = LLMTracer(
+            run_id,
+            root=getattr(env, "trace_dir", None),
+            enabled=os.environ.get("COTRAFFIC_LLM_TRACE", "1").lower()
+            not in ("", "0", "false", "no", "off"),
+        )
+        self._trace_summary_written = False
         self._metrics = {
             "llm_provider": self.provider_name,
             "llm_model": "",
@@ -100,11 +115,16 @@ class LLMController(Controller):
             "llm_partial": 0,
             "llm_fallbacks": 0,
             "llm_cache_hits": 0,
+            "llm_errors": 0,
+            "llm_budget_hit": 0,
+            "llm_interval_s": self.interval_s,
+            "llm_max_calls": self.max_calls,
             "llm_latency_ms_total": 0.0,
             "llm_latency_ms_max": 0.0,
             "llm_prompt_tokens": 0,
             "llm_completion_tokens": 0,
             "llm_last_error": "",
+            "llm_trace_path": str(self._tracer.path) if self._tracer else "",
         }
         if self._client is None:
             try:
@@ -113,6 +133,7 @@ class LLMController(Controller):
                     model=self.model_name,
                     timeout_s=self.timeout_s,
                     attempts=self.attempts,
+                    tracer=self._tracer,
                 )
             except LLMUnavailableError as error:
                 self._client_error = str(error)
@@ -126,6 +147,7 @@ class LLMController(Controller):
         agents = sorted(env.intersections)
         if self._last_actions and now < self._next_call:
             self._metrics["llm_cache_hits"] += 1
+            self._trace_event({"event": "cache_hit", "sim_time_s": now, "agents": len(agents)})
             return {agent: int(self._last_actions.get(agent, 0)) for agent in agents}
 
         fallback = self._fallback.act(env, obs)
@@ -134,19 +156,35 @@ class LLMController(Controller):
                 LOGGER.warning("LLM unavailable: %s; using MaxPressure", self._client_error)
                 self._logged_unavailable = True
             self._metrics["llm_fallbacks"] += 1
+            self._trace_event(
+                {
+                    "event": "fallback",
+                    "reason": "unavailable",
+                    "sim_time_s": now,
+                    "error": self._client_error or "",
+                }
+            )
             return fallback
         if now < self._retry_after:
             self._metrics["llm_fallbacks"] += 1
+            self._trace_event(
+                {"event": "fallback", "reason": "retry_backoff", "sim_time_s": now}
+            )
             return fallback
         if self.max_calls and self._metrics["llm_calls"] >= self.max_calls:
             if not self._logged_max_calls:
-                LOGGER.info(
-                    "max_calls=%d reached at sim=%.1fs; using MaxPressure for the rest",
+                LOGGER.warning(
+                    "max_calls=%d reached at sim=%.1fs; the rest of this episode runs on "
+                    "MaxPressure, so its metrics describe the fallback, not the LLM",
                     self.max_calls,
                     now,
                 )
                 self._logged_max_calls = True
+            self._metrics["llm_budget_hit"] = 1
             self._metrics["llm_fallbacks"] += 1
+            self._trace_event(
+                {"event": "fallback", "reason": "budget", "sim_time_s": now}
+            )
             return fallback
 
         call_number = self._metrics["llm_calls"] + 1
@@ -186,6 +224,18 @@ class LLMController(Controller):
             )
             self._metrics["llm_prompt_tokens"] += int(result.prompt_tokens or 0)
             self._metrics["llm_completion_tokens"] += int(result.completion_tokens or 0)
+            self._trace_event(
+                {
+                    "event": "decision",
+                    "sim_time_s": now,
+                    "call": call_number,
+                    "actions": {a: int(v) for a, v in actions.items()},
+                    "missing": int(missing),
+                    "latency_ms": round(float(result.latency_ms), 2),
+                    "prompt_tokens": int(result.prompt_tokens or 0),
+                    "completion_tokens": int(result.completion_tokens or 0),
+                }
+            )
             LOGGER.info(
                 "call %d ok latency=%.0fms tokens=%s/%s partial=%d phases=%s",
                 call_number,
@@ -198,11 +248,22 @@ class LLMController(Controller):
             return {agent: int(actions[agent]) for agent in agents}
         except Exception as error:  # noqa: BLE001 - any provider/schema failure must fall back
             self._metrics["llm_calls"] += 1
+            self._metrics["llm_errors"] += 1
             self._metrics["llm_fallbacks"] += 1
             self._metrics["llm_last_error"] = self._safe_error(error)
             self._failures += 1
             backoff = min(300.0, max(self.interval_s, 10.0) * (2 ** (self._failures - 1)))
             self._retry_after = now + backoff
+            self._trace_event(
+                {
+                    "event": "fallback",
+                    "reason": "error",
+                    "sim_time_s": now,
+                    "call": call_number,
+                    "error": self._metrics["llm_last_error"],
+                    "backoff_s": round(backoff, 1),
+                }
+            )
             LOGGER.warning(
                 "call %d failed (sim=%.1fs): %s; MaxPressure, retry in %.0fs",
                 call_number,
@@ -212,14 +273,67 @@ class LLMController(Controller):
             )
             return fallback
 
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "controller": "llm",
+            "provider": self.provider_name,
+            "model": getattr(self._client, "model", None) or self.model_name or "",
+            "interval_s": self.interval_s,
+            "timeout_s": self.timeout_s,
+            "attempts": self.attempts,
+            "max_tokens": self.max_tokens,
+            "max_calls": self.max_calls,
+            "fallback": self.fallback_name,
+            "safety_shield": True,
+        }
+
     def metrics(self) -> dict[str, Any]:
         calls = int(self._metrics.get("llm_calls", 0))
+        success = int(self._metrics.get("llm_success", 0))
+        errors = int(self._metrics.get("llm_errors", 0))
         total = float(self._metrics.get("llm_latency_ms_total", 0.0))
+        status = self._status(success, errors)
+        if self._tracer is not None and not self._trace_summary_written:
+            self._tracer.write_summary()
+            self._trace_summary_written = True
+        trace = self._tracer.summary() if self._tracer is not None else {}
         return {
             **self._metrics,
+            "llm_trace_path": trace.get("trace_path", self._metrics.get("llm_trace_path", "")),
+            "llm_trace_calls": trace.get("calls", 0),
+            # A round is one decision the model was asked for, not one simulation step:
+            # the steps between calls are cache hits, and a fallback step (a retry backoff
+            # or the tail after the budget) is not a round either.
+            "llm_rounds": calls,
+            "llm_coverage_pct": round(100.0 * success / calls, 1) if calls else 0.0,
             "llm_latency_ms_mean": round(total / calls, 2) if calls else 0.0,
             "llm_latency_ms_max": round(float(self._metrics.get("llm_latency_ms_max", 0.0)), 2),
+            "llm_status": status,
+            "llm_valid": int(status == "ok"),
         }
+
+    def _status(self, success: int, errors: int) -> str:
+        """Whether an episode's metrics describe the LLM or its fallback.
+
+        ``ok`` is the only interpretable state: the provider was ready and the model
+        answered *every* round it was asked in. ``degraded`` means some calls failed
+        (quota, network, invalid JSON), so part of the episode ran on Max-Pressure and
+        the numbers are the fallback's, not the model's; ``budget`` means the
+        per-episode call cap was reached and the tail of the episode is fallback too;
+        ``unavailable`` means no call was ever possible (no API key); ``silent`` means
+        the provider was ready but the model never answered once. Only ``ok`` is a
+        result about the LLM - the others are results about Max-Pressure with an LLM
+        attempt in front of it, and the aggregate drops them.
+        """
+        if not int(self._metrics.get("llm_available", 0)):
+            return "unavailable"
+        if errors:
+            return "degraded"
+        if self._metrics.get("llm_budget_hit"):
+            return "budget"
+        if not success:
+            return "silent"
+        return "ok"
 
     # ------------------------------------------------------------------ prompt state
     def _state(self, env, agents: list[str]) -> dict[str, Any]:
@@ -303,6 +417,16 @@ class LLMController(Controller):
                     continue
                 actions[agent] = phase
         return actions, len(agents) - len(actions)
+
+    def _trace_event(self, event: dict[str, Any]) -> None:
+        if self._tracer is not None:
+            self._tracer.record(
+                {
+                    "provider": self.provider_name,
+                    "model": getattr(self._client, "model", None) or self.model_name or "",
+                    **event,
+                }
+            )
 
     def _safe_error(self, error: Exception) -> str:
         text = f"{type(error).__name__}: {error}"

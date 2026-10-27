@@ -56,7 +56,7 @@ def test_learned_method_without_checkpoint_is_refused():
 
 
 def test_valid_baseline_round_trips():
-    response = client.put("/api/policy", json={"method": "mp", "network": "grid4x4"})
+    response = client.put("/api/policy", json={"method": "mp", "network": "grid3x3"})
     assert response.status_code == 200
     body = response.json()
     assert body["method"] == "mp"

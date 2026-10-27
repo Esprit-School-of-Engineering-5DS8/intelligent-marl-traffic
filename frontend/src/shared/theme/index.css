@@ -200,9 +200,9 @@
   }
 }
 
-/* Form controls. Native <select> keeps its keyboard and screen-reader behaviour, but the
-   operating system paints the closed control: without an appearance reset the benchmark
-   filters fall back to plain HTML widgets inside an otherwise designed page. */
+/* Form controls. The benchmark listboxes use the designed `SelectControl`; native
+   <select> remains for the shell chrome and react-hook-form fields, where an appearance
+   reset keeps the closed control from falling back to the OS widget. */
 @layer base {
   select,
   input,
@@ -210,7 +210,7 @@
     font: inherit;
     color: var(--text);
   }
-  /* the dropdown list itself is OS-drawn, but colours and spacing still apply */
+  /* native option lists are OS-drawn, but colours and spacing still apply */
   option,
   optgroup {
     background: var(--surface);
@@ -257,6 +257,66 @@
   }
   .select-control option {
     padding-block: 4px;
+  }
+  .select-control.is-open {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+  }
+
+  /* The designed listbox that replaces the OS drop-down. It is portalled to the body,
+     so it carries its own data-theme to keep the benchmark's light palette. */
+  .select-menu {
+    position: fixed;
+    z-index: 90;
+    margin: 0;
+    padding: 3px;
+    list-style: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow:
+      0 18px 40px -16px rgb(8 16 26 / 0.45),
+      0 2px 6px rgb(8 16 26 / 0.12);
+    animation: select-menu-in 120ms ease-out;
+  }
+  .select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 9px;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+  }
+  .select-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .select-option.is-active {
+    background: var(--accent-soft);
+  }
+  .select-option[aria-selected="true"] {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .select-option.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  @keyframes select-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   /* text and number fields share the select's box so a form reads as one control set */

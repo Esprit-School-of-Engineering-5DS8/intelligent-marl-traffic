@@ -6,7 +6,7 @@ episode's own metrics are stored with the frames, so the replay's numbers are th
 real run. The window starts 30 s before the first emergency vehicle departs when there is
 one, otherwise 20 min into the measured hour.
 
-    python scripts/record_replay.py --net grid4x4 --scenarios emergency --demand peak \
+    python scripts/record_replay.py --net grid3x3 --scenarios emergency --demand peak \
         --left ft --right coop_full [--seed 3] [--window 480] [--every 2]
 
 Output: frontend/public/data/replays/<net>__<scenarios>__<demand>__s<seed>.json
@@ -142,7 +142,7 @@ def record(method: str, args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--net", default="grid4x4")
+    parser.add_argument("--net", default="grid3x3")
     parser.add_argument("--scenarios", nargs="*", default=["emergency"])
     parser.add_argument("--demand", default="peak")
     parser.add_argument("--seed", type=int, default=3)

@@ -19,6 +19,7 @@ from gymnasium import spaces
 from pettingzoo import ParallelEnv
 
 from cotraffic import config
+from cotraffic.controllers.overlays import build_overlays
 from cotraffic.envs.intersection import Intersection
 from cotraffic.envs.observations import (
     Measurements,
@@ -76,7 +77,14 @@ class CoTrafficEnv(ParallelEnv):
         self.timing = self.protocol["timing"]
         self.delta = float(self.timing["delta_time"])
         self.step_length = float(self.protocol["sumo"]["step_length"])
-        self.shield_cfg = ShieldConfig.from_timing(self.timing)
+        runtime_cfg = dict(agent_cfg.get("runtime") or {})
+        shield_over = dict(runtime_cfg.get("shield") or {})
+        self.shield_cfg = ShieldConfig(
+            float(shield_over.get("min_green", self.timing["min_green"])),
+            float(shield_over.get("max_green", self.timing["max_green"])),
+            float(shield_over.get("max_red", self.timing["max_red"])),
+        )
+        self.overlays = build_overlays(runtime_cfg)
         self.builder = ObservationBuilder(
             self.obs_cfg, self.pad, self.timing, self.protocol["observation"]
         )
@@ -155,6 +163,8 @@ class CoTrafficEnv(ParallelEnv):
                 inter.start(self.now, 0)
 
         self.rewards.reset()
+        for overlay in self.overlays:
+            overlay.reset(self)
         self.ev_ids: set[str] = set()
         self.bus_ids: set[str] = set()
         self.person_ids: set[str] = set()
@@ -181,14 +191,30 @@ class CoTrafficEnv(ParallelEnv):
         conn = self.conn
         now = self.now
         if self.controlled:
+            requested_actions = {
+                aid: (
+                    int(actions[aid])
+                    if actions is not None and aid in actions
+                    else inter.phase
+                )
+                for aid, inter in self.intersections.items()
+                if not inter.in_yellow
+            }
+            effective_actions = dict(requested_actions)
+            for overlay in self.overlays:
+                effective_actions = overlay.apply(self, effective_actions, now)
+
             for aid, inter in self.intersections.items():
                 if inter.in_yellow:
                     continue
-                requested = (
-                    int(actions[aid]) if actions is not None and aid in actions else inter.phase
+                requested = requested_actions[aid]
+                effective = int(effective_actions.get(aid, requested))
+                decision = apply_shield(
+                    effective, self._shield_state(inter, now), self.shield_cfg
                 )
-                decision = apply_shield(requested, self._shield_state(inter, now), self.shield_cfg)
                 self.stats["decisions"] += 1
+                if effective != requested:
+                    self.stats["overlay_overrides"] += 1
                 if decision.reason is not None:
                     self.stats[decision.reason] += 1
                 switched = inter.switch(decision.phase, now)
@@ -199,6 +225,7 @@ class CoTrafficEnv(ParallelEnv):
                             "time": now,
                             "agent": aid,
                             "requested": requested,
+                            "overlaid": effective,
                             "executed": decision.phase,
                             "reason": decision.reason or "",
                         }
@@ -423,6 +450,9 @@ class CoTrafficEnv(ParallelEnv):
         }
         for reason in REASONS:
             s[f"shield_{reason}"] = self.stats[reason]
+        s["overlay_overrides"] = self.stats["overlay_overrides"]
+        for overlay in self.overlays:
+            s.update(overlay.summary())
         if "comm_dropout" in self.runtime:
             d = self.runtime["comm_dropout"]
             s["messages_sent"], s["messages_lost"] = d.sent, d.lost

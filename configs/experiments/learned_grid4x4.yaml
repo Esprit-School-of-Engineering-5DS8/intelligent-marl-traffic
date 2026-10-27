@@ -1,8 +1,0 @@
-name: learned_grid4x4
-description: Learned variants on grid4x4, normal scenario, all demand levels.
-seeds: [0, 1, 2, 3, 4]
-cells:
-  - network: grid4x4
-    methods: [ind, coop, coop_eco05, coop_eco, coop_full]
-    demands: [low, medium, peak, rush_profile]
-    scenarios: [normal]

@@ -8,7 +8,7 @@ seeds:
 - 3
 - 4
 cells:
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -23,7 +23,7 @@ cells:
   - rush_profile
   scenarios:
   - normal
-- network: grid4x4
+- network: grid3x3
   methods:
   - coop_eco05
   - coop_eco
@@ -33,7 +33,7 @@ cells:
   scenarios:
   - normal
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -46,7 +46,7 @@ cells:
   scenarios:
   - emergency
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -59,7 +59,7 @@ cells:
   scenarios:
   - incident
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - mp
   - ind
@@ -69,7 +69,7 @@ cells:
   scenarios:
   - sensor_noise
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - coop
   demands:
@@ -79,7 +79,7 @@ cells:
   - comm_dropout_30
   - comm_dropout_50
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -92,8 +92,8 @@ cells:
   - pedestrians
   - buses
   ssm: false
-- network: grid8x8
-  checkpoint_network: grid4x4
+- network: monaco
+  checkpoint_network: grid3x3
   methods:
   - ft
   - mp
@@ -104,7 +104,7 @@ cells:
   scenarios:
   - normal
   ssm: false
-- network: real_district
+- network: tunis
   methods:
   - ft
   - act
@@ -117,7 +117,7 @@ cells:
   - peak
   scenarios:
   - normal
-- network: real_district
+- network: tunis
   methods:
   - ft
   - act
@@ -130,7 +130,7 @@ cells:
   scenarios:
   - emergency
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -143,7 +143,7 @@ cells:
   scenarios:
   - incident
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -157,7 +157,7 @@ cells:
   scenarios:
   - emergency
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ft
   - act
@@ -170,7 +170,7 @@ cells:
   - pedestrians
   - buses
   ssm: false
-- network: grid4x4
+- network: grid3x3
   methods:
   - ped_rule_mp
   demands:
@@ -178,8 +178,8 @@ cells:
   scenarios:
   - pedestrians
   ssm: false
-- network: grid8x8
-  checkpoint_network: grid4x4
+- network: monaco
+  checkpoint_network: grid3x3
   methods:
   - ft
   - mp
@@ -190,7 +190,7 @@ cells:
   scenarios:
   - normal
   ssm: false
-- network: real_district
+- network: tunis
   methods:
   - ft
   - act
@@ -203,7 +203,7 @@ cells:
   - rush_profile
   scenarios:
   - normal
-- network: real_district
+- network: tunis
   methods:
   - ft
   - act

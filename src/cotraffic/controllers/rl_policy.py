@@ -38,10 +38,36 @@ class LearnedPolicy(Controller):
         algorithm = algorithm_class(self.agent_cfg.get("algorithm", "ppo"))
         self.model = algorithm.load(self.checkpoint, device="cpu")
 
+    def parameters(self) -> dict[str, Any]:
+        """Algorithm hyperparameters and the observation/reward switches that define the
+        variant: an A/B table can then show the one key that actually differs."""
+        algorithm = str(self.agent_cfg.get("algorithm", "ppo"))
+        hyper = dict(self.agent_cfg.get(algorithm, {}))
+        net_arch = hyper.pop("net_arch", None)
+        params: dict[str, Any] = {
+            "controller": self.name,
+            "algorithm": algorithm,
+            "checkpoint": self.checkpoint.name,
+            **hyper,
+        }
+        if net_arch:
+            params["net_arch"] = list(net_arch)
+        for block in ("observation", "reward"):
+            for key, value in (self.agent_cfg.get(block) or {}).items():
+                params[f"{block}.{key}"] = value
+        overlays = (self.agent_cfg.get("runtime") or {}).get("overlays") or []
+        if overlays:
+            params["runtime.overlays"] = [
+                overlay if isinstance(overlay, str) else str(overlay.get("id", overlay))
+                for overlay in overlays
+            ]
+        return params
+
     def reset(self, env) -> None:
         from cotraffic.forecasting.online import attach_forecaster
 
-        attach_forecaster(env, env.network)
+        if getattr(env, "obs_cfg", None) is not None and env.obs_cfg.forecast:
+            attach_forecaster(env, env.network)
         expected = self.model.observation_space.shape
         if env.observation_space(env.possible_agents[0]).shape != expected:
             raise ValueError(

@@ -18,7 +18,7 @@ Usage
     python scripts/build_osm_networks.py --force
 
     # Use the old network name (backward-compatible)
-    python scripts/build_osm_networks.py --nets real_district
+    python scripts/build_osm_networks.py --nets tunis
 
 What it does
 ------------
@@ -48,8 +48,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Networks supported by this helper. real_district is kept for backward compat.
-OSM_NETWORKS = ["monaco", "tunis", "real_district", "real_district_ped"]
+# Networks supported by this helper. tunis is kept for backward compat.
+OSM_NETWORKS = ["monaco", "tunis", "tunis", "tunis"]
 
 
 def build(name: str, force: bool) -> bool:

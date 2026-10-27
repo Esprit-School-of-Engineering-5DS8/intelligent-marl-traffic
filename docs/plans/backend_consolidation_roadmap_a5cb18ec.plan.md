@@ -123,7 +123,7 @@ Today `[api/simulation.py](api/simulation.py)` starts TraCI on `[scenarios/grid_
 3. Run the same loop as `run_episode`: `reset` → `while env.agents: act → step` in a background thread, publishing snapshots for `[frontend/app.js](frontend/app.js)` / `[frontend/sumo-env.js](frontend/sumo-env.js)` (vehicles, signals, time).
 4. Keep response shape stable for `app.js` (`simulationTime`, `vehicles`, `signals`, `status`) to avoid breaking the 3D map initially.
 
-Optional follow-up (Phase 4): extend to `grid4x4` / `real_district` once perf is acceptable.
+Optional follow-up (Phase 4): extend to `grid3x3` / `tunis` once perf is acceptable.
 
 ### 1.3 Control policy API + config (RL vs LLM toggle backend)
 

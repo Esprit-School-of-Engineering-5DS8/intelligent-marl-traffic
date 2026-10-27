@@ -42,6 +42,6 @@ export const useFilters = create<FiltersStore>()(
       setControllers: (controllers) => set({ controllers }),
       setMetric: (metric) => set({ metric }),
     }),
-    { name: "cotraffic-filters", storage: createJSONStorage(() => safeStorage) },
+    { name: "kemetra-filters", storage: createJSONStorage(() => safeStorage) },
   ),
 );

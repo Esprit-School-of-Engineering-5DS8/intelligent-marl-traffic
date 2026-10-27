@@ -34,8 +34,9 @@ EXTRA_DIR = RESULTS_DIR / "extra"  # dashboard measurements, apart from the repo
 FIGURES_DIR = REPO_ROOT / "figures"
 DOCS_DIR = REPO_ROOT / "docs"
 
-# networks without their own trained agents run the agents of the network they derive from
-TRAINED_ON = {"real_district_ped": "real_district", "grid8x8": "grid4x4"}
+# Every network trains its own agents. Kept as a hook for derived networks: map a
+# network to the one whose checkpoints it should run.
+TRAINED_ON: dict[str, str] = {}
 
 
 def default_checkpoint(agent: str, network: str) -> Path:

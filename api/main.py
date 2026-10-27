@@ -30,7 +30,7 @@ if str(SRC) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import assistant, data, policy, runs, simulation
+from api.routes import assistant, catalog, data, jobs, llm, policy, recipes, runs, simulation
 
 DEFAULT_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
 
@@ -50,7 +50,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (data, assistant, runs, simulation, policy):
+    for module in (data, assistant, runs, simulation, policy, catalog, recipes, jobs, llm):
         app.include_router(module.router)
 
     @app.get("/api/health")

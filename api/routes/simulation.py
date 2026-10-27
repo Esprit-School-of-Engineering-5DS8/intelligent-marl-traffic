@@ -3,21 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from api.simulation import network_geojson, session
+from api.simulation import SCENARIOS, network_geojson, session
 
 router = APIRouter(tags=["simulation"])
 
 
 class SimulationRequest(BaseModel):
-    scenario: Literal["grid-2x2", "grid-3x3"] = "grid-2x2"
+    scenario: str = "grid-3x3"
     speed: float = Field(default=1, ge=0.25, le=20)
     count: int = Field(default=1, ge=1, le=600)
+
+    @field_validator("scenario")
+    @classmethod
+    def known_scenario(cls, scenario: str) -> str:
+        if scenario not in SCENARIOS:
+            raise ValueError(f"unknown scenario {scenario}")
+        return scenario
 
 
 @router.get("/api/simulation/state")
@@ -26,7 +33,9 @@ def simulation_state() -> dict[str, Any]:
 
 
 @router.get("/api/simulation/network/{scenario}")
-def simulation_network(scenario: Literal["grid-2x2", "grid-3x3"]) -> JSONResponse:
+def simulation_network(scenario: str) -> JSONResponse:
+    if scenario not in SCENARIOS:
+        raise HTTPException(404, f"unknown scenario {scenario}")
     return JSONResponse(network_geojson(scenario))
 
 

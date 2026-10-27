@@ -21,6 +21,16 @@ class Controller:
         """Extra SUMO files the controller needs, e.g. its signal programs."""
         return []
 
+    def parameters(self) -> dict[str, Any]:
+        """The hyperparameters this controller actually runs with.
+
+        Recorded on every result row, so a table can say *what* produced a number
+        instead of only naming the method. Values must be JSON-serialisable; return the
+        effective ones (after config files, environment overrides and defaults), not the
+        ones that were merely requested.
+        """
+        return {"controller": self.name}
+
     def step_hooks(self) -> list:
         """Callbacks run after every simulation second (``hook(env, now)``)."""
         return []

@@ -6,16 +6,16 @@ classical controller use ``--left mp``, or ``--left ev_rule_mp`` for Max-Pressur
 emergency-vehicle preemption (report, section 8.2).
 
     python scripts/demo_side_by_side.py [--left ft] [--right coop_full]
-        [--checkpoint results/checkpoints/coop_full/real_district/seed1.zip]
-        [--net real_district] [--demand peak] [--scenarios ...] [--seed 3]
+        [--checkpoint results/checkpoints/coop_full/tunis/seed1.zip]
+        [--net tunis] [--demand peak] [--scenarios ...] [--seed 3]
 
     python scripts/demo_side_by_side.py --left llm --right coop --net grid2x2 --demand medium
 
 Scenarios by default: emergency vehicles and buses, plus pedestrians on the networks that
 have sidewalks. The district's OpenStreetMap import has almost none (FAILURES F-011);
-``--net real_district_ped`` is the same district with sidewalks and crossings on every
+``--net tunis`` is the same district with sidewalks and crossings on every
 street, for the demonstration only (not evaluated), driven by the agents trained on
-real_district.
+tunis.
 
 Display only (the simulation is unchanged): dark asphalt, light paving for sidewalks and
 crossings, green blocks; road users drawn as detailed shapes in one colour per type - cars
@@ -600,7 +600,7 @@ def main() -> None:
         default=None,
         help="policy of the learned controller (default: its training run 1 on the network)",
     )
-    parser.add_argument("--net", default="real_district")
+    parser.add_argument("--net", default="tunis")
     parser.add_argument("--demand", default="peak")
     parser.add_argument(
         "--scenarios",
@@ -642,7 +642,7 @@ def main() -> None:
         parser.error(
             f"{args.net} cannot run {', '.join(sorted(excluded & set(args.scenarios)))}: its "
             "OpenStreetMap import has almost no sidewalks (FAILURES F-011); "
-            "pedestrians are on the grids, e.g. --net grid4x4"
+            "pedestrians are on the grids, e.g. --net grid3x3"
         )
     if args.follow_incident and "incident" not in args.scenarios:
         args.scenarios = [*args.scenarios, "incident"]

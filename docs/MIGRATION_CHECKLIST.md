@@ -27,13 +27,13 @@
 - [ ] `curl -s localhost:8000/api/health` → `{"ok": true, ...}`.
 - [ ] `curl -s localhost:8000/api/data/meta` returns the exported meta file.
 - [ ] `GET /api/policy` returns the active method and its availability.
-- [ ] `PUT /api/policy {"method": "coop", "network": "grid4x4"}` → 200 when the checkpoint
+- [ ] `PUT /api/policy {"method": "coop", "network": "grid3x3"}` → 200 when the checkpoint
       exists, `422` when it does not.
 - [ ] `PUT /api/policy {"method": "nope"}` → `422` (unknown method).
-- [ ] `PUT /api/policy {"method": "mp", "network": "grid4x4"}` then
+- [ ] `PUT /api/policy {"method": "mp", "network": "grid3x3"}` then
       `POST /api/simulation/start {"scenario": "grid-2x2"}` → snapshots carry `simulationTime`,
       `vehicles`, `signals`, `status`; `step` accepts an empty body while paused.
-- [ ] A learned method whose checkpoint exists only for `grid4x4` → the 2x2 live run returns
+- [ ] A learned method whose checkpoint exists only for `grid3x3` → the 2x2 live run returns
       `422` (the checkpoint must match the network that runs, not the settings selection).
 - [ ] `PUT /api/policy {"method": "llm"}` with no key → accepted, marked `degraded`, and the
       live run still completes on the Max-Pressure fallback.

@@ -1,13 +1,10 @@
-# Tunis — real-world OSM arterial network (Avenue Habib Bourguiba corridor)
+# Tunis — real-world OSM network, central Tunis (whole city, not just the Bourguiba corridor)
 #
 # Built automatically by `python -m cotraffic networks tunis --force`
 # This is the canonical "Phase 2 real-world" network for the project.
-# It corresponds to what was previously named `real_district` but is now
-# given a proper geographic name.
-#
-# Bounding box (WGS84):
-#   Covers Avenue Mohamed V, Avenue Habib Bourguiba and Rue Jean Jaures
-#   — roughly 1.4 km × 1.3 km of central Tunis arterial corridor.
+# Central Tunis: the lake edge and the port in the north, El Menzah in the east,
+# Bab Saadoun / El Omaria in the west — roughly 5.2 km × 4.3 km with real
+# signalised junctions.
 #
 # To change area: edit osm.bbox (and tls_set/tls_unset), delete
 # sumo_files/tunis/ and run `python -m cotraffic networks tunis --force`.
@@ -15,12 +12,15 @@
 name: tunis
 kind: osm
 description: >
-  Central Tunis – arterial corridor between Avenue Mohamed V, Avenue Habib
-  Bourguiba and Rue Jean Jaures. Built from OpenStreetMap via Overpass API
-  + netconvert. About 1.4 km × 1.3 km with real signalised junctions.
+  Central Tunis – city-scale network from the Tunisian lake through the medina
+  and Avenue Habib Bourguiba to El Menzah. Built from OpenStreetMap via
+  Overpass API + netconvert, arterial and secondary roads only.
 
 osm:
-  bbox: [10.176, 36.800, 10.192, 36.812]   # [west, south, east, north], WGS84
+  # The corridor OpenStreetMap extract is saved next to the network (tunis.osm.xml),
+  # so `cotraffic networks tunis --force` rebuilds offline instead of
+  # downloading Grand Tunis again.
+  bbox: [10.160, 36.785, 10.215, 36.828]   # [west, south, east, north], WGS84
   # Arterial-only: residential streets are unsignalised and would triple the
   # network size without adding meaningful RL decisions.
   road_types:
@@ -51,25 +51,35 @@ pedestrians: true
 unsupported_scenarios: [pedestrians]
 
 padding:
-  lanes_per_side: 3
-  max_phases: 3
-  max_crossings: 4
+  # City-scale rebuild: the biggest signalised junction runs 6 phases, so 8 keeps a margin
+  # (observations are rejected when a junction exceeds the padding, see Monaco).
+  lanes_per_side: 4
+  max_phases: 8
+  max_crossings: 8
+  extra_crossings_unobserved: true
 
 neighbours:
   max_distance_m: 500
 
 demand:
-  peak_vehicles_per_hour: 5200   # calibrated against fixed-time control — see docs/EXPERIMENT_JOURNAL.md
+  # The corridor net (1.4 × 1.3 km, ~112 arterial edges) was calibrated at 5200 veh/h.
+  # The city-scale net (~6x the edges and 13 signalised junctions) takes the rate up
+  # proportionally; re-calibrate with `cotraffic calibrate-demand --net tunis` before
+  # drawing study conclusions at this size.
+  peak_vehicles_per_hour: 13000
   origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
   opposite_side_prob: 0.5
   route_random_factor: 1.3
 
-# Avenue Mohamed V / Avenue Habib Bourguiba through 3 signalised junctions
+# Avenue Mohamed V / Avenue Habib Bourguiba through the signalised junctions
+# (577010716 was absorbed by the junction joining in the city-scale rebuild;
+# 1431945574#0 starts at the junction downstream of 10641416#0 and reaches the
+# old terminus 94346392#5.)
 bus_lines:
   - id: L1
     from_edge: "247165438#0"
     to_edge: "10641416#0"
-    reverse_from_edge: "577010716#1"
+    reverse_from_edge: "1431945574#0"
     reverse_to_edge: "94346392#5"
 
 incident:

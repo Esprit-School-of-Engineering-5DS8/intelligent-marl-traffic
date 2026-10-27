@@ -14,11 +14,11 @@ middle button to rotate; the arrow keys move forward, back and sideways; F switc
 actuated control (``--controller act``). Max-Pressure, the learned agents and the LLM
 controller decide from live measurements, so they need the demo: ``scripts/demo_side_by_side.py``.
 
-    python scripts/open_in_sumo.py [--net real_district] [--demand peak]
+    python scripts/open_in_sumo.py [--net tunis] [--demand peak]
         [--scenarios emergency buses] [--seed 3] [--controller ft] [--quick] [--3d]
 
 Scenarios by default: emergency vehicles and buses, plus pedestrians where the network has
-sidewalks (``--net real_district_ped`` for the district with sidewalks). Colours come from
+sidewalks (``--net tunis`` for the district with sidewalks). Colours come from
 the vehicle types: cars yellow, buses blue, emergency vehicles drawn as white ambulances,
 the accident vehicle magenta. The window stays open at the end.
 """
@@ -75,7 +75,7 @@ def build_command(args: argparse.Namespace, gui: bool = True) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--net", default="real_district")
+    parser.add_argument("--net", default="tunis")
     parser.add_argument("--demand", default="peak")
     parser.add_argument("--scenarios", nargs="*", default=None)
     parser.add_argument("--seed", type=int, default=3)

@@ -159,13 +159,13 @@ Routers live in `api/routes/`; `api/main.py` only assembles the app and CORS.
 
 ```bash
 # 1. networks (only when a config changed)
-python -m cotraffic networks --net grid4x4
+python -m cotraffic networks --net grid3x3
 
 # 2. train one variant, one network, one seed
-python -m cotraffic train --agent coop --net grid4x4 --seed 0
+python -m cotraffic train --agent coop --net grid3x3 --seed 0
 
 # 3. pick the best checkpoint on validation seeds (never evaluation seeds)
-python -m cotraffic select --agent coop --net grid4x4 --seed 0
+python -m cotraffic select --agent coop --net grid3x3 --seed 0
 
 # 4. evaluate an experiment matrix
 python -m cotraffic evaluate --experiment llm_ab --jobs 2
@@ -271,9 +271,12 @@ Fairness constraints to state whenever these numbers are reported:
 Retired-module tests (`test_baselines`, `test_marl_env`, `test_monaco`, `test_multimodal`)
 were replaced by `tests/test_policy_api.py`, which covers the contract the dashboard uses.
 
-Deletion is gated by `docs/MIGRATION_CHECKLIST.md`. Grid networks are generated from
-`configs/networks/`; `scenarios/monaco` is kept only as the source of
-`frontend/public/monaco-network.json` (`frontend/scripts/extract_monaco_network.py`).
+Deletion is gated by `docs/MIGRATION_CHECKLIST.md`. Every network in the catalogue is
+rebuilt from `configs/networks/` (grids by `netgenerate`, OSM networks by `netconvert` from
+a saved extract; `monaco` vendors the published MoSTScenario net); the old `scenarios/monaco`
+builder directory and the `grid4x4` / `grid8x8`
+/ `real_district` / `real_district_ped` networks were removed, leaving `grid2x2`, `grid3x3`,
+`monaco` and `tunis`.
 
 ---
 

@@ -33,6 +33,130 @@ export async function api<T>(
   return parsed.data;
 }
 
+const Bounds = z.object({
+  west: z.number(),
+  south: z.number(),
+  east: z.number(),
+  north: z.number(),
+});
+
+export const CatalogController = z.object({
+  method: z.string(),
+  label: z.string(),
+  learned: z.boolean(),
+  trained: z.boolean(),
+  available: z.boolean(),
+  reason: z.string().nullable(),
+  checkpointPath: z.string().nullable(),
+});
+
+export const CatalogNetwork = z.object({
+  network: z.string(),
+  title: z.string(),
+  description: z.string(),
+  tlsCount: z.number(),
+  edgeCount: z.number(),
+  junctionCount: z.number(),
+  bounds: Bounds,
+  geoBounds: Bounds,
+  measuredWallTimeS: z.number(),
+  runnable: z.boolean(),
+  disabledReason: z.string().nullable(),
+  controllers: z.record(z.string(), CatalogController),
+});
+
+export const CatalogAgent = z.object({
+  name: z.string(),
+  label: z.string(),
+  family: z
+    .enum(["rl", "llm", "legacy"])
+    .optional()
+    .nullable()
+    .transform((value) => value ?? "legacy"),
+  algorithm: z.string(),
+  note: z.string(),
+  source: z.string(),
+  hash: z.string(),
+  overlays: z
+    .array(z.string())
+    .nullish()
+    .transform((value) => value ?? []),
+  trainable: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+export const Catalog = z.object({
+  networks: z.array(CatalogNetwork),
+  agentConfigs: z.array(CatalogAgent),
+  controllers: z.array(
+    z.object({
+      method: z.string(),
+      label: z.string(),
+      learned: z.boolean(),
+    }),
+  ),
+});
+
+export type CatalogNetwork = z.infer<typeof CatalogNetwork>;
+export type CatalogController = z.infer<typeof CatalogController>;
+
+export function useCatalog() {
+  const live = useSettings((s) => s.dataSource) === "live";
+  return useQuery({
+    queryKey: ["catalog"],
+    queryFn: () => api("catalog", Catalog),
+    enabled: live,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+const LlmProvider = z.object({
+  id: z.string(),
+  label: z.string(),
+  available: z.boolean(),
+  models: z.array(
+    z.object({
+      id: z.string(),
+      context_window: z.number().nullish().transform((value) => value ?? 0),
+    }),
+  ).nullish().transform((value) => value ?? []),
+});
+
+const ProvidersResponse = z.object({ providers: z.array(LlmProvider) });
+
+export type LlmProviderList = z.infer<typeof ProvidersResponse>;
+
+export function useLlmProviders() {
+  const live = useSettings((s) => s.dataSource) === "live";
+  return useQuery({
+    queryKey: ["llm-providers"],
+    queryFn: () => api("llm/providers", ProvidersResponse),
+    enabled: live,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+const RecipeResponse = z.object({
+  id: z.string(),
+  hash: z.string(),
+  config: z.record(z.string(), z.unknown()),
+});
+
+export type RecipeResponse = z.infer<typeof RecipeResponse>;
+
+export function useRecipe(recipeId: string) {
+  const live = useSettings((s) => s.dataSource) === "live";
+  return useQuery({
+    queryKey: ["recipe", recipeId],
+    queryFn: () => api(`recipes/${recipeId}`, RecipeResponse),
+    enabled: live && Boolean(recipeId),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 export function useRuns() {
   const live = useSettings((s) => s.dataSource) === "live";
   return useQuery({

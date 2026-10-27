@@ -194,6 +194,17 @@ def build_report_tables(raw_dir: Path = RAW_DIR, summary_dir: Path = SUMMARY_DIR
             table = comparison_table(comp, reference, family)
             if table:
                 lines += [f"### {title}", ""] + table
+        llm = comp[comp["method"] == "llm"]
+        for reference, title in (
+            ("mp", "LLM against Max-Pressure (the controller it falls back to)"),
+            ("ft", "LLM against fixed-time (status quo)"),
+            ("coop", "LLM against the learned cooperative policy"),
+        ):
+            table = comparison_table(llm, reference, "llm")
+            if table:
+                lines += [f"### {title}", ""] + table
+    lines += llm_table(summary_dir)
+    lines += hyperparameter_table(summary_dir, raw)
     lines += failures_table(raw)
     lines += training_table()
     lines += forecast_tables(summary_dir)
@@ -201,6 +212,122 @@ def build_report_tables(raw_dir: Path = RAW_DIR, summary_dir: Path = SUMMARY_DIR
     out = summary_dir / "REPORT_TABLES.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out
+
+
+def _plain(value: object) -> str:
+    """A markdown-cell rendering of one number: NaN as '-' and no trailing '.0'."""
+    if isinstance(value, float):
+        if value != value:
+            return "-"
+        return str(int(value)) if value == int(value) else f"{value:.1f}"
+    return str(value)
+
+
+def llm_table(summary_dir: Path) -> list[str]:
+    """Whether each LLM run described the model or its Max-Pressure fallback, and its cost.
+
+    Without this table a rate-limited cell is indistinguishable from an LLM result; the
+    comparison tables only ever contain rows whose status is ``ok``.
+    """
+    path = summary_dir / "llm_health.csv"
+    if not path.is_file():
+        return []
+    health = pd.read_csv(path)
+    if health.empty:
+        return []
+    ok = int(pd.to_numeric(health.get("llm_valid", 0), errors="coerce").fillna(0).sum())
+    intro = (
+        f"{len(health)} runs of the LLM controller, {ok} of them usable. `ok` means the "
+        "provider was ready and the model answered every round it was asked in; "
+        "`degraded` means some calls failed (quota, network, invalid JSON) and part of "
+        "the episode ran on Max-Pressure; `budget` means the per-episode call cap was "
+        "reached; `unavailable` means no API key. Anything but `ok` measures the fallback, "
+        "so those runs are excluded from `summary.csv` and from the LLM comparisons above."
+    )
+    fields = [
+        ("network", "Network"),
+        ("demand", "Demand"),
+        ("seed", "Seed"),
+        ("llm_status", "Status"),
+        ("llm_valid", "Valid"),
+        ("llm_calls", "Calls"),
+        ("llm_success", "Answered"),
+        ("llm_errors", "Failed"),
+        ("llm_rounds", "Rounds"),
+        ("llm_coverage_pct", "Coverage %"),
+        ("llm_fallbacks", "Fallbacks"),
+        ("llm_prompt_tokens", "Prompt tok"),
+        ("llm_completion_tokens", "Out tok"),
+        ("llm_latency_ms_mean", "Latency ms"),
+        ("llm_last_error", "Last error"),
+    ]
+    present = [(c, h) for c, h in fields if c in health.columns]
+    order = [c for c, _ in present]
+    rows = []
+    for _, r in health.sort_values(
+        [c for c in ("network", "demand", "seed") if c in health.columns]
+    ).iterrows():
+        row = []
+        for column in order:
+            text = _plain(r[column])
+            if column == "llm_last_error":
+                text = text[:60].replace("|", "/")
+            row.append(text)
+        rows.append(row)
+    header = [h for _, h in present]
+    return ["## LLM controller - is the model actually driving?", "", intro, ""] + _table(
+        header, rows
+    )
+
+
+def hyperparameter_table(summary_dir: Path, raw: pd.DataFrame | None = None) -> list[str]:
+    """One row per configuration actually run, with the knobs that produced the numbers."""
+    path = summary_dir / "hyperparameters.csv"
+    params = pd.read_csv(path) if path.is_file() else pd.DataFrame()
+    legacy = 0
+    if raw is not None:
+        # Rows written before every result carried its configuration. Rather than leave
+        # the table out (and let a reader assume the knobs are uninteresting), the report
+        # states that those runs cannot be attributed to a configuration.
+        legacy = (
+            int(raw["parameters"].isna().sum())
+            if "parameters" in raw.columns
+            else len(raw)
+        )
+    if params.empty and not legacy:
+        return []
+    ordered = []
+    grouped = (
+        params.groupby(["method", "variant", "param_hash"], dropna=False)
+        if not params.empty
+        else []
+    )
+    for (method, variant, digest), group in grouped:
+        knobs = " · ".join(
+            f"{r['parameter']}={r['value']}"
+            for _, r in group.sort_values("parameter").iterrows()
+        )
+        ordered.append((str(method), str(variant), str(digest), int(group["runs"].max()), knobs))
+    ordered.sort(key=lambda r: (method_sort_key(r[0]), -r[3], r[2]))
+    rows = [
+        [label(method), variant, digest, str(runs), knobs.replace("|", "/")]
+        for method, variant, digest, runs, knobs in ordered
+    ]
+    intro = (
+        "Every configuration present in `results/raw`, read from each result row's "
+        "`parameters`. `Config` is a digest of the whole parameter set, so rows sharing one "
+        "came from the same model; `Runs` is how many result rows used it. For the learned "
+        "variants the varying keys are the ones named in `configs/agents/*.yaml`."
+    )
+    if legacy:
+        intro += (
+            f" {legacy} run(s) predate the `parameters` column and are not listed: they were "
+            "made before every result row recorded its configuration, and re-deriving their "
+            "knobs from today's config files would describe the configs, not the runs."
+        )
+    header = ["Method", "Variant", "Config", "Runs", "Hyperparameters"]
+    lines = ["## Hyperparameters of every configuration run", "", intro, ""]
+    return lines + (_table(header, rows) if rows else [])
 
 
 def failures_table(raw: pd.DataFrame) -> list[str]:

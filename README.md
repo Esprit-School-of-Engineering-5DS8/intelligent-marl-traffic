@@ -45,7 +45,6 @@ intelligent-marl-traffic/
 │       ├── shared/      #   api client, schemas, ui, charts, i18n, theme tokens
 │       └── shell/       #   vanilla shell, Mapbox/3D env, benchmark island mount
 ├── docs/                # ARCHITECTURE, DESIGN_TOKENS, FRONTEND_ROADMAP, plans/
-├── scenarios/monaco/    # source for the Monaco map JSON (extract_monaco_network.py)
 ├── sumo_files/          # generated SUMO networks (gitignored)
 └── results/             # generated runs, summary, checkpoints (gitignored)
 ```

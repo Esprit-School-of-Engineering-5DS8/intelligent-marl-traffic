@@ -97,7 +97,7 @@ def _record(args: tuple[str, str, int] | tuple[str, str, int, str]) -> pd.DataFr
 
 
 def build_dataset(
-    network: str = "grid4x4",
+    network: str = "grid3x3",
     seeds_per_level: int = 4,
     jobs: int = 2,
     mode: str = "evaluation",

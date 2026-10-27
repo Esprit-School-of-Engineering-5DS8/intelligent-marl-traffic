@@ -24,12 +24,14 @@ import argparse
 import json
 import math
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
+from cotraffic import config
 from cotraffic.networks.build import net_file
 from cotraffic.paths import RESULTS_DIR
 
@@ -39,7 +41,9 @@ SUMMARY = RESULTS_DIR / "summary"
 LOGS = RESULTS_DIR / "logs"
 EXTRA = RESULTS_DIR / "extra"
 TRAINING = RESULTS_DIR / "training"
-NETWORKS = ["grid4x4", "grid8x8", "real_district"]
+# The networks that exist, read from configs/networks rather than repeated here: an
+# exporter with its own list keeps serving a network whose config was deleted.
+NETWORKS = config.available("networks")
 RUN_ID = re.compile(r"^(?P<method>[^_]+(?:_[^_]+)*?)__(?P<network>[^_]+(?:_[^_]+)*?)__")
 
 
@@ -486,6 +490,42 @@ def export_meta(out: Path, summary: pd.DataFrame, extras: dict[str, Any]) -> Non
     write(out, "meta.json", payload)
 
 
+def prune_stale(out: Path, networks: Sequence[str]) -> list[str]:
+    """Delete the exported files of networks that no longer exist in ``configs/networks``.
+
+    Every generated file carries its network in its name, so removing a network otherwise
+    leaves its JSON behind for ever and the dashboard keeps offering scenarios that no run
+    can produce any more (the old grid4x4 and grid8x8 grids).
+    """
+    known = set(networks)
+    targets: list[tuple[Path, int]] = []
+    # Index of the network inside each file's name: the per-cell files are named
+    # <network>__<scenario>__<demand>, the per-run ones keep the run id, in which the
+    # method comes first and the network second.
+    for folder, index in (
+        ("timeseries", 0),
+        ("distributions", 0),
+        ("decisions", 1),
+        ("training", 1),
+        ("replays", 0),
+    ):
+        directory = out / folder
+        if directory.is_dir():
+            targets += [(p, index) for p in sorted(directory.glob("*.json"))]
+    network_dir = out / "networks"
+    if network_dir.is_dir():
+        targets += [(p, -1) for p in sorted(network_dir.glob("*.json"))]
+    removed = []
+    for path, index in targets:
+        parts = path.stem.split("__")
+        name = path.stem if index == -1 else (parts[index] if len(parts) > index else None)
+        if not name or name in known:
+            continue
+        path.unlink()
+        removed.append(str(path.relative_to(out)))
+    return removed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -493,7 +533,9 @@ def main() -> None:
     args = parser.parse_args()
     out: Path = args.out
     out.mkdir(parents=True, exist_ok=True)
-    print(f"exporting to {out}")
+    print(f"exporting to {out} (networks: {', '.join(NETWORKS)})")
+    for name in prune_stale(out, NETWORKS):
+        print(f"  pruned {name} (network no longer exists)")
     summary = export_summary(out)
     export_comparisons(out)
     timeseries = export_timeseries(out)

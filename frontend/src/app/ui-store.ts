@@ -20,7 +20,7 @@ export const useUi = create<UiStore>()(
       setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
     }),
     {
-      name: "cotraffic-ui",
+      name: "kemetra-ui",
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed }),
     },

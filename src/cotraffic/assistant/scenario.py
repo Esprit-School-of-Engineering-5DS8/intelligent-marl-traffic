@@ -2,7 +2,7 @@
 
 "Montre MP contre COOP-FULL à Tunis avec un accident et des piétons" becomes the
 command ``python scripts/demo_side_by_side.py --left mp --right coop_full --net
-real_district_ped --scenarios emergency buses pedestrians incident --follow-incident``.
+tunis --scenarios emergency buses pedestrians incident --follow-incident``.
 
 Keyword matching reads the request; when it recognises nothing, the language model fills a
 JSON object restricted to the values the demo accepts. The result is then checked against
@@ -30,7 +30,7 @@ from cotraffic.paths import REPO_ROOT, default_checkpoint
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
 LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "coop_forecast")
-DEMO_NETWORKS = ("grid4x4", "grid8x8", "real_district", "real_district_ped")
+DEMO_NETWORKS = ("grid3x3", "monaco", "tunis", "tunis")
 DEMO_SCENARIOS = ("emergency", "buses", "pedestrians", "incident", "sensor_noise")
 DEMO_DEMANDS = ("low", "medium", "peak", "rush_profile")
 
@@ -39,7 +39,7 @@ DEMO_DEMANDS = ("low", "medium", "peak", "rush_profile")
 class DemoSpec:
     left: str = "mp"
     right: str = "coop_full"
-    network: str = "real_district"
+    network: str = "tunis"
     demand: str = "peak"
     scenarios: list[str] = field(default_factory=lambda: ["emergency", "buses"])
     seed: int = 3
@@ -133,11 +133,11 @@ by side on the same traffic. Return JSON only. Controllers: ft fixed-time, act a
 Max-Pressure, ev_rule_mp Max-Pressure with emergency preemption, ped_rule_mp Max-Pressure \
 with a pedestrian rule, ind / coop / coop_full learned agents (coop_full handles emergency \
 vehicles, pedestrians and buses). "left" is the classical controller, "right" the learned \
-agent, unless the request says otherwise. Networks: real_district (Tunis district), \
-real_district_ped (Tunis with sidewalks, needed for pedestrians), grid4x4, grid8x8. \
+agent, unless the request says otherwise. Networks: tunis (Tunis district), \
+tunis (Tunis with sidewalks, needed for pedestrians), grid3x3, monaco. \
 Scenarios: emergency (ambulances), buses, pedestrians, incident (accident), sensor_noise. \
 follow_ev: camera follows ambulances. follow_incident: camera on the accident. quick: short \
-episode. Defaults: left mp, right coop_full, network real_district, demand peak, scenarios \
+episode. Defaults: left mp, right coop_full, network tunis, demand peak, scenarios \
 emergency and buses, seed 3."""
 
 
@@ -161,13 +161,13 @@ def parse_llm(text: str, llm: LocalLLM) -> DemoSpec:
 def check(spec: DemoSpec) -> list[str]:
     """Make ``spec`` runnable; returns what was changed and why."""
     notes = []
-    if "pedestrians" in spec.scenarios and spec.network == "real_district":
-        spec.network = "real_district_ped"
+    if "pedestrians" in spec.scenarios and spec.network == "tunis":
+        spec.network = "tunis"
         notes.append(
-            "Piétons demandés sur le quartier : réseau real_district_ped (le quartier avec "
+            "Piétons demandés sur le quartier : réseau tunis (le quartier avec "
             "trottoirs, démonstration seulement)."
         )
-    if spec.network == "real_district_ped" and "pedestrians" not in spec.scenarios:
+    if spec.network == "tunis" and "pedestrians" not in spec.scenarios:
         spec.scenarios.append("pedestrians")  # the reason this variant exists
     for side in ("left", "right"):
         method = getattr(spec, side)

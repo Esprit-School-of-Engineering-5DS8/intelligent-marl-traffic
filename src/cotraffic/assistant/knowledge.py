@@ -104,7 +104,7 @@ def _missing(network: str, scenario: str, demand: str, metric: str) -> Finding:
         f"Nous n'avons pas de résultat pour {cell_name(network, scenario, demand)} "
         f"({metric_name(metric)[0]}). Cellules évaluées sur ce réseau : {hint}."
     )
-    if network == "real_district" and scenario == "pedestrians":
+    if network == "tunis" and scenario == "pedestrians":
         text += (
             " Les piétons ne sont pas évalués sur le quartier : son import n'a presque pas de "
             "trottoirs (FAILURES F-011)."

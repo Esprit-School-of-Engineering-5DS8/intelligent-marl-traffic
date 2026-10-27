@@ -8,6 +8,7 @@ eclipse-sumo==1.27.1
 libsumo==1.27.1
 sumolib==1.27.1
 traci==1.27.1
+pyproj==3.7.2         # the net's <location> CRS, for the live map projection
 
 # multi-agent reinforcement learning
 pettingzoo==1.27.0

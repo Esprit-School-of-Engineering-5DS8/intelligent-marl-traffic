@@ -76,7 +76,7 @@ export const useSettings = create<SettingsStore>()(
     {
       // Keep the key stable so existing preferences survive; new fields fall back to
       // DEFAULT_SETTINGS because persist merges the stored object over the defaults.
-      name: "cotraffic-settings",
+      name: "kemetra-settings",
       version: 3,
       migrate: (persisted) => persisted as Settings,
       storage: createJSONStorage(() => safeStorage),

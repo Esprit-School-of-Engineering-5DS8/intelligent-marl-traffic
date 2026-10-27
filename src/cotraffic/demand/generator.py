@@ -214,10 +214,16 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
     demand_cfg = config.load("demand", request.demand)
     scen_cfg = _scenario_config(request.scenarios)
     vtypes_cfg = config.load_yaml(CONFIG_DIR / "vehicles.yaml")
+    # The road layout itself must be part of the key: swapping a network (e.g. the old
+    # OSM Monaco for the MoSTScenario net) keeps every config value identical while every
+    # edge id changes, and stale routes then reference edges SUMO no longer knows.
+    net_path = ensure_network(request.network)
+    stat = net_path.stat()
     key = _digest(
         [
             GENERATOR_VERSION,
             asdict(request),
+            {"net": net_path.name, "size": stat.st_size, "mtime": int(stat.st_mtime)},
             net_cfg.get("demand"),
             net_cfg.get("bus_lines"),
             net_cfg.get("incident"),

@@ -20,6 +20,9 @@ class FixedTime(Controller):
         super().__init__()
         self.scale = scale
 
+    def parameters(self) -> dict[str, Any]:
+        return {"controller": self.name, "plan": "webster", "scale": self.scale}
+
     def additional_files(self, network: str, demand: str) -> list[Path]:
         return [webster_program(network, demand, self.scale)]
 

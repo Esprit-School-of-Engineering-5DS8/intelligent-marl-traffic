@@ -18,6 +18,7 @@ import os
 import platform
 import re
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from cotraffic.envs.episodes import TrainingEpisodes
 from cotraffic.envs.traffic_env import CoTrafficEnv
 from cotraffic.forecasting.online import attach_forecaster
 from cotraffic.paths import TRAINING_DIR
+from cotraffic.recipes import recipe_hash
 
 CHECKPOINT_RE = re.compile(r"model_(\d+)_steps\.zip$")
 
@@ -64,6 +66,41 @@ def trim_episode_log(path: Path, steps: int) -> int:
     return len(rows) - len(kept)
 
 
+def write_checkpoint_sidecar(
+    checkpoint: Path,
+    recipe: dict[str, Any],
+    network: str,
+    seed: int,
+    *,
+    selected: bool = False,
+    extra: dict[str, Any] | None = None,
+) -> Path:
+    """Write the config that a checkpoint was trained with next to it.
+
+    Without this file ``LearnedPolicy`` falls back to the current YAML, so editing a
+    recipe would silently change the behaviour of an old checkpoint.
+    """
+    checkpoint = Path(checkpoint)
+    record: dict[str, Any] = {
+        "agent": recipe.get("name", checkpoint.parent.parent.name),
+        "network": network,
+        "training_seed": seed,
+        "selected_checkpoint": checkpoint.name,
+        "selected": bool(selected),
+        "recipe_hash": recipe_hash(recipe),
+        "config": recipe,
+        "runtime": recipe.get("runtime", {}),
+        "overlays": recipe.get("runtime", {}).get("overlays", []),
+    }
+    if selected:
+        record["selection"] = {"metric": "mean_travel_time", "episode": "protocol.validation"}
+    if extra:
+        record.update(extra)
+    path = checkpoint.with_suffix(".json")
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    return path
+
+
 def make_vec_env(network: str, agent_cfg: dict[str, Any], quick: bool = False):
     """SB3-compatible vector environment, one slot per intersection."""
     import supersuit as ss
@@ -75,7 +112,8 @@ def make_vec_env(network: str, agent_cfg: dict[str, Any], quick: bool = False):
         network, training["demand_levels"], training["scenarios"], episode_s=float(episode_s)
     )
     env = CoTrafficEnv(network, episodes, agent_cfg, protocol=protocol)
-    attach_forecaster(env, network)
+    if env.obs_cfg.forecast:
+        attach_forecaster(env, network)
     vec = ss.pettingzoo_env_to_vec_env_v1(env)
     vec = ss.concat_vec_envs_v1(vec, 1, num_cpus=0, base_class="stable_baselines3")
     return vec, env
@@ -214,14 +252,16 @@ def train(
     resume: bool = True,
     total_timesteps: int | None = None,
     threads: int = 1,
+    recipe: dict[str, Any] | None = None,
+    extra_callbacks: Sequence[Any] = (),
 ) -> Path:
-    """Train (or continue training) one variant on one network; returns the run folder."""
+    """Train (or continue training) one recipe on one network; returns the run folder."""
     import torch
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
     from stable_baselines3.common.utils import set_random_seed
 
     torch.set_num_threads(threads)
-    cfg = config.load_agent(agent)
+    cfg = recipe or config.load_agent(agent)
     algorithm = cfg.get("algorithm", "ppo")
     Algorithm = algorithm_class(algorithm)
     hyper = dict(cfg[algorithm])
@@ -236,6 +276,21 @@ def train(
 
     vec, env = make_vec_env(network, cfg, quick)
     n_agents = len(env.possible_agents)
+    info_file = folder / "run_info.json"
+    previous_info: dict[str, Any] = {}
+    if info_file.is_file():
+        try:
+            previous_info = json.loads(info_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            previous_info = {}
+    current_hash = recipe_hash(cfg)
+    if previous_info and previous_info.get("recipe_hash") not in (None, current_hash):
+        print(
+            f"[train] {agent}/{network}/seed{seed} | recipe changed "
+            f"({previous_info.get('recipe_hash')} -> {current_hash}); starting a fresh run",
+            flush=True,
+        )
+        resume = False
     existing = list_checkpoints(ckpt_dir) if resume else []
     started = time.strftime("%Y-%m-%d %H:%M:%S")
     if existing:
@@ -270,6 +325,8 @@ def train(
             f"[train] {label} | already at {model.num_timesteps:,}/{total:,} steps",
             flush=True,
         )
+        if existing:
+            write_checkpoint_sidecar(existing[-1][1], cfg, network, seed, extra={"quick": quick})
     else:
         every = max(1, int(training["checkpoint_every"]) // n_agents)
         callbacks = CallbackList(
@@ -282,6 +339,7 @@ def train(
                     total,
                     every_s=float(training.get("progress_every_s", 15)),
                 ),
+                *extra_callbacks,
             ]
         )
         model.learn(
@@ -292,14 +350,10 @@ def train(
         )
         saved = ckpt_dir / f"model_{model.num_timesteps}_steps.zip"
         model.save(saved)
+        write_checkpoint_sidecar(saved, cfg, network, seed, extra={"quick": quick})
         print(f"[train] {label} | saved {saved}", flush=True)
     vec.close()
-    info_file = folder / "run_info.json"
-    history = (
-        json.loads(info_file.read_text(encoding="utf-8")).get("sessions", [])
-        if info_file.is_file()
-        else []
-    )
+    history = list(previous_info.get("sessions", []))
     history.append(
         {
             "started": started,
@@ -315,6 +369,8 @@ def train(
         "quick": quick,
         "n_agents": n_agents,
         "total_timesteps": total,
+        "recipe_hash": current_hash,
+        "overlays": cfg.get("runtime", {}).get("overlays", []),
         "config": cfg,
         "sessions": history,
         "train_wall_time_s": round(sum(s["wall_time_s"] for s in history), 1),

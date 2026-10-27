@@ -1,0 +1,8 @@
+name: learned_grid3x3
+description: Learned variants on grid3x3, normal scenario, all demand levels.
+seeds: [0, 1, 2, 3, 4]
+cells:
+  - network: grid3x3
+    methods: [ind, coop, coop_eco05, coop_eco, coop_full]
+    demands: [low, medium, peak, rush_profile]
+    scenarios: [normal]

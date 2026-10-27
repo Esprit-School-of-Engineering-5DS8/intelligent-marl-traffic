@@ -6,57 +6,57 @@ description: >
 seeds: [0, 1, 2, 3, 4]
 cells:
   # RQ1 - main comparison (SSM on: safety compared on the normal scenario)
-  - network: grid4x4
+  - network: grid3x3
     methods: [ft, act, mp, ind, coop, coop_full]
     demands: [low, medium, peak, rush_profile]
     scenarios: [normal]
   # RQ3 - travel time vs CO2
-  - network: grid4x4
+  - network: grid3x3
     methods: [coop_eco05, coop_eco]
     demands: [medium, peak]
     scenarios: [normal]
     ssm: false          # the Pareto front needs travel time and CO2 only
   # RQ2 - emergency vehicles
-  - network: grid4x4
+  - network: grid3x3
     methods: [ft, act, mp, ev_rule, coop, coop_full]
     demands: [peak]
     scenarios: [emergency]
     ssm: false
   # RQ4 - incident, sensor faults, communication failures
-  - network: grid4x4
+  - network: grid3x3
     methods: [ft, act, mp, ind, coop, coop_full]
     demands: [peak]
     scenarios: [incident]
     ssm: false
-  - network: grid4x4
+  - network: grid3x3
     methods: [mp, ind, coop]
     demands: [peak]
     scenarios: [sensor_noise]
     ssm: false
-  - network: grid4x4
+  - network: grid3x3
     methods: [coop]
     demands: [peak]
     scenarios: [comm_dropout_10, comm_dropout_30, comm_dropout_50]
     ssm: false
   # people
-  - network: grid4x4
+  - network: grid3x3
     methods: [ft, act, mp, coop, coop_full]
     demands: [medium]
     scenarios: [pedestrians, buses]
     ssm: false
   # RQ5 - zero-shot scalability
-  - network: grid8x8
-    checkpoint_network: grid4x4
+  - network: monaco
+    checkpoint_network: grid3x3
     methods: [ft, mp, ind, coop]
     demands: [peak]
     scenarios: [normal]
     ssm: false
   # real district
-  - network: real_district
+  - network: tunis
     methods: [ft, act, mp, ind, coop, coop_full]
     demands: [medium, peak]
     scenarios: [normal]
-  - network: real_district
+  - network: tunis
     methods: [ft, act, mp, ev_rule, coop, coop_full]
     demands: [peak]
     scenarios: [emergency]

@@ -1,0 +1,8 @@
+name: coop_ped
+extends: coop
+label: COOP + pedestrian service
+description: Cooperative PPO with a pedestrian-service overlay active in training and evaluation.
+runtime:
+  overlays:
+    - id: pedestrian_service
+      wait_s: 30

@@ -6,6 +6,6 @@ live:
   # Registry name: mp | ft | act | coop | llm | ...
   method: mp
   # Network the live demo runs on (configs/networks/<network>.yaml).
-  network: grid4x4
+  network: grid3x3
   # "auto" resolves results/checkpoints/<method>/<network>/seed1.zip.
   checkpoint: auto

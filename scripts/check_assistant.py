@@ -22,11 +22,11 @@ from cotraffic.assistant.scenario import parse_rules as demo_rules
 QUESTIONS = [
     (
         "Quel est le meilleur contrôleur à la pointe sur la grille ?",
-        dict(intent="best", network="grid4x4", scenario="normal", demand="peak"),
+        dict(intent="best", network="grid3x3", scenario="normal", demand="peak"),
     ),
     (
         "Compare COOP et MP sur le quartier à la pointe",
-        dict(intent="compare", network="real_district", demand="peak", methods=["coop", "mp"]),
+        dict(intent="compare", network="tunis", demand="peak", methods=["coop", "mp"]),
     ),
     (
         "Quel est le retard des ambulances avec EV-RULE-MP ?",
@@ -48,7 +48,7 @@ QUESTIONS = [
         "Combien de CO2 émet IND à la pointe sur la grille ?",
         dict(
             intent="values",
-            network="grid4x4",
+            network="grid3x3",
             demand="peak",
             metric="co2_total_kg",
             methods=["ind"],
@@ -67,17 +67,17 @@ QUESTIONS = [
     ("Explique l'échec F-009", dict(intent="failure", failure_code="F-009")),
     (
         "Quel contrôleur est le plus rapide sur la grande grille de 64 carrefours ?",
-        dict(intent="best", network="grid8x8"),
+        dict(intent="best", network="monaco"),
     ),
     (
         "Et sur le quartier avec un accident, qui est le meilleur ?",
-        dict(intent="best", network="real_district", scenario="incident"),
+        dict(intent="best", network="tunis", scenario="incident"),
     ),
     (
         "Le débit de MP et d'ACT à demande faible sur la grille",
         dict(
             intent="values",
-            network="grid4x4",
+            network="grid3x3",
             demand="low",
             metric="throughput_per_h",
             methods=["mp", "act"],
@@ -85,7 +85,7 @@ QUESTIONS = [
     ),
     (
         "Quel est l'écart entre feux fixes et COOP-FULL à Tunis en heure de pointe ?",
-        dict(intent="compare", network="real_district", demand="peak", methods=["ft", "coop_full"]),
+        dict(intent="compare", network="tunis", demand="peak", methods=["ft", "coop_full"]),
     ),
 ]
 DEMOS = [
@@ -94,7 +94,7 @@ DEMOS = [
         dict(
             left="mp",
             right="coop_full",
-            network="real_district_ped",
+            network="tunis",
             follow_incident=True,
             has={"incident", "pedestrians"},
         ),
@@ -104,7 +104,7 @@ DEMOS = [
         dict(
             left="ev_rule_mp",
             right="coop_full",
-            network="grid4x4",
+            network="grid3x3",
             follow_ev=True,
             has={"emergency"},
         ),
@@ -113,14 +113,14 @@ DEMOS = [
         "Une démo rapide avec des bus à demande moyenne",
         dict(demand="medium", quick=True, has={"buses"}),
     ),
-    ("Feux fixes contre IND sur la grande grille", dict(left="ft", right="ind", network="grid8x8")),
+    ("Feux fixes contre IND sur la grande grille", dict(left="ft", right="ind", network="monaco")),
     (
         "Compare l'agent indépendant et le coopératif sur le quartier",
-        dict(left="ind", right="coop", network="real_district"),
+        dict(left="ind", right="coop", network="tunis"),
     ),
     (
         "Tunis à l'heure de pointe avec un accident, graine 2",
-        dict(network="real_district", demand="peak", seed=2, has={"incident"}),
+        dict(network="tunis", demand="peak", seed=2, has={"incident"}),
     ),
 ]
 

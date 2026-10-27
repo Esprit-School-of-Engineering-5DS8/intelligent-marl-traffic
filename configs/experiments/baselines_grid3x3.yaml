@@ -1,0 +1,13 @@
+name: baselines_grid3x3
+description: Classical controllers on grid3x3 - first comparison table (M2).
+seeds: [0, 1, 2, 3, 4]
+cells:
+  - network: grid3x3
+    methods: [ft, act, mp]
+    demands: [low, medium, peak, rush_profile]
+    scenarios: [normal]
+  - network: grid3x3
+    methods: [ft, act, mp, ev_rule]
+    demands: [peak]
+    scenarios: [emergency]
+    ssm: false          # safety is compared on the normal scenario

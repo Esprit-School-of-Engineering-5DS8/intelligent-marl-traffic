@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import FreshCompare from "@/features/analytics/FreshCompare";
 import { useComparisons, useDistribution, useMeta } from "@/shared/api/queries";
 import { forest, heatmap, lines } from "@/shared/charts/builders";
 import { ChartCard } from "@/shared/charts/ChartCard";
@@ -199,6 +200,7 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
         </ChartCard>
       </div>
 
+      <FreshCompare />
       <TestsTable rows={scoped} metric={metric} />
       <Distribution meta={meta} />
     </>

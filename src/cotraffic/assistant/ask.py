@@ -143,7 +143,7 @@ _EXAMPLES = [
         "Quel est le meilleur contrôleur à la pointe sur la grille ?",
         {
             "intent": "best",
-            "network": "grid4x4",
+            "network": "grid3x3",
             "scenario": UNSPECIFIED,
             "demand": "peak",
             "metric": UNSPECIFIED,
@@ -154,7 +154,7 @@ _EXAMPLES = [
         "COOP fait-il mieux que Max-Pressure sur le quartier ?",
         {
             "intent": "compare",
-            "network": "real_district",
+            "network": "tunis",
             "scenario": UNSPECIFIED,
             "demand": UNSPECIFIED,
             "metric": UNSPECIFIED,
@@ -170,8 +170,8 @@ ROUTER_PROMPT = (
     "(which inputs an agent relies on), failure (an entry F-0xx of the failure log), help "
     "(anything else). Controllers: ft fixed-time, act actuated, mp Max-Pressure, ev_rule and "
     "ev_rule_mp emergency preemption, ped_rule_mp pedestrian rule, ind, coop, coop_eco, "
-    "coop_full, coop_forecast learned agents. Networks: grid4x4 (the grid, 16 junctions), "
-    'grid8x8 (64 junctions), real_district (the Tunis district). Use "unspecified" when '
+    "coop_full, coop_forecast learned agents. Networks: grid3x3 (the grid, 16 junctions), "
+    'monaco (64 junctions), tunis (the Tunis district). Use "unspecified" when '
     "the question does not say. Examples:\n"
     + "\n".join(f"{q!r} -> {json.dumps(a)}" for q, a in _EXAMPLES)
 )
@@ -229,9 +229,9 @@ def read_question(question: str, llm: LocalLLM | None) -> tuple[Query, str, str]
 
 def complete(q: Query) -> Query:
     """Fill what the question left open with the report's main cells."""
-    q.network = q.network or "grid4x4"
-    if q.network == "real_district_ped":
-        q.network = "real_district"  # the variant with sidewalks is not evaluated
+    q.network = q.network or "grid3x3"
+    if q.network == "tunis":
+        q.network = "tunis"  # the variant with sidewalks is not evaluated
     q.scenario = q.scenario or "normal"
     q.metric = q.metric or SCENARIO_METRIC.get(q.scenario, "mean_travel_time")
     if q.demand is None:
@@ -251,11 +251,11 @@ def lookup(q: Query) -> knowledge.Finding:
         return knowledge.failure(q.failure_code)
     if q.intent == "importance":
         return knowledge.importance(
-            q.methods[0] if q.methods else "coop_full", q.network or "grid4x4"
+            q.methods[0] if q.methods else "coop_full", q.network or "grid3x3"
         )
     if q.intent == "decision":
         agent = next((m for m in q.methods if m in ("ind", "coop", "coop_full")), "coop_full")
-        return knowledge.decision(agent, q.network or "grid4x4", q.time_s, q.junction)
+        return knowledge.decision(agent, q.network or "grid3x3", q.time_s, q.junction)
     if q.intent == "help":
         return knowledge.Finding(HELP)
     q = complete(q)

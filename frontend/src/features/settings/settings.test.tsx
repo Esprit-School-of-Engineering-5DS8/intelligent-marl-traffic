@@ -9,7 +9,7 @@ describe("settings store", () => {
   it("updates, persists and resets", () => {
     useSettings.getState().update({ language: "en", timeUnit: "min" });
     expect(useSettings.getState()).toMatchObject({ language: "en", timeUnit: "min" });
-    expect(window.localStorage.getItem("cotraffic-settings")).toContain('"language":"en"');
+    expect(window.localStorage.getItem("kemetra-settings")).toContain('"language":"en"');
 
     useSettings.getState().reset();
     expect(useSettings.getState()).toMatchObject(DEFAULT_SETTINGS);

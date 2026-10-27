@@ -8,6 +8,8 @@ output files are deleted once the metrics are computed.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 import time
 from collections.abc import Sequence
@@ -52,6 +54,7 @@ def run_episode(
     scale: float = 1.0,
     mode: str = "evaluation",
     extra: bool = False,
+    agent_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Simulate one episode with ``method`` and return (and store) its result row.
 
@@ -61,17 +64,24 @@ def run_episode(
     protocol = config.load_protocol()
     scenarios = [s for s in scenarios if s != "normal"]
     controller = controller or make_controller(method, checkpoint)
+    agent_cfg = (
+        config.deep_merge(controller.agent_cfg, agent_overrides)
+        if agent_overrides
+        else controller.agent_cfg
+    )
     rid = run_id(method, network, scenarios, demand, seed, tag)
     out_dir = RESULTS_DIR / "tmp" / rid
     if out_dir.exists():
         shutil.rmtree(out_dir)
+    # Monaco's 4500 junctions abort SUMO with the SSM device enabled (see BENCHMARK_REDESIGN.md §1 & §8)
+    actual_ssm = False if (network == "monaco" and ssm) else ssm
     episode = evaluation_episode(
         network,
         demand,
         scenarios,
         seed,
         output_dir=out_dir,
-        ssm=ssm,
+        ssm=actual_ssm,
         additional=controller.additional_files(network, demand),
         protocol=protocol,
         quick=quick,
@@ -96,7 +106,7 @@ def run_episode(
     env = CoTrafficEnv(
         network,
         lambda rng: episode,
-        controller.agent_cfg,
+        agent_cfg,
         controlled=controller.controlled,
         runtime_scenarios=runtime,
         step_hooks=hooks,
@@ -104,6 +114,7 @@ def run_episode(
         record_decisions=record_decisions,
         protocol=protocol,
     )
+    env.run_id = rid
     latencies: list[float] = []
     wall = time.perf_counter()
     try:
@@ -129,7 +140,7 @@ def run_episode(
         episode.end_time,
         protocol,
         teleported,
-        ssm,
+        actual_ssm,
         incident,
     )
     extra_metrics: dict[str, float] = {}
@@ -149,6 +160,11 @@ def run_episode(
             on="minute",
             how="left",
         )
+    # The effective hyperparameters of this run, recorded verbatim plus a short digest:
+    # two rows with the same param_hash ran the same configuration, which is what makes
+    # "coop with 64x64 vs coop with 128x128" a checkable claim rather than a memory.
+    parameters = controller.parameters()
+    params_json = json.dumps(parameters, sort_keys=True, default=str)
     row: dict[str, Any] = {
         "run_id": rid,
         "method": method,
@@ -161,6 +177,11 @@ def run_episode(
         "git_commit": git_commit(),
         "quick": quick,
         "demand_scale": scale,
+        "parameters": params_json,
+        "param_hash": hashlib.sha256(params_json.encode("utf-8")).hexdigest()[:12],
+        "overlays": json.dumps(
+            (agent_cfg.get("runtime") or {}).get("overlays", []), sort_keys=True, default=str
+        ),
     }
     row.update(metrics)
     row.update(extra_metrics)
@@ -173,6 +194,12 @@ def run_episode(
             "shield_interventions": sum(summary[k] for k in summary if k.startswith("shield_")),
             **{k: summary[k] for k in summary if k.startswith("shield_")},
             "messages_lost": summary.get("messages_lost", 0),
+            "overlay_overrides": summary.get("overlay_overrides", 0),
+            **{
+                k: summary[k]
+                for k in summary
+                if k.startswith("overlay_") and k != "overlay_overrides"
+            },
             "inference_ms_per_decision": 1000 * float(np.mean(latencies)) / n_agents
             if latencies
             else 0.0,

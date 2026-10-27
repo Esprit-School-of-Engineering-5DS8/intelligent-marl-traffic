@@ -2,7 +2,7 @@
 
 Configs are grouped by kind (``networks``, ``demand``, ``scenarios``, ``agents``,
 ``experiments``) under ``configs/``. A config is referenced either by name
-(``grid4x4``) or by path.
+(``grid3x3``) or by path.
 """
 
 from __future__ import annotations

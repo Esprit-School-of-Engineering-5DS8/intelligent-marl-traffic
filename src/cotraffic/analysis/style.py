@@ -23,6 +23,10 @@ METHOD_LABELS = {
 }
 METHOD_ORDER = list(METHOD_LABELS)
 BASELINE_METHODS = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
+# The LLM is neither scripted nor trained: it has no checkpoint to validate and it costs
+# money per decision, so it is compared as its own family and never lumped with the
+# learned policies (whose CIs resample training runs).
+LLM_METHODS = ("llm",)
 DEMAND_ORDER = ["low", "medium", "peak", "rush_profile"]
 
 # Categorical hues checked for colour-vision deficiency and normal-vision separation in

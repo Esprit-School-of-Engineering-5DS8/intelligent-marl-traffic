@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -16,7 +17,12 @@ from cotraffic.analysis.stats import (
     mann_whitney_p,
     paired_change_ci,
 )
-from cotraffic.analysis.style import BASELINE_METHODS, HIGHER_IS_BETTER, METRIC_LABELS
+from cotraffic.analysis.style import (
+    BASELINE_METHODS,
+    HIGHER_IS_BETTER,
+    LLM_METHODS,
+    METRIC_LABELS,
+)
 from cotraffic.paths import RAW_DIR, SUMMARY_DIR
 
 CELL = ["network", "scenario", "demand"]
@@ -33,6 +39,123 @@ def load_raw(raw_dir: Path = RAW_DIR, allow_quick: bool = False) -> pd.DataFrame
         if quick.any():
             raise ValueError(f"{quick.sum()} quick-mode rows in {raw_dir}; they are not results")
     return df
+
+
+LLM_HEALTH_COLUMNS = (
+    "run_id",
+    "network",
+    "scenario",
+    "demand",
+    "seed",
+    "llm_provider",
+    "llm_model",
+    "llm_calls",
+    "llm_success",
+    "llm_errors",
+    "llm_fallbacks",
+    "llm_rounds",
+    "llm_coverage_pct",
+    "llm_prompt_tokens",
+    "llm_completion_tokens",
+    "llm_latency_ms_mean",
+    "llm_budget_hit",
+    "llm_status",
+    "llm_valid",
+    "llm_last_error",
+)
+
+
+def llm_valid_column(df: pd.DataFrame) -> pd.Series:
+    """1 where an LLM run's metrics describe the LLM rather than its Max-Pressure fallback.
+
+    Runs written after the budget existed carry ``llm_valid`` directly. Older rows are
+    recovered from the same counters: ``llm_calls`` counts every attempt, ``llm_success``
+    only the attempts the model answered, so a cell with zero successful calls (the
+    rate-limited grid3x3 peak cells) is a fallback result whatever it is labelled.
+    """
+    if "llm_valid" in df.columns:
+        return pd.to_numeric(df["llm_valid"], errors="coerce").fillna(0).astype(int)
+    if "llm_success" not in df.columns:
+        return pd.Series(1, index=df.index)
+    success = pd.to_numeric(df["llm_success"], errors="coerce").fillna(0)
+    calls = pd.to_numeric(df.get("llm_calls", 0), errors="coerce").fillna(0)
+    return ((success > 0) & (calls == success)).astype(int)
+
+
+def llm_health(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per LLM run: did the model drive it, and what did that cost?
+
+    Written to ``results/summary/llm_health.csv`` whether or not the cell is usable, so a
+    degraded run is a recorded result instead of a quiet one.
+    """
+    if "method" not in df.columns or not (df["method"] == "llm").any():
+        return pd.DataFrame()
+    sub = df[df["method"] == "llm"].copy()
+    sub["llm_valid"] = llm_valid_column(sub)
+    if "llm_status" not in sub.columns:  # runs written before the verdict existed
+        success = pd.to_numeric(sub.get("llm_success", 0), errors="coerce").fillna(0)
+        calls = pd.to_numeric(sub.get("llm_calls", 0), errors="coerce").fillna(0)
+        available = pd.to_numeric(sub.get("llm_available", 0), errors="coerce").fillna(0)
+        sub["llm_errors"] = (calls - success).clip(lower=0)
+        sub["llm_status"] = np.select(
+            [available == 0, calls > success, success > 0],
+            ["unavailable", "degraded", "ok"],
+            default="silent",
+        )
+    # A round is one decision the model was asked for. Legacy rows counted every fallback
+    # *step* as a round (the steps between calls), which turned a clean run into a 4%
+    # coverage; answered/attempted is the same quantity on both generations of rows.
+    rounds = pd.to_numeric(sub.get("llm_calls", 0), errors="coerce").fillna(0)
+    answered = pd.to_numeric(sub.get("llm_success", 0), errors="coerce").fillna(0)
+    sub["llm_rounds"] = rounds
+    sub["llm_coverage_pct"] = np.where(rounds > 0, 100.0 * answered / rounds, 0.0).round(1)
+    keep = [c for c in LLM_HEALTH_COLUMNS if c in sub.columns]
+    return sub[keep].sort_values(["network", "demand", "seed"]).reset_index(drop=True)
+
+
+def valid_only(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows the statistics are allowed to use: LLM cells only when they are LLM results."""
+    if "method" not in df.columns:
+        return df
+    invalid = (df["method"] == "llm") & (llm_valid_column(df) != 1)
+    return df[~invalid]
+
+
+def hyperparameters(df: pd.DataFrame) -> pd.DataFrame:
+    """Long table: one row per (configuration, hyperparameter) of the runs in ``df``.
+
+    ``param_hash`` is a digest of the full parameter set and ``runs`` counts the result
+    rows that share it, so the table answers both "what were the knobs?" and "which of
+    these numbers came from the same model?".
+    """
+    if "parameters" not in df.columns:
+        return pd.DataFrame()
+    digest = (
+        df["param_hash"].astype(str)
+        if "param_hash" in df.columns
+        else df["parameters"].astype(str)
+    )
+    frame = df.assign(_params=df["parameters"].astype(str), _digest=digest)
+    rows = []
+    for (method, variant, key), group in frame.groupby(
+        ["method", "variant", "_digest"], dropna=False
+    ):
+        try:
+            params = json.loads(group["_params"].iloc[0])
+        except (TypeError, ValueError):
+            continue
+        for name, value in sorted(params.items()):
+            rows.append(
+                {
+                    "method": method,
+                    "variant": variant,
+                    "param_hash": key,
+                    "runs": len(group),
+                    "parameter": name,
+                    "value": value,
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 def core_cells(experiment: str = "core") -> set[tuple[str, str, str, str]]:
@@ -85,6 +208,9 @@ def assign_families(
             comp["network"], comp["scenario"], comp["demand"], comp["method"], strict=True
         )
     ]
+    # The LLM comparisons are their own family: they are a different kind of claim (costly
+    # external model vs controller) and must not move the report's corrected p-values.
+    comp.loc[comp["comparison"].astype(str).str.startswith("llm_"), "family"] = "llm"
     comp["p_holm"] = comp.groupby(["comparison", "family"])["p_value"].transform(
         lambda p: pd.Series(holm(p.tolist()), index=p.index)
     )
@@ -211,13 +337,30 @@ def run_aggregate(
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     core = core_cells()
-    summary = summarise(df)
+    health = llm_health(df)
+    if not health.empty:
+        path = out_dir / "llm_health.csv"
+        health.to_csv(path, index=False)
+        written.append(path)
+    params = hyperparameters(df)
+    if not params.empty:
+        path = out_dir / "hyperparameters.csv"
+        params.to_csv(path, index=False)
+        written.append(path)
+    # An LLM cell that never reached the model measured Max-Pressure, so it is reported in
+    # llm_health.csv but kept out of every table that claims to be about the LLM.
+    stats = valid_only(df)
+    dropped = len(df) - len(stats)
+    if dropped:
+        print(f"aggregate: {dropped} LLM run(s) dropped as fallback-only; see llm_health.csv")
+    summary = summarise(stats)
     path = out_dir / "summary.csv"
     summary.to_csv(path, index=False)
     written.append(path)
-    methods = sorted(df["method"].unique())
-    learned = [m for m in methods if m not in BASELINE_METHODS]
+    methods = sorted(stats["method"].unique())
+    learned = [m for m in methods if m not in BASELINE_METHODS and m not in LLM_METHODS]
     baselines = [m for m in methods if m in BASELINE_METHODS]
+    llm = [m for m in methods if m in LLM_METHODS]
     for metric in (
         "mean_travel_time",
         "mean_waiting_time",
@@ -226,17 +369,26 @@ def run_aggregate(
         "person_weighted_delay",
         "ped_mean_waiting_time",
     ):
-        if metric not in df.columns:
+        if metric not in stats.columns:
             continue
         tables = [
-            compare(df, metric, [m for m in baselines if m != "ft"], "ft").assign(
+            compare(stats, metric, [m for m in baselines if m != "ft"], "ft").assign(
                 comparison="baselines_vs_ft"
             )
         ]
+        if llm:
+            # Max-Pressure is the LLM's own fallback, so it is the reference that says
+            # whether the model adds anything over the cheap controller it degrades to.
+            tables.append(compare(stats, metric, llm, "mp").assign(comparison="llm_vs_mp"))
+            tables.append(compare(stats, metric, llm, "ft").assign(comparison="llm_vs_ft"))
+            if "coop" in methods:
+                tables.append(compare(stats, metric, llm, "coop").assign(comparison="llm_vs_coop"))
         if learned:
             tables += [
-                compare(df, metric, learned, "best_baseline").assign(comparison="learned_vs_best"),
-                compare(df, metric, learned, "ft").assign(comparison="learned_vs_ft"),
+                compare(stats, metric, learned, "best_baseline").assign(
+                    comparison="learned_vs_best"
+                ),
+                compare(stats, metric, learned, "ft").assign(comparison="learned_vs_ft"),
             ]
         tables = [t for t in tables if not t.empty and "p_value" in t]
         if not tables:
@@ -249,4 +401,23 @@ def run_aggregate(
     path = out_dir / "run_counts.csv"
     counts.to_csv(path, index=False)
     written.append(path)
+    _prune_derived(out_dir, written)
     return written
+
+
+OWNED_PATTERNS = ("comparisons_*.csv", "llm_health.csv", "hyperparameters.csv")
+
+
+def _prune_derived(out_dir: Path, written: Sequence[Path]) -> None:
+    """Delete this step's previous outputs that the new raw data no longer produces.
+
+    A metric that disappears with its runs (EV delay and pedestrian waits only existed on
+    the retired networks) stops being written, and a left-over CSV of it keeps feeding the
+    dashboard and the report: they list cells for a scenario nothing can produce any more.
+    """
+    keep = {Path(p).resolve() for p in written}
+    for pattern in OWNED_PATTERNS:
+        for path in out_dir.glob(pattern):
+            if path.resolve() not in keep:
+                path.unlink()
+                print(f"aggregate: removed stale {path.name} (no runs left for it)")

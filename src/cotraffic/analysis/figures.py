@@ -135,10 +135,10 @@ def _bars(
         ax.set_ylim(0, top * (1.12 + 0.07 * ((n + 1) // 2)))
 
 
-NETWORK_ORDER = ("grid4x4", "real_district", "grid8x8")
+NETWORK_ORDER = ("grid3x3", "tunis", "monaco")
 
 
-def _networks(df: pd.DataFrame, exclude: tuple[str, ...] = ("grid8x8",)) -> list[str]:
+def _networks(df: pd.DataFrame, exclude: tuple[str, ...] = ("monaco",)) -> list[str]:
     """Networks present in ``df``, in the report's order."""
     if df.empty:
         return []
@@ -197,7 +197,7 @@ class Data:
 def fig01_training_curves(d: Data) -> Path | None:
     """One panel per demand level: training episodes draw a random level, so a single
     curve would mostly show which levels happened to be drawn."""
-    net = "grid4x4"
+    net = "grid3x3"
     runs = {}
     for agent in LEARNED:
         logs = [
@@ -254,7 +254,7 @@ def fig01_training_curves(d: Data) -> Path | None:
     axes[0, 0].set_ylabel("Halting vehicles at the signals")
     axes[0, 0].legend()
     fig.suptitle(
-        "Training on grid4x4 - episodes of each demand level (rolling mean of 3), "
+        "Training on grid3x3 - episodes of each demand level (rolling mean of 3), "
         "mean ± std over seeds",
         fontsize=9,
         color=TEXT_SECONDARY,
@@ -288,7 +288,7 @@ def fig02_travel_time(d: Data) -> Path | None:
 
 
 def fig03_improvement_heatmap(d: Data) -> Path | None:
-    cell = d.cell(network="grid4x4")
+    cell = d.cell(network="grid3x3")
     if cell.empty or "ft" not in set(cell["method"]):
         return None
     means = (
@@ -331,7 +331,7 @@ def fig03_improvement_heatmap(d: Data) -> Path | None:
                 ax.text(j, i, f"{v:+.0f}%", ha="center", va="center", fontsize=7, color=ink)
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
     cbar.set_label("Travel time improvement vs FT (%) - blue = better")
-    ax.set_title("grid4x4 - change in mean travel time against fixed-time control")
+    ax.set_title("grid3x3 - change in mean travel time against fixed-time control")
     fig.tight_layout()
     return _save(fig, "fig03_improvement_heatmap")
 
@@ -339,21 +339,21 @@ def fig03_improvement_heatmap(d: Data) -> Path | None:
 def fig04_pareto(d: Data) -> Path | None:
     panels = []
     for demand in ("medium", "peak"):
-        cell = d.cell(network="grid4x4", scenario="normal", demand=demand)
+        cell = d.cell(network="grid3x3", scenario="normal", demand=demand)
         if not cell.empty and {"coop", "coop_eco"} & set(cell["method"]):
             panels.append(demand)
     if not panels:
         return None
     fig, axes = plt.subplots(1, len(panels), figsize=(5 * len(panels), 3.8), squeeze=False)
     for ax, demand in zip(axes[0], panels, strict=True):
-        cell = d.cell(network="grid4x4", scenario="normal", demand=demand)
+        cell = d.cell(network="grid3x3", scenario="normal", demand=demand)
         for method in _methods(cell["method"]):
             x = d.ci(
-                "co2_g_per_km", network="grid4x4", scenario="normal", demand=demand, method=method
+                "co2_g_per_km", network="grid3x3", scenario="normal", demand=demand, method=method
             )
             y = d.ci(
                 "mean_travel_time",
-                network="grid4x4",
+                network="grid3x3",
                 scenario="normal",
                 demand=demand,
                 method=method,
@@ -381,14 +381,14 @@ def fig04_pareto(d: Data) -> Path | None:
                 (
                     d.ci(
                         "co2_g_per_km",
-                        network="grid4x4",
+                        network="grid3x3",
                         scenario="normal",
                         demand=demand,
                         method=m,
                     )[0],
                     d.ci(
                         "mean_travel_time",
-                        network="grid4x4",
+                        network="grid3x3",
                         scenario="normal",
                         demand=demand,
                         method=m,
@@ -399,7 +399,7 @@ def fig04_pareto(d: Data) -> Path | None:
             ax.plot(*zip(*pts, strict=True), color=TEXT_SECONDARY, linewidth=1, zorder=0)
         ax.set_xlabel("CO2 (g/km)")
         ax.set_ylabel("Mean travel time (s)")
-        ax.set_title(f"Travel time vs CO2 - grid4x4, {demand}")
+        ax.set_title(f"Travel time vs CO2 - grid3x3, {demand}")
         ax.legend(fontsize=7)
     fig.tight_layout()
     return _save(fig, "fig04_pareto_travel_time_co2")
@@ -444,7 +444,7 @@ def _mean_series(d: Data, cell: pd.DataFrame, column: str) -> pd.Series | None:
 
 
 def fig06_incident(d: Data) -> Path | None:
-    cell = d.cell(network="grid4x4", scenario="incident", demand="peak")
+    cell = d.cell(network="grid3x3", scenario="incident", demand="peak")
     if cell.empty:
         return None
     fig, (local, network) = plt.subplots(2, 1, figsize=(8, 5.4), sharex=True)
@@ -476,7 +476,7 @@ def fig06_incident(d: Data) -> Path | None:
             transform=local.get_xaxis_transform(),
         )
     local.set_ylabel("Halting on the blocked approach")
-    local.set_title("Incident on grid4x4 at peak demand - mean over runs")
+    local.set_title("Incident on grid3x3 at peak demand - mean over runs")
     local.legend(ncol=3)
     network.set_xlabel("Simulation time (min)")
     network.set_ylabel("Halting in the network")
@@ -485,7 +485,7 @@ def fig06_incident(d: Data) -> Path | None:
 
 
 def fig07_rush_profile(d: Data) -> Path | None:
-    cell = d.cell(network="grid4x4", scenario="normal", demand="rush_profile")
+    cell = d.cell(network="grid3x3", scenario="normal", demand="rush_profile")
     if cell.empty:
         return None
     protocol = config.load_protocol()
@@ -503,7 +503,7 @@ def fig07_rush_profile(d: Data) -> Path | None:
         0.5, 0.9, "warm-up", fontsize=7, color=TEXT_SECONDARY, transform=top.get_xaxis_transform()
     )
     top.set_ylabel("Demand\n(share of peak)")
-    top.set_title("Rush-hour profile on grid4x4 - demand (top) and queues (bottom), mean over runs")
+    top.set_title("Rush-hour profile on grid3x3 - demand (top) and queues (bottom), mean over runs")
     for method in _methods(cell["method"]):
         s = _mean_series(d, cell[cell["method"] == method], "halting")
         if s is not None:
@@ -516,7 +516,7 @@ def fig07_rush_profile(d: Data) -> Path | None:
 
 
 def fig08_robustness(d: Data) -> Path | None:
-    cell = d.cell(network="grid4x4", demand="peak")
+    cell = d.cell(network="grid3x3", demand="peak")
     if cell.empty or not (
         cell["scenario"].str.startswith("comm_dropout").any()
         or (cell["scenario"] == "sensor_noise").any()
@@ -533,7 +533,7 @@ def fig08_robustness(d: Data) -> Path | None:
         ):
             ci = d.ci(
                 "mean_travel_time",
-                network="grid4x4",
+                network="grid3x3",
                 scenario=scenario,
                 demand="peak",
                 method=method,
@@ -574,7 +574,7 @@ def fig08_robustness(d: Data) -> Path | None:
             )
     a.set_xlabel("Probability that a neighbour message is lost")
     a.set_ylabel("Mean travel time (s)")
-    a.set_title("Communication dropout - grid4x4, peak")
+    a.set_title("Communication dropout - grid3x3, peak")
     a.legend()
     methods = _methods(cell[cell["scenario"] == "sensor_noise"]["method"])
     if methods:
@@ -583,12 +583,12 @@ def fig08_robustness(d: Data) -> Path | None:
             ["normal", "sensor_noise"],
             methods,
             lambda g, m: d.ci(
-                "mean_travel_time", network="grid4x4", scenario=g, demand="peak", method=m
+                "mean_travel_time", network="grid3x3", scenario=g, demand="peak", method=m
             ),
             {"normal": "exact sensors", "sensor_noise": "noise + 20% dead detectors"},
         )
         b.set_ylabel("Mean travel time (s)")
-        b.set_title("Sensor faults - grid4x4, peak")
+        b.set_title("Sensor faults - grid3x3, peak")
         b.legend()
     else:
         b.set_visible(False)
@@ -597,7 +597,7 @@ def fig08_robustness(d: Data) -> Path | None:
 
 
 def fig09_scalability(d: Data) -> Path | None:
-    cell = d.cell(network="grid8x8")
+    cell = d.cell(network="monaco")
     if cell.empty:
         return None
     fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3.6))
@@ -608,14 +608,14 @@ def fig09_scalability(d: Data) -> Path | None:
         demands,
         methods,
         lambda g, m: d.ci(
-            "mean_travel_time", network="grid8x8", scenario="normal", demand=g, method=m
+            "mean_travel_time", network="monaco", scenario="normal", demand=g, method=m
         ),
     )
     a.set_ylabel("Mean travel time (s)")
-    a.set_title("grid8x8 (64 signals), policies trained on grid4x4")
+    a.set_title("monaco (64 signals), policies trained on grid3x3")
     a.legend(ncol=2)
     learned = [m for m in methods if m not in BASELINE_METHODS]
-    nets = ["grid4x4", "grid8x8"]
+    nets = ["grid3x3", "monaco"]
     _bars(
         b,
         nets,
@@ -632,7 +632,7 @@ def fig09_scalability(d: Data) -> Path | None:
 
 
 def fig10_equity(d: Data) -> Path | None:
-    cell = d.cell(network="grid4x4", scenario="normal", demand="peak")
+    cell = d.cell(network="grid3x3", scenario="normal", demand="peak")
     if cell.empty:
         return None
     fig, ax = plt.subplots(figsize=(7.5, 3.8))
@@ -660,7 +660,7 @@ def fig10_equity(d: Data) -> Path | None:
     ax.set_xlim(0, 600)
     ax.set_xlabel("Waiting time of a vehicle (s)")
     ax.set_ylabel("Share of vehicles waiting at most this long")
-    ax.set_title("Who waits? Distribution of waiting times - grid4x4, peak (all runs pooled)")
+    ax.set_title("Who waits? Distribution of waiting times - grid3x3, peak (all runs pooled)")
     ax.legend(loc="lower right")
     fig.tight_layout()
     return _save(fig, "fig10_equity_waiting_distribution")
@@ -679,18 +679,18 @@ def fig11_people(d: Data) -> Path | None:
         if cell.empty or metric not in cell:
             ax.set_visible(False)
             continue
-        cell = cell[cell["network"] == "grid4x4"]
+        cell = cell[cell["network"] == "grid3x3"]
         demands = [x for x in DEMAND_ORDER if x in set(cell["demand"])]
         _bars(
             ax,
             demands,
             _methods(cell["method"]),
             lambda g, m, metric=metric, scenario=scenario: d.ci(
-                metric, network="grid4x4", scenario=scenario, demand=g, method=m
+                metric, network="grid3x3", scenario=scenario, demand=g, method=m
             ),
         )
         ax.set_ylabel(title)
-        ax.set_title(f"grid4x4 - {scenario} scenario")
+        ax.set_title(f"grid3x3 - {scenario} scenario")
         ax.legend(ncol=2)
     fig.tight_layout()
     return _save(fig, "fig11_pedestrians_and_buses")

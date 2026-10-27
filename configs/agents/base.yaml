@@ -16,7 +16,7 @@ reward:
   clip: 5.0
 
 # Stable-Baselines3 PPO defaults, except n_steps: every intersection is one environment
-# slot, so 256 steps x 16 agents = 4 096 samples per update on grid4x4 (the default 2 048
+# slot, so 256 steps x 16 agents = 4 096 samples per update on grid3x3 (the default 2 048
 # would give 32 768 samples and only a handful of updates in our budget).
 ppo:
   learning_rate: 3.0e-4

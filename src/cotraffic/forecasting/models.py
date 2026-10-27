@@ -76,7 +76,7 @@ def _scores(test: pd.DataFrame, preds: dict[str, np.ndarray], split: str) -> lis
 
 
 def evaluate(
-    network: str = "grid4x4", data_dir: Path = DATA_DIR, out_dir: Path = SUMMARY_DIR
+    network: str = "grid3x3", data_dir: Path = DATA_DIR, out_dir: Path = SUMMARY_DIR
 ) -> Path:
     data = pd.read_csv(data_dir / f"inflow_{network}.csv")
     if "demand_end_minute" not in data:  # datasets recorded with the evaluation protocol

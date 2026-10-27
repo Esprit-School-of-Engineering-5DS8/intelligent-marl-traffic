@@ -127,7 +127,7 @@ function ExportCell({ meta }: { meta: Meta }) {
           ci_hi: r.ciHi,
           std: r.std,
         })),
-      `cotraffic_${cell.network}_${cell.scenario}_${cell.demand}.csv`,
+      `kemetra_${cell.network}_${cell.scenario}_${cell.demand}.csv`,
     );
   return (
     <Card>

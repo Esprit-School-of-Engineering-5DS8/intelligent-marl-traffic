@@ -16,8 +16,8 @@ from pathlib import Path
 
 import numpy as np
 
-from cotraffic import config
 from cotraffic.paths import CHECKPOINTS_DIR, TRAINING_DIR
+from cotraffic.recipes import load_recipe, recipe_hash
 from cotraffic.seeds import VALIDATION_SEEDS, check_seeds
 from cotraffic.training.train import list_checkpoints, run_dir
 
@@ -45,7 +45,7 @@ def _validate(args: tuple[str, str, str, int, str, int]) -> tuple[int, str, int,
 
 
 def select_checkpoint(agent: str, network: str, seed: int, jobs: int = 2) -> Path:
-    cfg = config.load_agent(agent)
+    cfg = load_recipe(agent)
     val = cfg["validation"]
     check_seeds(val["seeds"], VALIDATION_SEEDS, "validation")
     folder = run_dir(agent, network, seed)
@@ -88,6 +88,8 @@ def select_checkpoint(agent: str, network: str, seed: int, jobs: int = 2) -> Pat
         },
         "train_wall_time_s": train_info.get("train_wall_time_s"),
         "total_timesteps": train_info.get("total_timesteps"),
+        "recipe_hash": recipe_hash(cfg),
+        "overlays": cfg.get("runtime", {}).get("overlays", []),
         "config": cfg,
     }
     out.with_suffix(".json").write_text(json.dumps(record, indent=2), encoding="utf-8")
@@ -123,7 +125,7 @@ def validation_table(
     from cotraffic.paths import RESULTS_DIR
 
     check_seeds(val_seeds, VALIDATION_SEEDS, "validation")
-    demands = config.load_agent("base")["validation"]["demands"]
+    demands = load_recipe("base")["validation"]["demands"]
     tasks = []
     for agent in agents:
         steps, path = list_checkpoints(run_dir(agent, network, seed) / "checkpoints")[-1]

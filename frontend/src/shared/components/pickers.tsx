@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { compareCells } from "@/shared/domain/cells";
@@ -7,43 +7,7 @@ import { useFormat } from "@/shared/domain/format";
 import { methodColor, sortMethods } from "@/shared/domain/methods";
 import { cn } from "@/shared/lib/cn";
 import type { Cell, Meta } from "@/shared/schemas";
-
-const selectClass = "select-control w-full text-sm";
-
-function Select({
-  label,
-  value,
-  options,
-  onChange,
-  className,
-}: {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
-  className?: string;
-}) {
-  const id = useId();
-  return (
-    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
-      <label htmlFor={id} className="text-xs font-medium text-text-2">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={selectClass}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
+import { Select } from "@/shared/ui/select";
 
 /**
  * Network, scenario and demand, limited to the combinations we evaluated: changing the
