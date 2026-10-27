@@ -16,6 +16,7 @@ export const METHOD_LABELS: Record<string, string> = {
   coop_full_ev4: "COOP-FULL (λ_ev=4)",
   dqn: "DQN",
   llm: "LLM",
+  llm_team: "LLM team",
 };
 
 const METHOD_COLORS: Record<string, string> = {
@@ -35,6 +36,7 @@ const METHOD_COLORS: Record<string, string> = {
   coop_full_ev4: "#f4c455",
   dqn: "#d6337a",
   llm: "#7cbd40",
+  llm_team: "#2f7d32",
 };
 
 export const METHOD_ORDER = Object.keys(METHOD_LABELS);

@@ -5448,6 +5448,48 @@ html.is-sidebar-collapsed .sidebar-collapse {
   box-shadow: 0 0 0 2px rgba(118, 173, 69, 0.14);
 }
 
+.live-controller {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #2c3328;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(20, 30, 15, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.live-controller span {
+  color: #6b7464;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-controller select {
+  max-width: 118px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.live-controller select:focus-visible {
+  outline: 2px solid #76ad45;
+  outline-offset: 2px;
+}
+
+.live-controller.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .live-top-actions {
   position: relative;
   display: flex;

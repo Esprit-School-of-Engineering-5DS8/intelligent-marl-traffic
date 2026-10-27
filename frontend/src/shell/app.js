@@ -422,6 +422,8 @@ function setScenario(name, { announce = true } = {}) {
   }
   applyScenarioChrome();
   loadLiveWeather();
+  renderPolicyControl();
+  if (activeGridNetwork()) loadPolicy();
 
   const scenario = getScenario();
   if (map) {
@@ -1293,6 +1295,8 @@ let simulationSocket = null;
 let simulationSpeed = 1;
 let latestSimulationState = null;
 let simulationSeeded = false;
+let policyCatalog = [];
+let activePolicyMethod = 'mp';
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
 const SIMULATION_BOUNDS = {
   'grid-2x2': { west: -97.7245, east: -97.7192, south: 30.2649, north: 30.2704, width: 400, height: 400 },
@@ -1302,6 +1306,74 @@ const SIMULATION_BOUNDS = {
 function simulationFetch(path, options) {
   return fetch(`${API_BASE}${path}`, options);
 }
+
+const POLICY_GRID = { 'grid-2x2': 'grid2x2', 'grid-3x3': 'grid3x3' };
+
+function activeGridNetwork() {
+  return POLICY_GRID[activeScenario] || null;
+}
+
+function policyLabel(method) {
+  return policyCatalog.find((entry) => entry.method === method)?.label || method;
+}
+
+function renderPolicyControl() {
+  const select = document.getElementById('liveControllerSelect');
+  if (!select) return;
+  const network = activeGridNetwork();
+  select.closest('.live-controller')?.classList.toggle('is-disabled', !network);
+  select.disabled = !network;
+  if (!policyCatalog.length) return;
+  select.innerHTML = policyCatalog
+    .map((entry) => `<option value="${entry.method}">${entry.label}</option>`)
+    .join('');
+  select.value = activePolicyMethod;
+}
+
+async function loadPolicy() {
+  try {
+    const response = await simulationFetch('/api/policy');
+    if (!response.ok) return;
+    const body = await response.json();
+    policyCatalog = Array.isArray(body.catalog) ? body.catalog : [];
+    activePolicyMethod = body.method || activePolicyMethod;
+    renderPolicyControl();
+  } catch {
+    renderPolicyControl();
+  }
+}
+
+async function selectPolicy(method) {
+  const network = activeGridNetwork();
+  if (!network) return;
+  try {
+    const response = await simulationFetch('/api/policy', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method, network })
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.detail || `controller ${response.status}`);
+    policyCatalog = Array.isArray(body.catalog) ? body.catalog : policyCatalog;
+    activePolicyMethod = body.method || method;
+    renderPolicyControl();
+    showToast(`Controller: ${policyLabel(activePolicyMethod)} (next run).`, {
+      duration: activePolicyMethod === 'llm_team' ? 5200 : 2200
+    });
+    if (activePolicyMethod === 'llm_team') {
+      showToast('LLM team uses OpenCode Go and makes paid calls.', { duration: 5200 });
+    }
+  } catch (error) {
+    renderPolicyControl();
+    showToast(error instanceof Error ? error.message : 'Controller unavailable.');
+  }
+}
+
+document.getElementById('liveControllerSelect')?.addEventListener('change', (event) => {
+  selectPolicy(event.currentTarget.value);
+});
+
+loadPolicy();
 
 function simulationPoint(scenario, x, y) {
   const bounds = SIMULATION_BOUNDS[scenario] || SIMULATION_BOUNDS['grid-2x2'];

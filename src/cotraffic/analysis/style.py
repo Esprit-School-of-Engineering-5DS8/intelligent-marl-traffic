@@ -19,6 +19,7 @@ METHOD_LABELS = {
     "coop_full_ev4": "COOP-FULL (λ_ev=4)",
     "dqn": "DQN",
     "llm": "LLM",
+    "llm_team": "LLM team",
     "random": "Random",
 }
 METHOD_ORDER = list(METHOD_LABELS)
@@ -45,6 +46,7 @@ METHOD_COLORS = {
     "coop_full_ev4": "#f4c455",
     "dqn": "#c2185b",
     "llm": "#7b3fa0",
+    "llm_team": "#2f7d32",
     "random": "#52514e",
 }
 SURFACE = "#fcfcfb"
@@ -81,6 +83,21 @@ METRIC_LABELS = {
     "bus_delay": "Bus delay (s)",
     "ev_travel_time": "EV travel time (s)",
     "ev_delay": "EV delay (s)",
+    "llm_calls": "LLM calls",
+    "llm_fallbacks": "LLM fallbacks",
+    "llm_prompt_tokens": "LLM prompt tokens",
+    "llm_completion_tokens": "LLM completion tokens",
+    "llm_latency_ms_mean": "LLM latency per call (ms)",
+    "llm_team_calls": "LLM team calls",
+    "llm_team_operator_calls": "LLM team Operator calls",
+    "llm_team_emergency_calls": "LLM team Emergency calls",
+    "llm_team_fallbacks": "LLM team fallbacks",
+    "llm_team_retries": "LLM team retries",
+    "llm_team_tokens_in": "LLM team input tokens",
+    "llm_team_tokens_out": "LLM team output tokens",
+    "llm_team_tokens_reasoning": "LLM team reasoning tokens",
+    "llm_team_latency_mean_s": "LLM team latency per call (s)",
+    "llm_team_estimated_cost_usd": "LLM team estimated cost (USD)",
     "inference_ms_per_decision": "Inference per decision (ms)",
     "inference_ms_per_step": "Inference per step, all signals (ms)",
     "sim_wall_time_s": "Simulation wall time (s)",

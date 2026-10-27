@@ -1,6 +1,6 @@
 # LLM team port and speed plan
 
-Status: Phase 3 done at `d922480`; Phase 4 next
+Status: Phase 3 done at `d922480`; Phase 4 deferred; Phase 5 minimal frontend done
 
 Base: `integration` at `b908238`  
 Working branch: `feat/llm-team-speed`  
@@ -382,7 +382,10 @@ Findings:
 Phase 3 acceptance: met, with the 4 team fallbacks and the replay cache misses
 reported above.
 
-### Phase 4: Monaco stress test
+### Phase 4: Monaco stress test (deferred)
+
+Deferred by decision after Phase 3. Do not spend Monaco tokens without a new
+decision. The target below is kept for when it is resumed.
 
 - One seed only.
 - Check calls, input tokens, wall time and fallbacks.
@@ -396,11 +399,29 @@ Phase 3 measured 91 to 110 team calls per full `real_district` episode, so Monac
 will likely miss the 50-call target unless the cadence or event coalescing changes.
 Record the miss or reduce calls before the run.
 
-### Phase 5: expose
+### Phase 5: expose (minimal frontend done)
 
-- Add `llm_team` to the API policy catalog and labels.
-- Add the metrics to the evaluation export.
-- Keep the frontend work minimal until the backend is stable.
+Delivered:
+
+- `llm_team` has a label and colour in the analysis style and the React benchmark
+  helpers, so it renders correctly in charts, pickers and tooltips.
+- The summary and dashboard export include the operational LLM metrics: calls,
+  fallbacks, retries, input/output/reasoning tokens, latency per call and estimated
+  cost.
+- The live-map shell has a Controller selector. It reads `GET /api/policy`, writes
+  `PUT /api/policy`, offers `llm_team`, and is enabled only for grid2x2 and grid3x3.
+  Selecting `llm_team` shows a paid-call warning. The setting applies to the next run.
+- The existing Analytics and method pickers show the new team metrics. No separate
+  LLM monitor page was added.
+- Verification: 121 tests pass, the Vite build passes, the non-test TypeScript check
+  passes, and the API policy tests cover `llm_team`.
+
+Still out of scope:
+
+- Migrating the served shell to the React app.
+- Live simulation on `real_district`; the shell and API still support grids only.
+- Cleaning the mock Optimize/Predict/Roam providers.
+- A dedicated LLM monitor benchmark page.
 
 ## 10. Files
 
@@ -449,9 +470,20 @@ src/cotraffic/controllers/llm.py
 src/cotraffic/controllers/registry.py
 src/cotraffic/envs/observations.py
 src/cotraffic/envs/traffic_env.py
+src/cotraffic/analysis/style.py
 configs/agents/llm.yaml
 api/policy.py
 configs/dashboard_policy.yaml
+frontend/index.html
+frontend/styles.css
+frontend/src/shell/app.js
+frontend/src/shared/domain/methods.ts
+frontend/src/shared/domain/metrics.ts
+frontend/src/shared/i18n/locales/en.json
+frontend/src/shared/i18n/locales/fr.json
+frontend/src/shared/i18n/locales/ar.json
+frontend/public/data
+scripts/export_dashboard_data.py
 requirements-dev.txt
 .env.example
 tests/test_llm_controller.py
@@ -528,9 +560,10 @@ Rules:
 
 ## 13. Fresh session start
 
-Read this file first. Phase 3 is done; implement Phase 4 only.
+Read this file first. Phase 3 and the minimal Phase 5 frontend are done. Phase 4
+is deferred.
 
-Start from `d922480` on `feat/llm-team-speed`. Do not redo Phases 1 to 3.
+Start from the latest commit on `feat/llm-team-speed`. Do not redo Phases 1 to 3.
 
 Rules:
 
@@ -547,12 +580,11 @@ Rules:
 - Run `pytest tests -q` and the mock matrix before spending tokens.
 - One real seed, inspect calls/tokens/fallbacks, then replay.
 
-Phase 4 first steps:
+No further paid runs are planned. If Monaco is resumed, restore the Phase 4 steps:
+one seed, mock and replay first, `--jobs 1`, then check wall time, calls, input tokens
+and fallbacks. Phase 3 measured 91 to 110 calls per full episode, so the 50-call target
+will need a cadence change or an honest miss.
 
-1. Run Monaco on one seed with `llm_team` and a call guard, using `--jobs 1`.
-2. Mock and replay first. Do not start a paid Monaco run blind.
-3. Check fresh wall time, calls, input tokens per call and fallbacks.
-4. Target: under 10 minutes fresh, no more than 50 calls, no more than 8k input
-   tokens per call. Phase 3 measured 91 to 110 calls per full episode, so expect the
-   call target to need a cadence change or an honest miss.
-5. Record the bottleneck and commit only after tests and mock pass.
+Remaining frontend work is optional and separate: consolidate the served shell onto the
+React app, add live `real_district` support, and replace the mock Optimize/Predict/Roam
+providers. Do not mix that migration into the LLM speed work.

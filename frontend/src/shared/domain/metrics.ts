@@ -1,5 +1,16 @@
 export type Unit =
-  "s" | "kg" | "g" | "gkm" | "vehh" | "veh" | "count" | "pct" | "ratio" | "ms" | "spp";
+  | "s"
+  | "kg"
+  | "g"
+  | "gkm"
+  | "vehh"
+  | "veh"
+  | "count"
+  | "pct"
+  | "ratio"
+  | "ms"
+  | "spp"
+  | "usd";
 
 export interface MetricInfo {
   unit: Unit;
@@ -33,6 +44,21 @@ export const METRICS: Record<string, MetricInfo> = {
   ev_stops_at_red_mean: { unit: "count", better: "lower" },
   ev_eta_error_mean_s: { unit: "s", better: "none" },
   ev_eta_abs_error_mean_s: { unit: "s", better: "lower" },
+  llm_calls: { unit: "count", better: "lower" },
+  llm_fallbacks: { unit: "count", better: "lower" },
+  llm_prompt_tokens: { unit: "count", better: "lower" },
+  llm_completion_tokens: { unit: "count", better: "lower" },
+  llm_latency_ms_mean: { unit: "ms", better: "lower" },
+  llm_team_calls: { unit: "count", better: "lower" },
+  llm_team_operator_calls: { unit: "count", better: "lower" },
+  llm_team_emergency_calls: { unit: "count", better: "lower" },
+  llm_team_fallbacks: { unit: "count", better: "lower" },
+  llm_team_retries: { unit: "count", better: "lower" },
+  llm_team_tokens_in: { unit: "count", better: "lower" },
+  llm_team_tokens_out: { unit: "count", better: "lower" },
+  llm_team_tokens_reasoning: { unit: "count", better: "lower" },
+  llm_team_latency_mean_s: { unit: "s", better: "lower" },
+  llm_team_estimated_cost_usd: { unit: "usd", better: "lower" },
   ssm_conflicts_per_1000_veh: { unit: "count", better: "lower" },
   hard_braking_events: { unit: "count", better: "lower" },
   gini_waiting_time: { unit: "ratio", better: "lower" },

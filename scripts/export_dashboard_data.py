@@ -278,6 +278,8 @@ def export_decisions(out: Path) -> list[dict[str, Any]]:
 def export_training(out: Path) -> list[dict[str, Any]]:
     """Learning curves: one point per training episode, per seed."""
     index = []
+    if not TRAINING.exists():
+        return index
     for agent_dir in sorted(
         p for p in TRAINING.iterdir() if p.is_dir() and not p.name.startswith("_")
     ):
