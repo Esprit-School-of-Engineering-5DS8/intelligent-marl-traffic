@@ -309,6 +309,11 @@ def compute_metrics(
                     np.mean(pop.loc[sel, "duration"] - pop.loc[sel, "time_loss"])
                 )
                 m["ev_max_delay"] = float(np.max(time_loss[sel]))
+                # each vehicle's delay ("id:seconds"): runs have only 3 to 5 of them
+                m["ev_delays"] = " ".join(  # type: ignore[assignment]
+                    f"{vid}:{d:.1f}"
+                    for vid, d in zip(pop.loc[sel, "id"], time_loss[sel], strict=True)
+                )
     if not persons.empty:
         ped = persons[(persons["depart"] >= begin) & (persons["depart"] < finish)]
         if not ped.empty:
