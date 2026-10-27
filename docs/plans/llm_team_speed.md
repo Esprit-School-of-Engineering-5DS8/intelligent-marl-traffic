@@ -361,10 +361,16 @@ Mean KPIs over 3 seeds:
 Findings:
 
 - `llm_team` matches or slightly beats Max-Pressure on all three scenarios. The gain is
-  small and not robust: it wins all 3 normal seeds and 2 of 3 incident seeds, but the
-  emergency EV delay improves only on seed 0 and worsens on seeds 1 and 2.
+  small and not robust. It wins all 3 normal seeds and 2 of 3 incident seeds. The
+  emergency EV delay is 15.05 s against 23.11 s on seed 0, then 21.61 s against
+  17.33 s on seed 1 and 28.94 s against 26.65 s on seed 2.
+- No paired comparison is statistically significant with 3 seeds. Treat these as
+  exploratory differences, not confirmed effects.
 - Simple `llm` is consistently worse than Max-Pressure on travel time and waiting time.
   Its throughput is unchanged, so the extra delay is not from lost demand.
+- Safety: `llm_team` had 0 collisions and 0 teleports in all 9 runs. `mp` and simple
+  `llm` each recorded one collision and one teleport in one normal and one emergency
+  run.
 - The team's 4 fallbacks are on low-effort emergency ticks. Raising `max_tokens` from
   300/500/300 to 600/900/500 cut failures from 13 to 4. Further reruns were stopped to
   avoid more paid calls, so the frozen v2 rows keep those 4 fallbacks.
