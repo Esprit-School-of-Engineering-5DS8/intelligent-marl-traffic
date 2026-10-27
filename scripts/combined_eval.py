@@ -30,9 +30,17 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
-from cotraffic.controllers.combined import GUIDES, GuidedPolicy
+from cotraffic import config
+from cotraffic.controllers.combined import GUIDES, EvRuleGuide, GuidedPolicy
+from cotraffic.controllers.hybrid import (
+    CongestionStrategy,
+    HybridPolicy,
+    PedRuleGuide,
+    TeamRoleGuide,
+)
 from cotraffic.controllers.registry import make_controller
 from cotraffic.controllers.team import TEAM_NUM_CTX, prompt_version
 from cotraffic.evaluation.runner import run_episode, run_id
@@ -54,7 +62,15 @@ GUIDED = {
     "coop_full_evrule_bias": ("ev_rule", "bias"),
     "coop_full_evrule_switch": ("ev_rule", "switch"),
 }
-ALL_METHODS = METHODS + list(GUIDED)
+# phase A: COOP-FULL under a strategy, with pre-emption (controllers/hybrid.py)
+HYBRID = {
+    "hybrid_h1": "ppo/max_pressure by congestion (H1) + switch(EV-RULE)",
+    "hybrid_h2": "ppo + logit_bias(max_pressure) (H2) + switch(EV-RULE)",
+    "coop_full_tped_switch": "ppo + switch(team serve_ped rules, no LLM) + switch(EV-RULE)",
+    "coop_full_pedrule_switch": "ppo + switch(PED-RULE) + switch(EV-RULE)",
+}
+ALL_METHODS = METHODS + ["ped_rule_mp"] + list(GUIDED) + list(HYBRID)
+THRESHOLDS = OUT / "congestion_thresholds.json"  # H1, from --profile-congestion
 WITH_LLM = {"coop_full_llm", "team_qwen"}
 NETWORKS = ["grid4x4", "real_district"]
 SCENARIOS = ["normal", "emergency", "incident"]
@@ -71,6 +87,8 @@ MECHANISM = {
     "coop_full_team_switch": "ppo+switch(team emergency rules, no LLM)",
     "coop_full_evrule_bias": "ppo+logit_bias(EV-RULE)",
     "coop_full_evrule_switch": "ppo+switch(EV-RULE)",
+    "ped_rule_mp": "max_pressure+ped_rule",
+    **HYBRID,
 }
 TEAM_SOURCE = "teammate's LLM team (controllers/llm_team/PROVENANCE.md)"
 LOWER_IS_BETTER = ["mean_travel_time", "others_travel_time", "mean_waiting_time", "ev_delay"]
@@ -81,23 +99,25 @@ def checkpoint(network: str, run: int) -> Path:
 
 
 def on_coop_full(method: str) -> bool:
-    return method.startswith("coop_full")
+    return method.startswith(("coop_full", "hybrid"))
 
 
-def tag_of(method: str, run: int, beta: float | None) -> str:
+def tag_of(method: str, run: int, param: float | None) -> str:
+    """t<run>, then -b<beta> (bias) or -q<quantile> (H1 threshold)."""
     if not on_coop_full(method):
         return ""
-    return f"t{run}" + (f"-b{beta:g}" if beta is not None else "")
+    prefix = "q" if method == "hybrid_h1" else "b"
+    return f"t{run}" + (f"-{prefix}{param:g}" if param is not None else "")
 
 
 def rid_of(task: tuple) -> str:
-    method, network, scenario, demand, seed, run, beta = task
+    method, network, scenario, demand, seed, run, param = task
     scenarios = [s for s in [scenario] if s != "normal"]
-    return run_id(method, network, scenarios, demand, seed, tag_of(method, run, beta))
+    return run_id(method, network, scenarios, demand, seed, tag_of(method, run, param))
 
 
 def run_task(task: tuple) -> dict:
-    method, network, scenario, demand, seed, run, beta = task
+    method, network, scenario, demand, seed, run, param = task
     settings = load_settings()
     rid = rid_of(task)
     calls_dir = OUT / "calls"
@@ -129,9 +149,23 @@ def run_task(task: tuple) -> dict:
         )
     elif method in GUIDED:
         guide, mode = GUIDED[method]
-        controller = GuidedPolicy(make_controller("coop_full", ckpt), GUIDES[guide](), mode, beta)
+        controller = GuidedPolicy(make_controller("coop_full", ckpt), GUIDES[guide](), mode, param)
         if guide == "team":
             extra["source"] = TEAM_SOURCE
+    elif method in HYBRID:
+        base = make_controller("coop_full", ckpt)
+        if method == "hybrid_h1":
+            threshold = json.loads(THRESHOLDS.read_text(encoding="utf-8"))[network][f"q{param:g}"]
+            controller = HybridPolicy(base, CongestionStrategy(threshold), ev_guide=EvRuleGuide())
+            extra["quantile"] = param
+        elif method == "hybrid_h2":
+            controller = HybridPolicy(base, mp_beta=param, ev_guide=EvRuleGuide())
+        elif method == "coop_full_tped_switch":
+            ped = TeamRoleGuide(("pedestrian",))
+            controller = HybridPolicy(base, ped_guide=ped, ev_guide=EvRuleGuide())
+            extra["source"] = TEAM_SOURCE
+        else:
+            controller = HybridPolicy(base, ped_guide=PedRuleGuide(), ev_guide=EvRuleGuide())
     elif method in ("team_rules", "team_qwen"):
         log = calls_dir / f"{rid}.jsonl"
         log.unlink(missing_ok=True)  # the team's logger appends
@@ -154,7 +188,7 @@ def run_task(task: tuple) -> dict:
         [scenario],
         seed,
         checkpoint=ckpt,
-        tag=tag_of(method, run, beta),
+        tag=tag_of(method, run, param),
         raw_dir=OUT / "raw",
         logs_dir=OUT / "logs",
         controller=controller,
@@ -165,7 +199,7 @@ def run_task(task: tuple) -> dict:
         with (calls_dir / f"{rid}.jsonl").open("w", encoding="utf-8") as f:
             for c in controller.calls:
                 f.write(json.dumps(asdict(c), default=str) + "\n")
-    elif method in GUIDED:
+    elif method in GUIDED or method in HYBRID:
         extra.update(controller.summary())
     elif controller is not None and hasattr(controller, "metrics"):
         extra.update(controller.metrics())
@@ -277,9 +311,65 @@ def tasks_for(args) -> list[tuple]:
             for d in args.demands:
                 for m in args.methods:
                     runs = args.runs if on_coop_full(m) else [0]
-                    betas = args.betas if GUIDED.get(m, ("", ""))[1] == "bias" else [None]
-                    out += [(m, n, s, d, args.seed, k, b) for k in runs for b in betas]
+                    out += [(m, n, s, d, args.seed, k, p) for k in runs for p in params(m, args)]
     return out
+
+
+def params(method: str, args) -> list:
+    """The swept parameter of a method: beta of a bias guide or of H2, quantile of H1."""
+    if GUIDED.get(method, ("", ""))[1] == "bias":
+        return args.betas
+    if method == "hybrid_h1":
+        return args.h1_quantiles
+    if method == "hybrid_h2":
+        return args.h2_betas
+    return [None]
+
+
+def congestion_samples(task: tuple) -> np.ndarray:
+    """Neighbourhood congestion of every junction at every decision of the measured window,
+    under COOP-FULL (training run 1) in the normal scenario."""
+    from cotraffic.llm.rollout import EpisodeSpec, make_env
+
+    network, demand, seed = task
+    timing = config.load_protocol()["validation"]
+    begin = float(timing["warmup_s"])
+    end = begin + float(timing["measure_s"])
+    base = make_controller("coop_full", checkpoint(network, 1))
+    env = make_env(EpisodeSpec(network, demand, [], seed), base.agent_cfg)
+    probe_strategy = CongestionStrategy(threshold=float("inf"))
+    values: list[float] = []
+    try:
+        obs, _ = env.reset(seed=seed)
+        base.reset(env)
+        probe_strategy.reset(env)
+        while env.now < end:
+            congestion = probe_strategy.observe(env)
+            if env.now >= begin:
+                values += list(congestion.values())
+            obs, *_ = env.step(base.act(env, obs))
+    finally:
+        env.close()
+    return np.array(values)
+
+
+def profile_congestion(networks: list[str], demands: list[str], seed: int, jobs: int) -> None:
+    """The thresholds of H1: quantiles 50, 75, 90 and 95 % of the congestion under COOP-FULL,
+    per network, pooled over the demands (validation seed only)."""
+    tasks = [(n, d, seed) for n in networks for d in demands]
+    with ProcessPoolExecutor(max_workers=jobs) as pool:
+        samples = dict(zip(tasks, pool.map(congestion_samples, tasks), strict=True))
+    out = {}
+    for n in networks:
+        values = np.concatenate([v for (net, _, _), v in samples.items() if net == n])
+        out[n] = {f"q{q}": round(float(np.quantile(values, q / 100)), 4) for q in (50, 75, 90, 95)}
+        out[n]["samples"] = int(values.size)
+        out[n]["source"] = (
+            f"coop_full t1, normal, demands {'+'.join(demands)}, seed {seed}, measured window"
+        )
+    THRESHOLDS.parent.mkdir(parents=True, exist_ok=True)
+    THRESHOLDS.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps(out, indent=1))
 
 
 def main() -> None:
@@ -290,6 +380,9 @@ def main() -> None:
     parser.add_argument("--demands", nargs="+", default=DEMANDS)
     parser.add_argument("--runs", nargs="+", type=int, default=[1], help="COOP-FULL runs")
     parser.add_argument("--betas", nargs="+", type=float, default=[4.0], help="bias guides")
+    parser.add_argument("--h1-quantiles", nargs="+", type=float, default=[50, 75, 90, 95])
+    parser.add_argument("--h2-betas", nargs="+", type=float, default=[1.0, 2.0, 4.0])
+    parser.add_argument("--profile-congestion", action="store_true", help="thresholds of H1")
     parser.add_argument("--seed", type=int, default=1000)
     parser.add_argument("--jobs", type=int, default=4, help="workers for episodes without LLM")
     parser.add_argument("--force", action="store_true", help="run again saved episodes")
@@ -302,6 +395,9 @@ def main() -> None:
         raise SystemExit("test seeds are never used to tune anything")
     if args.probe:
         probe(args.networks, args.seed)
+        return
+    if args.profile_congestion:
+        profile_congestion(args.networks, args.demands, args.seed, args.jobs)
         return
     if not args.summary_only:
         tasks = tasks_for(args)
