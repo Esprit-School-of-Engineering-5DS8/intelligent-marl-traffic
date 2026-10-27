@@ -16,7 +16,7 @@ import { findComparison, indexSummary } from "@/shared/domain/results";
 import { usePageTitle } from "@/shared/lib/use-page-title";
 import { useRtl } from "@/shared/lib/use-rtl";
 import type { Comparison, Meta, SummaryRow, TimeseriesCell } from "@/shared/schemas";
-import { useFilters } from "@/shared/state/filters";
+import { useFilters, useReconciledFilters } from "@/shared/state/filters";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Panel } from "@/shared/ui/panel";
@@ -73,6 +73,7 @@ function Overview({
   const rtl = useRtl();
   const { cell, controller, reference, metric, setCell, setController, setReference, setMetric } =
     useFilters();
+  useReconciledFilters(meta);
   const index = useMemo(() => indexSummary(rows), [rows]);
   const methods = sortMethods(index.methods(cell));
   const metrics = MAIN_METRICS.filter((m) => index.metrics(cell).includes(m));

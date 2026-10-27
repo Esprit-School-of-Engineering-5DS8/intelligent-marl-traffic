@@ -20,7 +20,7 @@ import { methodColor, sortMethods } from "@/shared/domain/methods";
 import { usePageTitle } from "@/shared/lib/use-page-title";
 import { useRtl } from "@/shared/lib/use-rtl";
 import type { Comparison, DistributionCell, Meta } from "@/shared/schemas";
-import { useFilters } from "@/shared/state/filters";
+import { useFilters, useReconciledFilters } from "@/shared/state/filters";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -53,6 +53,7 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
   const f = useFormat();
   const rtl = useRtl();
   const { controller, reference, setController, setReference } = useFilters();
+  useReconciledFilters(meta);
   const metrics = [...new Set(rows.map((r) => r.metric))];
   const [metric, setMetric] = useState(
     metrics.includes("mean_waiting_time") ? "mean_waiting_time" : (metrics[0] ?? ""),
