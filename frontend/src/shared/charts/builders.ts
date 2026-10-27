@@ -223,6 +223,9 @@ export function forest(
 ): ChartOption {
   const { axis, tooltip } = baseAxes(t);
   const labels = items.map((i) => i.label);
+  const low = Math.min(0, ...items.map((i) => i.lo));
+  const high = Math.max(0, ...items.map((i) => i.hi));
+  const pad = Math.max(0.5, (high - low) * 0.08);
   return {
     grid: { left: 8, right: 24, top: 16, bottom: 32, containLabel: true },
     tooltip: {
@@ -240,6 +243,8 @@ export function forest(
       name: xName,
       nameLocation: "middle",
       nameGap: 24,
+      min: low - pad,
+      max: high + pad,
       inverse: rtl,
       ...axis,
     },
