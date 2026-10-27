@@ -19,6 +19,7 @@ from gymnasium import spaces
 from pettingzoo import ParallelEnv
 
 from cotraffic import config
+from cotraffic.envs.ev import read_ev_states
 from cotraffic.envs.intersection import Intersection
 from cotraffic.envs.observations import (
     Measurements,
@@ -310,22 +311,23 @@ class CoTrafficEnv(ParallelEnv):
             noise.apply(self.meas, self._rng)
 
         self.ped_waiting: dict[str, float] = defaultdict(float)
+        self.ped_wait_sum: dict[str, float] = defaultdict(float)
         for person in self.person_ids:
-            if (
-                conn.person.getRoadID(person) in self.walkingareas
-                and conn.person.getWaitingTime(person) > 0
-            ):
+            waiting = conn.person.getWaitingTime(person)
+            if conn.person.getRoadID(person) in self.walkingareas and waiting > 0:
                 nxt = conn.person.getNextEdge(person)
                 if nxt in self.crossing_owner:
                     self.ped_waiting[nxt] += 1.0
+                    self.ped_wait_sum[nxt] += waiting
 
+        self.ev_states = read_ev_states(conn, self.ev_ids)
         rng_ev = float(self.protocol["observation"]["ev_detection_range_m"])
         self.ev_info: dict[str, dict[str, Any]] = {}
-        for ev in self.ev_ids:
-            upcoming = conn.vehicle.getNextTLS(ev)
-            if not upcoming:
+        for ev in self.ev_states:
+            if not ev.next_tls:
                 continue
-            tls, link_index, dist, _state = upcoming[0]
+            nxt = ev.next_tls[0]
+            tls, link_index, dist = nxt.tls_id, nxt.link_index, nxt.distance_m
             inter = self.intersections.get(tls)
             if inter is None or dist > rng_ev or link_index not in inter.link_by_index:
                 continue

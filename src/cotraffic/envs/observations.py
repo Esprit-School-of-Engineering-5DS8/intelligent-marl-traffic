@@ -110,6 +110,7 @@ class Measurements:
         self.halting = dict.fromkeys(self.lanes, 0.0)
         self.count = dict.fromkeys(self.lanes, 0.0)
         self.speed = dict(self.speed_limit)
+        self.waiting = dict.fromkeys(self.lanes, 0.0)
 
     def refresh(self, conn) -> None:
         lane = conn.lane
@@ -117,6 +118,7 @@ class Measurements:
             self.halting[ln] = float(lane.getLastStepHaltingNumber(ln))
             self.count[ln] = float(lane.getLastStepVehicleNumber(ln))
             self.speed[ln] = float(lane.getLastStepMeanSpeed(ln))
+            self.waiting[ln] = float(lane.getWaitingTime(ln))
 
     def queue(self, lanes: Iterable[str]) -> float:
         lanes = list(lanes)

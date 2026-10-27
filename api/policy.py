@@ -18,6 +18,7 @@ from typing import Any
 import yaml
 
 from cotraffic.controllers.registry import BASELINES, LEARNED, LLM
+from cotraffic.llm.providers import provider_available
 from cotraffic.paths import RESULTS_DIR, default_checkpoint
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +41,7 @@ LABELS = {
     "coop_full": "COOP full",
     "dqn": "DQN",
     "llm": "LLM controller",
+    "llm_team": "LLM team",
 }
 
 _lock = threading.RLock()
@@ -76,16 +78,16 @@ def _load() -> dict[str, Any]:
     return state
 
 
-def _llm_ready() -> tuple[bool, str | None]:
-    provider = (os.environ.get("COTRAFFIC_LLM_PROVIDER") or "groq").lower()
-    if provider == "gemini":
-        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        name = "GEMINI_API_KEY"
-    else:
-        key = os.environ.get("GROQ_API_KEY")
-        name = "GROQ_API_KEY"
-    if not key:
-        return False, f"{name} is not configured on the backend"
+def _llm_ready(method: str = "llm") -> tuple[bool, str | None]:
+    if method == "llm_team":
+        backend = (os.environ.get("COTRAFFIC_LLM_BACKEND") or "opencode").lower()
+        if backend in ("mock", "replay"):
+            return True, None
+    default = "opencode" if method == "llm_team" else "groq"
+    provider = (os.environ.get("COTRAFFIC_LLM_PROVIDER") or default).lower()
+    ready, reason = provider_available(provider)
+    if not ready:
+        return False, f"{reason} on the backend"
     return True, None
 
 
@@ -113,7 +115,7 @@ def availability(method: str, network: str) -> tuple[bool, str | None]:
             return False, f"no trained {method} model for {network} (train it first)"
         return True, None
     if method in LLM:
-        ready, reason = _llm_ready()
+        ready, reason = _llm_ready(method)
         if ready:
             return True, None
         return True, f"{reason}: every LLM call falls back to Max-Pressure"

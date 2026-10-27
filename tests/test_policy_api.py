@@ -75,3 +75,24 @@ def test_llm_without_a_key_stays_runnable_but_degraded(monkeypatch):
     assert body["available"] is True
     assert body["degraded"] is True
     assert "GEMINI_API_KEY" in body["reason"]
+
+
+def test_llm_team_is_listed_and_degrades_without_a_key(monkeypatch):
+    monkeypatch.setenv("COTRAFFIC_LLM_BACKEND", "opencode")
+    monkeypatch.setenv("COTRAFFIC_LLM_PROVIDER", "opencode")
+    monkeypatch.delenv("COTRAFFIC_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+
+    body = client.get("/api/policy").json()
+    assert "llm_team" in {entry["method"] for entry in body["catalog"]}
+
+    response = client.put("/api/policy", json={"method": "llm_team", "network": "grid2x2"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True and body["degraded"] is True
+    assert "COTRAFFIC_LLM_API_KEY" in body["reason"]
+
+    monkeypatch.setenv("COTRAFFIC_LLM_BACKEND", "mock")
+    body = client.put("/api/policy", json={"method": "llm_team", "network": "grid2x2"}).json()
+    assert body["degraded"] is False

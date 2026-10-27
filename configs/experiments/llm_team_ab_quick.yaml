@@ -1,0 +1,16 @@
+name: llm_team_ab_quick
+description: >-
+  Short offline smoke matrix for the LLM team. Run with
+  COTRAFFIC_LLM_BACKEND=mock to exercise the full pipeline without API calls.
+
+quick: true
+seeds: [0]
+cells:
+  - network: grid2x2
+    methods: [mp, llm_team]
+    demands: [medium]
+    scenarios: [normal]
+  - network: grid3x3
+    methods: [mp, llm_team]
+    demands: [medium]
+    scenarios: [normal]

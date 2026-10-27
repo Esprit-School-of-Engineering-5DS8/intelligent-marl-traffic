@@ -3,7 +3,7 @@
 # results/dashboard_policy.json (gitignored) so it survives a backend restart.
 
 live:
-  # Registry name: mp | ft | act | coop | llm | ...
+  # Registry name: mp | ft | act | coop | llm | llm_team | ...
   method: mp
   # Network the live demo runs on (configs/networks/<network>.yaml).
   network: grid4x4

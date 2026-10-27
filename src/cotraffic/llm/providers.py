@@ -1,4 +1,4 @@
-"""Small JSON-capable LLM providers (Groq and Gemini) with no extra dependency.
+"""Small JSON-capable LLM providers (OpenCode Go, Groq and Gemini) with no extra dependency.
 
 The traffic controller needs a strict, short JSON answer. Both APIs are called with
 the standard library so that the simulation can run on a laptop without installing
@@ -28,6 +28,8 @@ LOGGER = logging.getLogger("cotraffic.llm")
 
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_OPENCODE_MODEL = "deepseek-v4.1-flash"
+DEFAULT_OPENCODE_BASE_URL = "https://opencode.ai/zen/go/v1"
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,10 @@ class LLMResult:
     latency_ms: float
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cached_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    model: str = ""
+    attempts: int = 1
 
 
 class BaseProvider:
@@ -57,7 +63,9 @@ class BaseProvider:
         self.timeout_s = float(timeout_s)
         self.attempts = max(1, int(attempts))
         self.min_interval_s = max(0.0, float(min_interval_s))
+        self.reasoning_effort = ""
         self._last_request_at: float | None = None
+        self._last_usage: dict[str, int | None] = {}
 
     def _throttle(self) -> None:
         if self.min_interval_s <= 0:
@@ -117,8 +125,11 @@ class BaseProvider:
         messages: Sequence[Mapping[str, str]],
         schema: Mapping[str, Any],
         max_tokens: int = 700,
+        effort: str | None = None,
     ) -> LLMResult:
         """Call the model until it returns JSON that satisfies ``schema``."""
+        if effort is not None:
+            self.reasoning_effort = effort
         schema_message = {
             "role": "system",
             "content": "Reply with a JSON object that validates against this JSON Schema:\n"
@@ -131,8 +142,9 @@ class BaseProvider:
         ]
         last = ""
         last_error: LLMUnavailableError | None = None
-        for _ in range(self.attempts):
+        for attempt in range(1, self.attempts + 1):
             started = time.perf_counter()
+            self._last_usage = {}
             try:
                 text, prompt_tokens, completion_tokens = self._complete(
                     history, max_tokens, schema
@@ -168,6 +180,10 @@ class BaseProvider:
                         latency_ms,
                         prompt_tokens,
                         completion_tokens,
+                        self._last_usage.get("cached"),
+                        self._last_usage.get("reasoning"),
+                        self.model,
+                        attempt,
                     )
                 last = "; ".join(problems[:3])
             history += [
@@ -215,6 +231,73 @@ class GroqProvider(BaseProvider):
         if not isinstance(text, str) or not text.strip():
             raise LLMUnavailableError("Groq returned an empty response")
         usage = body.get("usage", {})
+        return (
+            text,
+            _as_int(usage.get("prompt_tokens")),
+            _as_int(usage.get("completion_tokens")),
+        )
+
+
+class OpenCodeGoProvider(BaseProvider):
+    """OpenCode Go's OpenAI-compatible endpoint."""
+
+    name = "opencode"
+
+    def __init__(
+        self,
+        model: str,
+        api_key: str = "",
+        timeout_s: float = 30.0,
+        attempts: int = 2,
+        min_interval_s: float = 0.0,
+        base_url: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> None:
+        super().__init__(model, api_key, timeout_s, attempts, min_interval_s)
+        self.base_url = (
+            base_url
+            or os.environ.get("COTRAFFIC_LLM_BASE_URL")
+            or os.environ.get("LLM_BASE_URL")
+            or DEFAULT_OPENCODE_BASE_URL
+        ).rstrip("/")
+        self.extra_headers = dict(
+            extra_headers if extra_headers is not None else _env_headers()
+        )
+
+    def _complete(self, messages, max_tokens, schema):
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": [dict(message) for message in messages],
+            "max_tokens": max_tokens,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
+        headers = {"Authorization": f"Bearer {self.api_key}", **self.extra_headers}
+        try:
+            body = self._request(f"{self.base_url}/chat/completions", payload, headers)
+        except LLMUnavailableError as error:
+            if self.reasoning_effort and "HTTP 400" in str(error):
+                payload.pop("reasoning_effort", None)
+                body = self._request(f"{self.base_url}/chat/completions", payload, headers)
+            else:
+                raise
+        try:
+            text = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as error:
+            raise LLMUnavailableError("OpenCode Go returned an unexpected response") from error
+        if not isinstance(text, str) or not text.strip():
+            raise LLMUnavailableError("OpenCode Go returned an empty response")
+        usage = body.get("usage") or {}
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        completion_details = usage.get("completion_tokens_details") or {}
+        self._last_usage = {
+            "cached": _as_int(
+                prompt_details.get("cached_tokens") or usage.get("prompt_cache_hit_tokens")
+            ),
+            "reasoning": _as_int(completion_details.get("reasoning_tokens")),
+        }
         return (
             text,
             _as_int(usage.get("prompt_tokens")),
@@ -272,6 +355,44 @@ def _as_int(value: Any) -> int | None:
         return None
 
 
+def _env_headers() -> dict[str, str]:
+    raw = (
+        os.environ.get("COTRAFFIC_LLM_EXTRA_HEADERS")
+        or os.environ.get("LLM_EXTRA_HEADERS")
+        or ""
+    ).strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(key): str(value) for key, value in data.items()}
+
+
+def opencode_api_key() -> str:
+    return (
+        os.environ.get("COTRAFFIC_LLM_API_KEY")
+        or os.environ.get("OPENCODE_API_KEY")
+        or os.environ.get("LLM_API_KEY")
+        or ""
+    )
+
+
+def provider_available(provider: str) -> tuple[bool, str | None]:
+    name = (provider or "groq").lower()
+    if name in ("opencode", "opencode-go"):
+        return (True, None) if opencode_api_key() else (False, "COTRAFFIC_LLM_API_KEY is not configured")
+    if name == "gemini":
+        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        return (True, None) if key else (False, "GEMINI_API_KEY is not configured")
+    if name == "groq":
+        return (True, None) if os.environ.get("GROQ_API_KEY") else (False, "GROQ_API_KEY is not configured")
+    return False, f"unknown LLM provider {name!r}"
+
+
 def make_provider(
     provider: str | None = None,
     model: str | None = None,
@@ -294,4 +415,17 @@ def make_provider(
             raise LLMUnavailableError("GEMINI_API_KEY is not configured")
         chosen = model or os.environ.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
         return GeminiProvider(chosen, key, timeout, attempts, min_interval)
-    raise LLMUnavailableError(f"unknown LLM provider {name!r} (expected groq or gemini)")
+    if name in ("opencode", "opencode-go"):
+        key = opencode_api_key()
+        if not key:
+            raise LLMUnavailableError("COTRAFFIC_LLM_API_KEY is not configured")
+        chosen = (
+            model
+            or os.environ.get("COTRAFFIC_LLM_MODEL")
+            or os.environ.get("LLM_MODEL")
+            or DEFAULT_OPENCODE_MODEL
+        )
+        return OpenCodeGoProvider(chosen, key, timeout, attempts, min_interval)
+    raise LLMUnavailableError(
+        f"unknown LLM provider {name!r} (expected opencode, groq or gemini)"
+    )

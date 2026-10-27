@@ -1,0 +1,36 @@
+name: llm_team
+description: >-
+  Three-role LLM team (Operator, Emergency, Pedestrian) on top of Max-Pressure.
+  Roles propose typed directives; code validates, arbitrates and applies them.
+  The environment shield remains the final safety layer.
+
+provider: opencode
+backend: opencode
+model: deepseek-v4.1-flash
+timeout_s: 90
+attempts: 1
+max_retries: 1
+max_calls: 0
+cache_path: results/llm_cache/llm_team.jsonl
+log_path: ""
+
+tokens:
+  operator: 300
+  emergency: 500
+  pedestrian: 300
+
+supervisor:
+  delta_s: 30
+  quiet_delta_s: 60
+  congested_delta_s: 15
+  ev_replan_s: 10
+  pedestrian_interval_s: 30
+  feedback_ttl_s: 60
+  quiet_queue_threshold: 8
+  congested_queue_threshold: 15
+  base_effort: none
+  escalate_effort: low
+  ev_event_triggers: true
+  ev_event_min_gap_s: 3
+  ped_trigger_wait_s: 20
+  ped_event_min_gap_s: 5

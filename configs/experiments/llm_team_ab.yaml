@@ -1,0 +1,19 @@
+name: llm_team_ab
+description: >-
+  Compare Max-Pressure, the single-call LLM controller and the three-role LLM
+  team. The LLM arms use the provider configured in the environment.
+
+seeds: [0, 1, 2]
+cells:
+  - network: grid2x2
+    methods: [mp, llm, llm_team]
+    demands: [medium]
+    scenarios: [normal]
+  - network: grid3x3
+    methods: [mp, llm, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency, incident, pedestrians]
+  - network: real_district
+    methods: [mp, llm, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency, incident]

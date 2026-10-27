@@ -16,9 +16,11 @@ from cotraffic.assistant.llm import LLMUnavailableError
 from cotraffic.llm.providers import (
     DEFAULT_GEMINI_MODEL,
     DEFAULT_GROQ_MODEL,
+    DEFAULT_OPENCODE_MODEL,
     BaseProvider,
     GeminiProvider,
     GroqProvider,
+    OpenCodeGoProvider,
     make_provider,
 )
 
@@ -185,3 +187,80 @@ def test_gemini_maps_roles_and_system_instruction(monkeypatch):
 def test_keys_are_redacted_from_errors():
     provider = GroqProvider("model-x", "gsk-secret")
     assert "gsk-secret" not in provider._redact("failed gsk-secret")
+
+
+def test_make_provider_opencode_uses_defaults_and_key_aliases(monkeypatch):
+    monkeypatch.delenv("COTRAFFIC_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("COTRAFFIC_LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("COTRAFFIC_LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+
+    with pytest.raises(LLMUnavailableError, match="COTRAFFIC_LLM_API_KEY"):
+        make_provider("opencode")
+
+    monkeypatch.setenv("LLM_API_KEY", "zen-test")
+    provider = make_provider("opencode")
+    assert isinstance(provider, OpenCodeGoProvider)
+    assert provider.model == DEFAULT_OPENCODE_MODEL
+    assert provider.base_url == "https://opencode.ai/zen/go/v1"
+
+
+def test_opencode_payload_effort_and_usage(monkeypatch):
+    provider = OpenCodeGoProvider("deepseek-test", "zen-secret", base_url="https://example.test/v1")
+    captured = {}
+
+    def fake_request(url, payload, headers):
+        captured["url"] = url
+        captured["payload"] = payload
+        captured["headers"] = headers
+        return {
+            "choices": [{"message": {"content": '{"directives": []}'}}],
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 5,
+                "prompt_tokens_details": {"cached_tokens": 7},
+                "completion_tokens_details": {"reasoning_tokens": 3},
+            },
+        }
+
+    monkeypatch.setattr(provider, "_request", fake_request)
+    directive_schema = {
+        "type": "object",
+        "required": ["directives"],
+        "properties": {"directives": {"type": "array"}},
+    }
+    result = provider.chat_json(
+        [{"role": "user", "content": "state"}], directive_schema, effort="low"
+    )
+
+    assert captured["url"] == "https://example.test/v1/chat/completions"
+    assert captured["payload"]["reasoning_effort"] == "low"
+    assert captured["payload"]["response_format"] == {"type": "json_object"}
+    assert captured["headers"]["Authorization"] == "Bearer zen-secret"
+    assert result.data == {"directives": []}
+    assert result.cached_tokens == 7
+    assert result.reasoning_tokens == 3
+    assert result.prompt_tokens == 12 and result.completion_tokens == 5
+
+
+def test_opencode_drops_effort_after_http_400(monkeypatch):
+    provider = OpenCodeGoProvider("deepseek-test", "zen-secret", base_url="https://example.test/v1")
+    payloads = []
+
+    def fake_request(url, payload, headers):
+        payloads.append(dict(payload))
+        if len(payloads) == 1:
+            raise LLMUnavailableError("opencode HTTP 400: reasoning_effort unsupported")
+        return {"choices": [{"message": {"content": '{"directives": []}'}}]}
+
+    monkeypatch.setattr(provider, "_request", fake_request)
+    schema = {"type": "object", "required": ["directives"]}
+    result = provider.chat_json(
+        [{"role": "user", "content": "state"}], schema, effort="low"
+    )
+    assert result.data == {"directives": []}
+    assert "reasoning_effort" in payloads[0]
+    assert "reasoning_effort" not in payloads[1]
