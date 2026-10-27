@@ -30,7 +30,7 @@ def weight_of(strength: int) -> float:
 
 class Item(BaseModel):  # [Exigence 9] bornes revérifiées par Pydantic
     model_config = ConfigDict(extra="forbid")
-    j: str = Field(min_length=1, max_length=16)
+    j: str = Field(min_length=1, max_length=64)  # real_district TLS ids: up to 48 chars
     p: int = Field(ge=0, le=MAX_PHASE)
     w: float = Field(ge=0.0, le=1.0)
     s: int = Field(ge=MIN_VALID_S, le=MAX_VALID_S)

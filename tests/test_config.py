@@ -68,10 +68,15 @@ def test_seed_ranges_are_enforced():
 
 
 def test_every_config_uses_its_own_seed_range():
+    from cotraffic.controllers.registry import LEARNED
     from cotraffic.seeds import TEST_SEEDS, VALIDATION_SEEDS, check_seeds
 
     for name in config.available("agents"):
-        check_seeds(config.load_agent(name)["validation"]["seeds"], VALIDATION_SEEDS, name)
+        cfg = config.load_agent(name)
+        # every learned agent selects on validation seeds; llm_team (the teammate's LLM team,
+        # controllers/llm_team/PROVENANCE.md) is not trained and declares no seed
+        if name in LEARNED or "validation" in cfg:
+            check_seeds(cfg["validation"]["seeds"], VALIDATION_SEEDS, name)
     for name in config.available("experiments"):
         check_seeds(config.load("experiments", name)["seeds"], TEST_SEEDS, name)
 

@@ -75,7 +75,7 @@ class Ollama:
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as err:
             raise LLMError(f"{self.model}: {err}") from err
 
-    def chat(self, messages: list[dict[str, str]], schema: dict[str, Any] | None = None) -> Reply:
+    def chat(self, messages: list[dict[str, str]], schema: Any = None) -> Reply:  # or "json"
         body: dict[str, Any] = {  # [Exigence 2] requête au modèle choisi, via Ollama
             "model": self.model,
             "messages": messages,

@@ -18,7 +18,12 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-extend-exclude = ["sumo_files", "results", "figures", "notebooks"]
+extend-exclude = [
+    "sumo_files", "results", "figures", "notebooks",
+    # verbatim copies of our teammate's work, kept byte-identical for their
+    # provenance (src/cotraffic/controllers/llm_team/PROVENANCE.md)
+    "src/cotraffic/controllers/llm_team", "src/cotraffic/envs/ev.py", "tests/test_llm_team_*.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "N"]

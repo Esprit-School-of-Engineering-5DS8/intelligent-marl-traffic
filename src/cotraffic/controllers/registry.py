@@ -8,6 +8,9 @@ from cotraffic.controllers.base import Controller
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
 LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
+# our teammate's LLM team (controllers/llm_team/PROVENANCE.md):
+# Max-Pressure + the team's code rules (team_rules) or + the local model (team_qwen)
+TEAM = ("team_rules", "team_qwen")
 
 # "<method>_guard": the same controller behind the shield with the spillback guard and
 # detector recall (FAILURES F-012, F-014), evaluated as a family of its own.
@@ -55,6 +58,10 @@ def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Co
         from cotraffic.controllers.random_policy import RandomPolicy
 
         return RandomPolicy(**kwargs)
+    if method in TEAM:
+        from cotraffic.controllers.team import TeamController
+
+        return TeamController(method, **kwargs)
     if method in LEARNED or checkpoint is not None:
         from cotraffic.controllers.rl_policy import LearnedPolicy
 

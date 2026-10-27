@@ -1,0 +1,52 @@
+name: llm_team
+description: >-
+  Three-role LLM team (Operator, Emergency, Pedestrian) on top of Max-Pressure.
+  Roles propose typed directives; code validates, arbitrates and applies them.
+  The environment shield remains the final safety layer.
+
+provider: opencode
+backend: opencode
+model: deepseek-v4.1-flash
+timeout_s: 90
+attempts: 1
+max_retries: 1
+max_calls: 80  # live safety cap; experiments override with COTRAFFIC_LLM_MAX_CALLS
+cache_path: results/llm_cache/llm_team.jsonl
+log_path: ""
+
+tokens:
+  operator: 600
+  emergency: 900
+  pedestrian: 500
+
+supervisor:
+  delta_s: 30
+  quiet_delta_s: 60
+  congested_delta_s: 20
+  ev_replan_s: 60
+  pedestrian_interval_s: 60
+  feedback_ttl_s: 60
+  quiet_queue_threshold: 8
+  congested_queue_threshold: 15
+  base_effort: none
+  escalate_effort: low
+  ev_event_triggers: true
+  ev_event_min_gap_s: 5
+  ev_eta_thresholds: []
+  ped_trigger_wait_s: 20
+  ped_event_min_gap_s: 20
+  ped_group_min_gap_s: 30
+  parallel: true
+  parallel_workers: 3
+
+snapshot:
+  max_alerts: 5
+  max_blackboard: 6
+  ev_horizon_s: 60
+  ev_lookahead: 3
+
+pricing:
+  # OpenCode Go DeepSeek V4.1 Flash list price, peak hours, USD per 1M tokens.
+  input_per_1m: 0.30
+  output_per_1m: 1.20
+  cached_per_1m: 0.006

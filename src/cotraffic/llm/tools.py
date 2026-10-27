@@ -48,7 +48,7 @@ class _Strict(BaseModel):  # [Exigences 5 et 9] arguments stricts (Pydantic)
 
 
 class JunctionArgs(_Strict):
-    junction: str = Field(min_length=1, max_length=16)
+    junction: str = Field(min_length=1, max_length=64)
 
 
 class EvArgs(_Strict):
@@ -60,7 +60,7 @@ class NoArgs(_Strict):
 
 
 class AdviceItemArgs(_Strict):
-    junction: str = Field(min_length=1, max_length=16)
+    junction: str = Field(min_length=1, max_length=64)
     phase: int = Field(ge=0, le=MAX_PHASE)
     strength: Literal[1, 2, 3]
     seconds: int = Field(ge=MIN_VALID_S, le=MAX_VALID_S)
