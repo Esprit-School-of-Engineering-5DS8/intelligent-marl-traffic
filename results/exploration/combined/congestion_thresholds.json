@@ -1,0 +1,18 @@
+{
+ "grid4x4": {
+  "q50": 0.026,
+  "q75": 0.0478,
+  "q90": 0.0592,
+  "q95": 0.0656,
+  "samples": 11520,
+  "source": "coop_full t1, normal, demands medium+peak, seed 1000, measured window"
+ },
+ "real_district": {
+  "q50": 0.0091,
+  "q75": 0.0159,
+  "q90": 0.0318,
+  "q95": 0.0403,
+  "samples": 5040,
+  "source": "coop_full t1, normal, demands medium+peak, seed 1000, measured window"
+ }
+}
