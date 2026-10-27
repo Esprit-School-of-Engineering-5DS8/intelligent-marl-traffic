@@ -43,7 +43,7 @@ from cotraffic.llm.settings import load_settings
 from cotraffic.llm.sources import llm_source
 from cotraffic.paths import CHECKPOINTS_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS
-from cotraffic.utils.io import write_row
+from cotraffic.utils.io import git_commit, write_row
 
 OUT = RESULTS_DIR / "exploration" / "combined"
 METHODS = ["ft", "mp", "ev_rule_mp", "coop_full", "coop_full_llm", "team_rules", "team_qwen"]
@@ -296,6 +296,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="list the episodes to run")
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--probe", action="store_true")
+    parser.add_argument("--allow-dirty", action="store_true", help="run on uncommitted changes")
     args = parser.parse_args()
     if args.seed in TEST_SEEDS:
         raise SystemExit("test seeds are never used to tune anything")
@@ -313,6 +314,9 @@ def main() -> None:
             for t in plain + llm:
                 print(" ", rid_of(t))
             return
+        if git_commit().endswith("-dirty") and not args.allow_dirty:
+            # every row stores the commit: commit first (the summary of a previous run too)
+            raise SystemExit("tracked files have uncommitted changes: commit them first")
         (OUT / "raw").mkdir(parents=True, exist_ok=True)
         with ProcessPoolExecutor(max_workers=args.jobs) as pool:
             for row in pool.map(run_task, plain):
