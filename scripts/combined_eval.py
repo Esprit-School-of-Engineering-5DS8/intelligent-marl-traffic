@@ -388,6 +388,9 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="run again saved episodes")
     parser.add_argument("--dry-run", action="store_true", help="list the episodes to run")
     parser.add_argument("--summary-only", action="store_true")
+    parser.add_argument(
+        "--no-summary", action="store_true", help="do not rewrite combined_summary.csv"
+    )
     parser.add_argument("--probe", action="store_true")
     parser.add_argument("--allow-dirty", action="store_true", help="run on uncommitted changes")
     args = parser.parse_args()
@@ -423,6 +426,8 @@ def main() -> None:
         for t in llm:  # alone: the measured latency must not include other simulations
             row = run_task(t)
             print(f"done {row['run_id']} ({row['sim_wall_time_s']:.0f} s)", flush=True)
+    if args.no_summary:  # batches: a rewritten summary would mark the next batch -dirty
+        return
     table = summarise()
     if not table.empty:
         table.to_csv(OUT / "combined_summary.csv", index=False)
