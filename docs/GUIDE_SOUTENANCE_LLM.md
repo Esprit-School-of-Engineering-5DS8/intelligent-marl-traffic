@@ -200,7 +200,7 @@ code --goto src\cotraffic\envs\shield.py:95
   bouclier a refusé ;
 - le bilan final, par exemple `106 décisions sous conseil : 6 changées par le conseil`.
 
-Secours : `type docs\demo\llm_demo_emergency.txt`, une sortie déjà enregistrée.
+Secours : `Get-Content -Encoding UTF8 docs\demo\llm_demo_emergency.txt`, une sortie déjà enregistrée.
 
 **g. Les chiffres clés.**
 
@@ -742,7 +742,7 @@ code --goto src\cotraffic\llm\tools.py:252
 `test_an_unknown_tool_is_refused_and_reported_to_the_model`.
 
 Pour un essai réel avec le LLM (environ 1 min) : `.venv\Scripts\python scripts\llm_tools_demo.py`,
-ou sa sortie enregistrée `type docs\demo\llm_tools_demo.txt`.
+ou sa sortie enregistrée `Get-Content -Encoding UTF8 docs\demo\llm_tools_demo.txt`.
 
 **g. Chiffres clés.** 12 tests réussis. En réel, un conseil prend 27,2 s et 50,0 s sur les
 deux situations essayées (`docs/demo/llm_tools_demo.txt`).
@@ -1450,8 +1450,8 @@ ollama list                                                   # qwen2.5:3b doit 
 
 | Problème | Que faire |
 |---|---|
-| Ollama lent (premier appel de plus de 30 s) ou absent | Montrer la sortie enregistrée : `type docs\demo\llm_demo_emergency.txt`. Ou lancer la même démo sans LLM : `.venv\Scripts\python scripts\llm_demo.py --source rules` (même mécanisme, conseils des règles) |
-| La démo des outils est trop lente | `type docs\demo\llm_tools_demo.txt` |
+| Ollama lent (premier appel de plus de 30 s) ou absent | Montrer la sortie enregistrée : `Get-Content -Encoding UTF8 docs\demo\llm_demo_emergency.txt`. Ou lancer la même démo sans LLM : `.venv\Scripts\python scripts\llm_demo.py --source rules` (même mécanisme, conseils des règles) |
+| La démo des outils est trop lente | `Get-Content -Encoding UTF8 docs\demo\llm_tools_demo.txt` |
 | SUMO ne démarre pas | Montrer d'abord les tests (`test_llm_tools.py`, puis `test_llm.py -k refused`), puis la sortie enregistrée de la démo |
 | La commande `code` ne répond pas | Dans VS Code, Ctrl+P, puis taper `advised.py:189` et Entrée |
 

@@ -314,7 +314,7 @@ Une seule graine par case : un écart de ±3 % n'est pas significatif. L'épisod
 | Temps | Quoi | Commande ou fichier |
 |---|---|---|
 | 1 min | Le principe : le LLM conseille, le RL exécute, le bouclier décide en dernier | Schéma de `docs/LLM_DESIGN.md`, section 3 |
-| 4 min | **La preuve que le LLM agit sur les décisions** : la démo en direct | `.venv\Scripts\python scripts\llm_demo.py` (secours : `type docs\demo\llm_demo_emergency.txt`) |
+| 4 min | **La preuve que le LLM agit sur les décisions** : la démo en direct | `.venv\Scripts\python scripts\llm_demo.py` (secours : `Get-Content -Encoding UTF8 docs\demo\llm_demo_emergency.txt`) |
 | 3 min | Le code, aux bons endroits | `docs/VISITE_DU_CODE.md`, étapes 2, 6 et 7 |
 | 2 min | Les réglages, et le choix du modèle | `Get-Content configs\llm.yaml` ; `type results\exploration\llm_benchmark\step2_choice.json` |
 | 2 min | La sécurité : tests adverses et attaque contre le bouclier | `.venv\Scripts\python -m pytest tests\test_llm_security.py -v` |

@@ -419,7 +419,7 @@ lignes 90 à 96) :</p>
     bouclier a refusé ;</li>
 <li>le bilan final, par exemple <code>106 décisions sous conseil : 6 changées par le conseil</code>.</li>
 </ul>
-<p>Secours : <code>type docs\demo\llm_demo_emergency.txt</code>, une sortie déjà enregistrée.</p>
+<p>Secours : <code>Get-Content -Encoding UTF8 docs\demo\llm_demo_emergency.txt</code>, une sortie déjà enregistrée.</p>
 <p><strong>g. Les chiffres clés.</strong></p>
 <table>
 <thead>
@@ -1021,7 +1021,7 @@ lignes 252 à 266, sans la docstring de la ligne 253) :</p>
 <p>À montrer : <code>12 passed</code>, dont <code>test_invalid_tool_calls_are_refused</code> et
 <code>test_an_unknown_tool_is_refused_and_reported_to_the_model</code>.</p>
 <p>Pour un essai réel avec le LLM (environ 1 min) : <code>.venv\Scripts\python scripts\llm_tools_demo.py</code>,
-ou sa sortie enregistrée <code>type docs\demo\llm_tools_demo.txt</code>.</p>
+ou sa sortie enregistrée <code>Get-Content -Encoding UTF8 docs\demo\llm_tools_demo.txt</code>.</p>
 <p><strong>g. Chiffres clés.</strong> 12 tests réussis. En réel, un conseil prend 27,2 s et 50,0 s sur les
 deux situations essayées (<code>docs/demo/llm_tools_demo.txt</code>).</p>
 <p><strong>h. La phrase à dire.</strong> « Le LLM peut lire la situation par des outils en lecture seule,
@@ -1862,11 +1862,11 @@ toutes les 3 min, les piétons perdent 24,8 %.</p>
 <tbody>
 <tr>
 <td>Ollama lent (premier appel de plus de 30 s) ou absent</td>
-<td>Montrer la sortie enregistrée : <code>type docs\demo\llm_demo_emergency.txt</code>. Ou lancer la même démo sans LLM : <code>.venv\Scripts\python scripts\llm_demo.py --source rules</code> (même mécanisme, conseils des règles)</td>
+<td>Montrer la sortie enregistrée : <code>Get-Content -Encoding UTF8 docs\demo\llm_demo_emergency.txt</code>. Ou lancer la même démo sans LLM : <code>.venv\Scripts\python scripts\llm_demo.py --source rules</code> (même mécanisme, conseils des règles)</td>
 </tr>
 <tr>
 <td>La démo des outils est trop lente</td>
-<td><code>type docs\demo\llm_tools_demo.txt</code></td>
+<td><code>Get-Content -Encoding UTF8 docs\demo\llm_tools_demo.txt</code></td>
 </tr>
 <tr>
 <td>SUMO ne démarre pas</td>

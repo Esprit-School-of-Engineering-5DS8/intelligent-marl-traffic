@@ -269,7 +269,7 @@ Pendant la démo 1, il faut montrer :
 
 | Problème | Que faire |
 |---|---|
-| Ollama lent (premier appel de plus de 30 s) ou absent | Montrer la sortie enregistrée : `type docs\demo\llm_demo_emergency.txt`. Ou lancer la même démo sans LLM : `.venv\Scripts\python scripts\llm_demo.py --source rules` (même mécanisme, conseils des règles) |
-| La démo des outils est trop lente (27 à 50 s par conseil) | `type docs\demo\llm_tools_demo.txt` |
+| Ollama lent (premier appel de plus de 30 s) ou absent | Montrer la sortie enregistrée : `Get-Content -Encoding UTF8 docs\demo\llm_demo_emergency.txt`. Ou lancer la même démo sans LLM : `.venv\Scripts\python scripts\llm_demo.py --source rules` (même mécanisme, conseils des règles) |
+| La démo des outils est trop lente (27 à 50 s par conseil) | `Get-Content -Encoding UTF8 docs\demo\llm_tools_demo.txt` |
 | SUMO ne démarre pas | Les tests de sécurité et d'outils ne lancent pas tous SUMO : les montrer d'abord (lignes 3 à 5), puis la sortie enregistrée de la démo |
 | Plus de temps | `--compare` ajoute COOP-FULL seul sur le même épisode : `.venv\Scripts\python scripts\llm_demo.py --scenario incident --compare` (environ 3 min) |
