@@ -10,5 +10,6 @@ call_interval_s: 30
 timeout_s: 30
 attempts: 2
 max_tokens: 700
+reasoning_effort: none
 max_calls: 0
 fallback: mp

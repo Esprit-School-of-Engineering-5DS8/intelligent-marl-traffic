@@ -67,6 +67,10 @@ class LLMController(Controller):
         )
         self.attempts = int(os.environ.get("COTRAFFIC_LLM_ATTEMPTS", cfg.get("attempts", 2)))
         self.max_tokens = int(os.environ.get("COTRAFFIC_LLM_MAX_TOKENS", cfg.get("max_tokens", 700)))
+        self.reasoning_effort = str(
+            os.environ.get("COTRAFFIC_LLM_REASONING_EFFORT", cfg.get("reasoning_effort", "none"))
+            or "none"
+        )
         configured_max = os.environ.get("COTRAFFIC_LLM_MAX_CALLS", cfg.get("max_calls", 0))
         self.max_calls = int(max_calls if max_calls is not None else configured_max or 0)
         self.fallback_name = fallback or str(cfg.get("fallback", "mp"))
@@ -94,6 +98,7 @@ class LLMController(Controller):
         self._metrics = {
             "llm_provider": self.provider_name,
             "llm_model": "",
+            "llm_reasoning_effort": self.reasoning_effort,
             "llm_available": 0,
             "llm_calls": 0,
             "llm_success": 0,
@@ -168,6 +173,7 @@ class LLMController(Controller):
                 ],
                 schema,
                 max_tokens=self.max_tokens,
+                effort=self.reasoning_effort,
             )
             actions, missing = self._parse(result.data, env, agents)
             if not actions:
@@ -257,8 +263,13 @@ class LLMController(Controller):
             "intersections": intersections,
         }
 
+    @staticmethod
+    def _phase_count(env, agent: str) -> int:
+        inter = env.intersections[agent]
+        return int(getattr(inter, "n_phases", len(inter.phase_lanes)))
+
     def _schema(self, env, agents: list[str]) -> dict[str, Any]:
-        max_phase = max(int(env.action_space(agent).n) for agent in agents) - 1
+        max_phase = max(self._phase_count(env, agent) for agent in agents) - 1
         return {
             "type": "object",
             "additionalProperties": False,
@@ -285,7 +296,7 @@ class LLMController(Controller):
                 if (
                     isinstance(phase, int)
                     and not isinstance(phase, bool)
-                    and 0 <= phase < int(env.action_space(agent).n)
+                    and 0 <= phase < self._phase_count(env, agent)
                 ):
                     actions[agent] = phase
         else:
@@ -299,7 +310,7 @@ class LLMController(Controller):
                 phase = item.get("phase")
                 if agent not in agents or not isinstance(phase, int) or isinstance(phase, bool):
                     continue
-                if not 0 <= phase < int(env.action_space(agent).n):
+                if not 0 <= phase < self._phase_count(env, agent):
                     continue
                 actions[agent] = phase
         return actions, len(agents) - len(actions)

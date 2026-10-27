@@ -20,6 +20,10 @@ class FakeActionSpace:
     n = 2
 
 
+class WideActionSpace:
+    n = 3
+
+
 class FakeMeasurements:
     def __init__(self) -> None:
         self.lanes = ["a0", "b0", "ao", "bo"]
@@ -75,6 +79,11 @@ class FakeEnv:
         return FakeActionSpace()
 
 
+class WideEnv(FakeEnv):
+    def action_space(self, agent: str):
+        return WideActionSpace()
+
+
 class FakeProvider:
     model = "fake-model"
 
@@ -82,9 +91,11 @@ class FakeProvider:
         self.data = data or {"decisions": []}
         self.error = error
         self.calls = 0
+        self.efforts: list[str] = []
 
-    def chat_json(self, messages, schema, max_tokens=700):
+    def chat_json(self, messages, schema, max_tokens=700, effort=None):
         self.calls += 1
+        self.efforts.append(effort)
         if self.error is not None:
             raise self.error
         return LLMResult(self.data, "{}", 1.0, 10, 5)
@@ -142,6 +153,29 @@ def test_schema_uses_a_compact_phases_array():
     assert schema["required"] == ["phases"]
     assert schema["additionalProperties"] is False
     assert schema["properties"]["phases"]["items"]["maximum"] == 1
+
+
+def test_reasoning_effort_is_forwarded_and_reported():
+    provider = FakeProvider({"phases": [0, 0]})
+    env = FakeEnv()
+    controller = make_controller(provider)
+    controller.reset(env)
+
+    controller.act(env, {})
+    assert provider.efforts == ["none"]
+    assert controller.metrics()["llm_reasoning_effort"] == "none"
+
+
+def test_phase_count_uses_intersection_not_padded_action_space():
+    provider = FakeProvider({"phases": [2, 0]})
+    env = WideEnv()
+    controller = make_controller(provider)
+    controller.reset(env)
+
+    schema = controller._schema(env, sorted(env.intersections))
+    assert schema["properties"]["phases"]["items"]["maximum"] == 1
+    assert controller.act(env, {}) == {"A0": 0, "B0": 0}
+    assert controller.metrics()["llm_partial"] == 1
 
 
 def test_invalid_phase_and_missing_intersection_fall_back_to_max_pressure():
