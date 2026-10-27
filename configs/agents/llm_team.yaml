@@ -15,9 +15,9 @@ cache_path: results/llm_cache/llm_team.jsonl
 log_path: ""
 
 tokens:
-  operator: 300
-  emergency: 500
-  pedestrian: 300
+  operator: 600
+  emergency: 900
+  pedestrian: 500
 
 supervisor:
   delta_s: 30
