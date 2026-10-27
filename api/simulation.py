@@ -225,7 +225,7 @@ class SimulationSession:
         except Exception:
             pass
 
-    def _publish(self, env: CoTrafficEnv, scenario: str) -> None:
+    def _publish(self, env: CoTrafficEnv, scenario: str, controller: Any = None) -> None:
         conn = env.conn
         sim_time = int(conn.simulation.getTime())
         vehicles = []
@@ -257,6 +257,13 @@ class SimulationSession:
                 )
             except Exception:
                 continue
+        metrics: dict[str, Any] = {
+            "vehicles": len(vehicles),
+            "arrived": int(conn.simulation.getArrivedNumber()),
+        }
+        metrics_fn = getattr(controller, "metrics", None)
+        if callable(metrics_fn):
+            metrics["controller"] = metrics_fn()
         with self.lock:
             self.state.update(
                 {
@@ -264,10 +271,7 @@ class SimulationSession:
                     "clock": f"{sim_time // 3600:02d}:{sim_time % 3600 // 60:02d}:{sim_time % 60:02d}",
                     "vehicles": vehicles,
                     "signals": signals,
-                    "metrics": {
-                        "vehicles": len(vehicles),
-                        "arrived": int(conn.simulation.getArrivedNumber()),
-                    },
+                    "metrics": metrics,
                 }
             )
 
@@ -313,10 +317,10 @@ class SimulationSession:
                         if not env.agents or self.stop_event.is_set():
                             break
                         obs = self._advance(env, controller, obs)
-                    self._publish(env, scenario)
+                    self._publish(env, scenario, controller)
                     continue
                 obs = self._advance(env, controller, obs)
-                self._publish(env, scenario)
+                self._publish(env, scenario, controller)
                 speed = self.state.get("speed", 1) or 1
                 time.sleep(max(0.0, min(1.0, 1.0 / max(float(speed), 0.25))))
             if not self.stop_event.is_set():

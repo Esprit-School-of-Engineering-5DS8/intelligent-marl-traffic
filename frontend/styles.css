@@ -5485,6 +5485,16 @@ html.is-sidebar-collapsed .sidebar-collapse {
   outline-offset: 2px;
 }
 
+.live-controller-budget {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #eef7e5;
+  color: #628b38;
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .live-controller.is-disabled {
   opacity: 0.45;
   pointer-events: none;

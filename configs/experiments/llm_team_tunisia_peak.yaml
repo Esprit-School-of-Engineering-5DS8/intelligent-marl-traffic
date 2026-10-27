@@ -1,0 +1,12 @@
+name: llm_team_tunisia_peak
+description: >-
+  Peak-demand stress check on the Tunis real district. One seed, Max-Pressure
+  against the three-role LLM team, normal and emergency scenarios.
+
+seeds: [0]
+cells:
+  - network: real_district
+    methods: [mp, llm_team]
+    demands: [peak]
+    scenarios: [normal, emergency]
+    ssm: true

@@ -1,6 +1,6 @@
 # LLM team port and speed plan
 
-Status: Phase 3 done at `d922480`; Phase 4 deferred; Phase 5 minimal frontend done
+Status: Phase 3 done; peak check negative; Phase 4 deferred; Phase 5 minimal frontend done
 
 Base: `integration` at `b908238`  
 Working branch: `feat/llm-team-speed`  
@@ -379,8 +379,21 @@ Findings:
   action space. Before the fix it produced empty or truncated responses on 7 of 23
   calls.
 
-Phase 3 acceptance: met, with the 4 team fallbacks and the replay cache misses
-reported above.
+Peak-demand check (seed 0, normal and emergency):
+
+| scenario | method | travel s | wait s | throughput/h | EV delay s |
+|---|---|---:|---:|---:|---:|
+| normal | mp | 167.28 | 48.46 | 5252 | |
+| normal | llm_team | 182.21 | 62.72 | 5260 | |
+| emergency | mp | 164.11 | 44.09 | 5274 | 103.96 |
+| emergency | llm_team | 170.29 | 50.98 | 5290 | 136.03 |
+
+Findings: the team loses to Max-Pressure at peak demand on travel time, waiting
+time and EV delay. Throughput is slightly higher, so the extra delay is not from
+lost demand. Do not claim the team helps under stress on this evidence.
+
+Phase 3 acceptance: met for medium demand, with the 4 team fallbacks and the replay
+cache misses reported above. The peak check is negative.
 
 ### Phase 4: Monaco stress test (deferred)
 
@@ -410,9 +423,14 @@ Delivered:
   cost.
 - The live-map shell has a Controller selector. It reads `GET /api/policy`, writes
   `PUT /api/policy`, offers `llm_team`, and is enabled only for grid2x2 and grid3x3.
-  Selecting `llm_team` shows a paid-call warning. The setting applies to the next run.
-- The existing Analytics and method pickers show the new team metrics. No separate
-  LLM monitor page was added.
+  Selecting `llm_team` asks for confirmation, warns about paid calls, and applies to
+  the next run.
+- Live runs have a safety cap (`max_calls: 80`), a calls/cap badge, and the live API
+  publishes the controller metrics with each simulation state.
+- The dashboard exports per-run `llm_runs.json` and adds a Benchmark > LLM monitor
+  page with calls, fallbacks, retries, tokens, latency and estimated cost per run.
+  Cost is computed from the configured peak list price, including cached tokens.
+- The existing Analytics and method pickers show the new team metrics.
 - Verification: 121 tests pass, the Vite build passes, the non-test TypeScript check
   passes, and the API policy tests cover `llm_team`.
 
@@ -421,7 +439,6 @@ Still out of scope:
 - Migrating the served shell to the React app.
 - Live simulation on `real_district`; the shell and API still support grids only.
 - Cleaning the mock Optimize/Predict/Roam providers.
-- A dedicated LLM monitor benchmark page.
 
 ## 10. Files
 
@@ -453,6 +470,8 @@ configs/experiments/llm_team_ab.yaml
 configs/experiments/llm_team_ab_quick.yaml
 configs/experiments/llm_team_speed.yaml
 configs/experiments/llm_team_tunisia.yaml
+configs/experiments/llm_team_tunisia_peak.yaml
+frontend/src/features/analytics/LlmMonitorPage.tsx
 tests/conftest.py
 tests/test_llm_team_schemas.py
 tests/test_llm_team_arbiter.py
@@ -471,7 +490,10 @@ src/cotraffic/controllers/registry.py
 src/cotraffic/envs/observations.py
 src/cotraffic/envs/traffic_env.py
 src/cotraffic/analysis/style.py
+src/cotraffic/controllers/llm_team/supervisor.py
+api/simulation.py
 configs/agents/llm.yaml
+configs/agents/llm_team.yaml
 api/policy.py
 configs/dashboard_policy.yaml
 frontend/index.html
@@ -479,6 +501,9 @@ frontend/styles.css
 frontend/src/shell/app.js
 frontend/src/shared/domain/methods.ts
 frontend/src/shared/domain/metrics.ts
+frontend/src/shared/schemas/index.ts
+frontend/src/shared/api/queries.ts
+frontend/src/shell/benchmark-mount.jsx
 frontend/src/shared/i18n/locales/en.json
 frontend/src/shared/i18n/locales/fr.json
 frontend/src/shared/i18n/locales/ar.json

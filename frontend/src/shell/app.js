@@ -1346,6 +1346,13 @@ async function loadPolicy() {
 async function selectPolicy(method) {
   const network = activeGridNetwork();
   if (!network) return;
+  if (
+    method === 'llm_team' &&
+    !window.confirm('LLM team makes paid OpenCode Go calls, capped per run. Continue?')
+  ) {
+    renderPolicyControl();
+    return;
+  }
   try {
     const response = await simulationFetch('/api/policy', {
       method: 'PUT',
@@ -1357,12 +1364,12 @@ async function selectPolicy(method) {
     policyCatalog = Array.isArray(body.catalog) ? body.catalog : policyCatalog;
     activePolicyMethod = body.method || method;
     renderPolicyControl();
-    showToast(`Controller: ${policyLabel(activePolicyMethod)} (next run).`, {
-      duration: activePolicyMethod === 'llm_team' ? 5200 : 2200
-    });
-    if (activePolicyMethod === 'llm_team') {
-      showToast('LLM team uses OpenCode Go and makes paid calls.', { duration: 5200 });
-    }
+    showToast(
+      activePolicyMethod === 'llm_team'
+        ? 'LLM team selected. Paid calls are capped per run.'
+        : `Controller: ${policyLabel(activePolicyMethod)} (next run).`,
+      { duration: activePolicyMethod === 'llm_team' ? 5200 : 2200 }
+    );
   } catch (error) {
     renderPolicyControl();
     showToast(error instanceof Error ? error.message : 'Controller unavailable.');
@@ -1404,6 +1411,18 @@ function updateSimulationState(state) {
   if (simulationClock) simulationClock.textContent = state.clock || '00:00:00';
   setSimulationStatus(state.status);
   if (simulationMetrics) simulationMetrics.textContent = `${state.metrics?.vehicles || 0} vehicles`;
+  const budget = document.getElementById('liveControllerBudget');
+  if (budget) {
+    const controllerMetrics = state.metrics?.controller || {};
+    const calls = Number(controllerMetrics.llm_team_calls || 0);
+    const cap = Number(controllerMetrics.llm_team_max_calls || 0);
+    const show = state.method === 'llm_team' && (calls > 0 || cap > 0);
+    budget.hidden = !show;
+    if (show) {
+      budget.textContent = cap ? `${calls}/${cap}` : `${calls}`;
+      budget.title = `LLM calls this run: ${calls}${cap ? ` of ${cap}` : ''}`;
+    }
+  }
   if (simulationTime && Number.isFinite(Number(state.simulationTime))) simulationTime.value = state.simulationTime;
   paintSimulationTimeline(simulationTime?.value || 0);
   refreshSimulationVehicles(state);

@@ -30,13 +30,16 @@ from typing import Any
 
 import pandas as pd
 
+from cotraffic import config
 from cotraffic.networks.build import net_file
 from cotraffic.paths import RESULTS_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = ROOT / "frontend" / "public" / "data"
 SUMMARY = RESULTS_DIR / "summary"
+RAW = RESULTS_DIR / "raw"
 LOGS = RESULTS_DIR / "logs"
+PRICING = config.load_agent("llm_team").get("pricing") or {}
 EXTRA = RESULTS_DIR / "extra"
 TRAINING = RESULTS_DIR / "training"
 NETWORKS = ["grid4x4", "grid8x8", "real_district"]
@@ -162,6 +165,74 @@ def extra_summary() -> pd.DataFrame:
 
 
 BASELINE_SET = {"ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp"}
+
+
+def _number(record: dict[str, Any], key: str) -> float | None:
+    value = record.get(key)
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
+
+
+def _llm_cost(tokens_in: float | None, tokens_out: float | None, cached: float | None) -> float | None:
+    if tokens_in is None and tokens_out is None:
+        return None
+    cached = cached or 0.0
+    normal_in = max(0.0, (tokens_in or 0.0) - cached)
+    return (
+        normal_in * float(PRICING.get("input_per_1m", 0.0))
+        + cached * float(PRICING.get("cached_per_1m", 0.0))
+        + (tokens_out or 0.0) * float(PRICING.get("output_per_1m", 0.0))
+    ) / 1_000_000
+
+
+def export_llm_runs(out: Path) -> list[dict[str, Any]]:
+    """Per-run operational metrics of the LLM controllers."""
+    rows = []
+    for path in sorted(RAW.glob("*.csv")):
+        frame = pd.read_csv(path)
+        for record in frame.to_dict("records"):
+            method = str(record.get("method", ""))
+            if method not in ("llm", "llm_team"):
+                continue
+            if str(record.get("quick", "")).lower() == "true":
+                continue
+            team = method == "llm_team"
+            calls = _number(record, "llm_team_calls" if team else "llm_calls")
+            fallbacks = _number(record, "llm_team_fallbacks" if team else "llm_fallbacks")
+            retries = _number(record, "llm_team_retries")
+            latency_ms = _number(record, "llm_latency_ms_mean")
+            tokens_in = _number(record, "llm_team_tokens_in" if team else "llm_prompt_tokens")
+            tokens_out = _number(record, "llm_team_tokens_out" if team else "llm_completion_tokens")
+            cached = _number(record, "llm_team_tokens_cached")
+            rows.append(
+                {
+                    "runId": str(record.get("run_id", path.stem)),
+                    "network": str(record.get("network", "")),
+                    "scenario": str(record.get("scenario", "")),
+                    "demand": str(record.get("demand", "")),
+                    "method": method,
+                    "seed": int(record.get("seed", 0)),
+                    "calls": None if calls is None else int(calls),
+                    "success": None
+                    if calls is None or fallbacks is None
+                    else int(calls - fallbacks),
+                    "partial": _number(record, "llm_partial"),
+                    "fallbacks": None if fallbacks is None else int(fallbacks),
+                    "retries": None if retries is None else int(retries),
+                    "tokensIn": tokens_in,
+                    "tokensOut": tokens_out,
+                    "cachedTokens": cached,
+                    "latencyS": _number(record, "llm_team_latency_mean_s")
+                    if team
+                    else (None if latency_ms is None else latency_ms / 1000.0),
+                    "costUsd": _llm_cost(tokens_in, tokens_out, cached),
+                    "wallS": _number(record, "sim_wall_time_s"),
+                }
+            )
+    rows.sort(key=lambda row: (row["method"], row["scenario"], row["seed"]))
+    write(out, "llm_runs.json", rows)
+    return rows
 
 
 def export_comparisons(out: Path) -> None:
@@ -497,6 +568,7 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     print(f"exporting to {out}")
     summary = export_summary(out)
+    export_llm_runs(out)
     export_comparisons(out)
     timeseries = export_timeseries(out)
     export_distributions(out)

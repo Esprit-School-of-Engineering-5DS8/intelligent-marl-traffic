@@ -12,6 +12,7 @@ import {
   NetworkGeometry,
   PedestrianGreens,
   Replay,
+  LlmRuns,
   Summary,
   TimeseriesCell,
   Training,
@@ -34,6 +35,7 @@ function useData<T>(path: string | null, schema: ZodType<T>, optional = false) {
 export const useMeta = () => useData("meta", Meta);
 export const useSummary = () => useData("summary", Summary);
 export const useComparisons = () => useData("comparisons", Comparisons);
+export const useLlmRuns = () => useData("llm_runs", LlmRuns);
 export const usePedestrianGreens = () => useData("pedestrian_greens", PedestrianGreens, true);
 export const useEmergencyLog = () => useData("emergency_log", EmergencyLog, true);
 

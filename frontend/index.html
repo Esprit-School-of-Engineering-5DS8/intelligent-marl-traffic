@@ -103,6 +103,7 @@
             <button type="button" class="nav-subitem" data-benchmark-tab="agents">Agents RL</button>
             <button type="button" class="nav-subitem" data-benchmark-tab="live">Carte en direct</button>
             <button type="button" class="nav-subitem" data-benchmark-tab="compare">Analyse comparative</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="llm">LLM monitor</button>
             <button type="button" class="nav-subitem" data-benchmark-tab="overview">Vue d’ensemble</button>
           </div>
         </div>
@@ -551,6 +552,7 @@
               <label class="live-controller" title="Controller used by the next live simulation">
                 <span>Controller</span>
                 <select id="liveControllerSelect" aria-label="Active controller"></select>
+                <span class="live-controller-budget" id="liveControllerBudget" title="LLM calls this run" hidden></span>
               </label>
             </div>
 

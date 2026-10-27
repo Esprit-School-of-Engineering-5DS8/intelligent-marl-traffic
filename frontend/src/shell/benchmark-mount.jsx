@@ -25,12 +25,14 @@ import OverviewPage from '@/features/overview/OverviewPage';
 import AgentsPage from '@/features/agents/AgentsPage';
 import LiveMapPage from '@/features/live-map/LiveMapPage';
 import AnalyticsPage from '@/features/analytics/AnalyticsPage';
+import LlmMonitorPage from '@/features/analytics/LlmMonitorPage';
 
 const PAGES = {
   overview: OverviewPage,
   agents: AgentsPage,
   live: LiveMapPage,
   compare: AnalyticsPage,
+  llm: LlmMonitorPage,
 };
 
 /** The benchmark pages read the backend, not the bundled export. */

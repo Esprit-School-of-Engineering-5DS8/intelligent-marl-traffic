@@ -714,6 +714,7 @@ class Supervisor:
         ) / 1_000_000
         metrics: dict[str, Any] = {
             "llm_team_calls": int(self.stats["calls"]),
+            "llm_team_max_calls": int(self.config.max_calls),
             "llm_team_fallbacks": int(self.stats["fallbacks"]),
             "llm_team_retries": int(self.stats["retries"]),
             "llm_team_escalated": int(self.stats["escalated"]),

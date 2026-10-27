@@ -48,6 +48,28 @@ export const Comparison = Cell.extend({
 });
 export const Comparisons = z.array(Comparison);
 
+export const LlmRun = z.object({
+  runId: z.string(),
+  network: z.string(),
+  scenario: z.string(),
+  demand: z.string(),
+  method: z.string(),
+  seed: num,
+  calls: maybe,
+  success: maybe,
+  partial: maybe,
+  fallbacks: maybe,
+  retries: maybe,
+  tokensIn: maybe,
+  tokensOut: maybe,
+  cachedTokens: maybe,
+  latencyS: maybe,
+  costUsd: maybe,
+  wallS: maybe,
+});
+export type LlmRun = z.infer<typeof LlmRun>;
+export const LlmRuns = z.array(LlmRun);
+
 export const Meta = z.object({
   generatedAt: z.string(),
   cells: z.array(Cell.extend({ methods: z.array(z.string()) })),
