@@ -1,0 +1,13 @@
+name: llm_team_tunisia
+description: >-
+  Phase 3 comparison on the Tunis real district. Three seeds, Max-Pressure, the
+  single-call LLM controller and the three-role LLM team on normal, emergency and
+  incident. Run with the OpenCode Go provider and a call guard.
+
+seeds: [0, 1, 2]
+cells:
+  - network: real_district
+    methods: [mp, llm, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency, incident]
+    ssm: true
