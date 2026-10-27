@@ -41,7 +41,9 @@ export function QueryState<T>({
           {t("data.loadError")}
         </p>
         <p className="text-xs text-text-2">
-          {source === "live" ? t("data.loadErrorLive") : query.error.message}
+          {source === "live"
+            ? `${t("data.loadErrorLive")} (${query.error.message})`
+            : query.error.message}
         </p>
         <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
           {t("common.retry")}

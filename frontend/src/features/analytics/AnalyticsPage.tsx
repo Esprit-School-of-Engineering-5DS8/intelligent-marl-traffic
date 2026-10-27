@@ -14,7 +14,7 @@ import {
   Select,
 } from "@/shared/components/pickers";
 import { EmptyData, QueryState } from "@/shared/components/QueryState";
-import { cellKey, compareCells } from "@/shared/domain/cells";
+import { cellKey, compareCells, sameCell } from "@/shared/domain/cells";
 import { useFormat, useTx } from "@/shared/domain/format";
 import { methodColor, sortMethods } from "@/shared/domain/methods";
 import { usePageTitle } from "@/shared/lib/use-page-title";
@@ -85,7 +85,7 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
     (tk: ChartTokens) =>
       forest(tk, {
         items: mine.map((r) => ({
-          label: f.cellName(r),
+          label: `${f.scenarioName(r.scenario)} · ${f.demandName(r.demand)}`,
           value: r.pairedImprovementPct ?? 0,
           lo: r.pairedCiLo ?? r.pairedImprovementPct ?? 0,
           hi: r.pairedCiHi ?? r.pairedImprovementPct ?? 0,
@@ -100,12 +100,16 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
   );
 
   const cells = [...new Map(scoped.map((r) => [cellKey(r), r])).values()].sort(compareCells);
+  const heatRows = useMemo(
+    () => (methods.includes(controller) ? [controller] : methods),
+    [methods, controller],
+  );
   const buildHeat = useCallback(
     (tk: ChartTokens) =>
       heatmap(tk, {
-        rows: methods.map((m) => f.methodName(m)),
-        columns: cells.map((c) => f.cellName(c)),
-        values: methods.flatMap((m, y) =>
+        rows: heatRows.map((m) => f.methodName(m)),
+        columns: cells.map((c) => `${f.scenarioName(c.scenario)} · ${f.demandName(c.demand)}`),
+        values: heatRows.flatMap((m, y) =>
           cells.map((c, x): [number, number, number | null] => [
             x,
             y,
@@ -116,7 +120,7 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
         format: (v) => f.number(v, 0),
         rtl,
       }),
-    [methods, cells, scoped, f, rtl],
+    [heatRows, cells, scoped, f, rtl],
   );
 
   return (
@@ -320,12 +324,17 @@ function TestsTable({ rows, metric }: { rows: Comparison[]; metric: string }) {
 
 function Distribution({ meta }: { meta: Meta }) {
   const { t } = useTranslation();
+  useReconciledFilters(meta);
   const { cell, setCell, controllers, toggleController } = useFilters();
-  const query = useDistribution(cell);
+  const valid =
+    meta.cells.find((c) => sameCell(c, cell)) ??
+    meta.cells.find((c) => c.scenario === "normal") ??
+    meta.cells[0];
+  const query = useDistribution(valid ?? null);
   return (
     <ChartCard title={t("analytics.distribution")} description={t("analytics.distributionText")}>
       <div className="mb-3">
-        <CellPicker meta={meta} value={cell} onChange={setCell} />
+        <CellPicker meta={meta} value={valid ?? cell} onChange={setCell} />
       </div>
       <QueryState query={query} height={300}>
         {(d) => <DistributionChart dist={d} selected={controllers} onToggle={toggleController} />}
@@ -347,7 +356,8 @@ function DistributionChart({
   const f = useFormat();
   const rtl = useRtl();
   const methods = sortMethods(Object.keys(dist.methods));
-  const shown = methods.filter((m) => selected.includes(m));
+  const chosen = methods.filter((m) => selected.includes(m));
+  const shown = chosen.length ? chosen : methods;
   const first = dist.methods[methods[0] ?? ""];
   // bins beyond 5 minutes hold few vehicles: cut there for readability
   const limit = first ? first.from.findIndex((x) => x >= 300) : -1;
