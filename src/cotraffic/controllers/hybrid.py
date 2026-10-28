@@ -8,6 +8,10 @@ Every decision (5 s) goes down four layers:
      congested (mean normalised queue of the last minute above a threshold), COOP-FULL
      elsewhere; the thresholds are quantiles of that congestion under COOP-FULL on the
      validation seed (``congestion_thresholds``);
+   * ``BacklogStrategy`` (H3): Max-Pressure at every junction while the queue at the
+     entrances of the network (vehicles SUMO could not insert yet, mean of the last minute)
+     exceeds a threshold; the thresholds are quantiles of that queue under H2 on the
+     validation seed (``backlog_thresholds``);
 2. tactics: the mode decides the phase; in the COOP-FULL mode, ``mp_beta`` > 0 (H2) adds
    ``mp_beta`` to the logit of Max-Pressure's phase (Max-Pressure as a guide of COOP-FULL);
 3. pre-emption, by switching at the concerned junctions only: pedestrians (PED-RULE or the
@@ -97,6 +101,57 @@ class CongestionStrategy:
             "threshold": self.threshold,
             "period_s": self.period_s,
             "mode_switches": self.switches,
+        }
+
+
+def insertion_backlog(env) -> int:
+    """Vehicles whose departure time has come but that SUMO could not insert yet: the queue
+    at the entrances of the network (``waiting`` in SUMO's summary)."""
+    return len(env.conn.simulation.getPendingVehicles())
+
+
+class BacklogStrategy:
+    """H3: Max-Pressure at every junction while the queue at the entrances exceeds a
+    threshold, decided every ``period_s``; otherwise every junction stays in the COOP-FULL
+    mode (with the bias of H2 when the policy has one)."""
+
+    name = "backlog"
+
+    def __init__(self, threshold: float, period_s: float = 300.0, window_s: float = 60.0):
+        self.threshold, self.period_s, self.window_s = float(threshold), period_s, window_s
+
+    def reset(self, env) -> None:
+        self.history: deque = deque()
+        self.current = "coop"
+        self.next_update = 0.0
+        self.switches = 0
+        self.periods = {"coop": 0, "mp": 0}
+
+    def observe(self, env) -> float:
+        """Mean queue at the entrances over the last ``window_s`` (one sample per decision)."""
+        now = env.now
+        self.history.append((now, insertion_backlog(env)))
+        while self.history and self.history[0][0] < now - self.window_s:
+            self.history.popleft()
+        return float(np.mean([b for _, b in self.history]))
+
+    def modes(self, env) -> dict[str, str]:
+        backlog = self.observe(env)
+        if env.now >= self.next_update:
+            new = "mp" if backlog > self.threshold else "coop"
+            self.switches += new != self.current
+            self.current = new
+            self.periods[new] += 1
+            self.next_update = env.now + self.period_s
+        return dict.fromkeys(env.intersections, "mp") if self.current == "mp" else {}
+
+    def summary(self) -> dict[str, Any]:
+        n = max(1, sum(self.periods.values()))
+        return {
+            "threshold": self.threshold,
+            "period_s": self.period_s,
+            "mode_switches": self.switches,
+            "periods_mp": round(self.periods["mp"] / n, 4),
         }
 
 

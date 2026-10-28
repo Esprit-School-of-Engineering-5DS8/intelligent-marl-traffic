@@ -7,6 +7,7 @@ from test_combined import OBS, FixedGuide, FixedLogits
 from test_llm_team_controller import FakeEnv
 
 from cotraffic.controllers.hybrid import (
+    BacklogStrategy,
     CongestionStrategy,
     HybridPolicy,
     PedRuleGuide,
@@ -179,3 +180,24 @@ def test_hybrid_in_max_pressure_mode_everywhere_requests_what_max_pressure_reque
     finally:
         env.close()
     assert hybrid.summary()["share_mp"] == 1.0
+
+
+def backlog_env(now: float, pending: int):
+    sim = SimpleNamespace(getPendingVehicles=lambda: [f"v{i}" for i in range(pending)])
+    return SimpleNamespace(
+        now=now, intersections={"A0": None, "B0": None}, conn=SimpleNamespace(simulation=sim)
+    )
+
+
+def test_backlog_strategy_puts_the_whole_network_in_mp_while_the_entrance_queue_is_long():
+    s = BacklogStrategy(threshold=2.0, period_s=300.0, window_s=60.0)
+    s.reset(backlog_env(0, 0))
+    assert s.modes(backlog_env(0, 5)) == {"A0": "mp", "B0": "mp"}  # 5 vehicles > 2
+    for t in range(5, 300, 5):  # held for the period, whatever the queue
+        assert s.modes(backlog_env(t, 0)) == {"A0": "mp", "B0": "mp"}
+    assert s.modes(backlog_env(300, 2)) == {}  # mean of the last minute 2/13: COOP-FULL mode
+    assert s.summary() == {
+        "threshold": 2.0, "period_s": 300.0, "mode_switches": 2, "periods_mp": 0.5
+    }  # fmt: skip
+    s.reset(backlog_env(0, 0))
+    assert s.modes(backlog_env(0, 2)) == {}  # equal to the threshold: not above it

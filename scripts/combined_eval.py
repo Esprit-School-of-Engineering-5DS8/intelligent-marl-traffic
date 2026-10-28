@@ -16,6 +16,9 @@ Episodes without a language model run in parallel; the episodes with one run alo
 after the other: the latency of each call is measured and sets the delay before its answer
 acts.
 
+The hybrids of the combined study (H1, H2, H3, controllers/hybrid.py) take their thresholds
+from --profile-congestion (H1) and --profile-backlog (H3). Episodes run on libsumo unless
+--traci (the rows before the column sumo_backend ran on TraCI; same episodes).
 Rows go to results/exploration/combined/raw/ (never results/raw), every call to calls/,
 the comparison to combined_summary.csv (gains: positive = better).
 """
@@ -24,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -36,6 +40,7 @@ import pandas as pd
 from cotraffic import config
 from cotraffic.controllers.combined import GUIDES, EvRuleGuide, GuidedPolicy
 from cotraffic.controllers.hybrid import (
+    BacklogStrategy,
     CongestionStrategy,
     HybridPolicy,
     PedRuleGuide,
@@ -52,6 +57,7 @@ from cotraffic.llm.sources import llm_source
 from cotraffic.paths import CHECKPOINTS_DIR, RESULTS_DIR
 from cotraffic.seeds import TEST_SEEDS
 from cotraffic.utils.io import git_commit, write_row
+from cotraffic.utils.sumo import use_libsumo
 
 OUT = RESULTS_DIR / "exploration" / "combined"
 METHODS = ["ft", "mp", "ev_rule_mp", "coop_full", "coop_full_llm", "team_rules", "team_qwen"]
@@ -68,9 +74,12 @@ HYBRID = {
     "hybrid_h2": "ppo + logit_bias(max_pressure) (H2) + switch(EV-RULE)",
     "coop_full_tped_switch": "ppo + switch(team serve_ped rules, no LLM) + switch(EV-RULE)",
     "coop_full_pedrule_switch": "ppo + switch(PED-RULE) + switch(EV-RULE)",
+    "hybrid_h3": "H2 beta 4 / max_pressure everywhere by entrance queue (H3) + switch(EV-RULE)",
 }
 ALL_METHODS = METHODS + ["ped_rule_mp"] + list(GUIDED) + list(HYBRID)
 THRESHOLDS = OUT / "congestion_thresholds.json"  # H1, from --profile-congestion
+BACKLOG_THRESHOLDS = OUT / "backlog_thresholds.json"  # H3, from --profile-backlog
+H3_BETA = 4.0  # H3 = the best H2 of the three validation seeds, with the switch to MP
 WITH_LLM = {"coop_full_llm", "team_qwen"}
 NETWORKS = ["grid4x4", "real_district"]
 SCENARIOS = ["normal", "emergency", "incident"]
@@ -103,10 +112,10 @@ def on_coop_full(method: str) -> bool:
 
 
 def tag_of(method: str, run: int, param: float | None) -> str:
-    """t<run>, then -b<beta> (bias) or -q<quantile> (H1 threshold)."""
+    """t<run>, then -b<beta> (bias) or -q<quantile> (H1 or H3 threshold)."""
     if not on_coop_full(method):
         return ""
-    prefix = "q" if method == "hybrid_h1" else "b"
+    prefix = "q" if method in ("hybrid_h1", "hybrid_h3") else "b"
     return f"t{run}" + (f"-{prefix}{param:g}" if param is not None else "")
 
 
@@ -160,6 +169,12 @@ def run_task(task: tuple) -> dict:
             extra["quantile"] = param
         elif method == "hybrid_h2":
             controller = HybridPolicy(base, mp_beta=param, ev_guide=EvRuleGuide())
+        elif method == "hybrid_h3":
+            q = json.loads(BACKLOG_THRESHOLDS.read_text(encoding="utf-8"))[network][f"q{param:g}"]
+            controller = HybridPolicy(
+                base, BacklogStrategy(q), mp_beta=H3_BETA, ev_guide=EvRuleGuide()
+            )
+            extra["quantile"] = param
         elif method == "coop_full_tped_switch":
             ped = TeamRoleGuide(("pedestrian",))
             controller = HybridPolicy(base, ped_guide=ped, ev_guide=EvRuleGuide())
@@ -203,6 +218,7 @@ def run_task(task: tuple) -> dict:
         extra.update(controller.summary())
     elif controller is not None and hasattr(controller, "metrics"):
         extra.update(controller.metrics())
+    extra["sumo_backend"] = "libsumo" if use_libsumo() else "traci"  # no column: TraCI
     row.update(extra)
     write_row(OUT / "raw" / f"{rid}.csv", row)
     return row
@@ -323,6 +339,8 @@ def params(method: str, args) -> list:
         return args.h1_quantiles
     if method == "hybrid_h2":
         return args.h2_betas
+    if method == "hybrid_h3":
+        return args.h3_quantiles
     return [None]
 
 
@@ -372,6 +390,54 @@ def profile_congestion(networks: list[str], demands: list[str], seed: int, jobs:
     print(json.dumps(out, indent=1))
 
 
+def backlog_samples(task: tuple) -> np.ndarray:
+    """Queue at the entrances (mean of the last minute) at every decision of the measured
+    window, under H2 beta 4 (training run 1, the base of H3) in the normal scenario."""
+    from cotraffic.llm.rollout import EpisodeSpec, make_env
+
+    network, demand, seed = task
+    timing = config.load_protocol()["validation"]
+    begin = float(timing["warmup_s"])
+    end = begin + float(timing["measure_s"])
+    base = make_controller("coop_full", checkpoint(network, 1))
+    policy = HybridPolicy(base, mp_beta=H3_BETA, ev_guide=EvRuleGuide())
+    env = make_env(EpisodeSpec(network, demand, [], seed), base.agent_cfg)
+    probe_strategy = BacklogStrategy(threshold=float("inf"))
+    values: list[float] = []
+    try:
+        obs, _ = env.reset(seed=seed)
+        policy.reset(env)
+        probe_strategy.reset(env)
+        while env.now < end:
+            backlog = probe_strategy.observe(env)
+            if env.now >= begin:
+                values.append(backlog)
+            obs, *_ = env.step(policy.act(env, obs))
+    finally:
+        env.close()
+    return np.array(values)
+
+
+def profile_backlog(networks: list[str], demands: list[str], seed: int, jobs: int) -> None:
+    """The thresholds of H3: quantiles 75, 90 and 95 % of the queue at the entrances under
+    H2 beta 4, per network, pooled over the demands (validation seed only)."""
+    tasks = [(n, d, seed) for n in networks for d in demands]
+    with ProcessPoolExecutor(max_workers=jobs) as pool:
+        samples = dict(zip(tasks, pool.map(backlog_samples, tasks), strict=True))
+    out = {}
+    for n in networks:
+        values = np.concatenate([v for (net, _, _), v in samples.items() if net == n])
+        out[n] = {f"q{q}": round(float(np.quantile(values, q / 100)), 4) for q in (50, 75, 90, 95)}
+        out[n]["share_positive"] = round(float(np.mean(values > 0)), 4)
+        out[n]["samples"] = int(values.size)
+        out[n]["source"] = (
+            f"hybrid_h2 beta {H3_BETA:g} t1, normal, demands {'+'.join(demands)}, seed {seed}, "
+            "measured window"
+        )
+    BACKLOG_THRESHOLDS.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps(out, indent=1))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--methods", nargs="+", default=METHODS, choices=ALL_METHODS)
@@ -382,7 +448,12 @@ def main() -> None:
     parser.add_argument("--betas", nargs="+", type=float, default=[4.0], help="bias guides")
     parser.add_argument("--h1-quantiles", nargs="+", type=float, default=[50, 75, 90, 95])
     parser.add_argument("--h2-betas", nargs="+", type=float, default=[1.0, 2.0, 4.0])
+    parser.add_argument("--h3-quantiles", nargs="+", type=float, default=[75, 90, 95])
     parser.add_argument("--profile-congestion", action="store_true", help="thresholds of H1")
+    parser.add_argument("--profile-backlog", action="store_true", help="thresholds of H3")
+    parser.add_argument(
+        "--traci", action="store_true", help="TraCI instead of libsumo (the same episodes)"
+    )
     parser.add_argument("--seed", type=int, default=1000)
     parser.add_argument("--jobs", type=int, default=4, help="workers for episodes without LLM")
     parser.add_argument("--force", action="store_true", help="run again saved episodes")
@@ -396,8 +467,15 @@ def main() -> None:
     args = parser.parse_args()
     if args.seed in TEST_SEEDS:
         raise SystemExit("test seeds are never used to tune anything")
+    if not args.traci:
+        # inherited by the workers; over TraCI, the ports drawn by workers starting together
+        # can collide. Same episodes as TraCI (scripts/backend_check.py); rows: sumo_backend
+        os.environ.setdefault("LIBSUMO_AS_TRACI", "1")
     if args.probe:
         probe(args.networks, args.seed)
+        return
+    if args.profile_backlog:
+        profile_backlog(args.networks, args.demands, args.seed, args.jobs)
         return
     if args.profile_congestion:
         profile_congestion(args.networks, args.demands, args.seed, args.jobs)

@@ -54,6 +54,7 @@ LABELS = {
     "coop_full_pedrule_switch": "COOP-FULL + EV-RULE + PED-RULE (commutation)",
     "hybrid_h1": "H1 : COOP-FULL / MP selon la congestion, quantile {p:g} %, + EV-RULE",
     "hybrid_h2": "H2 : COOP-FULL + biais MP β = {p:g}, + EV-RULE",
+    "hybrid_h3": "H3 : H2 β = 4, MP partout si file d'entrée > quantile {p:g} %, + EV-RULE",
 }
 
 
