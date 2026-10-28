@@ -1,0 +1,22 @@
+{
+ "grid4x4": {
+  "q50": 0.0769,
+  "q75": 0.1538,
+  "q90": 0.2308,
+  "q95": 0.3115,
+  "share_positive": 0.7125,
+  "applied": "max(quantile, 1 vehicle)",
+  "samples": 720,
+  "source": "hybrid_h2 beta 4 t1, normal, demands medium+peak, seed 1000, measured window"
+ },
+ "real_district": {
+  "q50": 0.0769,
+  "q75": 7.9423,
+  "q90": 11.0077,
+  "q95": 17.5423,
+  "share_positive": 0.6694,
+  "applied": "max(quantile, 1 vehicle)",
+  "samples": 720,
+  "source": "hybrid_h2 beta 4 t1, normal, demands medium+peak, seed 1000, measured window"
+ }
+}

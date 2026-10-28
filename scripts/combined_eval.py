@@ -80,6 +80,9 @@ ALL_METHODS = METHODS + ["ped_rule_mp"] + list(GUIDED) + list(HYBRID)
 THRESHOLDS = OUT / "congestion_thresholds.json"  # H1, from --profile-congestion
 BACKLOG_THRESHOLDS = OUT / "backlog_thresholds.json"  # H3, from --profile-backlog
 H3_BETA = 4.0  # H3 = the best H2 of the three validation seeds, with the switch to MP
+# below one vehicle waiting on average the entrances are not saturated: without this floor,
+# H3 would switch grid4x4 on single vehicles (its 95 % quantile is 0.31 vehicle, seed 1000)
+H3_MIN_QUEUE = 1.0
 WITH_LLM = {"coop_full_llm", "team_qwen"}
 NETWORKS = ["grid4x4", "real_district"]
 SCENARIOS = ["normal", "emergency", "incident"]
@@ -171,8 +174,9 @@ def run_task(task: tuple) -> dict:
             controller = HybridPolicy(base, mp_beta=param, ev_guide=EvRuleGuide())
         elif method == "hybrid_h3":
             q = json.loads(BACKLOG_THRESHOLDS.read_text(encoding="utf-8"))[network][f"q{param:g}"]
+            threshold = max(q, H3_MIN_QUEUE)
             controller = HybridPolicy(
-                base, BacklogStrategy(q), mp_beta=H3_BETA, ev_guide=EvRuleGuide()
+                base, BacklogStrategy(threshold), mp_beta=H3_BETA, ev_guide=EvRuleGuide()
             )
             extra["quantile"] = param
         elif method == "coop_full_tped_switch":
@@ -420,7 +424,8 @@ def backlog_samples(task: tuple) -> np.ndarray:
 
 def profile_backlog(networks: list[str], demands: list[str], seed: int, jobs: int) -> None:
     """The thresholds of H3: quantiles 75, 90 and 95 % of the queue at the entrances under
-    H2 beta 4, per network, pooled over the demands (validation seed only)."""
+    H2 beta 4, per network, pooled over the demands (validation seed only); H3 applies
+    max(quantile, H3_MIN_QUEUE)."""
     tasks = [(n, d, seed) for n in networks for d in demands]
     with ProcessPoolExecutor(max_workers=jobs) as pool:
         samples = dict(zip(tasks, pool.map(backlog_samples, tasks), strict=True))
@@ -429,6 +434,7 @@ def profile_backlog(networks: list[str], demands: list[str], seed: int, jobs: in
         values = np.concatenate([v for (net, _, _), v in samples.items() if net == n])
         out[n] = {f"q{q}": round(float(np.quantile(values, q / 100)), 4) for q in (50, 75, 90, 95)}
         out[n]["share_positive"] = round(float(np.mean(values > 0)), 4)
+        out[n]["applied"] = f"max(quantile, {H3_MIN_QUEUE:g} vehicle)"
         out[n]["samples"] = int(values.size)
         out[n]["source"] = (
             f"hybrid_h2 beta {H3_BETA:g} t1, normal, demands {'+'.join(demands)}, seed {seed}, "
