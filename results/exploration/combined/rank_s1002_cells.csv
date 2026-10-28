@@ -1,0 +1,71 @@
+variant,cell,verdict,mean_travel_time_gap_%,mean_waiting_time_gap_%,mean_travel_time_ref,mean_waiting_time_ref,share_coop,share_mp,share_mix,share_ped,share_ev
+COOP-FULL seul,grid4x4 emergency medium,✗,2.44,0.25,team_rules,team_rules,,,,,
+COOP-FULL seul,grid4x4 emergency peak,✗,4.63,7.47,mp,mp,,,,,
+COOP-FULL seul,grid4x4 incident medium,✗,1.99,0.0,mp,coop_full,,,,,
+COOP-FULL seul,grid4x4 incident peak,✗,3.58,3.9,mp,mp,,,,,
+COOP-FULL seul,grid4x4 normal medium,✗,2.47,-0.0,mp,coop_full,,,,,
+COOP-FULL seul,grid4x4 normal peak,✗,2.59,1.49,mp,mp,,,,,
+COOP-FULL seul,grid4x4 pedestrians medium,✗,2.62,1.79,team_rules,team_rules,,,,,
+COOP-FULL seul,grid4x4 pedestrians peak,✗,3.76,3.51,mp,mp,,,,,
+COOP-FULL seul,real_district emergency medium,?,1.32,0.0,mp,coop_full,,,,,
+COOP-FULL seul,real_district emergency peak,≥,0.0,-0.0,coop_full,coop_full,,,,,
+COOP-FULL seul,real_district incident medium,≥,0.79,-0.0,mp,coop_full,,,,,
+COOP-FULL seul,real_district incident peak,≥,-0.0,-0.0,coop_full,coop_full,,,,,
+COOP-FULL seul,real_district normal medium,≥,0.57,0.0,mp,coop_full,,,,,
+COOP-FULL seul,real_district normal peak,≥,-0.0,-0.0,coop_full,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 emergency medium,✗,2.29,0.11,team_rules,team_rules,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 emergency peak,✗,4.88,8.02,mp,mp,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 incident medium,✗=,1.99,0.0,mp,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 incident peak,✗=,3.58,3.9,mp,mp,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 normal medium,✗=,2.47,-0.0,mp,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 normal peak,✗=,2.59,1.49,mp,mp,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 pedestrians medium,✗=,2.62,1.79,team_rules,team_rules,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),grid4x4 pedestrians peak,✗=,3.76,3.51,mp,mp,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),real_district emergency medium,?,1.1,-1.91,mp,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),real_district emergency peak,≥,-1.35,-5.26,coop_full,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),real_district incident medium,≥=,0.79,-0.0,mp,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),real_district incident peak,≥=,-0.0,-0.0,coop_full,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),real_district normal medium,≥=,0.57,0.0,mp,coop_full,,,,,
+V1 : COOP-FULL + EV-RULE (commutation),real_district normal peak,≥=,-0.0,-0.0,coop_full,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 emergency medium,✗=,2.29,0.11,team_rules,team_rules,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 emergency peak,✗=,4.88,8.02,mp,mp,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 incident medium,✗=,1.99,0.0,mp,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 incident peak,✗=,3.58,3.9,mp,mp,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 normal medium,✗=,2.47,-0.0,mp,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 normal peak,✗=,2.59,1.49,mp,mp,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 pedestrians medium,✗,2.62,1.79,team_rules,team_rules,0.9995666666666668,0.0,0.0,0.0004333333333333333,0.0
+COOP-FULL + EV-RULE + PED-RULE (commutation),grid4x4 pedestrians peak,✗,5.62,8.09,mp,mp,0.9929666666666668,0.0,0.0,0.007033333333333333,0.0
+COOP-FULL + EV-RULE + PED-RULE (commutation),real_district emergency medium,?=,1.1,-1.91,mp,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),real_district emergency peak,≥=,-1.35,-5.26,coop_full,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),real_district incident medium,≥=,0.79,-0.0,mp,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),real_district incident peak,≥=,-0.0,-0.0,coop_full,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),real_district normal medium,≥=,0.57,0.0,mp,coop_full,,,,,
+COOP-FULL + EV-RULE + PED-RULE (commutation),real_district normal peak,≥=,-0.0,-0.0,coop_full,coop_full,,,,,
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 emergency medium,✗,1.3,-2.2,team_rules,team_rules,0.0,0.0,0.9911333333333334,0.0,0.008866666666666667
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 emergency peak,✗,3.84,6.86,mp,mp,0.0,0.0,0.9872666666666666,0.0,0.012733333333333333
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 incident medium,✗,1.6,-0.95,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 incident peak,?,1.76,0.58,mp,mp,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 normal medium,✗,1.53,-1.25,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 normal peak,≥,0.94,-1.45,mp,mp,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 pedestrians medium,✗,2.27,2.23,team_rules,team_rules,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",grid4x4 pedestrians peak,✗,3.07,3.67,mp,mp,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",real_district emergency medium,≥,0.64,-3.54,mp,coop_full,0.0,0.0,0.9955000000000002,0.0,0.0045
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",real_district emergency peak,≥,-1.48,-5.95,coop_full,coop_full,0.0,0.0,0.9942666666666667,0.0,0.005733333333333333
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",real_district incident medium,≥,0.27,-2.79,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",real_district incident peak,≥,-3.15,-11.08,coop_full,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",real_district normal medium,≥,0.35,0.89,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",real_district normal peak,≥,-0.98,-4.72,coop_full,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 emergency medium,≥,0.86,-3.18,team_rules,team_rules,0.0,0.0,0.9903666666666667,0.0,0.009633333333333334
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 emergency peak,✗,1.89,2.88,mp,mp,0.0,0.0,0.987,0.0,0.013
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 incident medium,≥,0.9,-2.08,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 incident peak,≥,0.84,-0.21,mp,mp,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 normal medium,≥,0.45,-4.42,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 normal peak,≥,0.58,-1.42,mp,mp,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 pedestrians medium,?,1.05,-0.94,team_rules,team_rules,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",grid4x4 pedestrians peak,≥,0.73,-1.05,mp,mp,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",real_district emergency medium,≥,0.72,-0.52,mp,coop_full,0.0,0.0,0.9953,0.0,0.004699999999999999
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",real_district emergency peak,≥,-1.51,-1.78,coop_full,coop_full,0.0,0.0,0.9950666666666667,0.0,0.004933333333333334
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",real_district incident medium,✗,0.41,3.29,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",real_district incident peak,≥,-0.87,-2.1,coop_full,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",real_district normal medium,≥,-0.24,-0.99,mp,coop_full,0.0,0.0,1.0,0.0,0.0
+"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",real_district normal peak,✗,3.02,14.73,coop_full,coop_full,0.0,0.0,1.0,0.0,0.0

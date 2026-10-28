@@ -1,0 +1,6 @@
+rank,variant,cells,better_or_equal,uncertain,worse,ev_delay,ped_wait
+1,"H2 : COOP-FULL + biais MP β = 4, + EV-RULE",14,7,3,4,39.98,14.1
+2,V1 : COOP-FULL + EV-RULE (commutation),14,6,0,8,46.15,12.44
+3,COOP-FULL + EV-RULE + PED-RULE (commutation),14,6,0,8,46.15,12.74
+4,COOP-FULL seul,14,6,0,8,72.1,12.44
+5,"H2 : COOP-FULL + biais MP β = 2, + EV-RULE",14,5,1,8,38.11,14.45
