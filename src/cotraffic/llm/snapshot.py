@@ -3,8 +3,11 @@
 A snapshot is SUMO's state (with its random generators and pedestrians) plus the Python
 state of the environment that SUMO does not hold: signal timers, measurements, reward
 memory, perturbations (sensor faults, message loss), counters and the environment's own
-random generator. Restoring it and stepping on reproduces the original continuation
-exactly (tests/test_llm_snapshot.py), which is what makes short rollouts comparable.
+random generator. Two restorations of the same snapshot step on identically
+(tests/test_llm_snapshot.py), which is what makes short rollouts comparable with each other.
+They do not reproduce the uninterrupted episode: with SUMO 1.27.1, a restored run leaves it
+within the first minute, even from a snapshot taken right after the reset (a few % of
+cumulated halting after 600 s on grid4x4, whatever --save-state.precision).
 """
 
 from __future__ import annotations
