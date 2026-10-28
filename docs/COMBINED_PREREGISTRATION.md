@@ -38,6 +38,28 @@ des trois graines. Les graines 1001 et 1002 ne sont ni d'entraînement (100000 e
 test (0 à 999) ; la graine 1001 a servi une fois, à une étude exploratoire sur IND et DQN
 (journal d'expériences), jamais à COOP-FULL ni à cette étude ; la graine 1002 n'a jamais servi.
 
+**Phase B : l'oracle de stratégie** (fixé le 2026-10-28, après le classement de la phase A et
+avant le premier épisode de la phase B). À chaque fenêtre de 300 s, l'oracle choisit un mode
+pour tout le réseau parmi K = 3 : COOP-FULL, MP partout, et le meilleur hybride du classement
+de la graine 1000 (H2, β = 4), tous avec la préemption EV-RULE et le bouclier. Chaque mode est
+joué depuis le début de l'épisode (le planning déjà choisi, le mode sur la fenêtre, puis 300 s
+de COOP-FULL, la même suite pour les trois modes) ; le mode de plus petit coût sur la fenêtre
+et la suite est retenu. Coût : attente des véhicules (véh·s) + 10 × temps d'arrêt des
+ambulances (s) + attente des piétons (personne·s), sur tout le réseau. On rejoue depuis le
+début plutôt que depuis un instantané SUMO, parce qu'un état restauré s'écarte de l'épisode
+ininterrompu (src/cotraffic/llm/snapshot.py) : l'oracle planifierait sur une autre trajectoire
+que celle où il est mesuré. Le planning retenu est rejoué dans un épisode ordinaire, qui donne
+les métriques. Le placebo joue, par case, 3 plannings tirés uniformément au hasard ; le
+« meilleur du hasard » est le meilleur des 3 sur la métrique considérée.
+
+Version rapide : modèle t1 seul, graine 1000, les 14 cases. **On continue vers la phase B
+complète et la phase C seulement si, dans au moins 4 des 14 cases, l'oracle bat le meilleur
+hybride fixe (H2, β = 4, même modèle t1) de plus de 3 % sur le temps de trajet ou sur
+l'attente, et bat aussi le meilleur du hasard de plus de 3 % sur la même métrique.** Sinon,
+on passe à la phase D sans couche de stratégie. Le rapport donne aussi, par case, l'écart au
+meilleur des trois modes fixes et la part des fenêtres de chaque mode ; ils ne changent pas
+la décision.
+
 **Rapport.** Toutes les variantes essayées sont rapportées, pas seulement la meilleure.
 
 ## Brouillon de l'étape 4 (remplacé en phase D)
