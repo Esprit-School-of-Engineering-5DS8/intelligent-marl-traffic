@@ -1,0 +1,9 @@
+run_id,saved_commit,backend,measures_compared,measures_different,differences
+mp__grid4x4__normal__peak__s1001,4bf8f8f,libsumo,53,0,
+team_rules__real_district__emergency__peak__s1001,4bf8f8f,libsumo,110,0,
+ped_rule_mp__grid4x4__pedestrians__medium__s1002,4bf8f8f,libsumo,57,0,
+coop_full-t2__grid4x4__incident__medium__s1002,4bf8f8f,libsumo,57,0,
+coop_full_evrule_switch-t2__real_district__emergency__medium__s1002,4bf8f8f,libsumo,66,0,
+coop_full_pedrule_switch-t1__grid4x4__pedestrians__peak__s1002,4bf8f8f,libsumo,71,0,
+hybrid_h1-t1-q90__grid4x4__incident__peak__s1000,2f1e775,libsumo,73,0,
+hybrid_h2-t3-b2__real_district__normal__peak__s1001,4bf8f8f,libsumo,66,0,

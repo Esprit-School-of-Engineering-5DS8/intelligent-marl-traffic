@@ -5,10 +5,14 @@ Règles : docs/COMBINED_PREREGISTRATION.md, section 0 (commit 7bd689e). ≥ meil
 | rank | variant | cells | better_or_equal | uncertain | worse | ev_delay | ped_wait |
 |---|---|---|---|---|---|---|---|
 | 1 | H2 : COOP-FULL + biais MP β = 4, + EV-RULE | 14 | 10 | 1 | 3 | 35.79 | 13.42 |
-| 2 | H2 : COOP-FULL + biais MP β = 2, + EV-RULE | 14 | 7 | 1 | 6 | 33.24 | 12.97 |
-| 3 | V1 : COOP-FULL + EV-RULE (commutation) | 14 | 5 | 1 | 8 | 35.72 | 12.07 |
-| 4 | COOP-FULL + EV-RULE + PED-RULE (commutation) | 14 | 5 | 1 | 8 | 35.72 | 12.64 |
-| 5 | COOP-FULL seul | 14 | 5 | 1 | 8 | 52.73 | 12.07 |
+| 2 | H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | 14 | 10 | 1 | 3 | 35.79 | 13.42 |
+| 3 | H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | 14 | 10 | 1 | 3 | 35.79 | 13.42 |
+| 4 | H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | 14 | 8 | 2 | 4 | 35.12 | 13.42 |
+| 5 | H2 : COOP-FULL + biais MP β = 2, + EV-RULE | 14 | 7 | 1 | 6 | 33.24 | 12.97 |
+| 6 | H2 : COOP-FULL + biais MP β = 8, + EV-RULE | 14 | 6 | 0 | 8 | 35.89 | 15.59 |
+| 7 | V1 : COOP-FULL + EV-RULE (commutation) | 14 | 5 | 1 | 8 | 35.72 | 12.07 |
+| 8 | COOP-FULL + EV-RULE + PED-RULE (commutation) | 14 | 5 | 1 | 8 | 35.72 | 12.64 |
+| 9 | COOP-FULL seul | 14 | 5 | 1 | 8 | 52.73 | 12.07 |
 
 ## Détail par case
 
@@ -84,3 +88,59 @@ Règles : docs/COMBINED_PREREGISTRATION.md, section 0 (commit 7bd689e). ≥ meil
 | H2 : COOP-FULL + biais MP β = 4, + EV-RULE | real_district incident peak | ≥ | -0.87 | -2.1 | coop_full | coop_full | 0 | 0 | 1 | 0 | 0 |
 | H2 : COOP-FULL + biais MP β = 4, + EV-RULE | real_district normal medium | ≥ | -0.24 | -0.99 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
 | H2 : COOP-FULL + biais MP β = 4, + EV-RULE | real_district normal peak | ✗ | 3.02 | 14.73 | coop_full | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 emergency medium | ≥ | 0.32 | -0.91 | team_rules | team_rules | 0 | 0 | 0.990933 | 0 | 0.00906667 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 emergency peak | ✗ | 1.13 | 2.87 | mp | mp | 0 | 0 | 0.987267 | 0 | 0.0127333 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 incident medium | ≥ | 0.01 | -0.75 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 incident peak | ≥ | -0.19 | -0.84 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 normal medium | ≥ | 0.05 | -1.36 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 normal peak | ≥ | -0.52 | -1.7 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 pedestrians medium | ✗ | 4.17 | 17.87 | team_rules | team_rules | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | grid4x4 pedestrians peak | ≥ | 0.12 | 0.45 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | real_district emergency medium | ✗ | 0.53 | 3.61 | mp | coop_full | 0 | 0 | 0.995233 | 0 | 0.00476667 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | real_district emergency peak | ✗ | 0.4 | 6.04 | coop_full | coop_full | 0 | 0 | 0.995033 | 0 | 0.00496667 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | real_district incident medium | ✗ | 0.15 | 7.72 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | real_district incident peak | ✗ | 2.73 | 15.31 | coop_full | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | real_district normal medium | ✗ | 0.14 | 8.96 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H2 : COOP-FULL + biais MP β = 8, + EV-RULE | real_district normal peak | ✗ | 5.09 | 27.02 | coop_full | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 emergency medium | ≥ | 0.86 | -3.18 | team_rules | team_rules | 0 | 0 | 0.990367 | 0 | 0.00963333 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 emergency peak | ✗ | 1.89 | 2.88 | mp | mp | 0 | 0 | 0.987 | 0 | 0.013 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 incident medium | ≥ | 0.9 | -2.08 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 incident peak | ≥ | 0.84 | -0.21 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 normal medium | ≥ | 0.45 | -4.42 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 normal peak | ≥ | 0.58 | -1.42 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 pedestrians medium | ? | 1.05 | -0.94 | team_rules | team_rules | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | grid4x4 pedestrians peak | ≥ | 0.73 | -1.05 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | real_district emergency medium | ≥ | 0.72 | -0.52 | mp | coop_full | 0 | 0 | 0.9953 | 0 | 0.0047 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | real_district emergency peak | ✗ | 0.55 | 4.89 | coop_full | coop_full | 0 | 0.1111 | 0.884333 | 0 | 0.00456667 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | real_district incident medium | ✗ | 0.41 | 3.29 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | real_district incident peak | ? | 0.3 | 2.68 | coop_full | coop_full | 0 | 0.0740667 | 0.925933 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | real_district normal medium | ≥ | -0.24 | -0.99 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 75 %, + EV-RULE | real_district normal peak | ✗ | 3.72 | 16.17 | coop_full | coop_full | 0 | 0.0740667 | 0.925933 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 emergency medium | ≥ | 0.86 | -3.18 | team_rules | team_rules | 0 | 0 | 0.990367 | 0 | 0.00963333 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 emergency peak | ✗ | 1.89 | 2.88 | mp | mp | 0 | 0 | 0.987 | 0 | 0.013 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 incident medium | ≥ | 0.9 | -2.08 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 incident peak | ≥ | 0.84 | -0.21 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 normal medium | ≥ | 0.45 | -4.42 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 normal peak | ≥ | 0.58 | -1.42 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 pedestrians medium | ? | 1.05 | -0.94 | team_rules | team_rules | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | grid4x4 pedestrians peak | ≥ | 0.73 | -1.05 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | real_district emergency medium | ≥ | 0.72 | -0.52 | mp | coop_full | 0 | 0 | 0.9953 | 0 | 0.0047 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | real_district emergency peak | ≥ | -1.51 | -1.7 | coop_full | coop_full | 0 | 0.0370333 | 0.958033 | 0 | 0.00493333 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | real_district incident medium | ✗ | 0.41 | 3.29 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | real_district incident peak | ≥ | -0.3 | 0.02 | coop_full | coop_full | 0 | 0.0370333 | 0.962967 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | real_district normal medium | ≥ | -0.24 | -0.99 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 90 %, + EV-RULE | real_district normal peak | ✗ | 4.28 | 19.61 | coop_full | coop_full | 0 | 0.0370333 | 0.962967 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 emergency medium | ≥ | 0.86 | -3.18 | team_rules | team_rules | 0 | 0 | 0.990367 | 0 | 0.00963333 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 emergency peak | ✗ | 1.89 | 2.88 | mp | mp | 0 | 0 | 0.987 | 0 | 0.013 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 incident medium | ≥ | 0.9 | -2.08 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 incident peak | ≥ | 0.84 | -0.21 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 normal medium | ≥ | 0.45 | -4.42 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 normal peak | ≥ | 0.58 | -1.42 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 pedestrians medium | ? | 1.05 | -0.94 | team_rules | team_rules | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | grid4x4 pedestrians peak | ≥ | 0.73 | -1.05 | mp | mp | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | real_district emergency medium | ≥ | 0.72 | -0.52 | mp | coop_full | 0 | 0 | 0.9953 | 0 | 0.0047 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | real_district emergency peak | ≥ | -1.51 | -1.78 | coop_full | coop_full | 0 | 0 | 0.995067 | 0 | 0.00493333 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | real_district incident medium | ✗ | 0.41 | 3.29 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | real_district incident peak | ≥ | -0.87 | -2.1 | coop_full | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | real_district normal medium | ≥ | -0.24 | -0.99 | mp | coop_full | 0 | 0 | 1 | 0 | 0 |
+| H3 : H2 β = 4, MP partout si file d'entrée > quantile 95 %, + EV-RULE | real_district normal peak | ✗ | 2.98 | 14.65 | coop_full | coop_full | 0 | 0.0370333 | 0.962967 | 0 | 0 |

@@ -27,6 +27,8 @@ import combined_eval as ce  # noqa: E402
 
 from cotraffic.utils.sumo import use_libsumo  # noqa: E402
 
+SAVED = ce.OUT  # the saved rows; a worker moves ce.OUT to its temporary folder
+
 # (method, network, scenario, demand, seed, training run, parameter), all saved on TraCI
 TASKS = [
     ("mp", "grid4x4", "normal", "peak", 1001, 0, None),
@@ -42,9 +44,11 @@ TIMES = ("wall", "inference_ms", "latency")  # computing times: not part of the 
 
 
 def check(task: tuple) -> dict:
-    saved = pd.read_csv(ce.OUT / "raw" / f"{ce.rid_of(task)}.csv").iloc[0]
+    saved = pd.read_csv(SAVED / "raw" / f"{ce.rid_of(task)}.csv").iloc[0]
     ce.OUT = Path(tempfile.mkdtemp())  # this worker's rows, calls and logs go there
-    row = ce.run_task(task)
+    ce.run_task(task)
+    # read back from its file, as the saved row: the same rounding of the decimals
+    row = pd.read_csv(ce.OUT / "raw" / f"{ce.rid_of(task)}.csv").iloc[0]
     compared, different = 0, []
     for k, v in saved.items():
         if k not in row or any(t in k for t in TIMES) or k in ("git_commit", "run_id"):
@@ -71,7 +75,7 @@ def main() -> None:
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
         rows = list(pool.map(check, TASKS))
     table = pd.DataFrame(rows)
-    table.to_csv(ce.OUT / "backend_check.csv", index=False)
+    table.to_csv(SAVED / "backend_check.csv", index=False)
     print(table[["run_id", "backend", "measures_compared", "measures_different"]].to_string())
     print("identical" if (table.measures_different == 0).all() else "DIFFERENT")
 
