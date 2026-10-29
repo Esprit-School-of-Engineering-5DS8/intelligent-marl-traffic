@@ -62,137 +62,213 @@ la décision.
 
 **Rapport.** Toutes les variantes essayées sont rapportées, pas seulement la meilleure.
 
-## Brouillon de l'étape 4 (remplacé en phase D)
+## Pré-enregistrement final (phase D), écrit le 2026-10-29 avant toute graine de test
 
-Les sections suivantes sont le brouillon écrit après l'étape 4 ; elles seront réécrites en
-phase D (variantes finales, références, scénarios, famille « hybrid »).
+**Statut : soumis à la validation de l'équipe le 2026-10-29.** Le gel est le commit qui
+remplace cette ligne par « Gelé le … » ; c'est lui qu'on donne à `--prereg` (section 6).
+
+Les sections 1 à 11 remplacent le brouillon de l'étape 4. La section 0 (règles de choix,
+critère de la phase B) ne change pas. Rien de ce qui suit n'a été réglé sur les graines de
+test 0 à 4 : tous les choix viennent des graines de validation 1000, 1001 et 1002.
 
 ## 1. Question
 
-Guider COOP-FULL pendant les urgences avec une règle de préemption, sans aucun LLM :
+Un contrôleur qui combine COOP-FULL, Max-Pressure (MP) et la préemption des ambulances, sans
+LLM dans la décision, est-il, sur des graines jamais vues :
 
-1. réduit-il le retard des ambulances ;
-2. sans coûter aux autres véhicules (attente, temps de trajet) ;
-3. et les règles d'urgence du coéquipier (le travail de notre coéquipier,
-   `src/cotraffic/controllers/llm_team/PROVENANCE.md`) apportent-elles quelque chose de plus que
-   notre règle EV-RULE ?
+1. **jamais moins bon que la meilleure référence** (MP, EV-RULE-MP, COOP-FULL, TEAM-RULES ;
+   PED-RULE-MP en plus dans le scénario piétons), à 2 % près, sur le temps de trajet et sur
+   l'attente, dans chaque case ;
+2. **meilleur** qu'elle, là où c'est possible ;
+3. robuste (bus, capteurs bruités, pertes de messages) et transférable (grid8x8, sans
+   réentraînement) ?
 
-Origine de la question, dite honnêtement : l'intérêt pour les urgences vient des résultats de
-test de l'étude principale (retard des ambulances sur grid4x4 en pointe : COOP-FULL 73,5 s,
-EV-RULE-MP 38,1 s). Les variantes et leurs paramètres ont été choisis sur la graine de
-validation 1000 seulement (section 3).
+Question secondaire, sans valeur de preuve : que fait le conseiller LLM local quand on
+l'ajoute à ce contrôleur, sur une case de test ?
 
-## 2. Mécanisme (code figé)
+## 2. Ce qui a été essayé sur la validation, et choisi
 
-`src/cotraffic/controllers/combined.py` :
+Toutes les variantes essayées sont rapportées (`results/exploration/combined/`).
 
-- un **guide** dit, à chaque décision, quels carrefours doivent servir une ambulance, et avec
-  quelle phase :
-  - **EV-RULE** : l'ambulance est à moins de `ev_preemption_range_m` = 200 m de son prochain feu
-    (`configs/protocol.yaml`), comme EV-RULE-MP ;
-  - **ses règles** : le code de son équipe sur le backend `mock`, donc sans LLM, sans base de
-    décision propre. Un carrefour n'est guidé que pendant une de ses fenêtres de préemption :
-    corridor sur les 3 prochains feux, avance, durée de maintien ;
-- deux façons d'appliquer le guide à COOP-FULL, toujours **avant notre bouclier** :
-  - **A′ biais** : + β sur le logit de la phase guidée ;
-  - **B′ commutation** : la phase guidée remplace celle de PPO, aux seuls carrefours guidés.
-
-Sans ambulance, aucun carrefour n'est guidé et la politique est COOP-FULL elle-même (test
-`tests/test_combined.py`). Les scénarios sans ambulance ne sont donc pas évalués.
-
-## 3. Ce qui a été choisi sur la validation (graine 1000)
-
-Source : `results/exploration/combined/guides.md` (commit `af36352`), 3 modèles COOP-FULL,
-4 cases urgences. Observations qui fixent le choix :
-
-- avec EV-RULE, β = 8 et β = 16 donnent exactement les mêmes épisodes que la commutation :
-  le biais dépasse toujours l'écart de logits de PPO ; avec ses règles, β = 16 donne exactement
-  la commutation. Le vrai choix est donc entre **β = 4 (biais doux)** et **la commutation** ;
-- grid4x4 : retard moyen des ambulances (9 valeurs : 3 modèles x 3 ambulances) contre
-  COOP-FULL 42,5 s (moyenne) et 55,0 s (pointe) :
-  - EV-RULE, commutation : 21,4 s et 35,2 s ; coût en attente +1,1 % en pointe (« net ») ;
-  - EV-RULE, β = 4 : 27,8 s et 47,3 s ; coût dans le bruit ;
-  - ses règles, commutation : 19,6 s et 39,1 s ; coût +1,4 % en pointe (« net ») ;
-  - ses règles, β = 4 : 27,8 s et 47,4 s, quasi identique à EV-RULE β = 4 ;
-- real_district : aucun effet distinguable du bruit, pour aucune variante (10 à 13 décisions
-  guidées, 1 à 3 changées par épisode).
-
-## 4. Configurations retenues (figées)
-
-| Code | Variante | Méthode (`scripts/combined_eval.py`) | β |
+| Étape | Variantes | Graines | Résultat |
 |---|---|---|---|
-| V1 | COOP-FULL + EV-RULE, commutation (B′) | `coop_full_evrule_switch` | – |
-| V2 | COOP-FULL + EV-RULE, biais doux (A′) | `coop_full_evrule_bias` | 4 |
-| V3 | COOP-FULL + ses règles, commutation (B′) | `coop_full_team_switch` | – |
+| Étape 4 | guides d'urgence A′ (biais β = 4, 8, 16) et B′ (commutation), EV-RULE et ses règles | 1000 | `guides.md` ; V1 = EV-RULE en commutation |
+| Phase A | H1 (4 seuils), H2 (β = 1, 2, 4), ses règles piétons, PED-RULE, V1 | 1000 | `rank_s1000.md` : H2 β = 4 premier (7 / 2 / 5) |
+| Revérification | H2 β = 2 et 4, V1, PED-RULE, toutes les références | 1001, 1002 | `rank_s1001.md`, `rank_s1002.md` : H2 β = 4 premier sur les deux |
+| Phase B | oracle de stratégie et placebo (modèle t1) | 1000 | `oracle_s1000.md` : 3 cases sur 14, arrêt (section 0) |
+| Lot H3 | H3 (seuils q75, q90, q95, plancher 1 véhicule), H2 β = 8 | 1000, 1001, 1002 | `rank_s100*.md` : H2 β = 4 reste en tête (voir ci-dessous) |
 
-Références : COOP-FULL seul (mêmes 3 modèles), MP, EV-RULE-MP, TEAM-RULES (contexte).
+**Candidate : H2 β = 4** (COOP-FULL + biais vers MP, β = 4, + EV-RULE en commutation),
+première du classement sur chacune des trois graines de validation (règle de la section 0) :
 
-## 5. Protocole
+- H3 l'égale exactement sur 1001 et 1002, et ne passe devant sur 1000 qu'au départage
+  (retard des ambulances 30,8 s contre 31,1 s). 106 de ses 126 épisodes au quantile 90 % sont
+  ceux de H2 β = 4 (aucune bascule) ; là où elle bascule (real_district en pointe), elle fait
+  moins bien (trajet −0,9 à −1,3 %, attente −3,7 à −6,3 %). Basculer sur MP quand la file
+  d'entrée s'est formée arrive trop tard : MP gagne en l'empêchant de se former. H3 ne
+  devient donc pas la candidate (règle fixée par l'équipe le 2026-10-28) ;
+- H2 β = 8 est sous β = 4 sur les trois graines : la tendance β = 1 < 2 < 4 s'arrête, β = 4
+  est figé.
 
-- Cases : scénario urgences ; grid4x4 en demande moyenne et en pointe ; real_district en
-  demande moyenne et en pointe.
-- Graines de test 0 à 4, protocole d'évaluation (`configs/protocol.yaml` : 900 s de chauffe,
+**Variantes finales**, la meilleure de chaque famille sur les trois graines, et V1 :
+
+| Code | Variante | Famille | Méthode (`scripts/combined_eval.py`) |
+|---|---|---|---|
+| C | H2 β = 4 + EV-RULE | candidate (et meilleure H2) | `hybrid_h2` β = 4 |
+| F-H1 | H1, quantile 90 % | bascule par carrefour | `hybrid_h1` q90 |
+| F-H3 | H3, quantile 90 % | bascule réseau sur file d'entrée | `hybrid_h3` q90 |
+| F-PED | COOP-FULL + EV-RULE + PED-RULE | règles piétons | `coop_full_pedrule_switch` |
+| V1 | COOP-FULL + EV-RULE, commutation | préemption seule | `coop_full_evrule_switch` |
+
+La candidate est aussi la meilleure de la famille H2 : elle n'est jouée qu'une fois. F-H1 n'a
+été classée que sur la graine 1000 (la revérification ne prenait que les 4 premières).
+
+## 3. Mécanisme et code figés
+
+Commit du gel (celui de ce document, donné à `--prereg`), `src/cotraffic/controllers/hybrid.py` : stratégie, tactique, préemption,
+bouclier (section « The layered controller »). H3 : toutes les 300 s, si la file d'entrée
+moyenne de la dernière minute (véhicules que SUMO n'a pas encore pu insérer) dépasse le
+seuil, MP décide à tous les carrefours pendant 300 s ; sinon H2 β = 4. Seuils :
+`results/exploration/combined/backlog_thresholds.json`, appliqués comme
+max(quantile, 1 véhicle). H1 : `congestion_thresholds.json`. Sur grid8x8, réseau sans profil,
+H1 et H3 prennent les seuils de grid4x4, le réseau d'entraînement des modèles.
+
+## 4. Contrôleurs évalués sur les graines de test
+
+- Variantes finales (section 2), chacune avec les modèles COOP-FULL 1, 2 et 3.
+- Références : MP, EV-RULE-MP, COOP-FULL (modèles 1, 2, 3), TEAM-RULES (backend `mock`, sans
+  LLM) ; PED-RULE-MP dans le scénario piétons.
+- Un contrôleur identique par construction à un autre dans une case n'y est pas rejoué : il
+  reprend ses épisodes (comme dans le classement, marque « = ») :
+  - sans ambulance, V1 et EV-RULE-MP sont COOP-FULL et MP ;
+  - sans ambulance ni piéton, TEAM-RULES est MP (épisodes identiques dans toutes ces cases
+    des graines de validation, les 4 cases nouvelles comprises) ;
+  - sans piéton, F-PED est V1 (urgences) ou COOP-FULL.
+- **Secondaire** : la candidate + le conseiller LLM (qwen2.5:3b local, `configs/llm.yaml`
+  actuel, latence mesurée appliquée), sur la seule case grid4x4 urgences pointe, modèle t1,
+  graines 0 à 4. Ses épisodes tournent seuls, après tous les autres.
+
+## 5. Cases
+
+- **Principales (14)** : grid4x4 et real_district x normal, urgences, incident x demande
+  moyenne et pointe ; grid4x4 x piétons x moyenne et pointe.
+- **Robustesse (3)**, grid4x4 : capteurs bruités en pointe, pertes de messages 30 % en
+  pointe, bus en demande moyenne (les cases de robustesse de l'étude principale).
+- **Généralisation (1)** : grid8x8 en pointe, scénario normal, modèles entraînés sur grid4x4.
+
+Avant les graines de test, chaque contrôleur a été joué une fois sur la graine de validation
+1000 dans les 4 cases nouvelles, pour vérifier qu'il tourne (2026-10-29, commit `00327fd`) :
+60 épisodes, aucun plantage, COOP-FULL tourne sur grid8x8 sans réentraînement. Rien n'y a
+été réglé.
+
+## 6. Protocole
+
+- Graines de test 0 à 4, épisodes d'évaluation (`configs/protocol.yaml` : 900 s de chauffe,
   3 600 s mesurées, 900 s de vidange).
-- COOP-FULL et V1 à V3 : modèles entraînés 1, 2 et 3, donc 15 épisodes par case ; MP,
-  EV-RULE-MP, TEAM-RULES : 5 épisodes par case.
-- Total : 4 cases x (4 x 15 + 3 x 5) = **300 épisodes**, sans LLM.
-- Sorties : `results/combined/` (jamais `results/raw`). Chaque ligne enregistre le commit, le
-  mécanisme, la provenance et le retard de chaque ambulance. Les runs refusent un arbre git
-  modifié.
+- libsumo (mêmes épisodes que TraCI, `scripts/backend_check.py`).
+- Exécution : `python scripts/combined_final.py --prereg <commit du gel>`, qui contient ce plan
+  écrit en clair (contrôleurs, cases, graines). Sorties : `results/combined/` (jamais
+  `results/raw`). Chaque ligne enregistre le commit et le moteur. Le script refuse de
+  démarrer si ce document, `src/cotraffic`, `configs`, les scripts d'évaluation ou les seuils
+  diffèrent du commit du gel, ou si l'arbre est modifié ; il ne rejoue jamais un épisode déjà
+  écrit. Aucun fichier suivi n'est modifié pendant l'exécution.
+- Analyse : `python scripts/combined_analysis.py` (`results/combined/analysis.md`), écrite et
+  figée avec ce document, vérifiée sur les données de validation.
+- Une seule exécution. Un épisode qui plante est rejoué tel quel (même graine, même code) ;
+  tout plantage est rapporté.
 
-## 6. Métriques
+## 7. Métriques
 
-- `ev_delay` (principale) : retard moyen des ambulances de l'épisode (temps perdu). Le retard
-  de chaque ambulance (`ev_delays`) et leur nombre par case sont rapportés.
-- `mean_waiting_time` : attente de tous les véhicules (les ambulances pèsent moins de 0,2 %).
-- `others_travel_time` : temps de trajet des véhicules autres que les ambulances, calculé
-  exactement en retirant les ambulances de la moyenne.
-- Rapportées sans test : décisions guidées et décisions changées, préemptions, véhicules
-  non arrivés, téléportations.
+- **Principales** : `mean_travel_time`, `mean_waiting_time`.
+- **Secondaires, sans test de Holm** : retard de chaque ambulance (`ev_delay`, `ev_delays`),
+  attente des piétons, trajet des autres véhicules, débit, CO2, téléportations, véhicules
+  non insérés, part des décisions de chaque couche.
+- **LLM** (variante secondaire) : latence p50 / p95, JSON valides, replis, conseils modifiés
+  par la validation ou le bouclier, appels par heure simulée, tokens.
 
-## 7. Hypothèses et tests (famille de Holm « combined »)
+## 8. Hypothèses et tests
 
-Pour chaque case (4) et chaque métrique (3) :
+Écart relatif, positif = mieux : gain = (référence − contrôleur) / référence. Dans chaque case
+et pour chaque métrique, **la meilleure référence est celle de meilleure moyenne sur les
+graines de test** (choix conservateur : il ne peut que rendre la preuve plus difficile).
+Dans les cases où EV-RULE-MP ou TEAM-RULES sont identiques à MP par construction (section 4),
+ils reprennent les épisodes de MP.
 
-- **H1 à H3** : V1, V2, V3 contre COOP-FULL (36 tests) ;
-- **H4, la question clé** : V3 contre V1 (12 tests).
+Appariement : par graine de test ; quand la meilleure référence est COOP-FULL, construite sur
+les mêmes 3 modèles que la candidate, par modèle et par graine. Bootstrap croisé (modèles x
+graines rééchantillonnés, 10 000 tirages, graine 0), comme
+`cotraffic.analysis.stats.paired_change_ci` ; IC à 95 % par les percentiles. p unilatéral de
+non-infériorité = (1 + nombre de tirages où le gain ≤ −2 %) / (1 + 10 000) ; de supériorité,
+la même chose avec 0 au lieu de −2 %.
 
-Total : **48 tests, une seule famille de Holm « combined »**, α = 0,05, séparée des familles
-existantes. Le code statistique est celui du projet (`cotraffic.analysis.aggregate.compare`,
-`cotraffic.analysis.stats`) :
+- **Famille de Holm « hybrid » (principale)** : la candidate contre la meilleure référence,
+  18 cases x 2 métriques = **36 tests de non-infériorité**. H0 : gain ≤ −2 %. Non-infériorité
+  démontrée si la borne basse de l'IC à 95 % est au-dessus de −2 %, équivalent à p < 0,025
+  unilatéral ; p bootstrap unilatéral, Holm sur les 36, α = 0,025.
+- **Famille « hybrid-sup » (secondaire)** : les mêmes 36 comparaisons, H0 : gain ≤ 0
+  (supériorité), Holm sur les 36, α = 0,025 unilatéral.
+- **Famille « hybrid-ablation » (exploratoire)** : chacune des autres variantes finales
+  contre la meilleure référence, même test de non-infériorité, Holm dans la famille ; et le
+  tableau d'ablation des couches (COOP-FULL → V1 : préemption ; → H2 : biais MP ; → H3 :
+  bascule sur saturation), sans test de Holm.
+- Rapportés aussi, comme dans l'étude principale : Mann-Whitney sur les épisodes, delta de
+  Cliff.
+- **Variante LLM** : 5 paires (graines) contre la candidate seule, modèle t1 ; gain apparié et
+  IC, sans test de Holm (5 paires ne suffisent pas à une preuve).
 
-- Mann-Whitney U bilatéral sur les épisodes (15 contre 15) ;
-- gain apparié par graine de test (moyenne sur les modèles), IC bootstrap à 95 % ;
-- delta de Cliff ;
-- convention : gain positif = mieux.
+## 9. Règles de décision
 
-## 8. Règles de décision (figées)
+- « Jamais moins bon que la meilleure référence » n'est affirmé que si les **36** tests de
+  non-infériorité passent après Holm. Sinon, le rapport donne, case par case, où il est
+  démontré, où il ne l'est pas, et l'IC.
+- « Non démontré » ne veut pas dire « pire » : avec 5 graines, un IC large peut empêcher la
+  preuve. Une case est dite **pire** seulement si la borne haute de l'IC du gain est sous
+  −2 %.
+- « Meilleur » n'est affirmé que dans les cases où la supériorité passe après Holm.
+- Le LLM : effet rapporté avec son IC, et ses métriques ; aucune conclusion générale.
 
-- **Gain sur les ambulances** pour une variante dans une case : `ev_delay` meilleur que
-  COOP-FULL, significatif après Holm.
-- **Coût pour les autres véhicules** : `mean_waiting_time` ou `others_travel_time` pire que
-  COOP-FULL, significatif après Holm. Un coût non significatif est rapporté avec son IC.
-- **Combinaison retenue** : une variante avec un gain sur les ambulances dans les deux cases
-  grid4x4, et aucun coût significatif dans aucune case. Si plusieurs variantes le satisfont :
-  la plus forte réduction moyenne du retard sur grid4x4 ; à égalité non significative entre
-  V3 et V1, **V1** (plus simple, déjà dans le projet).
-- **Réponse à la question clé** : ses règles apportent quelque chose de plus si V3 est
-  meilleure que V1 sur `ev_delay`, significatif après Holm, dans au moins une case grid4x4,
-  sans coût significatif de V3 contre V1. Sinon : « pas de différence démontrée ».
-- real_district : sur la validation, aucun effet n'est attendu ; le résultat est rapporté
-  tel quel, sans réglage.
+## 10. Durée estimée
 
-## 9. Durée estimée
+Mesurée sur la validation (libsumo, 4 épisodes en parallèle ; un épisode d'évaluation compte
+pour deux de validation ; grid8x8 et robustesse mesurées sur la graine 1000) :
 
-Mesurée sur la relance de l'étape 4 (104 épisodes de validation : 51 min, 4 en parallèle) et
-doublée pour la longueur d'un épisode d'évaluation : environ **4 h 30** (fourchette 4 à 5 h 30),
-dont grid4x4 en pointe environ la moitié. Aucun LLM : pas de latence à protéger, mais aucun
-autre calcul pendant le run.
+| Partie | Épisodes | Durée |
+|---|---|---|
+| Sans LLM, 4 en parallèle | 1 320 | environ 12,6 h (dont grid8x8 2,3 h, grid4x4 piétons pointe 1,9 h) |
+| Avec le LLM, seuls, à la fin | 5 | environ 25 min (247 s par épisode mesuré, 12 appels) |
+| **Total** | **1 325** | **environ 13 h** |
 
-## 10. Limites connues
+Parts que l'équipe peut retirer avant le gel : F-H1 partout (270 épisodes, 2,7 h) ; F-H3 dans
+les 4 cases nouvelles (60 épisodes, 1,0 h ; identique à H2 β = 4 sur la validation dans ces
+cases).
 
-- 3 à 5 ambulances par épisode : la variance du retard est grande ; la significativité repose
-  sur 15 contre 15 épisodes.
-- Une seule demande de validation a servi aux choix ; real_district n'a montré aucun effet.
-- La commutation (V1, V3) a montré en validation un coût faible mais régulier en pointe
-  (+1,1 à +1,4 % d'attente) : c'est précisément ce que les tests de coût doivent trancher.
+## 11. Limites connues
+
+- **Oracle de stratégie (phase B)** : son coût ne compte que l'attente des véhicules déjà
+  dans le réseau, pas la file d'entrée. Dans les cases saturées, il a appris à garder les
+  véhicules dehors. real_district en pointe, graine 1000, modèle t1 :
+
+  | Cas | Trajet oracle / H2 β = 4 / MP (s) | File d'entrée oracle / H2 β = 4 / MP |
+  |---|---|---|
+  | normal | 159 / 153 / 145 | 9,4 / 8,0 / 2,0 |
+  | urgences | 164 / 157 / 145 | 14,5 / 11,7 / 2,6 |
+  | incident | 176 / 162 / 144 | 24,9 / 13,9 / 5,3 |
+
+  Il y fait pire que le meilleur hybride fixe (−4 à −9 % de trajet) et que MP (−10 à −22 %).
+  Dans les cases saturées, il **sous-estime donc la marge** d'une couche de stratégie ; le
+  verdict de la phase B (3 cases sur 14) est un minorant là-bas. Dans les cases sans file
+  d'entrée (toutes les demandes moyennes), il fait ce qui est attendu. H3 a été conçu pour
+  ces cases saturées.
+- **Instantanés SUMO** : un état restauré s'écarte de l'épisode ininterrompu (SUMO 1.27.1) ;
+  l'oracle rejoue donc tout depuis le début (`src/cotraffic/llm/snapshot.py`).
+- H3 lit la file d'entrée dans SUMO, sans bruit, même dans le scénario capteurs bruités : sur
+  le terrain, il faudrait la mesurer (boucles en amont des entrées).
+- 5 graines de test et 3 modèles : les IC restent larges ; la preuve de non-infériorité peut
+  manquer de puissance.
+- Graines de test déjà jouées par l'étude principale pour les références ; les variantes de
+  cette étude ne l'ont jamais été.
+- Les lignes de validation d'avant la colonne `sumo_backend` ont tourné sur TraCI, les
+  suivantes sur libsumo (mêmes épisodes, vérifié sur 8 épisodes).
+
+Le brouillon de l'étape 4 (V1 à V3, 48 tests) est remplacé par ce document ; il reste
+dans l'historique git (commit `7bd689e`).

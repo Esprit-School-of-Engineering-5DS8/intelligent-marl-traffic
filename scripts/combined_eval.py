@@ -60,6 +60,7 @@ from cotraffic.utils.io import git_commit, write_row
 from cotraffic.utils.sumo import use_libsumo
 
 OUT = RESULTS_DIR / "exploration" / "combined"
+MODE = "validation"  # episode lengths of configs/protocol.yaml; combined_final.py: evaluation
 METHODS = ["ft", "mp", "ev_rule_mp", "coop_full", "coop_full_llm", "team_rules", "team_qwen"]
 # COOP-FULL guided during emergencies: method -> (guide, mode)
 GUIDED = {
@@ -228,7 +229,7 @@ def run_task(task: tuple) -> dict:
         raw_dir=OUT / "raw",
         logs_dir=OUT / "logs",
         controller=controller,
-        mode="validation",
+        mode=MODE,
     )
     if method in WITH_ADVISOR:
         extra.update(controller.summary())
