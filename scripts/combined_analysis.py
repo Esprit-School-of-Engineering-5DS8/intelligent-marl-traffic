@@ -170,13 +170,44 @@ def with_holm(rows: list[dict]) -> pd.DataFrame:
     out["p Holm"] = holm(out["p"].tolist())
     sup = out["famille"].eq("hybrid-sup")
     shown = out["p Holm"] < ALPHA
-    worse = out["IC haut"] < -MARGIN
+    # a failed non-inferiority: a true loss when the whole interval is below 0, else an
+    # interval too wide to conclude (preregistration, section 9)
+    loss = out["IC haut"] < 0
+    beyond = out["IC haut"] < -MARGIN
+    failed = np.where(
+        loss,
+        np.where(beyond, f"vraie perte (au-delà de −{MARGIN:g} %)", "vraie perte"),
+        "intervalle trop large pour conclure",
+    )
     out["verdict"] = np.where(
         sup,
         np.where(shown, "meilleure (démontré)", "supériorité non démontrée"),
-        np.where(shown, "non inférieure (démontré)", np.where(worse, "pire", "non démontré")),
+        np.where(shown, "non inférieure (démontré)", failed),
     )
     return out
+
+
+def one_sentence(main: pd.DataFrame, sup: pd.DataFrame) -> str:
+    """What the final evaluation allows us to state, and what it does not."""
+    shown = main.verdict == "non inférieure (démontré)"
+    lost = main[main.verdict.str.startswith("vraie perte")]
+    wide = int((main.verdict == "intervalle trop large pour conclure").sum())
+    better = sup[sup.verdict == "meilleure (démontré)"]
+
+    def where(d: pd.DataFrame) -> str:
+        return ", ".join(f"{c} ({m})" for c, m in zip(d["case"], d["métrique"], strict=True))
+
+    return (
+        f"On peut affirmer que la candidate n'est pas moins bonne que la meilleure référence, "
+        f"à {MARGIN:g} % près, dans {int(shown.sum())} comparaisons sur {len(main)}, et "
+        f"qu'elle est meilleure dans {len(better)}" + (f" ({where(better)})" if len(better) else "")
+        + f" ; on ne peut pas l'affirmer dans les {len(main) - int(shown.sum())} autres : "
+        + (f"{len(lost)} vraie perte" if len(lost) == 1 else f"{len(lost)} vraies pertes")
+        + (f" ({where(lost)})" if len(lost) else "")
+        + f" et {wide} "
+        + ("intervalle trop large" if wide == 1 else "intervalles trop larges")
+        + " pour conclure."
+    )  # fmt: skip
 
 
 def ablation(df: pd.DataFrame) -> pd.DataFrame:
@@ -252,6 +283,7 @@ def main() -> None:
     claim = "oui" if shown == len(main_rows) else "non"
     lines = [
         "# Évaluation finale de l'étude combinée", "",
+        f"**En une phrase.** {one_sentence(main_rows, sup)}", "",
         f"Non-infériorité de la candidate démontrée dans {shown} comparaisons sur "
         f"{len(main_rows)} (Holm, α = {ALPHA} unilatéral, marge −{MARGIN:g} %). "
         f"« Jamais moins bonne que la meilleure référence » : **{claim}**. Supériorité "

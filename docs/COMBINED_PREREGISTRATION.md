@@ -1,7 +1,7 @@
 # Pré-enregistrement de l'étude combinée
 
-**Statut : brouillon.** Aucun épisode sur les graines de test 0 à 4 n'est lancé avant le commit
-qui fige la version finale de ce fichier (phase D). Ce qui est figé ne change plus après le
+**Statut : gelé le 2026-10-29** (section « Pré-enregistrement final »). Aucun épisode sur les
+graines de test 0 à 4 n'a été lancé avant le commit qui fige cette version finale (phase D). Ce qui est figé ne change plus après le
 premier run de test ; toute analyse ajoutée ensuite est marquée « exploratoire ».
 
 ## 0. Règles de choix des variantes, fixées le 2026-10-27, avant les résultats de la phase A
@@ -64,8 +64,12 @@ la décision.
 
 ## Pré-enregistrement final (phase D), écrit le 2026-10-29 avant toute graine de test
 
-**Statut : soumis à la validation de l'équipe le 2026-10-29.** Le gel est le commit qui
-remplace cette ligne par « Gelé le … » ; c'est lui qu'on donne à `--prereg` (section 6).
+**Gelé le 2026-10-29 à 11 h 40, validé par l'équipe.** Le commit qui contient cette ligne est
+celui qu'on donne à `--prereg` (section 6). Décisions de l'équipe à la validation : F-H3 est
+retirée des 4 cases nouvelles (section 4) ; F-H1 est gardée (famille d'ablation, sans effet sur
+les tests principaux) ; chaque échec de non-infériorité est classé « vraie perte » ou
+« intervalle trop large pour conclure », et l'analyse s'ouvre sur une phrase qui dit ce qu'on
+peut affirmer et ce qu'on ne peut pas affirmer (section 9).
 
 Les sections 1 à 11 remplacent le brouillon de l'étape 4. La section 0 (règles de choix,
 critère de la phase B) ne change pas. Rien de ce qui suit n'a été réglé sur les graines de
@@ -116,7 +120,7 @@ première du classement sur chacune des trois graines de validation (règle de l
 |---|---|---|---|
 | C | H2 β = 4 + EV-RULE | candidate (et meilleure H2) | `hybrid_h2` β = 4 |
 | F-H1 | H1, quantile 90 % | bascule par carrefour | `hybrid_h1` q90 |
-| F-H3 | H3, quantile 90 % | bascule réseau sur file d'entrée | `hybrid_h3` q90 |
+| F-H3 | H3, quantile 90 % (14 cases principales) | bascule réseau sur file d'entrée | `hybrid_h3` q90 |
 | F-PED | COOP-FULL + EV-RULE + PED-RULE | règles piétons | `coop_full_pedrule_switch` |
 | V1 | COOP-FULL + EV-RULE, commutation | préemption seule | `coop_full_evrule_switch` |
 
@@ -144,6 +148,9 @@ H1 et H3 prennent les seuils de grid4x4, le réseau d'entraînement des modèles
   - sans ambulance ni piéton, TEAM-RULES est MP (épisodes identiques dans toutes ces cases
     des graines de validation, les 4 cases nouvelles comprises) ;
   - sans piéton, F-PED est V1 (urgences) ou COOP-FULL.
+- F-H3 n'est pas jouée dans les 4 cases nouvelles (décision de l'équipe à la validation) : sur
+  la graine de validation, elle n'y a jamais basculé (0 % des périodes en MP) et ses 12
+  épisodes y sont exactement ceux de H2 β = 4.
 - **Secondaire** : la candidate + le conseiller LLM (qwen2.5:3b local, `configs/llm.yaml`
   actuel, latence mesurée appliquée), sur la seule case grid4x4 urgences pointe, modèle t1,
   graines 0 à 4. Ses épisodes tournent seuls, après tous les autres.
@@ -221,9 +228,13 @@ la même chose avec 0 au lieu de −2 %.
 - « Jamais moins bon que la meilleure référence » n'est affirmé que si les **36** tests de
   non-infériorité passent après Holm. Sinon, le rapport donne, case par case, où il est
   démontré, où il ne l'est pas, et l'IC.
-- « Non démontré » ne veut pas dire « pire » : avec 5 graines, un IC large peut empêcher la
-  preuve. Une case est dite **pire** seulement si la borne haute de l'IC du gain est sous
-  −2 %.
+- « Non démontré » ne veut pas dire « pire ». Chaque test de non-infériorité qui échoue est
+  classé :
+  - **vraie perte** si la borne haute de l'IC du gain est elle aussi sous 0 (marquée « au-delà
+    de −2 % » si elle est sous −2 %) ;
+  - sinon **intervalle trop large pour conclure** : avec 5 graines, un IC large peut empêcher
+    la preuve.
+- L'analyse s'ouvre sur une phrase : ce qu'on peut affirmer, et ce qu'on ne peut pas affirmer.
 - « Meilleur » n'est affirmé que dans les cases où la supériorité passe après Holm.
 - Le LLM : effet rapporté avec son IC, et ses métriques ; aucune conclusion générale.
 
@@ -234,13 +245,12 @@ pour deux de validation ; grid8x8 et robustesse mesurées sur la graine 1000) :
 
 | Partie | Épisodes | Durée |
 |---|---|---|
-| Sans LLM, 4 en parallèle | 1 320 | environ 12,6 h (dont grid8x8 2,3 h, grid4x4 piétons pointe 1,9 h) |
+| Sans LLM, 4 en parallèle | 1 260 | environ 11,6 h (dont grid8x8 2 h, grid4x4 piétons pointe 1,9 h) |
 | Avec le LLM, seuls, à la fin | 5 | environ 25 min (247 s par épisode mesuré, 12 appels) |
-| **Total** | **1 325** | **environ 13 h** |
+| **Total** | **1 265** | **environ 12 h** |
 
-Parts que l'équipe peut retirer avant le gel : F-H1 partout (270 épisodes, 2,7 h) ; F-H3 dans
-les 4 cases nouvelles (60 épisodes, 1,0 h ; identique à H2 β = 4 sur la validation dans ces
-cases).
+Retiré à la validation : F-H3 dans les 4 cases nouvelles (60 épisodes, 1,0 h). Gardé : F-H1
+partout (270 épisodes, 2,7 h).
 
 ## 11. Limites connues
 

@@ -41,6 +41,7 @@ FROZEN = [  # must not differ from the preregistration commit
     "configs",
     "scripts/combined_eval.py",
     "scripts/combined_final.py",
+    "scripts/combined_analysis.py",
     "results/exploration/combined/congestion_thresholds.json",
     "results/exploration/combined/backlog_thresholds.json",
 ]
@@ -67,7 +68,11 @@ def controllers(network: str, scenario: str) -> list[tuple[str, float | None, li
     # without an emergency vehicle, V1 is COOP-FULL and EV-RULE-MP is MP; without one and
     # without pedestrians, TEAM-RULES is MP too (identical episodes in every such cell of the
     # validation seeds, the four new cells included)
-    out = [(m, p, RUNS) for m, p in LEARNED] + [("mp", None, [0])]
+    new_cell = (network, scenario) in {(n, s) for n, s, _ in ROBUSTNESS + GENERALISATION}
+    # F-H3 is not played in the new cells: on the validation seed it never switched there and
+    # its episodes were those of H2 beta 4 (team decision, 2026-10-29)
+    out = [(m, p, RUNS) for m, p in LEARNED if not (new_cell and m == "hybrid_h3")]
+    out.append(("mp", None, [0]))
     if scenario == "emergency":
         out += [("coop_full_evrule_switch", None, RUNS), ("ev_rule_mp", None, [0])]
     if scenario == "pedestrians":

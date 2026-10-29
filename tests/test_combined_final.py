@@ -16,7 +16,9 @@ from cotraffic.seeds import TEST_SEEDS  # noqa: E402
 
 def test_the_plan_is_the_preregistered_one():
     plain, llm = cf.tasks()
-    assert len(plain) == 1320 and len(llm) == 5  # preregistration, section 10
+    assert len(plain) == 1260 and len(llm) == 5  # preregistration, section 10
+    assert not [t for t in plain if t[0] == "hybrid_h3" and (t[1] == "grid8x8" or t[2] in (
+        "sensor_noise", "comm_dropout_30", "buses"))]  # fmt: skip
     assert {t[4] for t in plain + llm} == {0, 1, 2, 3, 4} <= set(TEST_SEEDS)
     assert len({cf.ce.rid_of(t) for t in plain + llm}) == len(plain) + len(llm)
     assert cf.OUT == RESULTS_DIR / "combined" and "raw" not in cf.OUT.parts[-1:]
