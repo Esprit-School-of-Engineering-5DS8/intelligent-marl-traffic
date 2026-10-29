@@ -201,3 +201,30 @@ def test_backlog_strategy_puts_the_whole_network_in_mp_while_the_entrance_queue_
     }  # fmt: skip
     s.reset(backlog_env(0, 0))
     assert s.modes(backlog_env(0, 2)) == {}  # equal to the threshold: not above it
+
+
+class FixedAdvisor:
+    """An LLM advice of phase 1 at A0, strong enough to change COOP-FULL's choice there."""
+
+    def reset(self, env):
+        pass
+
+    def bias_logits(self, env, agents, logits):
+        out = logits.copy()
+        out[agents.index("A0"), 1] += 10.0
+        return out
+
+    def summary(self):
+        return {"llm_calls": 0}
+
+
+def test_llm_advice_moves_coop_full_but_not_max_pressure_nor_pre_emption():
+    p = policy(advisor=FixedAdvisor())
+    assert p.act(None, OBS) == {"A0": 1, "B0": 1}  # COOP-FULL alone: A0 -> 0
+    assert p.changed_decisions == 1 and p.summary()["llm_calls"] == 0
+    p = policy(strategy=FixedModes({"A0": "mp"}), advisor=FixedAdvisor())
+    p.mp = FixedMp({"A0": 0, "B0": 0})
+    assert p.act(None, OBS)["A0"] == 0  # Max-Pressure decides there, without the advice
+    p = policy(ev_guide=FixedGuide({"A0": 0}), advisor=FixedAdvisor())
+    assert p.act(None, OBS)["A0"] == 0  # the emergency vehicle first
+    assert policy().advisor is None  # without an advisor: the controller of phase A

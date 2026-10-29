@@ -219,12 +219,16 @@ class HybridPolicy(Controller):
         ped_guide=None,
         ev_guide=None,
         name: str = "",
+        advisor=None,
     ) -> None:
         super().__init__()
         self.base = base
         self.strategy = strategy or CoopStrategy()
         self.mp_beta = float(mp_beta)
         self.ped_guide, self.ev_guide = ped_guide, ev_guide
+        # an AdvisedPolicy on the same base: its LLM bias joins the logits of COOP-FULL
+        # before the Max-Pressure bias; Max-Pressure and pre-emption decide without it
+        self.advisor = advisor
         self.mp = MaxPressure()
         self.agent_cfg = base.agent_cfg
         self.name = name or "hybrid"
@@ -235,7 +239,7 @@ class HybridPolicy(Controller):
         self.base.reset(env)
         self.mp.reset(env)
         self.strategy.reset(env)
-        for guide in (self.ped_guide, self.ev_guide):
+        for guide in (self.ped_guide, self.ev_guide, self.advisor):
             if guide is not None:
                 guide.reset(env)
         self.counts = dict.fromkeys(SOURCES, 0)
@@ -259,16 +263,19 @@ class HybridPolicy(Controller):
             logits = policy.get_distribution(policy.obs_to_tensor(batch)[0]).distribution.logits
         logits = logits.numpy()
         plain = logits.argmax(axis=1)  # the phase COOP-FULL would choose alone
+        if self.advisor is not None:
+            logits = self.advisor.bias_logits(env, agents, logits)
+        coop = logits.argmax(axis=1)  # COOP-FULL with the LLM bias, if any
         actions = {}
         for i, a in enumerate(agents):
-            phase, source = int(plain[i]), "coop"
+            phase, source = int(coop[i]), "coop"
             if modes.get(a) == "mp":
                 phase, source = int(mp[a]), "mp"
             elif self.mp_beta > 0 and mp.get(a, -1) < logits.shape[1]:
                 row = logits[i].copy()
                 row[int(mp[a])] += self.mp_beta
                 phase, source = int(row.argmax()), "mix"
-                self.mix_changed += phase != int(plain[i])
+                self.mix_changed += phase != int(coop[i])
             if a in pre and pre[a][0] < logits.shape[1]:
                 phase, source = pre[a]
             self.counts[source] += 1
@@ -291,4 +298,6 @@ class HybridPolicy(Controller):
         for guide, prefix in ((self.ped_guide, "ped"), (self.ev_guide, "ev")):
             if guide is not None:
                 out.update({f"{prefix}_{k}": v for k, v in guide.summary().items()})
+        if self.advisor is not None:
+            out.update(self.advisor.summary())  # llm_* (its changed decisions: LLM bias only)
         return out

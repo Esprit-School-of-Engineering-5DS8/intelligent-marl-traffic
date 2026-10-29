@@ -223,3 +223,34 @@ class AdvisedPolicy(Controller):
             "llm_biased_decisions": self.biased_decisions,
             "llm_changed_decisions": self.changed_decisions,
         }
+
+    # ---------------------------------------------------------------- inside another policy
+    def bias_logits(self, env, agents: list[str], logits: np.ndarray) -> np.ndarray:
+        """The steps of ``act`` for a policy that owns the logits (the hybrid controller of
+        the combined study): advice activation and expiry, a call when one is due, then
+        the LLM bias on a copy of ``logits`` (one row per agent of ``agents``)."""
+        from cotraffic.llm.situation import events
+
+        now = env.now
+        ready = [a for a in self.pending if a.start <= now]
+        self.pending = [a for a in self.pending if a.start > now]
+        self.active = [a for a in self.active + ready if a.end > now]
+        latest: dict[str, Active] = {}
+        for a in self.active:
+            if a.junction not in latest or a.call >= latest[a.junction].call:
+                latest[a.junction] = a
+        self.active = list(latest.values())
+        trigger = self._trigger(env, events(env))
+        if trigger is not None:
+            self._ask(env, trigger)
+        out = np.array(logits, dtype=float, copy=True)
+        index = {a: i for i, a in enumerate(agents)}
+        for a in self.active:
+            i = index.get(a.junction)
+            if i is not None and a.phase < out.shape[1]:
+                out[i, a.phase] += self.cfg.beta * a.weight
+                self.biased_decisions += 1
+        self.changed_decisions += int(
+            (out.argmax(axis=1) != np.asarray(logits).argmax(axis=1)).sum()
+        )
+        return out

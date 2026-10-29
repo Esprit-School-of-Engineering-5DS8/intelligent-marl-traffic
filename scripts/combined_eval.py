@@ -75,6 +75,7 @@ HYBRID = {
     "coop_full_tped_switch": "ppo + switch(team serve_ped rules, no LLM) + switch(EV-RULE)",
     "coop_full_pedrule_switch": "ppo + switch(PED-RULE) + switch(EV-RULE)",
     "hybrid_h3": "H2 beta 4 / max_pressure everywhere by entrance queue (H3) + switch(EV-RULE)",
+    "hybrid_h2_llm": "H2 + llm_logit_bias (configs/llm.yaml) + switch(EV-RULE)",
 }
 ALL_METHODS = METHODS + ["ped_rule_mp"] + list(GUIDED) + list(HYBRID)
 THRESHOLDS = OUT / "congestion_thresholds.json"  # H1, from --profile-congestion
@@ -83,7 +84,8 @@ H3_BETA = 4.0  # H3 = the best H2 of the three validation seeds, with the switch
 # below one vehicle waiting on average the entrances are not saturated: without this floor,
 # H3 would switch grid4x4 on single vehicles (its 95 % quantile is 0.31 vehicle, seed 1000)
 H3_MIN_QUEUE = 1.0
-WITH_LLM = {"coop_full_llm", "team_qwen"}
+WITH_LLM = {"coop_full_llm", "team_qwen", "hybrid_h2_llm"}
+WITH_ADVISOR = {"coop_full_llm", "hybrid_h2_llm"}  # our advisor (configs/llm.yaml)
 NETWORKS = ["grid4x4", "real_district"]
 SCENARIOS = ["normal", "emergency", "incident"]
 DEMANDS = ["medium", "peak"]
@@ -128,6 +130,26 @@ def rid_of(task: tuple) -> str:
     return run_id(method, network, scenarios, demand, seed, tag_of(method, run, param))
 
 
+def advisor_for(settings, base) -> tuple[AdvisedPolicy, dict]:
+    """Our LLM advisor on ``base`` (configs/llm.yaml), and what its rows record."""
+    cfg = settings.advisor
+    source, label = llm_source(
+        settings.model, settings.technique, settings.options, settings.prompt_version
+    )
+    info = Ollama(settings.model, settings.options).fingerprint()
+    return AdvisedPolicy(base, source, cfg), {
+        "llm_model": settings.model,
+        "llm_digest": info.get("digest", ""),
+        "llm_quantization": info.get("quantization", ""),
+        "prompt": load(settings.prompt_version, settings.technique).id,
+        "technique": label,
+        "beta": cfg.beta,
+        "period_s": cfg.period_s,
+        "latency_mode": cfg.latency,
+        **{f"opt_{k}": v for k, v in asdict(settings.options).items()},
+    }
+
+
 def run_task(task: tuple) -> dict:
     method, network, scenario, demand, seed, run, param = task
     settings = load_settings()
@@ -140,25 +162,8 @@ def run_task(task: tuple) -> dict:
         extra["train_run"] = run
     controller = None
     if method == "coop_full_llm":
-        cfg = settings.advisor
-        source, label = llm_source(
-            settings.model, settings.technique, settings.options, settings.prompt_version
-        )
-        controller = AdvisedPolicy(make_controller("coop_full", ckpt), source, cfg)
-        info = Ollama(settings.model, settings.options).fingerprint()
-        extra.update(
-            {
-                "llm_model": settings.model,
-                "llm_digest": info.get("digest", ""),
-                "llm_quantization": info.get("quantization", ""),
-                "prompt": load(settings.prompt_version, settings.technique).id,
-                "technique": label,
-                "beta": cfg.beta,
-                "period_s": cfg.period_s,
-                "latency_mode": cfg.latency,
-                **{f"opt_{k}": v for k, v in asdict(settings.options).items()},
-            }
-        )
+        controller, llm_extra = advisor_for(settings, make_controller("coop_full", ckpt))
+        extra.update(llm_extra)
     elif method in GUIDED:
         guide, mode = GUIDED[method]
         controller = GuidedPolicy(make_controller("coop_full", ckpt), GUIDES[guide](), mode, param)
@@ -172,6 +177,10 @@ def run_task(task: tuple) -> dict:
             extra["quantile"] = param
         elif method == "hybrid_h2":
             controller = HybridPolicy(base, mp_beta=param, ev_guide=EvRuleGuide())
+        elif method == "hybrid_h2_llm":
+            advisor, llm_extra = advisor_for(settings, base)
+            controller = HybridPolicy(base, mp_beta=param, ev_guide=EvRuleGuide(), advisor=advisor)
+            extra.update(llm_extra)
         elif method == "hybrid_h3":
             q = json.loads(BACKLOG_THRESHOLDS.read_text(encoding="utf-8"))[network][f"q{param:g}"]
             threshold = max(q, H3_MIN_QUEUE)
@@ -213,10 +222,11 @@ def run_task(task: tuple) -> dict:
         controller=controller,
         mode="validation",
     )
-    if method == "coop_full_llm":
+    if method in WITH_ADVISOR:
         extra.update(controller.summary())
+        advisor = controller if method == "coop_full_llm" else controller.advisor
         with (calls_dir / f"{rid}.jsonl").open("w", encoding="utf-8") as f:
-            for c in controller.calls:
+            for c in advisor.calls:
                 f.write(json.dumps(asdict(c), default=str) + "\n")
     elif method in GUIDED or method in HYBRID:
         extra.update(controller.summary())
@@ -341,7 +351,7 @@ def params(method: str, args) -> list:
         return args.betas
     if method == "hybrid_h1":
         return args.h1_quantiles
-    if method == "hybrid_h2":
+    if method in ("hybrid_h2", "hybrid_h2_llm"):
         return args.h2_betas
     if method == "hybrid_h3":
         return args.h3_quantiles
