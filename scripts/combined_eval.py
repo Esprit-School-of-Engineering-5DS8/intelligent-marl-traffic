@@ -87,6 +87,7 @@ H3_MIN_QUEUE = 1.0
 WITH_LLM = {"coop_full_llm", "team_qwen", "hybrid_h2_llm"}
 WITH_ADVISOR = {"coop_full_llm", "hybrid_h2_llm"}  # our advisor (configs/llm.yaml)
 NETWORKS = ["grid4x4", "real_district"]
+TRAINED_ON = {"grid8x8": "grid4x4"}  # generalisation cell of phase D, without retraining
 SCENARIOS = ["normal", "emergency", "incident"]
 DEMANDS = ["medium", "peak"]
 MECHANISM = {
@@ -108,8 +109,13 @@ TEAM_SOURCE = "teammate's LLM team (controllers/llm_team/PROVENANCE.md)"
 LOWER_IS_BETTER = ["mean_travel_time", "others_travel_time", "mean_waiting_time", "ev_delay"]
 
 
+def trained_on(network: str) -> str:
+    """grid8x8 runs zero-shot: models and thresholds of grid4x4, the network they learned on."""
+    return TRAINED_ON.get(network, network)
+
+
 def checkpoint(network: str, run: int) -> Path:
-    return CHECKPOINTS_DIR / "coop_full" / network / f"seed{run}.zip"
+    return CHECKPOINTS_DIR / "coop_full" / trained_on(network) / f"seed{run}.zip"
 
 
 def on_coop_full(method: str) -> bool:
@@ -172,7 +178,8 @@ def run_task(task: tuple) -> dict:
     elif method in HYBRID:
         base = make_controller("coop_full", ckpt)
         if method == "hybrid_h1":
-            threshold = json.loads(THRESHOLDS.read_text(encoding="utf-8"))[network][f"q{param:g}"]
+            profile = json.loads(THRESHOLDS.read_text(encoding="utf-8"))[trained_on(network)]
+            threshold = profile[f"q{param:g}"]
             controller = HybridPolicy(base, CongestionStrategy(threshold), ev_guide=EvRuleGuide())
             extra["quantile"] = param
         elif method == "hybrid_h2":
@@ -182,7 +189,8 @@ def run_task(task: tuple) -> dict:
             controller = HybridPolicy(base, mp_beta=param, ev_guide=EvRuleGuide(), advisor=advisor)
             extra.update(llm_extra)
         elif method == "hybrid_h3":
-            q = json.loads(BACKLOG_THRESHOLDS.read_text(encoding="utf-8"))[network][f"q{param:g}"]
+            profile = json.loads(BACKLOG_THRESHOLDS.read_text(encoding="utf-8"))
+            q = profile[trained_on(network)][f"q{param:g}"]
             threshold = max(q, H3_MIN_QUEUE)
             controller = HybridPolicy(
                 base, BacklogStrategy(threshold), mp_beta=H3_BETA, ev_guide=EvRuleGuide()
