@@ -89,14 +89,16 @@ def style() -> None:
             "figure.facecolor": SURFACE,
             "axes.facecolor": SURFACE,
             "savefig.facecolor": SURFACE,
+            "svg.hashsalt": "cotraffic",
         }
     )
 
 
 def save(fig, name: str) -> None:
     FIG.mkdir(parents=True, exist_ok=True)
-    for ext in ("png", "svg"):
-        fig.savefig(FIG / f"{name}.{ext}", dpi=200, bbox_inches="tight")
+    for ext in ("png", "svg"):  # no date and fixed ids: the same data give the same files
+        meta = {"Date": None} if ext == "svg" else {}
+        fig.savefig(FIG / f"{name}.{ext}", dpi=200, bbox_inches="tight", metadata=meta)
     plt.close(fig)
 
 
@@ -377,6 +379,45 @@ def bilan(df: pd.DataFrame, tests: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
     return summary.reset_index(), detail
 
 
+NOTE = (
+    "**Remarque.** Deux groupes de cas « trop larges pour conclure » ont une estimation "
+    "nettement défavorable : real_district en pointe (−0,4 à −11 % selon la situation et la "
+    "mesure) et grid4x4 avec piétons en pointe (−6,6 % de trajet, −12,9 % d'attente). La "
+    "candidate y fait probablement moins bien que Max-Pressure ; 5 graines ne suffisent pas à "
+    "le démontrer, et la validation allait dans le même sens. Avec piétons en pointe, la "
+    "candidate s'engorge sur certains épisodes ; COOP-FULL seul s'engorge plus souvent."
+)
+
+
+def tableau_final(table: pd.DataFrame) -> str:
+    """The 36 preregistered tests, in French, for the report."""
+    t = table.copy()
+    t.insert(0, "situation", [label(c) for c in t.pop("case")])
+    t["référence"] = t["référence"].str.upper().str.replace("_", "-")
+    bounds = zip(t.pop("IC bas"), t.pop("IC haut"), strict=True)
+    fr = lambda x, f: format(x, f).replace(".", ",").replace("-", "−")  # noqa: E731
+    t["IC à 95 %"] = [f"[{fr(lo, '+.1f')} ; {fr(hi, '+.1f')}]" for lo, hi in bounds]
+    t["gain (%)"] = t["gain (%)"].map(lambda g: fr(g, "+.1f"))
+    for col in ("p Holm (non-infériorité)", "p Holm (supériorité)"):
+        t[col] = t[col].map(lambda p: "< 0,01" if p < 0.01 else fr(p, ".2f"))
+    t = t[["situation", "métrique", "référence", "gain (%)", "IC à 95 %",
+           "p Holm (non-infériorité)", "p Holm (supériorité)", "verdict"]]  # fmt: skip
+    counts = table["verdict"].value_counts()
+    return "\n".join([
+        "# Tableau final : la candidate contre la meilleure référence", "",
+        "Évaluation unique sur les graines de test 0 à 4 (pré-enregistrement figé au commit "
+        "`2c0dd1d`), famille de Holm « hybrid » : 18 situations x 2 mesures. Gain = (référence "
+        "− candidate) / référence, positif = mieux ; intervalle à 95 % par bootstrap croisé "
+        "(modèles x graines). Verdicts : « prouvée meilleure » (supériorité, Holm), « prouvée "
+        "non inférieure » (non-infériorité à −2 %, Holm), « vraie perte » (l'intervalle entier "
+        "sous 0), sinon « trop large pour conclure ».", "",
+        " ; ".join(f"{k} : {v}" for k, v in counts.items()) + ".", "",
+        md(t), "", NOTE, "",
+        "Figure : `figures/combined/fig_forest.png`. Calcul : `scripts/combined_analysis.py` "
+        "(figé avec le pré-enregistrement), sortie complète dans `results/combined/analysis.md`.",
+    ]) + "\n"  # fmt: skip
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     style()
@@ -387,6 +428,7 @@ def main() -> None:
     a = ambulances(df)
     s, d = bilan(df, tests)
     f.to_csv(FIG / "fig_forest.csv", index=False)
+    (FIG.parent.parent / "combined_tableau_final.md").write_text(tableau_final(f), encoding="utf-8")
     g.to_csv(FIG / "fig_compromis.csv")
     a.to_csv(FIG / "fig_ambulances.csv", index=False)
     d.to_csv(OUT / "bilan_detail.csv", index=False)
