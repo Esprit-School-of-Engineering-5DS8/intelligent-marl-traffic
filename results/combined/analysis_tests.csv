@@ -1,0 +1,149 @@
+famille,variante,case,métrique,référence,moyenne référence,moyenne variante,gain (%),IC bas,IC haut,p,p Mann-Whitney,Cliff,effet,n,p Holm,verdict
+hybrid,H2 β = 4 (candidate),grid4x4 buses medium,trajet,mp,158.01,159.47,-0.92,-1.31,-0.58,9.999000099990002e-05,0.007739938080495356,0.787,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 buses medium,attente,mp,25.65,25.13,2.03,0.98,2.94,9.999000099990002e-05,0.06553147574819401,-0.573,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 comm_dropout_30 peak,trajet,mp,210.18,213.77,-1.71,-3.02,-0.48,0.3003699630036996,0.5531475748194015,0.2,small,3x5,1.0,vraie perte
+hybrid,H2 β = 4 (candidate),grid4x4 comm_dropout_30 peak,attente,mp,55.28,55.82,-0.98,-3.54,1.59,0.20937906209379062,0.8000515995872033,0.093,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 emergency medium,trajet,mp,157.54,159.14,-1.02,-1.31,-0.77,9.999000099990002e-05,0.010706914344685244,0.76,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 emergency medium,attente,mp,25.3,24.95,1.39,0.47,2.09,9.999000099990002e-05,0.06553147574819401,-0.573,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 emergency peak,trajet,mp,211.63,214.07,-1.15,-2.01,-0.11,0.025897410258974102,0.6724716202270382,0.147,negligible,3x5,0.5438456154384561,vraie perte
+hybrid,H2 β = 4 (candidate),grid4x4 emergency peak,attente,mp,55.9,56.02,-0.21,-2.39,1.88,0.046495350464953504,1.0,0.013,negligible,3x5,0.8369163083691631,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 incident medium,trajet,mp,157.88,159.15,-0.81,-1.02,-0.54,9.999000099990002e-05,0.01934984520123839,0.707,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 incident medium,attente,mp,25.47,24.88,2.31,1.54,3.11,9.999000099990002e-05,0.01934984520123839,-0.707,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 incident peak,trajet,mp,212.48,214.33,-0.87,-2.19,0.33,0.042495750424957505,0.8000515995872033,0.093,negligible,3x5,0.8074192580741926,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 incident peak,attente,mp,56.32,55.96,0.64,-2.16,3.35,0.031296870312968704,0.8000515995872033,-0.093,negligible,3x5,0.6259374062593741,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 normal medium,trajet,mp,157.94,159.05,-0.71,-1.03,-0.36,9.999000099990002e-05,0.04179566563467492,0.627,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 normal medium,attente,coop_full,25.47,24.87,2.33,1.35,3.35,9.999000099990002e-05,0.007940336264246579,-0.573,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 normal peak,trajet,mp,210.18,213.59,-1.63,-3.35,-0.17,0.29057094290570945,0.5531475748194015,0.2,small,3x5,1.0,vraie perte
+hybrid,H2 β = 4 (candidate),grid4x4 normal peak,attente,mp,55.28,55.67,-0.71,-4.77,2.34,0.22347765223477653,1.0,0.013,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 pedestrians medium,trajet,team_rules,164.62,165.59,-0.59,-0.84,-0.33,9.999000099990002e-05,0.1973684210526316,0.413,medium,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 pedestrians medium,attente,team_rules,29.83,28.95,2.95,1.94,3.97,9.999000099990002e-05,0.04179566563467492,-0.627,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 pedestrians peak,trajet,mp,265.17,282.57,-6.56,-18.82,0.24,0.867013298670133,0.3948658410732715,0.28,small,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 pedestrians peak,attente,mp,87.01,98.23,-12.9,-42.42,2.37,0.8783121687831217,0.6115841073271414,0.173,small,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),grid4x4 sensor_noise peak,trajet,coop_full,232.07,217.95,6.08,2.06,13.94,9.999000099990002e-05,0.02510289275359325,-0.484,large,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid4x4 sensor_noise peak,attente,coop_full,68.23,58.6,14.11,3.33,33.95,9.999000099990002e-05,0.04648668639528603,-0.431,medium,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),grid8x8 normal peak,trajet,mp,300.69,307.11,-2.14,-2.59,-1.71,0.7199280071992801,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte
+hybrid,H2 β = 4 (candidate),grid8x8 normal peak,attente,mp,52.33,53.09,-1.45,-2.14,-0.77,0.05449455054494551,0.0024509803921568627,0.867,large,3x5,0.9264073592640736,vraie perte
+hybrid,H2 β = 4 (candidate),real_district emergency medium,trajet,ev_rule_mp,109.55,109.3,0.23,-0.06,0.64,9.999000099990002e-05,0.5531475748194015,-0.2,small,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),real_district emergency medium,attente,coop_full,7.56,7.49,0.89,-4.16,6.39,0.17618238176182383,0.8034625743147712,-0.058,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district emergency peak,trajet,mp,155.16,159.32,-2.68,-10.24,7.03,0.5944405559444056,0.7354231166150671,0.12,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district emergency peak,attente,mp,38.0,41.89,-10.24,-39.71,22.76,0.7239276072392761,0.7354231166150671,0.12,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district incident medium,trajet,mp,109.77,109.36,0.38,-0.06,0.83,9.999000099990002e-05,0.1973684210526316,-0.413,medium,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),real_district incident medium,attente,coop_full,7.65,7.58,0.82,-3.79,5.03,0.1070892910708929,0.8357050269952793,-0.049,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district incident peak,trajet,coop_full,153.73,154.34,-0.39,-8.35,7.43,0.35036496350364965,0.7715511878155722,0.067,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district incident peak,attente,coop_full,36.74,37.75,-2.74,-35.55,24.39,0.5395460453954605,0.8682259903524354,0.04,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district normal medium,trajet,mp,109.45,109.4,0.04,-0.25,0.36,9.999000099990002e-05,0.9327915376676987,-0.04,negligible,3x5,0.0035996400359964006,non inférieure (démontré)
+hybrid,H2 β = 4 (candidate),real_district normal medium,attente,coop_full,7.52,7.54,-0.25,-5.3,6.23,0.3084691530846915,0.9338864180775845,0.022,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district normal peak,trajet,mp,153.45,157.45,-2.61,-7.95,2.2,0.5721427857214278,0.6115841073271414,0.173,small,3x5,1.0,intervalle trop large pour conclure
+hybrid,H2 β = 4 (candidate),real_district normal peak,attente,mp,36.2,40.22,-11.09,-32.14,7.92,0.8455154484551545,0.6115841073271414,0.173,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-sup,H2 β = 4 (candidate),grid4x4 buses medium,trajet,mp,158.01,159.47,-0.92,-1.31,-0.58,1.0,0.007739938080495356,0.787,large,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 buses medium,attente,mp,25.65,25.13,2.03,0.98,2.94,0.00029997000299970003,0.06553147574819401,-0.573,large,3x5,0.009599040095990401,meilleure (démontré)
+hybrid-sup,H2 β = 4 (candidate),grid4x4 comm_dropout_30 peak,trajet,mp,210.18,213.77,-1.71,-3.02,-0.48,0.9976002399760024,0.5531475748194015,0.2,small,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 comm_dropout_30 peak,attente,mp,55.28,55.82,-0.98,-3.54,1.59,0.7929207079292071,0.8000515995872033,0.093,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 emergency medium,trajet,mp,157.54,159.14,-1.02,-1.31,-0.77,1.0,0.010706914344685244,0.76,large,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 emergency medium,attente,mp,25.3,24.95,1.39,0.47,2.09,0.000999900009999,0.06553147574819401,-0.573,large,3x5,0.029997000299970003,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 emergency peak,trajet,mp,211.63,214.07,-1.15,-2.01,-0.11,0.9833016698330167,0.6724716202270382,0.147,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 emergency peak,attente,mp,55.9,56.02,-0.21,-2.39,1.88,0.5767423257674232,1.0,0.013,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 incident medium,trajet,mp,157.88,159.15,-0.81,-1.02,-0.54,1.0,0.01934984520123839,0.707,large,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 incident medium,attente,mp,25.47,24.88,2.31,1.54,3.11,9.999000099990002e-05,0.01934984520123839,-0.707,large,3x5,0.0035996400359964006,meilleure (démontré)
+hybrid-sup,H2 β = 4 (candidate),grid4x4 incident peak,trajet,mp,212.48,214.33,-0.87,-2.19,0.33,0.918008199180082,0.8000515995872033,0.093,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 incident peak,attente,mp,56.32,55.96,0.64,-2.16,3.35,0.3120687931206879,0.8000515995872033,-0.093,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 normal medium,trajet,mp,157.94,159.05,-0.71,-1.03,-0.36,1.0,0.04179566563467492,0.627,large,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 normal medium,attente,coop_full,25.47,24.87,2.33,1.35,3.35,9.999000099990002e-05,0.007940336264246579,-0.573,large,3x5,0.0035996400359964006,meilleure (démontré)
+hybrid-sup,H2 β = 4 (candidate),grid4x4 normal peak,trajet,mp,210.18,213.59,-1.63,-3.35,-0.17,0.9884011598840116,0.5531475748194015,0.2,small,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 normal peak,attente,mp,55.28,55.67,-0.71,-4.77,2.34,0.6439356064393561,1.0,0.013,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 pedestrians medium,trajet,team_rules,164.62,165.59,-0.59,-0.84,-0.33,0.9998000199980002,0.1973684210526316,0.413,medium,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 pedestrians medium,attente,team_rules,29.83,28.95,2.95,1.94,3.97,9.999000099990002e-05,0.04179566563467492,-0.627,large,3x5,0.0035996400359964006,meilleure (démontré)
+hybrid-sup,H2 β = 4 (candidate),grid4x4 pedestrians peak,trajet,mp,265.17,282.57,-6.56,-18.82,0.24,0.9666033396660334,0.3948658410732715,0.28,small,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 pedestrians peak,attente,mp,87.01,98.23,-12.9,-42.42,2.37,0.9324067593240676,0.6115841073271414,0.173,small,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid4x4 sensor_noise peak,trajet,coop_full,232.07,217.95,6.08,2.06,13.94,0.00019998000199980003,0.02510289275359325,-0.484,large,3x5,0.006599340065993401,meilleure (démontré)
+hybrid-sup,H2 β = 4 (candidate),grid4x4 sensor_noise peak,attente,coop_full,68.23,58.6,14.11,3.33,33.95,0.0005999400059994001,0.04648668639528603,-0.431,medium,3x5,0.018598140185981403,meilleure (démontré)
+hybrid-sup,H2 β = 4 (candidate),grid8x8 normal peak,trajet,mp,300.69,307.11,-2.14,-2.59,-1.71,1.0,0.00012899896800825592,1.0,large,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),grid8x8 normal peak,attente,mp,52.33,53.09,-1.45,-2.14,-0.77,1.0,0.0024509803921568627,0.867,large,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district emergency medium,trajet,ev_rule_mp,109.55,109.3,0.23,-0.06,0.64,0.0810918908109189,0.5531475748194015,-0.2,small,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district emergency medium,attente,coop_full,7.56,7.49,0.89,-4.16,6.39,0.35666433356664334,0.8034625743147712,-0.058,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district emergency peak,trajet,mp,155.16,159.32,-2.68,-10.24,7.03,0.7479252074792521,0.7354231166150671,0.12,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district emergency peak,attente,mp,38.0,41.89,-10.24,-39.71,22.76,0.7493250674932507,0.7354231166150671,0.12,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district incident medium,trajet,mp,109.77,109.36,0.38,-0.06,0.83,0.051094890510948905,0.1973684210526316,-0.413,medium,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district incident medium,attente,coop_full,7.65,7.58,0.82,-3.79,5.03,0.35626437356264373,0.8357050269952793,-0.049,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district incident peak,trajet,coop_full,153.73,154.34,-0.39,-8.35,7.43,0.5524447555244476,0.7715511878155722,0.067,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district incident peak,attente,coop_full,36.74,37.75,-2.74,-35.55,24.39,0.5795420457954205,0.8682259903524354,0.04,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district normal medium,trajet,mp,109.45,109.4,0.04,-0.25,0.36,0.407959204079592,0.9327915376676987,-0.04,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district normal medium,attente,coop_full,7.52,7.54,-0.25,-5.3,6.23,0.5783421657834217,0.9338864180775845,0.022,negligible,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district normal peak,trajet,mp,153.45,157.45,-2.61,-7.95,2.2,0.8641135886411359,0.6115841073271414,0.173,small,3x5,1.0,supériorité non démontrée
+hybrid-sup,H2 β = 4 (candidate),real_district normal peak,attente,mp,36.2,40.22,-11.09,-32.14,7.92,0.8867113288671132,0.6115841073271414,0.173,small,3x5,1.0,supériorité non démontrée
+hybrid-ablation,H1 q90,grid4x4 buses medium,trajet,mp,158.01,161.46,-2.18,-2.37,-2.0,0.9766023397660234,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte
+hybrid-ablation,H1 q90,grid4x4 buses medium,attente,mp,25.65,25.72,-0.29,-0.92,0.3,9.999000099990002e-05,0.6115841073271414,0.173,small,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,grid4x4 comm_dropout_30 peak,trajet,mp,210.18,216.6,-3.05,-4.11,-2.12,0.9886011398860114,0.1973684210526316,0.413,medium,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid4x4 comm_dropout_30 peak,attente,mp,55.28,57.62,-4.23,-6.52,-2.12,0.9832016798320168,0.4972910216718267,0.227,small,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid4x4 emergency medium,trajet,mp,157.54,160.89,-2.13,-2.56,-1.81,0.7397260273972602,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 emergency medium,trajet,mp,157.54,159.14,-1.02,-1.31,-0.77,9.999000099990002e-05,0.010706914344685244,0.76,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,grid4x4 emergency medium,trajet,mp,157.54,160.89,-2.13,-2.56,-1.81,0.7397260273972602,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte
+hybrid-ablation,H1 q90,grid4x4 emergency medium,attente,mp,25.3,25.45,-0.59,-2.46,0.87,0.06369363063693631,0.8659700722394221,-0.067,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,grid4x4 emergency medium,attente,mp,25.3,24.95,1.39,0.47,2.09,9.999000099990002e-05,0.06553147574819401,-0.573,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,grid4x4 emergency medium,attente,mp,25.3,25.45,-0.59,-2.46,0.87,0.06369363063693631,0.8659700722394221,-0.067,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid4x4 emergency peak,trajet,mp,211.63,216.44,-2.27,-3.44,-1.21,0.6787321267873213,0.3485552115583076,0.307,small,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 emergency peak,trajet,mp,211.63,214.07,-1.15,-2.01,-0.11,0.025897410258974102,0.6724716202270382,0.147,negligible,3x5,1.0,vraie perte
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,grid4x4 emergency peak,trajet,mp,211.63,220.23,-4.06,-5.37,-2.97,1.0,0.11855005159958722,0.493,large,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid4x4 emergency peak,attente,mp,55.9,57.7,-3.21,-5.69,-1.17,0.8604139586041396,0.4972910216718267,0.227,small,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 emergency peak,attente,mp,55.9,56.02,-0.21,-2.39,1.88,0.046495350464953504,1.0,0.013,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,grid4x4 emergency peak,attente,mp,55.9,58.38,-4.43,-7.37,-2.12,0.9811018898110189,0.3948658410732715,0.28,small,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid4x4 incident medium,trajet,mp,157.88,161.5,-2.29,-2.54,-1.98,0.971002899710029,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 incident medium,trajet,mp,157.88,159.15,-0.81,-1.02,-0.54,9.999000099990002e-05,0.01934984520123839,0.707,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,grid4x4 incident medium,attente,mp,25.47,25.61,-0.56,-1.46,0.48,0.0024997500249975004,0.44453044375645,0.253,small,3x5,0.13998600139986003,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,grid4x4 incident medium,attente,mp,25.47,24.88,2.31,1.54,3.11,9.999000099990002e-05,0.01934984520123839,-0.707,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,grid4x4 incident peak,trajet,mp,212.48,218.45,-2.81,-4.61,-1.13,0.8166183381661833,0.3055985552115584,0.333,medium,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 incident peak,trajet,mp,212.48,214.33,-0.87,-2.19,0.33,0.042495750424957505,0.8000515995872033,0.093,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid4x4 incident peak,attente,mp,56.32,58.6,-4.06,-7.77,-0.62,0.8693130686931307,0.5531475748194015,0.2,small,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 incident peak,attente,mp,56.32,55.96,0.64,-2.16,3.35,0.031296870312968704,0.8000515995872033,-0.093,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid4x4 normal medium,trajet,mp,157.94,161.06,-1.98,-2.35,-1.63,0.41575842415758424,0.0005159958720330237,0.947,large,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 normal medium,trajet,mp,157.94,159.05,-0.71,-1.03,-0.36,9.999000099990002e-05,0.04179566563467492,0.627,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,grid4x4 normal medium,attente,coop_full,25.47,25.47,0.0,0.0,0.0,9.999000099990002e-05,1.0,0.0,negligible,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H3 q90,grid4x4 normal medium,attente,coop_full,25.47,24.87,2.33,1.35,3.35,9.999000099990002e-05,0.007940336264246579,-0.573,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,grid4x4 normal peak,trajet,mp,210.18,216.26,-2.9,-4.68,-1.22,0.8412158784121588,0.23000515995872037,0.387,medium,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 normal peak,trajet,mp,210.18,213.59,-1.63,-3.35,-0.17,0.29057094290570945,0.5531475748194015,0.2,small,3x5,1.0,vraie perte
+hybrid-ablation,H1 q90,grid4x4 normal peak,attente,mp,55.28,57.44,-3.9,-7.75,-0.54,0.8457154284571543,0.44453044375645,0.253,small,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 normal peak,attente,mp,55.28,55.67,-0.71,-4.77,2.34,0.22347765223477653,1.0,0.013,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid4x4 pedestrians medium,trajet,team_rules,164.62,169.06,-2.69,-4.54,-1.71,0.8728127187281272,0.0005159958720330237,0.947,large,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 pedestrians medium,trajet,team_rules,164.62,165.59,-0.59,-0.84,-0.33,9.999000099990002e-05,0.1973684210526316,0.413,medium,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,COOP-FULL + EV-RULE + PED-RULE,grid4x4 pedestrians medium,trajet,team_rules,164.62,169.7,-3.08,-5.2,-1.74,0.9255074492550744,0.0005159958720330237,0.947,large,3x5,1.0,vraie perte
+hybrid-ablation,H1 q90,grid4x4 pedestrians medium,attente,team_rules,29.83,30.64,-2.74,-9.96,0.83,0.45765423457654236,0.3948658410732715,0.28,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,grid4x4 pedestrians medium,attente,team_rules,29.83,28.95,2.95,1.94,3.97,9.999000099990002e-05,0.04179566563467492,-0.627,large,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,COOP-FULL + EV-RULE + PED-RULE,grid4x4 pedestrians medium,attente,team_rules,29.83,31.06,-4.13,-12.79,0.79,0.6887311268873113,0.3485552115583076,0.307,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid4x4 pedestrians peak,trajet,mp,265.17,292.24,-10.21,-26.15,-0.17,0.9302069793020697,0.3055985552115584,0.333,medium,3x5,1.0,vraie perte
+hybrid-ablation,H3 q90,grid4x4 pedestrians peak,trajet,mp,265.17,279.34,-5.34,-17.76,0.75,0.7082291770822917,0.4972910216718267,0.227,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,COOP-FULL + EV-RULE + PED-RULE,grid4x4 pedestrians peak,trajet,mp,265.17,316.5,-19.36,-37.92,-4.25,0.9959004099590041,0.06553147574819401,0.573,large,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid4x4 pedestrians peak,attente,mp,87.01,106.41,-22.3,-59.92,0.0,0.9581041895810419,0.3485552115583076,0.307,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,grid4x4 pedestrians peak,attente,mp,87.01,96.32,-10.7,-40.08,2.86,0.7682231776822318,0.6724716202270382,0.147,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,COOP-FULL + EV-RULE + PED-RULE,grid4x4 pedestrians peak,attente,mp,87.01,123.73,-42.21,-87.59,-6.18,0.9938006199380062,0.08062435500515996,0.547,large,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid4x4 sensor_noise peak,trajet,coop_full,232.07,225.35,2.9,-1.76,11.21,0.019098090190980903,0.5897385933186072,-0.12,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid4x4 sensor_noise peak,attente,coop_full,68.23,63.84,6.44,-6.86,28.08,0.30596940305969406,0.7715511878155722,0.067,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,grid8x8 normal peak,trajet,mp,300.69,313.18,-4.15,-4.63,-3.67,1.0,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,grid8x8 normal peak,attente,mp,52.33,54.49,-4.14,-5.22,-3.16,1.0,0.00012899896800825592,1.0,large,3x5,1.0,vraie perte (au-delà de −2 %)
+hybrid-ablation,H1 q90,real_district emergency medium,trajet,ev_rule_mp,109.55,109.85,-0.27,-0.86,0.18,9.999000099990002e-05,0.6115841073271414,0.173,small,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H3 q90,real_district emergency medium,trajet,ev_rule_mp,109.55,109.3,0.23,-0.06,0.64,9.999000099990002e-05,0.5531475748194015,-0.2,small,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,real_district emergency medium,trajet,ev_rule_mp,109.55,109.88,-0.29,-1.02,0.37,9.999000099990002e-05,0.3485552115583076,0.307,small,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,real_district emergency medium,attente,coop_full,7.56,7.47,1.13,-0.89,3.57,0.0023997600239976003,0.5897385933186072,-0.12,negligible,3x5,0.13678632136786323,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district emergency medium,attente,coop_full,7.56,7.49,0.89,-4.16,6.39,0.17618238176182383,0.8034625743147712,-0.058,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,real_district emergency medium,attente,coop_full,7.56,7.5,0.72,-0.54,2.27,0.00029997000299970003,0.6629388722225713,-0.098,negligible,3x5,0.0173982601739826,non inférieure (démontré)
+hybrid-ablation,H1 q90,real_district emergency peak,trajet,mp,155.16,155.28,-0.07,-9.54,9.08,0.35496450354964504,0.8659700722394221,0.067,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district emergency peak,trajet,mp,155.16,158.36,-2.06,-8.62,7.03,0.573942605739426,0.8000515995872033,0.093,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,real_district emergency peak,trajet,mp,155.16,155.57,-0.26,-10.54,9.8,0.38996100389961,1.0,0.013,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district emergency peak,attente,mp,38.0,37.63,0.95,-35.97,29.28,0.44075592440755923,1.0,0.013,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district emergency peak,attente,mp,38.0,40.6,-6.87,-31.62,22.59,0.6708329167083291,0.7354231166150671,0.12,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,V1 : COOP-FULL + EV-RULE,real_district emergency peak,attente,mp,38.0,38.1,-0.27,-41.2,30.14,0.45685431456854314,1.0,-0.013,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district incident medium,trajet,mp,109.77,109.85,-0.07,-0.76,0.51,9.999000099990002e-05,0.7354231166150671,0.12,negligible,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H3 q90,real_district incident medium,trajet,mp,109.77,109.36,0.38,-0.06,0.83,9.999000099990002e-05,0.1973684210526316,-0.413,medium,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,real_district incident medium,attente,coop_full,7.65,7.49,2.06,-0.06,4.94,0.00019998000199980003,0.4067868333984651,-0.182,small,3x5,0.011798820117988202,non inférieure (démontré)
+hybrid-ablation,H3 q90,real_district incident medium,attente,coop_full,7.65,7.58,0.82,-3.79,5.03,0.1070892910708929,0.8357050269952793,-0.049,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district incident peak,trajet,coop_full,153.73,158.03,-2.79,-11.33,3.31,0.5420457954204579,0.3195059648919748,0.218,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district incident peak,trajet,coop_full,153.73,156.47,-1.78,-11.83,6.98,0.46055394460553944,0.5338294217441396,0.138,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district incident peak,attente,coop_full,36.74,39.84,-8.43,-45.88,13.48,0.6645335466453355,0.4553018964198552,0.164,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district incident peak,attente,coop_full,36.74,39.79,-8.3,-50.13,24.05,0.6266373362663734,0.6783024655972324,0.093,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district normal medium,trajet,mp,109.45,109.87,-0.39,-1.14,0.25,9.999000099990002e-05,0.3485552115583076,0.307,small,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H3 q90,real_district normal medium,trajet,mp,109.45,109.4,0.04,-0.25,0.36,9.999000099990002e-05,0.9327915376676987,-0.04,negligible,3x5,0.007599240075992401,non inférieure (démontré)
+hybrid-ablation,H1 q90,real_district normal medium,attente,coop_full,7.52,7.47,0.7,-1.59,2.91,0.010198980101989802,0.7715511878155722,-0.067,negligible,3x5,0.5609439056094391,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district normal medium,attente,coop_full,7.52,7.54,-0.25,-5.3,6.23,0.3084691530846915,0.9338864180775845,0.022,negligible,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district normal peak,trajet,mp,153.45,160.08,-4.32,-14.11,4.34,0.6828317168283171,0.44453044375645,0.253,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district normal peak,trajet,mp,153.45,157.32,-2.52,-8.3,3.18,0.585041495850415,0.5531475748194015,0.2,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H1 q90,real_district normal peak,attente,mp,36.2,42.1,-16.3,-58.0,15.82,0.7847215278472153,0.5531475748194015,0.2,small,3x5,1.0,intervalle trop large pour conclure
+hybrid-ablation,H3 q90,real_district normal peak,attente,mp,36.2,39.63,-9.47,-33.56,12.5,0.7584241575842415,0.6115841073271414,0.173,small,3x5,1.0,intervalle trop large pour conclure
