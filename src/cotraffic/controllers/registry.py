@@ -11,6 +11,10 @@ LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
 # our teammate's LLM team (controllers/llm_team/PROVENANCE.md):
 # Max-Pressure + the team's code rules (team_rules) or + the local model (team_qwen)
 TEAM = ("team_rules", "team_qwen")
+# the final controller of the combined study (docs/COMBINED_PREREGISTRATION.md, frozen at
+# 2c0dd1d): COOP-FULL with a bias of 4 towards Max-Pressure and EV-RULE pre-emption, built as
+# scripts/combined_eval.py builds it (method hybrid_h2, beta 4)
+CANDIDATE = "hybrid_h2"
 
 # "<method>_guard": the same controller behind the shield with the spillback guard and
 # detector recall (FAILURES F-012, F-014), evaluated as a family of its own.
@@ -62,6 +66,15 @@ def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Co
         from cotraffic.controllers.team import TeamController
 
         return TeamController(method, **kwargs)
+    if method == CANDIDATE:
+        from cotraffic.controllers.combined import EvRuleGuide
+        from cotraffic.controllers.hybrid import HybridPolicy
+
+        if checkpoint is None:
+            raise ValueError(f"method {method!r} needs a COOP-FULL checkpoint")
+        base = make_controller("coop_full", checkpoint)
+        beta = float(kwargs.get("beta", 4.0))
+        return HybridPolicy(base, mp_beta=beta, ev_guide=EvRuleGuide(), name=CANDIDATE)
     if method in LEARNED or checkpoint is not None:
         from cotraffic.controllers.rl_policy import LearnedPolicy
 

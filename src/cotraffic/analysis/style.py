@@ -19,6 +19,7 @@ METHOD_LABELS = {
     "coop_full_ev4": "COOP-FULL (λ_ev=4)",
     "dqn": "DQN",
     "random": "Random",
+    "hybrid_h2": "Candidate (H2 β=4)",
 }
 METHOD_ORDER = list(METHOD_LABELS)
 BASELINE_METHODS = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")

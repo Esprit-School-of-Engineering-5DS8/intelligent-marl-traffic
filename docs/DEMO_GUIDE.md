@@ -273,3 +273,32 @@ Pendant la démo 1, il faut montrer :
 | La démo des outils est trop lente (27 à 50 s par conseil) | `Get-Content -Encoding UTF8 docs\demo\llm_tools_demo.txt` |
 | SUMO ne démarre pas | Les tests de sécurité et d'outils ne lancent pas tous SUMO : les montrer d'abord (lignes 3 à 5), puis la sortie enregistrée de la démo |
 | Plus de temps | `--compare` ajoute COOP-FULL seul sur le même épisode : `.venv\Scripts\python scripts\llm_demo.py --scenario incident --compare` (environ 3 min) |
+
+## Démo du contrôleur final : une ambulance, la candidate contre Max-Pressure (environ 3 min)
+
+Le contrôleur retenu par l'étude combinée (`docs/report/combined_resume.md`) contre
+Max-Pressure, sur exactement le même trafic : grille 4x4, heure de pointe, graine de test 0.
+On suit l'ambulance `ev_1`, choisie parce que son gain est le plus proche de la médiane des
+24 ambulances de cette situation (55 s de gain ; médiane 53 s ; la candidate est plus rapide
+pour 23 ambulances sur 24). Ce n'est donc pas le meilleur cas.
+
+```powershell
+python scripts/demo_side_by_side.py --left mp --right hybrid_h2 --net grid4x4 --demand peak --scenarios emergency --seed 0 --only-ev ev_1 --ev-view-width 160 --no-chart
+```
+
+Deux fenêtres : Max-Pressure à gauche (bleu), la candidate à droite (orange). La simulation
+avance jusqu'à 30 s avant le départ de l'ambulance (environ 1 à 2 min), puis chaque caméra la
+suit. Avec la candidate, l'ambulance arrive après 119 s sur la route ; avec Max-Pressure,
+après 173 s. Chaque fenêtre se ferme 8 s après l'arrivée de son ambulance, et la console
+affiche les temps.
+
+### Plan de secours
+
+La même scène, enregistrée (une image par seconde simulée, vitesse x8) :
+`docs\demo\ambulance_mp_vs_candidate.gif` (s'ouvre dans le navigateur ou PowerPoint) ;
+l'image finale : `docs\demo\ambulance_mp_vs_candidate.png`. Pour la refaire :
+
+```powershell
+python scripts/demo_side_by_side.py --left mp --right hybrid_h2 --net grid4x4 --demand peak --scenarios emergency --seed 0 --only-ev ev_1 --ev-view-width 160 --no-chart --record
+python scripts/demo_record.py
+```

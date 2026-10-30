@@ -32,6 +32,15 @@ its hazard lights on, inside a flashing red zone, with an ACCIDENT sign beside t
 (display only, as the colours).
 ``--snapshot-at 900 1800`` saves screenshots of both windows at those simulation times
 (``results/tmp/demo/``), e.g. for the report.
+``--only-ev ev_1`` follows that emergency vehicle only and closes each window 8 s after it
+arrives, printing its time on the road; ``--record`` adds one screenshot per simulated second
+while it is followed (``results/tmp/demo/record/``), which ``scripts/demo_record.py`` puts side
+by side in an animated GIF. The final controller of the combined study is ``hybrid_h2``
+(COOP-FULL with its training run 1, a bias of 4 towards Max-Pressure, EV-RULE pre-emption):
+
+    python scripts/demo_side_by_side.py --left mp --right hybrid_h2 --net grid4x4
+        --demand peak --scenarios emergency --seed 0 --only-ev ev_1 --ev-view-width 160
+        --no-chart [--record]
 
 A third window charts both controllers live on the same traffic (``scripts/demo_chart.py``):
 headline numbers with the difference between them (mean trip time, waiting at the signals,
@@ -47,13 +56,14 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import multiprocessing as mp
 import time
 from pathlib import Path
 
 from demo_chart import SIDE_COLORS
 
-from cotraffic.controllers.registry import BASELINES
+from cotraffic.controllers.registry import BASELINES, CANDIDATE
 from cotraffic.paths import default_checkpoint
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "results" / "tmp" / "demo"
@@ -236,15 +246,17 @@ def view_settings(title: str, colour: str, tag: str) -> Path:
     return settings
 
 
-def ev_departures(episode) -> list[float]:
-    """Departure times of the emergency vehicles (ids ev_0, ev_1, ...) of the episode."""
+def ev_departures(episode, ev_id: str | None = None) -> list[float]:
+    """Departure times of the emergency vehicles (ids ev_0, ev_1, ...) of the episode, or of
+    the one named ``ev_id``."""
     import re
 
+    pattern = re.escape(ev_id) if ev_id else r"ev_\d+"
     times: list[float] = []
     for f in episode.bundle.route_files:
         text = Path(f).read_text(encoding="utf-8")
         times += [
-            float(t) for t in re.findall(r'<vehicle id="ev_\d+"[^>]*depart="([0-9.]+)"', text)
+            float(t) for t in re.findall(rf'<vehicle id="{pattern}"[^>]*depart="([0-9.]+)"', text)
         ]
     return sorted(times)
 
@@ -355,6 +367,9 @@ def run(
     sync=None,
     stats=None,
     follow_incident: bool = False,
+    only_ev: str | None = None,
+    record: bool = False,
+    ev_view_width: float = 120.0,
 ) -> None:
     from cotraffic.analysis.style import label
     from cotraffic.controllers.registry import make_controller
@@ -396,6 +411,28 @@ def run(
 
     if gui and incident:
         hooks.append(flash)
+    # --only-ev: the departure and arrival of that vehicle, to the second; --record: one
+    # screenshot per simulated second from the moment the camera follows it until 5 s after
+    # its arrival, for scripts/demo_record.py
+    rec = {"on": False, "depart": None, "arrive": None, "side": "", "dir": DEMO_DIR / "record"}
+
+    def ev_clock(env, now: float) -> None:
+        sim = env.conn.simulation
+        if rec["depart"] is None and only_ev in sim.getDepartedIDList():
+            rec["depart"] = now
+        if rec["arrive"] is None and only_ev in sim.getArrivedIDList():
+            rec["arrive"] = now
+
+    def shoot(env, now: float) -> None:
+        if rec["on"] and (rec["arrive"] is None or now <= rec["arrive"] + 5):
+            shot = rec["dir"] / f"{rec['side']}_{int(now):05d}.png"
+            with contextlib.suppress(Exception):
+                env.conn.gui.screenshot("View #0", str(shot))
+
+    if only_ev:
+        hooks.append(ev_clock)
+    if gui and record:
+        hooks.append(shoot)
     # live comparison: completed trips, measured the same way for both controllers; with an
     # accident, also the trips through the blocked street that depart from 10 min before it
     # to its end (the population of the evaluation's incident metric)
@@ -426,6 +463,11 @@ def run(
         hooks.append(count_trips)
     if gui:
         side = "left" if x == 0 else "right"
+        rec["side"] = side
+        if record:
+            rec["dir"].mkdir(parents=True, exist_ok=True)
+            for old in rec["dir"].glob(f"{side}_*"):
+                old.unlink()
         colour = SIDE_COLORS[0 if x == 0 else 1]
         settings = view_settings(f"{side}: {label(method)}", colour, f"{side}_{method}")
         options = ["--window-pos", f"{x},30", "--window-size", "940,900"]
@@ -448,6 +490,7 @@ def run(
     obs, _ = env.reset(seed=seed)
     controller.reset(env)
     reframe_until = 60.0 if gui else -1.0  # the window may be resized while it opens
+    framed = {"zoom": 100.0, "width": view_width}
     pending = sorted(snapshot_at)
     tracked: str | None = None
     meet_at = None  # simulation time at which both windows wait for each other
@@ -455,9 +498,10 @@ def run(
     if gui:
         meet_at = reframe_until
         targets = []
-        departures = ev_departures(episode) if follow_ev else []
+        departures = ev_departures(episode, only_ev) if follow_ev else []
         if follow_ev and not departures:
-            print(f"{method}: no emergency vehicle in this scenario (add --scenarios emergency)")
+            print(f"{method}: no emergency vehicle {only_ev or ''} in this scenario "
+                  "(add --scenarios emergency)")  # fmt: skip
         if departures:
             targets.append(departures[0] - 30.0)
             times = ", ".join(f"{t:.0f}" for t in departures)
@@ -482,6 +526,9 @@ def run(
             obs, *_ = env.step(controller.act(env, obs))
             if env.now <= reframe_until:
                 width = frame_view(env, episode.net_file, view_width)
+                # the zoom at which the view measured `width`: the camera following a vehicle
+                # is zoomed from it (trackVehicle may change the zoom of the window)
+                framed["zoom"], framed["width"] = env.conn.gui.getZoom("View #0"), width
                 if env.now + env.delta > reframe_until:
                     print(f"{method}: view {width:.0f} m wide")
             if stats is not None:
@@ -519,18 +566,19 @@ def run(
                 pace["on"] = True
                 meet_at = None
             if gui and follow_ev:
-                # the view is framed at view_width when following starts; while the camera
-                # follows a vehicle the window is not redrawn between TraCI calls, so the zoom
-                # is scaled by a fixed factor instead of being measured
-                factor = view_width / EV_VIEW_WIDTH
+                # while the camera follows a vehicle the window is not redrawn between TraCI
+                # calls, so its zoom is set from the one measured at framing, not measured
+                follow_zoom = framed["zoom"] * framed["width"] / ev_view_width
                 if tracked is not None and tracked not in env.ev_ids:  # it has arrived
                     env.conn.gui.trackVehicle("View #0", "")
-                    env.conn.gui.setZoom("View #0", env.conn.gui.getZoom("View #0") / factor)
+                    env.conn.gui.setZoom("View #0", framed["zoom"])
                     frame_view(env, episode.net_file, view_width)
                     tracked = None
                     on_incident = False
                 # only a vehicle driving now (not one being teleported or just arrived)
                 on_road = sorted(set(env.ev_ids) & set(env.conn.vehicle.getIDList()))
+                if only_ev:  # that one only, once
+                    on_road = [v for v in on_road if v == only_ev and rec["arrive"] is None]
                 if tracked is None and on_road:
                     try:
                         env.conn.gui.trackVehicle("View #0", on_road[0])
@@ -538,9 +586,21 @@ def run(
                         pass  # it left the network in between; try again at the next decision
                     else:
                         tracked = on_road[0]
-                        zoom = env.conn.gui.getZoom("View #0") * factor
-                        env.conn.gui.setZoom("View #0", zoom)
+                        env.conn.gui.setZoom("View #0", follow_zoom)
+                        rec["on"] = record
                         print(f"{method}: t={env.now:.0f} s, following emergency vehicle {tracked}")
+            if only_ev and rec["arrive"] is not None and env.now >= rec["arrive"] + 8:
+                trip = rec["arrive"] - (rec["depart"] or rec["arrive"])
+                print(f"{method}: {only_ev} departed at t={rec['depart']:.0f} s, arrived at "
+                      f"t={rec['arrive']:.0f} s: {trip:.0f} s on the road")  # fmt: skip
+                if record:
+                    meta = {"method": method, "label": label(method), "ev": only_ev,
+                            "depart": rec["depart"], "arrive": rec["arrive"], "seed": seed,
+                            "network": network, "demand": demand}  # fmt: skip
+                    (rec["dir"] / f"{rec['side']}.json").write_text(json.dumps(meta))
+                if sync is not None:
+                    sync.abort()  # the other window goes on alone until its own arrival
+                break
             if gui and incident:
                 # the stopped vehicle is in the network from its insertion (at the accident's
                 # start, later if its lane is full) until it drives off at the end
@@ -619,6 +679,16 @@ def main() -> None:
         action="store_true",
         help="add the accident scenario and show the blocked street",
     )
+    parser.add_argument(
+        "--only-ev", default=None, help="follow this emergency vehicle only (e.g. ev_1)"
+    )
+    parser.add_argument(
+        "--record", action="store_true", help="screenshots while following it (demo_record.py)"
+    )
+    parser.add_argument(
+        "--ev-view-width", type=float, default=EV_VIEW_WIDTH,
+        help="metres shown while the camera follows an emergency vehicle",
+    )  # fmt: skip
     parser.add_argument("--no-chart", action="store_true", help="no live comparison chart")
     parser.add_argument("--headless", action="store_true", help="no window (checks the setup)")
     parser.add_argument("--quick", action="store_true", help="short episode")
@@ -644,12 +714,17 @@ def main() -> None:
         )
     if args.follow_incident and "incident" not in args.scenarios:
         args.scenarios = [*args.scenarios, "incident"]
+    if args.only_ev or args.record:
+        args.follow_ev = True
+    if args.record and not args.only_ev:
+        parser.error("--record needs --only-ev (the vehicle the recording follows)")
     sync = None if args.headless else mp.Barrier(2)
     stats = None if args.headless or args.no_chart else mp.Queue()
     jobs = []
     for method, x in ((args.left, 0), (args.right, 960)):
+        agent = "coop_full" if method == CANDIDATE else method  # built on COOP-FULL
         ckpt = (
-            None if method in BASELINES else args.checkpoint or default_checkpoint(method, args.net)
+            None if method in BASELINES else args.checkpoint or default_checkpoint(agent, args.net)
         )
         p = mp.Process(
             target=run,
@@ -671,6 +746,9 @@ def main() -> None:
                 sync,
                 stats,
                 args.follow_incident,
+                args.only_ev,
+                args.record,
+                args.ev_view_width,
             ),
         )
         p.start()

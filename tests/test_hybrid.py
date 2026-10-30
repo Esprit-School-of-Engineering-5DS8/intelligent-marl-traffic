@@ -228,3 +228,18 @@ def test_llm_advice_moves_coop_full_but_not_max_pressure_nor_pre_emption():
     p = policy(ev_guide=FixedGuide({"A0": 0}), advisor=FixedAdvisor())
     assert p.act(None, OBS)["A0"] == 0  # the emergency vehicle first
     assert policy().advisor is None  # without an advisor: the controller of phase A
+
+
+def test_the_registry_builds_the_final_controller_as_the_evaluation_did():
+    from cotraffic.controllers.combined import EvRuleGuide
+    from cotraffic.controllers.registry import CANDIDATE, make_controller
+    from cotraffic.paths import CHECKPOINTS_DIR
+
+    checkpoint = CHECKPOINTS_DIR / "coop_full" / "grid4x4" / "seed1.zip"
+    if not checkpoint.is_file():
+        pytest.skip("COOP-FULL checkpoint not available")
+    c = make_controller(CANDIDATE, checkpoint)
+    assert isinstance(c, HybridPolicy) and c.mp_beta == 4.0 and c.name == "hybrid_h2"
+    assert isinstance(c.ev_guide, EvRuleGuide) and c.ped_guide is None and c.advisor is None
+    with pytest.raises(ValueError):
+        make_controller(CANDIDATE)
