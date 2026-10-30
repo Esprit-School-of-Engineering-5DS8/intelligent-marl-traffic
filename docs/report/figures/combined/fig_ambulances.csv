@@ -1,0 +1,11 @@
+demande,contrôleur,retard moyen (s),IC bas,IC haut
+moyenne,MP,52.0,43.6,60.4
+moyenne,COOP-FULL,40.3,29.6,54.1
+moyenne,TEAM-RULES,25.3,21.3,30.7
+moyenne,EV-RULE-MP,20.9,16.2,25.3
+moyenne,Candidate H2 β = 4,23.2,19.5,27.0
+pointe,MP,106.3,91.1,121.1
+pointe,COOP-FULL,73.5,58.8,96.5
+pointe,TEAM-RULES,41.6,35.3,47.8
+pointe,EV-RULE-MP,38.1,34.7,41.2
+pointe,Candidate H2 β = 4,44.2,37.1,50.7

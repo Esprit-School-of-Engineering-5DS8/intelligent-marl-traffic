@@ -1,0 +1,175 @@
+référence,case,critère,gain (%),IC bas,IC haut,verdict (IC à 95 %),test pré-enregistré
+MP,grid4x4 buses medium,trajet,-0.92,-1.31,-0.58,"moins bonne, de moins de 2 %",famille hybrid : non inférieure (démontré)
+MP,grid4x4 buses medium,attente,2.03,0.98,2.94,meilleure,famille hybrid : non inférieure (démontré)
+EV-RULE-MP,grid4x4 buses medium,trajet,-0.92,-1.31,-0.58,"moins bonne, de moins de 2 %",
+EV-RULE-MP,grid4x4 buses medium,attente,2.03,0.98,2.94,meilleure,
+COOP-FULL,grid4x4 buses medium,trajet,1.23,0.84,1.55,meilleure,
+COOP-FULL,grid4x4 buses medium,attente,2.31,1.07,3.46,meilleure,
+TEAM-RULES,grid4x4 buses medium,trajet,-0.92,-1.31,-0.58,"moins bonne, de moins de 2 %",
+TEAM-RULES,grid4x4 buses medium,attente,2.03,0.98,2.94,meilleure,
+MP,grid4x4 comm_dropout_30 peak,trajet,-1.71,-3.02,-0.48,"moins bonne, de moins de 2 %",famille hybrid : vraie perte
+MP,grid4x4 comm_dropout_30 peak,attente,-0.98,-3.54,1.59,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+EV-RULE-MP,grid4x4 comm_dropout_30 peak,trajet,-1.71,-3.02,-0.48,"moins bonne, de moins de 2 %",
+EV-RULE-MP,grid4x4 comm_dropout_30 peak,attente,-0.98,-3.54,1.59,pas d'écart démontré,
+COOP-FULL,grid4x4 comm_dropout_30 peak,trajet,2.57,1.05,3.99,meilleure,
+COOP-FULL,grid4x4 comm_dropout_30 peak,attente,3.6,0.77,6.29,meilleure,
+TEAM-RULES,grid4x4 comm_dropout_30 peak,trajet,-1.71,-3.02,-0.48,"moins bonne, de moins de 2 %",
+TEAM-RULES,grid4x4 comm_dropout_30 peak,attente,-0.98,-3.54,1.59,pas d'écart démontré,
+MP,grid4x4 emergency medium,trajet,-1.02,-1.31,-0.77,"moins bonne, de moins de 2 %",famille hybrid : non inférieure (démontré)
+MP,grid4x4 emergency medium,attente,1.39,0.47,2.09,meilleure,famille hybrid : non inférieure (démontré)
+MP,grid4x4 emergency medium,ambulances,55.46,48.12,62.52,meilleure,
+EV-RULE-MP,grid4x4 emergency medium,trajet,-0.86,-1.26,-0.47,"moins bonne, de moins de 2 %",
+EV-RULE-MP,grid4x4 emergency medium,attente,2.22,1.05,3.37,meilleure,
+EV-RULE-MP,grid4x4 emergency medium,ambulances,-11.06,-28.89,-0.31,"moins bonne, de 2 % ou plus",
+COOP-FULL,grid4x4 emergency medium,trajet,1.15,0.85,1.53,meilleure,
+COOP-FULL,grid4x4 emergency medium,attente,1.99,1.02,3.05,meilleure,
+COOP-FULL,grid4x4 emergency medium,ambulances,42.52,23.47,54.83,meilleure,
+TEAM-RULES,grid4x4 emergency medium,trajet,-0.78,-1.1,-0.48,"moins bonne, de moins de 2 %",
+TEAM-RULES,grid4x4 emergency medium,attente,2.39,1.59,3.2,meilleure,
+TEAM-RULES,grid4x4 emergency medium,ambulances,8.45,-3.2,20.09,pas d'écart démontré,
+MP,grid4x4 emergency peak,trajet,-1.15,-2.01,-0.11,"moins bonne, de moins de 2 %",famille hybrid : vraie perte
+MP,grid4x4 emergency peak,attente,-0.21,-2.39,1.88,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,grid4x4 emergency peak,ambulances,58.45,47.41,66.74,meilleure,
+EV-RULE-MP,grid4x4 emergency peak,trajet,-0.8,-2.18,0.45,pas d'écart démontré,
+EV-RULE-MP,grid4x4 emergency peak,attente,0.85,-2.36,3.45,pas d'écart démontré,
+EV-RULE-MP,grid4x4 emergency peak,ambulances,-16.03,-28.08,-3.06,"moins bonne, de 2 % ou plus",
+COOP-FULL,grid4x4 emergency peak,trajet,2.35,1.4,3.55,meilleure,
+COOP-FULL,grid4x4 emergency peak,attente,3.22,0.89,5.96,meilleure,
+COOP-FULL,grid4x4 emergency peak,ambulances,39.87,28.13,49.42,meilleure,
+TEAM-RULES,grid4x4 emergency peak,trajet,-0.94,-3.35,1.04,pas d'écart démontré,
+TEAM-RULES,grid4x4 emergency peak,attente,0.67,-3.96,4.87,pas d'écart démontré,
+TEAM-RULES,grid4x4 emergency peak,ambulances,-6.27,-23.72,6.48,pas d'écart démontré,
+MP,grid4x4 incident medium,trajet,-0.81,-1.02,-0.54,"moins bonne, de moins de 2 %",famille hybrid : non inférieure (démontré)
+MP,grid4x4 incident medium,attente,2.31,1.54,3.11,meilleure,famille hybrid : non inférieure (démontré)
+EV-RULE-MP,grid4x4 incident medium,trajet,-0.81,-1.02,-0.54,"moins bonne, de moins de 2 %",
+EV-RULE-MP,grid4x4 incident medium,attente,2.31,1.54,3.11,meilleure,
+COOP-FULL,grid4x4 incident medium,trajet,1.45,1.14,1.68,meilleure,
+COOP-FULL,grid4x4 incident medium,attente,2.85,1.98,3.69,meilleure,
+TEAM-RULES,grid4x4 incident medium,trajet,-0.81,-1.02,-0.54,"moins bonne, de moins de 2 %",
+TEAM-RULES,grid4x4 incident medium,attente,2.31,1.54,3.11,meilleure,
+MP,grid4x4 incident peak,trajet,-0.87,-2.19,0.33,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,grid4x4 incident peak,attente,0.64,-2.16,3.35,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+EV-RULE-MP,grid4x4 incident peak,trajet,-0.87,-2.19,0.33,pas d'écart démontré,
+EV-RULE-MP,grid4x4 incident peak,attente,0.64,-2.16,3.35,pas d'écart démontré,
+COOP-FULL,grid4x4 incident peak,trajet,3.35,1.25,5.35,meilleure,
+COOP-FULL,grid4x4 incident peak,attente,5.29,1.29,9.12,meilleure,
+TEAM-RULES,grid4x4 incident peak,trajet,-0.87,-2.19,0.33,pas d'écart démontré,
+TEAM-RULES,grid4x4 incident peak,attente,0.64,-2.16,3.35,pas d'écart démontré,
+MP,grid4x4 normal medium,trajet,-0.71,-1.03,-0.36,"moins bonne, de moins de 2 %",famille hybrid : non inférieure (démontré)
+MP,grid4x4 normal medium,attente,2.68,1.85,3.67,meilleure,
+EV-RULE-MP,grid4x4 normal medium,trajet,-0.71,-1.03,-0.36,"moins bonne, de moins de 2 %",
+EV-RULE-MP,grid4x4 normal medium,attente,2.68,1.85,3.67,meilleure,
+COOP-FULL,grid4x4 normal medium,trajet,1.25,0.88,1.63,meilleure,
+COOP-FULL,grid4x4 normal medium,attente,2.33,1.35,3.35,meilleure,famille hybrid : non inférieure (démontré)
+TEAM-RULES,grid4x4 normal medium,trajet,-0.71,-1.03,-0.36,"moins bonne, de moins de 2 %",
+TEAM-RULES,grid4x4 normal medium,attente,2.68,1.85,3.67,meilleure,
+MP,grid4x4 normal peak,trajet,-1.63,-3.35,-0.17,"moins bonne, de moins de 2 %",famille hybrid : vraie perte
+MP,grid4x4 normal peak,attente,-0.71,-4.77,2.34,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+EV-RULE-MP,grid4x4 normal peak,trajet,-1.63,-3.35,-0.17,"moins bonne, de moins de 2 %",
+EV-RULE-MP,grid4x4 normal peak,attente,-0.71,-4.77,2.34,pas d'écart démontré,
+COOP-FULL,grid4x4 normal peak,trajet,2.76,1.78,3.5,meilleure,
+COOP-FULL,grid4x4 normal peak,attente,4.14,2.37,5.67,meilleure,
+TEAM-RULES,grid4x4 normal peak,trajet,-1.63,-3.35,-0.17,"moins bonne, de moins de 2 %",
+TEAM-RULES,grid4x4 normal peak,attente,-0.71,-4.77,2.34,pas d'écart démontré,
+MP,grid4x4 pedestrians medium,trajet,-0.52,-1.21,0.4,pas d'écart démontré,
+MP,grid4x4 pedestrians medium,attente,3.32,0.85,6.27,meilleure,
+MP,grid4x4 pedestrians medium,piétons,17.98,11.77,23.69,meilleure,
+EV-RULE-MP,grid4x4 pedestrians medium,trajet,-0.52,-1.21,0.4,pas d'écart démontré,
+EV-RULE-MP,grid4x4 pedestrians medium,attente,3.32,0.85,6.27,meilleure,
+EV-RULE-MP,grid4x4 pedestrians medium,piétons,17.98,11.77,23.69,meilleure,
+COOP-FULL,grid4x4 pedestrians medium,trajet,2.1,1.18,3.97,meilleure,
+COOP-FULL,grid4x4 pedestrians medium,attente,5.65,1.63,12.75,meilleure,
+COOP-FULL,grid4x4 pedestrians medium,piétons,-16.15,-24.9,-6.71,"moins bonne, de 2 % ou plus",
+TEAM-RULES,grid4x4 pedestrians medium,trajet,-0.59,-0.84,-0.33,"moins bonne, de moins de 2 %",famille hybrid : non inférieure (démontré)
+TEAM-RULES,grid4x4 pedestrians medium,attente,2.95,1.94,3.97,meilleure,famille hybrid : non inférieure (démontré)
+TEAM-RULES,grid4x4 pedestrians medium,piétons,13.28,6.48,20.0,meilleure,
+PED-RULE-MP,grid4x4 pedestrians medium,trajet,-0.47,-1.05,0.23,pas d'écart démontré,
+PED-RULE-MP,grid4x4 pedestrians medium,attente,3.61,1.25,6.19,meilleure,
+PED-RULE-MP,grid4x4 pedestrians medium,piétons,11.53,3.31,17.91,meilleure,
+MP,grid4x4 pedestrians peak,trajet,-6.56,-18.82,0.24,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,grid4x4 pedestrians peak,attente,-12.9,-42.42,2.37,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,grid4x4 pedestrians peak,piétons,8.29,-0.14,15.68,pas d'écart démontré,
+EV-RULE-MP,grid4x4 pedestrians peak,trajet,-6.56,-18.82,0.24,pas d'écart démontré,
+EV-RULE-MP,grid4x4 pedestrians peak,attente,-12.9,-42.42,2.37,pas d'écart démontré,
+EV-RULE-MP,grid4x4 pedestrians peak,piétons,8.29,-0.14,15.68,pas d'écart démontré,
+COOP-FULL,grid4x4 pedestrians peak,trajet,17.77,-3.02,35.76,pas d'écart démontré,
+COOP-FULL,grid4x4 pedestrians peak,attente,35.4,-6.71,59.0,pas d'écart démontré,
+COOP-FULL,grid4x4 pedestrians peak,piétons,-2.71,-19.0,10.36,pas d'écart démontré,
+TEAM-RULES,grid4x4 pedestrians peak,trajet,17.76,0.48,28.36,meilleure,
+TEAM-RULES,grid4x4 pedestrians peak,attente,33.08,1.86,47.73,meilleure,
+TEAM-RULES,grid4x4 pedestrians peak,piétons,13.51,2.25,23.38,meilleure,
+PED-RULE-MP,grid4x4 pedestrians peak,trajet,-3.42,-13.39,3.99,pas d'écart démontré,
+PED-RULE-MP,grid4x4 pedestrians peak,attente,-7.19,-29.28,7.84,pas d'écart démontré,
+PED-RULE-MP,grid4x4 pedestrians peak,piétons,3.32,-5.44,9.71,pas d'écart démontré,
+MP,grid4x4 sensor_noise peak,trajet,14.67,1.88,31.35,meilleure,
+MP,grid4x4 sensor_noise peak,attente,34.36,7.19,58.85,meilleure,
+EV-RULE-MP,grid4x4 sensor_noise peak,trajet,14.67,1.88,31.35,meilleure,
+EV-RULE-MP,grid4x4 sensor_noise peak,attente,34.36,7.19,58.85,meilleure,
+COOP-FULL,grid4x4 sensor_noise peak,trajet,6.08,2.06,13.94,meilleure,famille hybrid : non inférieure (démontré)
+COOP-FULL,grid4x4 sensor_noise peak,attente,14.11,3.33,33.95,meilleure,famille hybrid : non inférieure (démontré)
+TEAM-RULES,grid4x4 sensor_noise peak,trajet,14.67,1.88,31.35,meilleure,
+TEAM-RULES,grid4x4 sensor_noise peak,attente,34.36,7.19,58.85,meilleure,
+MP,grid8x8 normal peak,trajet,-2.14,-2.59,-1.71,"moins bonne, de 2 % ou plus",famille hybrid : vraie perte
+MP,grid8x8 normal peak,attente,-1.45,-2.14,-0.77,"moins bonne, de moins de 2 %",famille hybrid : vraie perte
+EV-RULE-MP,grid8x8 normal peak,trajet,-2.14,-2.59,-1.71,"moins bonne, de 2 % ou plus",
+EV-RULE-MP,grid8x8 normal peak,attente,-1.45,-2.14,-0.77,"moins bonne, de moins de 2 %",
+COOP-FULL,grid8x8 normal peak,trajet,1.94,1.77,2.05,meilleure,
+COOP-FULL,grid8x8 normal peak,attente,2.58,1.75,3.25,meilleure,
+TEAM-RULES,grid8x8 normal peak,trajet,-2.14,-2.59,-1.71,"moins bonne, de 2 % ou plus",
+TEAM-RULES,grid8x8 normal peak,attente,-1.45,-2.14,-0.77,"moins bonne, de moins de 2 %",
+MP,real_district emergency medium,trajet,0.29,0.05,0.56,meilleure,
+MP,real_district emergency medium,attente,10.88,8.54,12.96,meilleure,
+MP,real_district emergency medium,ambulances,21.68,9.06,32.9,meilleure,
+EV-RULE-MP,real_district emergency medium,trajet,0.23,-0.06,0.64,pas d'écart démontré,famille hybrid : non inférieure (démontré)
+EV-RULE-MP,real_district emergency medium,attente,10.4,6.74,13.67,meilleure,
+EV-RULE-MP,real_district emergency medium,ambulances,1.25,-15.07,17.31,pas d'écart démontré,
+COOP-FULL,real_district emergency medium,trajet,0.63,-0.03,1.26,pas d'écart démontré,
+COOP-FULL,real_district emergency medium,attente,0.89,-4.16,6.39,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+COOP-FULL,real_district emergency medium,ambulances,16.62,-0.89,34.97,pas d'écart démontré,
+TEAM-RULES,real_district emergency medium,trajet,0.36,0.16,0.69,meilleure,
+TEAM-RULES,real_district emergency medium,attente,11.13,8.64,13.01,meilleure,
+TEAM-RULES,real_district emergency medium,ambulances,12.86,0.83,22.02,meilleure,
+MP,real_district emergency peak,trajet,-2.68,-10.24,7.03,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,real_district emergency peak,attente,-10.24,-39.71,22.76,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,real_district emergency peak,ambulances,13.27,-27.33,51.52,pas d'écart démontré,
+EV-RULE-MP,real_district emergency peak,trajet,-1.29,-8.46,7.55,pas d'écart démontré,
+EV-RULE-MP,real_district emergency peak,attente,-6.12,-33.87,23.6,pas d'écart démontré,
+EV-RULE-MP,real_district emergency peak,ambulances,8.01,-30.47,48.18,pas d'écart démontré,
+COOP-FULL,real_district emergency peak,trajet,-2.59,-11.54,4.14,pas d'écart démontré,
+COOP-FULL,real_district emergency peak,attente,-10.24,-48.77,14.51,pas d'écart démontré,
+COOP-FULL,real_district emergency peak,ambulances,-21.58,-56.21,9.64,pas d'écart démontré,
+TEAM-RULES,real_district emergency peak,trajet,-1.78,-8.74,7.81,pas d'écart démontré,
+TEAM-RULES,real_district emergency peak,attente,-6.19,-34.12,25.29,pas d'écart démontré,
+TEAM-RULES,real_district emergency peak,ambulances,9.17,-29.65,47.97,pas d'écart démontré,
+MP,real_district incident medium,trajet,0.38,-0.06,0.83,pas d'écart démontré,famille hybrid : non inférieure (démontré)
+MP,real_district incident medium,attente,11.4,7.81,15.52,meilleure,
+EV-RULE-MP,real_district incident medium,trajet,0.38,-0.06,0.83,pas d'écart démontré,
+EV-RULE-MP,real_district incident medium,attente,11.4,7.81,15.52,meilleure,
+COOP-FULL,real_district incident medium,trajet,0.62,0.28,0.96,meilleure,
+COOP-FULL,real_district incident medium,attente,0.82,-3.79,5.03,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+TEAM-RULES,real_district incident medium,trajet,0.38,-0.06,0.83,pas d'écart démontré,
+TEAM-RULES,real_district incident medium,attente,11.4,7.81,15.52,meilleure,
+MP,real_district incident peak,trajet,4.68,-1.41,11.19,pas d'écart démontré,
+MP,real_district incident peak,attente,12.74,-8.12,33.82,pas d'écart démontré,
+EV-RULE-MP,real_district incident peak,trajet,4.68,-1.41,11.19,pas d'écart démontré,
+EV-RULE-MP,real_district incident peak,attente,12.74,-8.12,33.82,pas d'écart démontré,
+COOP-FULL,real_district incident peak,trajet,-0.39,-8.35,7.43,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+COOP-FULL,real_district incident peak,attente,-2.74,-35.55,24.39,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+TEAM-RULES,real_district incident peak,trajet,4.68,-1.41,11.19,pas d'écart démontré,
+TEAM-RULES,real_district incident peak,attente,12.74,-8.12,33.82,pas d'écart démontré,
+MP,real_district normal medium,trajet,0.04,-0.25,0.36,pas d'écart démontré,famille hybrid : non inférieure (démontré)
+MP,real_district normal medium,attente,8.85,4.37,12.18,meilleure,
+EV-RULE-MP,real_district normal medium,trajet,0.04,-0.25,0.36,pas d'écart démontré,
+EV-RULE-MP,real_district normal medium,attente,8.85,4.37,12.18,meilleure,
+COOP-FULL,real_district normal medium,trajet,0.46,-0.01,1.1,pas d'écart démontré,
+COOP-FULL,real_district normal medium,attente,-0.25,-5.3,6.23,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+TEAM-RULES,real_district normal medium,trajet,0.04,-0.25,0.36,pas d'écart démontré,
+TEAM-RULES,real_district normal medium,attente,8.85,4.37,12.18,meilleure,
+MP,real_district normal peak,trajet,-2.61,-7.95,2.2,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+MP,real_district normal peak,attente,-11.09,-32.14,7.92,pas d'écart démontré,famille hybrid : intervalle trop large pour conclure
+EV-RULE-MP,real_district normal peak,trajet,-2.61,-7.95,2.2,pas d'écart démontré,
+EV-RULE-MP,real_district normal peak,attente,-11.09,-32.14,7.92,pas d'écart démontré,
+COOP-FULL,real_district normal peak,trajet,-0.63,-10.03,7.96,pas d'écart démontré,
+COOP-FULL,real_district normal peak,attente,-3.08,-42.02,24.09,pas d'écart démontré,
+TEAM-RULES,real_district normal peak,trajet,-2.61,-7.95,2.2,pas d'écart démontré,
+TEAM-RULES,real_district normal peak,attente,-11.09,-32.14,7.92,pas d'écart démontré,
