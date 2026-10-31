@@ -1,0 +1,1067 @@
+{
+ "source": "results/combined/raw (preregistration 2c0dd1d, test seeds 0-4)",
+ "cells": [
+  {
+   "network": "grid4x4",
+   "scenario": "normal",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 161.1,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 161.1,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 159.1,
+       "gainVsCoopFull": 1.2
+      },
+      "waiting": {
+       "mean": 24.9,
+       "gainVsCoopFull": 2.3
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 159.1,
+       "gainVsCoopFull": 1.2
+      },
+      "waiting": {
+       "mean": 24.9,
+       "gainVsCoopFull": 2.3
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "normal",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 219.7,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 58.1,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 219.7,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 58.1,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 213.6,
+       "gainVsCoopFull": 2.8
+      },
+      "waiting": {
+       "mean": 55.7,
+       "gainVsCoopFull": 4.1
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 213.6,
+       "gainVsCoopFull": 2.8
+      },
+      "waiting": {
+       "mean": 55.7,
+       "gainVsCoopFull": 4.1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "emergency",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 161.0,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 160.9,
+       "gainVsCoopFull": 0.1
+      },
+      "waiting": {
+       "mean": 25.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 159.1,
+       "gainVsCoopFull": 1.2
+      },
+      "waiting": {
+       "mean": 25.0,
+       "gainVsCoopFull": 2.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 159.1,
+       "gainVsCoopFull": 1.2
+      },
+      "waiting": {
+       "mean": 25.0,
+       "gainVsCoopFull": 2.0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "emergency",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 219.2,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 57.9,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 220.2,
+       "gainVsCoopFull": -0.5
+      },
+      "waiting": {
+       "mean": 58.4,
+       "gainVsCoopFull": -0.9
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 214.1,
+       "gainVsCoopFull": 2.3
+      },
+      "waiting": {
+       "mean": 56.0,
+       "gainVsCoopFull": 3.2
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 214.1,
+       "gainVsCoopFull": 2.3
+      },
+      "waiting": {
+       "mean": 56.0,
+       "gainVsCoopFull": 3.2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "incident",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 161.5,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.6,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 161.5,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.6,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 159.2,
+       "gainVsCoopFull": 1.4
+      },
+      "waiting": {
+       "mean": 24.9,
+       "gainVsCoopFull": 2.8
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 159.2,
+       "gainVsCoopFull": 1.4
+      },
+      "waiting": {
+       "mean": 24.9,
+       "gainVsCoopFull": 2.8
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "incident",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 221.8,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 59.1,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 221.8,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 59.1,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 214.3,
+       "gainVsCoopFull": 3.4
+      },
+      "waiting": {
+       "mean": 56.0,
+       "gainVsCoopFull": 5.3
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 214.3,
+       "gainVsCoopFull": 3.4
+      },
+      "waiting": {
+       "mean": 56.0,
+       "gainVsCoopFull": 5.3
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "pedestrians",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 169.1,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 30.7,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 169.1,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 30.7,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 165.6,
+       "gainVsCoopFull": 2.1
+      },
+      "waiting": {
+       "mean": 28.9,
+       "gainVsCoopFull": 5.6
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 165.6,
+       "gainVsCoopFull": 2.1
+      },
+      "waiting": {
+       "mean": 28.9,
+       "gainVsCoopFull": 5.6
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "pedestrians",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 343.6,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 152.1,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 343.6,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 152.1,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 282.6,
+       "gainVsCoopFull": 17.8
+      },
+      "waiting": {
+       "mean": 98.2,
+       "gainVsCoopFull": 35.4
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 279.3,
+       "gainVsCoopFull": 18.7
+      },
+      "waiting": {
+       "mean": 96.3,
+       "gainVsCoopFull": 36.7
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "real_district",
+   "scenario": "normal",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 109.9,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 109.9,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 109.4,
+       "gainVsCoopFull": 0.5
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": -0.2
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 109.4,
+       "gainVsCoopFull": 0.5
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": -0.2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "real_district",
+   "scenario": "normal",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 156.5,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 39.0,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 156.5,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 39.0,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 157.5,
+       "gainVsCoopFull": -0.6
+      },
+      "waiting": {
+       "mean": 40.2,
+       "gainVsCoopFull": -3.1
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 157.3,
+       "gainVsCoopFull": -0.5
+      },
+      "waiting": {
+       "mean": 39.6,
+       "gainVsCoopFull": -1.6
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "real_district",
+   "scenario": "emergency",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 110.0,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 7.6,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 109.9,
+       "gainVsCoopFull": 0.1
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": 0.7
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 109.3,
+       "gainVsCoopFull": 0.6
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": 0.9
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 109.3,
+       "gainVsCoopFull": 0.6
+      },
+      "waiting": {
+       "mean": 7.5,
+       "gainVsCoopFull": 0.9
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "real_district",
+   "scenario": "emergency",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 155.3,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 38.0,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 155.6,
+       "gainVsCoopFull": -0.2
+      },
+      "waiting": {
+       "mean": 38.1,
+       "gainVsCoopFull": -0.3
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 159.3,
+       "gainVsCoopFull": -2.6
+      },
+      "waiting": {
+       "mean": 41.9,
+       "gainVsCoopFull": -10.2
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 158.4,
+       "gainVsCoopFull": -2.0
+      },
+      "waiting": {
+       "mean": 40.6,
+       "gainVsCoopFull": -6.9
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "real_district",
+   "scenario": "incident",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 110.0,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 7.6,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 110.0,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 7.6,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 109.4,
+       "gainVsCoopFull": 0.6
+      },
+      "waiting": {
+       "mean": 7.6,
+       "gainVsCoopFull": 0.8
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 109.4,
+       "gainVsCoopFull": 0.6
+      },
+      "waiting": {
+       "mean": 7.6,
+       "gainVsCoopFull": 0.8
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "real_district",
+   "scenario": "incident",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 153.7,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 36.7,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 153.7,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 36.7,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 154.3,
+       "gainVsCoopFull": -0.4
+      },
+      "waiting": {
+       "mean": 37.8,
+       "gainVsCoopFull": -2.7
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": 156.5,
+       "gainVsCoopFull": -1.8
+      },
+      "waiting": {
+       "mean": 39.8,
+       "gainVsCoopFull": -8.3
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "sensor_noise",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 232.1,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 68.2,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 232.1,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 68.2,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 218.0,
+       "gainVsCoopFull": 6.1
+      },
+      "waiting": {
+       "mean": 58.6,
+       "gainVsCoopFull": 14.1
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": null,
+       "gainVsCoopFull": null
+      },
+      "waiting": {
+       "mean": null,
+       "gainVsCoopFull": null
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "comm_dropout_30",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 219.4,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 57.9,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 219.4,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 57.9,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 213.8,
+       "gainVsCoopFull": 2.6
+      },
+      "waiting": {
+       "mean": 55.8,
+       "gainVsCoopFull": 3.6
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": null,
+       "gainVsCoopFull": null
+      },
+      "waiting": {
+       "mean": null,
+       "gainVsCoopFull": null
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "buses",
+   "demand": "medium",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 161.5,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.7,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 161.5,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 25.7,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 159.5,
+       "gainVsCoopFull": 1.2
+      },
+      "waiting": {
+       "mean": 25.1,
+       "gainVsCoopFull": 2.3
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": null,
+       "gainVsCoopFull": null
+      },
+      "waiting": {
+       "mean": null,
+       "gainVsCoopFull": null
+      }
+     }
+    }
+   ]
+  },
+  {
+   "network": "grid8x8",
+   "scenario": "normal",
+   "demand": "peak",
+   "layers": [
+    {
+     "layer": "coop_full",
+     "values": {
+      "travel": {
+       "mean": 313.2,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 54.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "coop_full_evrule_switch",
+     "values": {
+      "travel": {
+       "mean": 313.2,
+       "gainVsCoopFull": 0.0
+      },
+      "waiting": {
+       "mean": 54.5,
+       "gainVsCoopFull": 0.0
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h2",
+     "values": {
+      "travel": {
+       "mean": 307.1,
+       "gainVsCoopFull": 1.9
+      },
+      "waiting": {
+       "mean": 53.1,
+       "gainVsCoopFull": 2.6
+      }
+     }
+    },
+    {
+     "layer": "hybrid_h3",
+     "values": {
+      "travel": {
+       "mean": null,
+       "gainVsCoopFull": null
+      },
+      "waiting": {
+       "mean": null,
+       "gainVsCoopFull": null
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

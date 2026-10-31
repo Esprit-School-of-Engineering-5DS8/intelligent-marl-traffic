@@ -1,0 +1,89 @@
+{
+ "source": "results/bigcity/*_lights.json, results/bigcity/calibration/sweep.csv (scripts/bigcity.py; docs/FAILURES.md, F-016)",
+ "status": "stopped",
+ "seed": 1000,
+ "cities": [
+  {
+   "network": "barcelona",
+   "lights": 85,
+   "driven": 75,
+   "drivenLightsPct": 88.2,
+   "drivenLanesPct": 83.1,
+   "wideLights": 49
+  },
+  {
+   "network": "paris",
+   "lights": 32,
+   "driven": 27,
+   "drivenLightsPct": 84.4,
+   "drivenLanesPct": 86.7,
+   "wideLights": 1
+  }
+ ],
+ "parisSweep": [
+  {
+   "controller": "ft",
+   "vehPerH": 2006,
+   "waiting": 48.3,
+   "travel": 341.0,
+   "teleports": 0,
+   "unfinished": 0
+  },
+  {
+   "controller": "ft",
+   "vehPerH": 3008,
+   "waiting": 193.0,
+   "travel": 547.0,
+   "teleports": 0,
+   "unfinished": 121
+  },
+  {
+   "controller": "ft",
+   "vehPerH": 3982,
+   "waiting": 1466.1,
+   "travel": 1705.0,
+   "teleports": 369,
+   "unfinished": 2529
+  },
+  {
+   "controller": "ft",
+   "vehPerH": 4996,
+   "waiting": 2014.6,
+   "travel": 2175.5,
+   "teleports": 501,
+   "unfinished": 4042
+  },
+  {
+   "controller": "mp",
+   "vehPerH": 2006,
+   "waiting": 368.8,
+   "travel": 650.0,
+   "teleports": 89,
+   "unfinished": 231
+  },
+  {
+   "controller": "mp",
+   "vehPerH": 3008,
+   "waiting": 612.7,
+   "travel": 912.7,
+   "teleports": 116,
+   "unfinished": 537
+  },
+  {
+   "controller": "mp",
+   "vehPerH": 3982,
+   "waiting": 998.5,
+   "travel": 1311.1,
+   "teleports": 160,
+   "unfinished": 1457
+  },
+  {
+   "controller": "mp",
+   "vehPerH": 4996,
+   "waiting": 1318.5,
+   "travel": 1607.8,
+   "teleports": 190,
+   "unfinished": 2461
+  }
+ ]
+}

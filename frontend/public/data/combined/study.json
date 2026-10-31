@@ -1,0 +1,55 @@
+{
+ "source": "results/combined/raw (1265 rows), analysis_tests.csv, configs/protocol.yaml, results/exploration/combined/rank_s100*.csv",
+ "prereg": "2c0dd1d",
+ "commits": [
+  "2c0dd1d"
+ ],
+ "episodes": 1265,
+ "episodeMinutes": 90,
+ "testSeeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ],
+ "models": 3,
+ "situations": 18,
+ "tests": 36,
+ "marginPct": 2.0,
+ "alpha": 0.025,
+ "bootstrapDraws": 10000,
+ "validationSeeds": [
+  1000,
+  1001,
+  1002
+ ],
+ "variantsTried": 15,
+ "perturbations": {
+  "sensorNoise": {
+   "countStdVeh": 2.0,
+   "failedPct": 20
+  },
+  "commDropout": {
+   "lossPct": 30,
+   "mode": "stale"
+  },
+  "buses": {
+   "periodMin": 5
+  },
+  "generalisation": {
+   "grid8x8": {
+    "trainedOn": "grid4x4",
+    "lights": 64,
+    "trainedLights": 16
+   }
+  }
+ },
+ "candidate": {
+  "beta": 4.0,
+  "decisionS": 5,
+  "evRangeM": 200,
+  "minGreenS": 10,
+  "maxRedS": 90
+ }
+}

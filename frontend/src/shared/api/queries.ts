@@ -19,6 +19,8 @@ import {
   type Cell,
 } from "@/shared/schemas";
 
+import { BigCity, Bilan, Cells, Layers, Study, Tests, Validation } from "@/shared/schemas/combined";
+
 import { fetchData } from "./source";
 
 function useData<T>(path: string | null, schema: ZodType<T>, optional = false) {
@@ -38,6 +40,15 @@ export const useComparisons = () => useData("comparisons", Comparisons);
 export const usePedestrianGreens = () => useData("pedestrian_greens", PedestrianGreens, true);
 export const useEmergencyLog = () => useData("emergency_log", EmergencyLog, true);
 export const useFinalController = () => useData("final_controller", FinalController, true);
+
+// the combined study (scripts/dashboard_combined.py)
+export const useStudy = () => useData("combined/study", Study, true);
+export const useCells = () => useData("combined/cells", Cells, true);
+export const useTests = () => useData("combined/tests", Tests, true);
+export const useLayers = () => useData("combined/layers", Layers, true);
+export const useValidation = () => useData("combined/validation", Validation, true);
+export const useBilan = () => useData("combined/bilan", Bilan, true);
+export const useBigCity = () => useData("combined/bigcity", BigCity, true);
 
 export const useTimeseries = (cell: Cell | null) =>
   useData(cell ? `timeseries/${cellKey(cell)}` : null, TimeseriesCell, true);
