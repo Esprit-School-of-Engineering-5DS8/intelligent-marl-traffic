@@ -20,7 +20,7 @@ line-length = 100
 target-version = "py310"
 extend-exclude = [
     "sumo_files", "results", "figures", "notebooks",
-    # verbatim copies of our teammate's work, kept byte-identical for their
+    # verbatim copies of the teammate's LLM team, kept byte-identical for their
     # provenance (src/cotraffic/controllers/llm_team/PROVENANCE.md)
     "src/cotraffic/controllers/llm_team", "src/cotraffic/envs/ev.py", "tests/test_llm_team_*.py",
 ]

@@ -1,11 +1,10 @@
 # Provenance of the LLM team
 
 The files of this package, `src/cotraffic/envs/ev.py`, `configs/agents/llm_team.yaml` and
-`tests/test_llm_team_*.py` come from a teammate's branch of the team repository:
+`tests/test_llm_team_*.py` come from a teammate's work in the team repository:
 
-- repository: `Esprit-School-of-Engineering-5DS8/intelligent-marl-traffic`
-- source: our teammate's work (base `integration` at `b908238`), received as an archive
-  without git history, from our teammate
+- repository: `Esprit-School-of-Engineering-5DS8/intelligent-marl-traffic` (base
+  `integration` at `b908238`), received from the teammate as an archive without git history
 - copied on 2026-10-27, byte for byte except the line endings (CRLF to LF); SHA-256 below
   is the hash of the source file as received.
 

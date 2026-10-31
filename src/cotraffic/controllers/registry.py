@@ -8,7 +8,7 @@ from cotraffic.controllers.base import Controller
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
 LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
-# our teammate's LLM team (controllers/llm_team/PROVENANCE.md):
+# the teammate's LLM team (controllers/llm_team/PROVENANCE.md):
 # Max-Pressure + the team's code rules (team_rules) or + the local model (team_qwen)
 TEAM = ("team_rules", "team_qwen")
 # the final controller of the combined study (docs/COMBINED_PREREGISTRATION.md, frozen at
