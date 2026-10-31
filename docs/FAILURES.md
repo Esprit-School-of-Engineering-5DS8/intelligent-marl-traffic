@@ -236,3 +236,47 @@ entries at the bottom. Negative results that belong in the report are marked **[
   densities, and a failed detector should be treated as unknown (imputed from neighbouring
   lanes) rather than as zero. Check that a new safety rule actually fires before
   evaluating its effect.
+
+## F-016 - Generalisation to a large city: two attempts stopped (2026-10-31)
+
+*Tentatives de généralisation à une grande ville.* **These are not evaluation results:**
+the study was stopped by the team before any test seed; every number below comes from the
+validation seed 1000, on short or single episodes.
+
+- **Tried:** an exploratory study ("bigcity") of the frozen final controller (H2 beta 4,
+  the three COOP-FULL models of real_district, no retraining) on a large city outside
+  Tunisia, imported from OpenStreetMap with the options of real_district and only the
+  traffic lights tagged in OSM. Lights the models cannot read (one green phase, or more
+  than 3) were to keep their SUMO program for every method. Demand calibrated with FT and
+  Max-Pressure only. Code: `scripts/bigcity.py`, `configs/networks/barcelona.yaml`,
+  `configs/networks/paris.yaml`; rows: `results/bigcity/` (validation only).
+- **Evidence, Barcelona** (Eixample and Diagonal, 2.4 km x 1.9 km, 852 signal nodes in OSM):
+  77 lights, 64 readable by the models (83 % of the lights, 73.5 % of the signalised
+  lanes), 48 with an approach of more than 3 lanes. The network blocks under every
+  controller, FT included, even at 25 % of the planned demand (about 2 800 veh/h, short
+  episodes): FT 26 teleports and 196 of 469 trips unfinished, Max-Pressure 31 and 182. A
+  snapshot of the halted vehicles puts the jams on lights that are clusters of junctions
+  merged by netconvert, with up to 8 green phases in a row (about 70 halted vehicles at the
+  8-phase light, 40 at a 6-phase one), on the Diagonal, and on unsignalised junctions where
+  a minor road never finds a gap. Importing without merging lights (`tls_join_dist_m: 1`:
+  85 lights, 75 readable, 88 % and 83 %) was not enough: at 25 % of the demand, FT 21
+  teleports, Max-Pressure 27, COOP-FULL 27, the candidate 24.
+- **Evidence, Paris** (Republique and the Grands Boulevards, 2.7 km x 1.8 km, 255 signal
+  nodes): 32 lights, 27 readable (84 % and 87 %), only one with an approach of more than 3
+  lanes. Full-length episodes: FT waits 48 s with no teleport at 2 000 veh/h, 193 s with
+  121 trips unfinished at 3 000, gridlocks at 4 000 (369 teleports). Max-Pressure collapses
+  from 2 000 veh/h (369 s, 89 teleports, 231 trips unfinished), mostly at one irregular
+  3-phase light (about 55 halted vehicles). At 2 000 veh/h the candidate waits 76 s and
+  COOP-FULL 86 s (10 teleports each, every trip finished): FT is better than every method.
+- **Diagnosis:** a raw OSM import of a dense, irregular centre gives merged junctions with
+  long fixed programs and unsignalised merges that block without repair by hand. On Paris,
+  the test would mostly measure the collapse of Max-Pressure at a few junctions: the
+  candidate would beat it because Max-Pressure fails, not because the candidate controls
+  well, and fixed time beats every adaptive method there. Such a test would not measure
+  the quality of the control.
+- **Fix / lesson:** stopped before any test seed; nothing deleted, kept as documented
+  attempts. A real test needs a cleaned network (junctions repaired, or a reference
+  scenario with validated signal plans), real demand (counts, or a calibrated scenario such
+  as LuST or MoST), and probably a retraining per city: the models learned on 7 lights in
+  Tunis, and 48 Barcelona lights have an approach of more than 3 lanes, a case met at only
+  2 of those 7 lights.

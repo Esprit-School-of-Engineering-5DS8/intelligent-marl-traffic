@@ -1,0 +1,41 @@
+name: barcelona
+kind: osm
+description: >
+  STOPPED ATTEMPT, never evaluated (docs/FAILURES.md, F-016): the network blocks under every
+  controller, fixed time included. Network of the exploratory study "bigcity":
+  Barcelona, the Eixample crossed by the Avinguda Diagonal (about 2.4 km x 1.9 km), imported
+  from OpenStreetMap with the options of real_district and only the traffic lights tagged in
+  OSM (no signalisation rule of ours). Never trained on: driven by the models of
+  real_district, whose observation format it shares (padding below).
+
+osm:
+  bbox: [2.150, 41.383, 2.178, 41.400]    # [west, south, east, north], WGS84
+  road_types: [motorway, motorway_link, trunk, trunk_link, primary, primary_link,
+               secondary, secondary_link, tertiary, tertiary_link]
+  join_dist_m: 15
+  signal_dist_m: 25
+  tls_join_dist_m: 1     # no merging of neighbouring junctions into one light (see the journal)
+  guess_tls: false       # 852 signal nodes are tagged in the area: nothing is guessed
+  tls_set: []
+  tls_unset: []
+
+pedestrians: false
+# no sidewalk model, no bus line and no incident location were set up for this network
+unsupported_scenarios: [pedestrians, buses, incident]
+
+# The padding of real_district, so that its policies run here without retraining. Lights
+# outside it (1 green phase, or more than 3) are not driven by the agents in the study
+# "bigcity": they keep their SUMO program for every method (scripts/bigcity.py).
+padding:
+  lanes_per_side: 3
+  max_phases: 3
+  max_crossings: 4
+
+neighbours:
+  max_distance_m: 500
+
+demand:
+  peak_vehicles_per_hour: 11000   # starting point of the sweep, never calibrated (F-016)
+  origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
+  opposite_side_prob: 0.5
+  route_random_factor: 1.3

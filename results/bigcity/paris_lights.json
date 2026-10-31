@@ -1,0 +1,21 @@
+{
+ "lights": 32,
+ "driven": 27,
+ "driven_share_lights_pct": 84.4,
+ "driven_share_lanes_pct": 86.7,
+ "phases": {
+  "1": 4,
+  "2": 26,
+  "3": 1,
+  "4": 1
+ },
+ "wide_lights": 1,
+ "wide_driven_lights": 1,
+ "not_driven": [
+  "26401021",
+  "361074",
+  "94139827",
+  "GS_7076374199",
+  "cluster_367979_420670204_420670205_7112415810"
+ ]
+}

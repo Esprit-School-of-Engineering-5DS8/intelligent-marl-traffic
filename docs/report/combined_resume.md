@@ -63,6 +63,11 @@ trajet et attente), avec la correction de Holm :
   probablement moins bien que Max-Pressure : 5 graines ne suffisent pas à le démontrer, mais
   la validation allait dans le même sens. Avec piétons en pointe, la candidate s'engorge
   parfois ; COOP-FULL seul s'engorge plus souvent et plus fort.
+- **La généralisation à une grande ville n'est pas testée.** Deux tentatives, Barcelone et
+  Paris importés d'OpenStreetMap, ont été arrêtées avant toute graine de test : à Barcelone
+  le réseau se bloque sous tous les contrôleurs, temps fixe compris ; à Paris Max-Pressure
+  s'effondre là où le temps fixe fonctionne, ce qui ne mesurerait pas la qualité du
+  contrôle. Ce ne sont pas des résultats d'évaluation (`docs/FAILURES.md`, F-016).
 
 Le tableau par référence (combien de critères meilleurs, égaux ou moins bons) est dans
 `results/combined/bilan_references.md` ; chaque test est dans `results/combined/analysis.md`.

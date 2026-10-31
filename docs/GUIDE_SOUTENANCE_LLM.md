@@ -1685,6 +1685,14 @@ moins bien dans les 20 autres.
 Non : comme pour le LLM (exigence 9), le bouclier s'applique à chaque décision dans
 l'environnement, quel que soit le contrôleur (`traffic_env.py:190`).
 
+**« Et sur une grande ville étrangère ? »**
+Nous avons essayé Barcelone et Paris, importés d'OpenStreetMap, et arrêté avant toute graine
+de test : à Barcelone le réseau brut se bloque sous tous les contrôleurs, temps fixe compris ;
+à Paris Max-Pressure s'effondre alors que le temps fixe fonctionne, donc le test aurait mesuré
+cet effondrement, pas la qualité du contrôle. Un vrai test demanderait un réseau nettoyé, une
+demande réelle et sans doute un réentraînement par ville (`docs/FAILURES.md`, F-016). Ce ne sont
+pas des résultats d'évaluation.
+
 ### Où trouver chaque chiffre
 
 | Chiffre | Fichier |
