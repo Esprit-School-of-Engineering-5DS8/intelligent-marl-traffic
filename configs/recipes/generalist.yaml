@@ -1,0 +1,43 @@
+# The flagship model: ONE end-to-end policy covering every situation.
+# Same architecture as base (parameter-shared PPO across intersections) but the
+# observation includes everything the sim can offer, the reward has every term on,
+# and training episodes cover all demand levels and all event scenarios.
+# Ablation variants (coop_ped, coop_ev, ...) remain only as study evidence; this
+# recipe is the model the Models registry should present.
+name: generalist
+description: >-
+  End-to-end RL controller: one parameter-shared PPO policy trained across all
+  demand levels (low/medium/peak/rush) and all event scenarios (normal,
+  emergency, pedestrians, buses, incident), with neighbours, EV, pedestrian and
+  bus observations and CO2/emergency/pedestrian penalties all active in the
+  reward. One weights file per seed; evaluated everywhere, specialized nowhere.
+
+extends: base
+
+# note: `forecast` omitted on purpose — training then needs the Ridge forecasting
+# model (`python -m cotraffic forecast --net <net>`), which is a separate long step.
+observation:
+  neighbours: true
+  emergency: true
+  pedestrians: true
+  buses: true
+
+reward:
+  person_weighted: true
+  co2: 1.0
+  ev: 2.0
+  ped: 1.0
+  clip: 5.0
+
+training:
+  total_timesteps: 500000
+  checkpoint_every: 50000
+  progress_every_s: 15
+  demand_levels: [low, medium, peak, rush_profile]
+  scenarios: [normal, emergency, pedestrians, buses, incident]
+  quick_timesteps: 3000
+
+validation:                   # checkpoint selection, never on evaluation seeds
+  seeds: [1000]
+  demands: [medium, peak]
+  last_checkpoints: 4

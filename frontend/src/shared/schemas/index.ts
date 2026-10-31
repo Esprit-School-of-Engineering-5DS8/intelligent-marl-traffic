@@ -204,6 +204,8 @@ export const ReplayFrame = z.object({
 });
 export const ReplaySide = z.object({
   method: z.string(),
+  /** Set when the side is a saved model version, e.g. "rl-shortpilot v1". */
+  label: z.string().nullish(),
   kpis: z.record(z.string(), maybe),
   frames: z.array(ReplayFrame),
   events: z.array(z.object({ t: num, type: z.string(), id: z.string() })),
@@ -279,6 +281,63 @@ export const ChatEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
 
+/** Runs registry (runs.json): one entity per training seed and per evaluation cell. */
+export const RegistryRun = z.object({
+  runId: z.string(),
+  name: z.string(),
+  kind: z.string(),
+  type: z.string(),
+  model: z.string().nullable(),
+  network: z.string().nullable().optional(),
+  scenario: z.string().nullable().optional(),
+  demand: z.string().nullable().optional(),
+  method: z.string().nullable().optional(),
+  seed: num.nullable().optional(),
+  seeds: z.array(num).optional(),
+  algorithm: z.string().nullable().optional(),
+  totalTimesteps: maybe.nullable().optional(),
+  episodes: num.nullable().optional(),
+  finalReward: maybe.nullable().optional(),
+  hyperparameters: z.record(z.string(), z.unknown()).optional(),
+  metrics: z.record(z.string(), maybe).default({}),
+  metricStats: z
+    .record(z.string(), z.object({ ciLo: maybe, ciHi: maybe, n: num }).catchall(z.unknown()))
+    .optional(),
+  artifacts: z.record(z.string(), z.unknown()).default({}),
+  status: z.string().default("finished"),
+  legacy: z.boolean().default(false),
+  legacyReason: z.string().nullable().optional(),
+});
+export const RunsRegistry = z.object({
+  generatedAt: z.string(),
+  columns: z.array(z.string()),
+  runs: z.array(RegistryRun),
+});
+
+/** Model registry (models.json, written by POST /api/models/promote). */
+export const ModelVersion = z.object({
+  version: num,
+  runId: z.string(),
+  runName: z.string().optional(),
+  network: z.string().nullable().optional(),
+  checkpoint: z.unknown().nullable().optional(),
+  sha256: z.string().optional(),
+  bytes: num.optional(),
+  trainingSeed: num.nullable().optional(),
+  algorithm: z.string().optional(),
+  timesteps: num.optional(),
+  method: z.string().optional(),
+  recipeHash: z.string().optional(),
+  recipe: z.record(z.string(), z.unknown()).optional(),
+  available: z.boolean().optional(),
+  promoted: z.boolean().default(false),
+  notes: z.string().optional(),
+  createdAt: z.string().optional(),
+});
+export const ModelsRegistry = z.object({
+  models: z.record(z.string(), z.array(ModelVersion)),
+});
+
 export type Cell = z.infer<typeof Cell>;
 export type SummaryRow = z.infer<typeof SummaryRow>;
 export type Comparison = z.infer<typeof Comparison>;
@@ -295,6 +354,10 @@ export type Replay = z.infer<typeof Replay>;
 export type ReplayFrame = z.infer<typeof ReplayFrame>;
 export type ScenarioRequest = z.infer<typeof ScenarioRequest>;
 export type Run = z.infer<typeof Run>;
+export type RegistryRun = z.infer<typeof RegistryRun>;
+export type RunsRegistry = z.infer<typeof RunsRegistry>;
+export type ModelVersion = z.infer<typeof ModelVersion>;
+export type ModelsRegistry = z.infer<typeof ModelsRegistry>;
 export type PageContext = z.infer<typeof PageContext>;
 export type ToolCall = z.infer<typeof ToolCall>;
 export type ChatEvent = z.infer<typeof ChatEvent>;

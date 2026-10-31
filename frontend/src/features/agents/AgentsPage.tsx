@@ -56,12 +56,18 @@ function LearningCurves({ meta }: { meta: Meta }) {
   const { t } = useTranslation();
   const f = useFormat();
   const agents = sortMethods(new Set(meta.training.map((x) => x.agent)));
-  const [agent, setAgent] = useState(
-    agents.includes("coop_full") ? "coop_full" : (agents[0] ?? ""),
-  );
+  // Choice followed by a data-driven fallback: the export may not contain the
+  // previously chosen (or hard-coded) pair, and a 404 here blanks every chart.
+  const [agentChoice, setAgent] = useState("");
+  const agent = agents.includes(agentChoice)
+    ? agentChoice
+    : agents.includes("rl")
+      ? "rl"
+      : (agents[0] ?? "");
   const networks = meta.training.filter((x) => x.agent === agent).map((x) => x.network);
-  const [network, setNetwork] = useState("grid4x4");
-  const net = networks.includes(network) ? network : (networks[0] ?? "");
+  const [networkChoice, setNetwork] = useState("");
+  const network = networks.includes(networkChoice) ? networkChoice : (networks[0] ?? "");
+  const net = network;
   const query = useTraining(agent, net);
 
   return (
@@ -227,7 +233,7 @@ function DecisionsExplorer({ meta }: { meta: Meta }) {
   const { t } = useTranslation();
   const f = useFormat();
   const [runId, setRunId] = useState(
-    meta.decisions.find((d) => d.method === "coop_full")?.runId ?? meta.decisions[0]?.runId ?? "",
+    meta.decisions.find((d) => d.method === "rl")?.runId ?? meta.decisions[0]?.runId ?? "",
   );
   const query = useDecisions(runId || null);
   return (

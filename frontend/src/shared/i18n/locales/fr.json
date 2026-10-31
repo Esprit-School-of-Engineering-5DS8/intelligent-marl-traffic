@@ -60,7 +60,8 @@
     },
     "simulation3d": {
       "title": "Simulation 3D",
-      "description": "Le même scénario rejoué côte à côte : contrôleur classique contre agent."
+      "description": "Le même épisode rejoué en 3D pour deux politiques enregistrées : deux scènes séparées, une horloge commune.",
+      "empty": "Aucun replay 2×2 ou 3×3 enregistré pour l'instant"
     },
     "scenarios": {
       "title": "Scénarios",

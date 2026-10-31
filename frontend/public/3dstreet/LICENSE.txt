@@ -1,0 +1,5 @@
+Road surface textures sourced from the 3DStreet asset distribution
+(https://assets.3dstreet.app/, repository: 3DStreet/3dstreet-assets-dist).
+
+License: CC BY-SA 4.0 — attribution + share-alike applies to these files.
+See the LICENSE in that repository for details.

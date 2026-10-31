@@ -7,10 +7,10 @@ description: >-
 seeds: [0, 1, 2]
 cells:
   - network: grid2x2
-    methods: [mp, coop, llm]
+    methods: [mp, rl, llm]
     demands: [medium, peak]
     scenarios: [normal]
   - network: grid3x3
-    methods: [mp, coop, llm]
+    methods: [mp, rl, llm]
     demands: [medium, peak]
     scenarios: [normal]

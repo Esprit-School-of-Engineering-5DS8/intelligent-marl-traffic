@@ -1,882 +1,1680 @@
-import { Brain, Cpu, Play, Square, Timer, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-
+import React, { useState, useEffect } from "react";
 import {
-  useCatalog,
-  useLlmProviders,
-  useRecipe,
-  type RecipeResponse,
-} from "@/shared/api/backend";
-import {
-  isActiveJob,
-  useCancelJob,
-  useJobStream,
-  useJobs,
-  useStartCompare,
-  useStartTraining,
-  useDeleteJob,
-  type Job,
-} from "@/shared/api/jobs";
-import { QueryState, EmptyData } from "@/shared/components/QueryState";
-import { Select } from "@/shared/components/pickers";
+  Cpu,
+  GitFork,
+  Sparkles,
+  Check,
+  ChevronRight,
+  Sliders,
+  ShieldCheck,
+  Zap,
+  Play,
+  RotateCcw,
+  Layers,
+  Terminal,
+  Activity,
+  AlertTriangle,
+  Info,
+  Tag,
+  Dna,
+  Key,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useCatalog } from "@/shared/api/backend";
+import { useStartTraining, useJobs, isActiveJob } from "@/shared/api/jobs";
 import { useFormat } from "@/shared/domain/format";
-import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
+import { NumberField } from "@/shared/ui/number-field";
+import { RangeInput } from "@/shared/ui/range-input";
+import { SelectControl } from "@/shared/ui/select";
 
-import { useTrainingDraft } from "./store";
+export type TrainingArchetype = "rl" | "hybrid" | "llm";
 
-type Notice = { tone: "flow" | "jam"; text: string };
-type Family = "rl" | "llm";
-
-const STATUS_TONE: Record<
-  Job["status"],
-  "neutral" | "accent" | "flow" | "jam"
-> = {
-  queued: "neutral",
-  running: "accent",
-  done: "flow",
-  failed: "jam",
-  cancelled: "neutral",
-};
-
-const SITUATIONS = ["neighbours", "emergency", "pedestrians", "buses", "forecast"] as const;
-const DEMAND_LEVELS = ["low", "medium", "peak", "rush_profile"] as const;
-const TRAINING_SCENARIOS = ["emergency", "pedestrians", "buses", "incident"] as const;
-const OVERLAYS = ["ev_preemption", "pedestrian_service", "mp_fallback"] as const;
-
-type RecipeConfig = Record<string, unknown>;
-
-/** The template defaults, used until the backend's rl.yaml arrives. */
-function defaultTemplate(): RecipeConfig {
-  return {
-    name: "rl",
-    algorithm: "ppo",
-    observation: Object.fromEntries(SITUATIONS.map((key) => [key, false])),
-    reward: { base: "wait", person_weighted: true, co2: 0.5, ev: 2, ped: 0.5, clip: 5 },
-    runtime: { overlays: OVERLAYS.map((id) => ({ id })) },
-    ppo: {
-      learning_rate: 0.0003,
-      n_steps: 256,
-      batch_size: 64,
-      n_epochs: 10,
-      gamma: 0.99,
-      gae_lambda: 0.95,
-      clip_range: 0.2,
-      ent_coef: 0,
-      net_arch: [64, 64],
-    },
-    training: { scenarios: ["emergency", "pedestrians", "buses"] },
-  };
+interface LLMProviderInfo {
+  id: string;
+  label: string;
+  available: boolean;
+  models: { id: string; context_window: number }[];
 }
 
-function normalizeTemplate(recipe: RecipeResponse | undefined): RecipeConfig {
-  if (!recipe?.config) return defaultTemplate();
-  const config = recipe.config as RecipeConfig;
-  // Strip identity/metadata fields: the profile name is recomputed server-side.
-  const { name, label, description, source, extends: _extends, ...rest } =
-    config as RecipeConfig & Record<string, unknown>;
-  return rest;
+interface ProvidersResponse {
+  providers: LLMProviderInfo[];
+  default: { provider: string; model: string };
 }
 
-function requestText(request: Record<string, unknown>, key: string): string | null {
-  const value = request[key];
-  return typeof value === "string" ? value : null;
+interface ArchetypeCard {
+  id: TrainingArchetype;
+  title: string;
+  subtitle: string;
+  badge: string;
+  badgeTone: string;
+  icon: React.ElementType;
+  description: string;
+  highlights: string[];
 }
+
+const ARCHETYPES: ArchetypeCard[] = [
+  {
+    id: "rl",
+    title: "RL Model",
+    subtitle: "High-frequency closed-loop policy",
+    badge: "Fast & Autonomous",
+    badgeTone: "border-accent/40 text-accent bg-accent/10",
+    icon: Cpu,
+    description:
+      "End-to-end Reinforcement Learning (PPO) trained directly against SUMO simulator reward functions. Sub-second actuation at edge intersections with minimal compute overhead.",
+    highlights: [
+      "Microsecond phase switching latency",
+      "PPO policy optimization across seeds",
+      "Dense reward shaping (delay, queue, halting)",
+    ],
+  },
+  {
+    id: "hybrid",
+    title: "Hybrid Model",
+    subtitle: "RL + LLM Hierarchical Orchestrator",
+    badge: "Recommended",
+    badgeTone: "border-accent/40 text-accent bg-accent/10",
+    icon: GitFork,
+    description:
+      "Hierarchical dual-tier controller: local RL policies execute reactive signal timing, while LLM reasoning analyzes regional corridors, incidents, and congestion anomalies to adapt policy objectives.",
+    highlights: [
+      "Dual-layer macro/micro coordination",
+      "LLM dynamic reward reweighting",
+      "Resilient fallback to pure RL during API timeouts",
+    ],
+  },
+  {
+    id: "llm",
+    title: "Full LLM Option",
+    subtitle: "Context-aware reasoning agent",
+    badge: "Semantic & Adaptive",
+    badgeTone: "border-accent/40 text-accent bg-accent/10",
+    icon: Sparkles,
+    description:
+      "Direct chain-of-thought and tool-assisted language models orchestrating multi-junction corridors with natural-language explainability, incident response, and zero-shot scenario handling.",
+    highlights: [
+      "Zero-shot emergency priority routing",
+      "Natural language strategy explanations",
+      "Dynamic prompt conditioning on lane telemetry",
+    ],
+  },
+];
+
+const AVAILABLE_SEEDS = [1, 2, 3, 7, 21, 42, 100, 1337];
+
+const GEMINI_MODELS = [
+  { value: "gemini-2.5-flash", label: "gemini-2.5-flash (Ultra-fast / Low latency)" },
+  { value: "gemini-2.5-pro", label: "gemini-2.5-pro (Deep corridor reasoning)" },
+  { value: "gemini-1.5-flash", label: "gemini-1.5-flash (Balanced)" },
+  { value: "gemini-1.5-pro", label: "gemini-1.5-pro (High context window)" },
+];
+
+const GROQ_MODELS = [
+  { value: "qwen/qwen3.8-27b", label: "qwen/qwen3.8-27b (Fast Reasoning)" },
+  { value: "llama-3.3-70b-versatile", label: "llama-3.3-70b-versatile (Flagship)" },
+  { value: "llama-3.1-8b-instant", label: "llama-3.1-8b-instant (Sub-100ms)" },
+  { value: "openai/gpt-oss-120b", label: "openai/gpt-oss-120b (Complex multi-agent)" },
+  { value: "openai/gpt-oss-20b", label: "openai/gpt-oss-20b (Default)" },
+];
+
+const BASE_POLICIES = [
+  { value: "sf_mission_2x2", label: "sf_mission_2x2_ppo_checkpoint_100k.pt" },
+  { value: "sf_mission_3x3", label: "sf_mission_3x3_ppo_checkpoint_100k.pt" },
+  { value: "monaco", label: "monaco_ppo_checkpoint_100k.pt" },
+  { value: "tunis", label: "tunis_ppo_checkpoint_100k.pt" },
+  { value: "train_fresh", label: "Train fresh alongside supervisor" },
+];
 
 export default function TrainingPage() {
-  const { t } = useTranslation();
-  const f = useFormat();
+  const [selected, setSelected] = useState<TrainingArchetype | null>("hybrid");
   const catalog = useCatalog();
   const jobs = useJobs();
-  const start = useStartTraining();
-  const startCompare = useStartCompare();
-  const cancel = useCancelJob();
-  const remove = useDeleteJob();
-  const draft = useTrainingDraft();
+  const startTraining = useStartTraining();
+  const f = useFormat();
 
-  const [family, setFamily] = useState<Family>("rl");
-  const [network, setNetwork] = useState("");
-  const [timesteps, setTimesteps] = useState("5000");
-  const [seedSet, setSeedSet] = useState<Set<number>>(new Set([1]));
+  // Query live LLM providers and API key readiness from backend
+  const { data: providersData, isLoading: providersLoading } = useQuery<ProvidersResponse>({
+    queryKey: ["llm-providers"],
+    queryFn: async () => {
+      const res = await fetch("/api/llm/providers");
+      if (!res.ok) throw new Error("Failed to fetch LLM providers status");
+      return res.json();
+    },
+    refetchInterval: 10000,
+  });
 
-  // RL editor state
-  const [profileName, setProfileName] = useState("rl");
-  const rlQuery = useRecipe(profileName);
-  const [situations, setSituations] = useState<Set<string>>(new Set(["neighbours", "emergency", "pedestrians", "buses"]));
-  const [demandLevels, setDemandLevels] = useState<Set<string>>(new Set(["medium", "peak"]));
-  const [scenarios, setScenarios] = useState<Set<string>>(new Set(["emergency", "pedestrians", "buses"]));
-  const [rewardBase, setRewardBase] = useState("wait");
-  const [personWeighted, setPersonWeighted] = useState(true);
-  const [evWeight, setEvWeight] = useState("2");
-  const [pedWeight, setPedWeight] = useState("0.5");
-  const [co2Weight, setCo2Weight] = useState("0.5");
-  const [lr, setLr] = useState("0.0003");
-  const [nSteps, setNSteps] = useState("256");
-  const [batchSize, setBatchSize] = useState("64");
-  const [gamma, setGamma] = useState("0.99");
-  const [gaeLambda, setGaeLambda] = useState("0.95");
-  const [clipRange, setClipRange] = useState("0.2");
-  const [entCoef, setEntCoef] = useState("0");
+  const groqProvider = providersData?.providers.find((p) => p.id === "groq");
+  const geminiProvider = providersData?.providers.find((p) => p.id === "gemini");
 
-  // LLM editor state
-  const llmQuery = useRecipe("llm");
-  const providersQuery = useLlmProviders();
-  const [provider, setProvider] = useState("");
-  const [model, setModel] = useState("");
-  const [maxCalls, setMaxCalls] = useState("48");
-  const [callInterval, setCallInterval] = useState("30");
-  const [timeoutS, setTimeoutS] = useState("30");
-  const [attempts, setAttempts] = useState("2");
-  const [llmFallback, setLlmFallback] = useState("mp");
-  const [benchmarkScenario, setBenchmarkScenario] = useState("emergency");
-  const [benchmarkSeeds, setBenchmarkSeeds] = useState("3");
+  const groqReady = Boolean(groqProvider?.available);
+  const geminiReady = Boolean(geminiProvider?.available);
 
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Active training job indicator
+  const activeJob = jobs.data?.find((j) => j.kind === "train" && isActiveJob(j));
 
-  const activeTrainJob =
-    jobs.data?.find((job) => job.kind === "train" && isActiveJob(job)) ?? null;
-  const activeCompareJob =
-    jobs.data?.find((job) => job.kind === "compare" && isActiveJob(job)) ?? null;
-  useJobStream(activeTrainJob?.id ?? activeCompareJob?.id ?? null);
+  // --- Common Settings ---
+  const [network, setNetwork] = useState("sf_mission_2x2");
+  const [demand, setDemand] = useState("rush_profile");
+  const [modelCustomName, setModelCustomName] = useState("Kemetra-SF-Mission-Supervisor-v1");
+  const [runTag, setRunTag] = useState("exp_sf_mission_rush");
+  const [selectedSeeds, setSelectedSeeds] = useState<number[]>([1, 2, 3]);
 
+  // --- Shared RL Core Parameters ---
+  const [rlAlgo, setRlAlgo] = useState<"ippo" | "mappo">("mappo");
+  const [rlPreset, setRlPreset] = useState("standard");
+  const [timesteps, setTimesteps] = useState(100000);
+  const [checkpointEvery, setCheckpointEvery] = useState(25000);
+  const [rewardDelay, setRewardDelay] = useState(-0.5);
+  const [rewardQueue, setRewardQueue] = useState(-0.3);
+  const [rewardPressure, setRewardPressure] = useState(0.2);
+  const [rewardEmergency, setRewardEmergency] = useState(2.0);
+  const [rewardSwitchPenalty, setRewardSwitchPenalty] = useState(-0.1);
+  const [minGreen, setMinGreen] = useState(10);
+  const [maxGreen, setMaxGreen] = useState(60);
+
+  // --- Hybrid-Specific State ---
+  const [hybridSubTab, setHybridSubTab] = useState<"orchestrator" | "rl_core">("orchestrator");
+  const [hybridCoupling, setHybridCoupling] = useState<"supervisory" | "gating" | "greenwave">(
+    "supervisory"
+  );
+  const [hybridLlmProvider, setHybridLlmProvider] = useState<"gemini" | "groq">("gemini");
+  const [hybridLlmModel, setHybridLlmModel] = useState("gemini-2.5-flash");
+  const [hybridUpdateInterval, setHybridUpdateInterval] = useState(30);
+  const [hybridBasePolicy, setHybridBasePolicy] = useState("pretrained_best");
+  const [hybridFallback, setHybridFallback] = useState(true);
+  const [hybridCoT, setHybridCoT] = useState(true);
+  const [hybridIncidentOverride, setHybridIncidentOverride] = useState(true);
+
+  // --- Option 3: Full LLM State ---
+  const [llmProviderChoice, setLlmProviderChoice] = useState<"gemini" | "groq">("gemini");
+  const [llmModel, setLlmModel] = useState("gemini-2.5-flash");
+  const [llmTemperature, setLlmTemperature] = useState(0.1);
+  const [llmDecisionCycle, setLlmDecisionCycle] = useState(10);
+  const [llmPersona, setLlmPersona] = useState("arterial_throughput");
+  const [llmExplainability, setLlmExplainability] = useState(true);
+  const [llmSafetyGuardrails, setLlmSafetyGuardrails] = useState(true);
+  const [llmSystemPrompt, setLlmSystemPrompt] = useState(
+    "You are KEMETRA's urban traffic signal coordinator. Analyze lane queues, approach speeds, and incident telemetry. Optimize for corridor throughput while strictly adhering to safety clearances."
+  );
+
+  // Sync default models when provider changes
   useEffect(() => {
-    if (!draft.request) return;
-    if (draft.network) setNetwork(draft.network);    if (typeof draft.recipe === "string" && draft.recipe) {
-      const known = (catalog.data?.agentConfigs ?? []).some(
-        (item) => item.name === draft.recipe && item.family === "rl",
-      );
-      if (known) setProfileName(draft.recipe);
-    }
-  }, [draft.network, draft.recipe, draft.request, catalog.data]);
-
-  // Loading a saved profile (from the catalog or a scenario card) seeds the editor.
-  useEffect(() => {
-    const config = rlQuery.data?.config as RecipeConfig | undefined;
-    if (!config) return;
-    const observation = (config.observation ?? {}) as Record<string, boolean>;
-    const reward = (config.reward ?? {}) as Record<string, unknown>;
-    const ppo = (config.ppo ?? {}) as Record<string, unknown>;
-    const training = (config.training ?? {}) as Record<string, unknown>;
-    if (reward.base) setRewardBase(String(reward.base));
-    if (typeof reward.person_weighted === "boolean") setPersonWeighted(reward.person_weighted);
-    if (reward.ev !== undefined) setEvWeight(String(Number(reward.ev)));
-    if (reward.ped !== undefined) setPedWeight(String(Number(reward.ped)));
-    if (reward.co2 !== undefined) setCo2Weight(String(Number(reward.co2)));
-    if (ppo.learning_rate !== undefined) setLr(String(Number(ppo.learning_rate)));
-    if (ppo.n_steps !== undefined) setNSteps(String(Number(ppo.n_steps)));
-    if (ppo.batch_size !== undefined) setBatchSize(String(Number(ppo.batch_size)));
-    if (ppo.gamma !== undefined) setGamma(String(Number(ppo.gamma)));
-    if (ppo.gae_lambda !== undefined) setGaeLambda(String(Number(ppo.gae_lambda)));
-    if (ppo.clip_range !== undefined) setClipRange(String(Number(ppo.clip_range)));
-    if (ppo.ent_coef !== undefined) setEntCoef(String(Number(ppo.ent_coef)));
-    if (Array.isArray(config.observation)) {
-      setSituations(new Set(config.observation as string[]));
-    } else if (observation && typeof observation === "object") {
-      setSituations(
-        new Set(
-          SITUATIONS.filter((key) => {
-            const value = (observation as Record<string, unknown>)[key];
-            if (typeof value === "boolean") return value;
-            return (config.observation as unknown as string[]).includes(key);
-          }),
-        ),
-      );
-    }
-    if (Array.isArray(training.demand_levels)) {
-      setDemandLevels(new Set(training.demand_levels as string[]));
-    }
-    if (Array.isArray(training.scenarios)) {
-      setScenarios(new Set(training.scenarios as string[]));
-    }
-  }, [rlQuery.data]);
-
-  const rlRecipe = useMemo((): RecipeConfig => {
-    const base = normalizeTemplate(rlQuery.data);
-    const template = { ...base };
-    template.observation = Object.fromEntries(
-      SITUATIONS.map((key) => [key, situations.has(key)]),
-    );
-    template.reward = {
-      base: rewardBase,
-      person_weighted: personWeighted,
-      co2: Number(co2Weight) || 0,
-      ev: Number(evWeight) || 0,
-      ped: Number(pedWeight) || 0,
-      clip: 5,
-    };
-    template.runtime = { overlays: OVERLAYS.map((id) => ({ id })) };
-    template.ppo = {
-      ...(template.ppo as RecipeConfig),
-      learning_rate: Number(lr) || 0.0003,
-      n_steps: Number(nSteps) || 256,
-      batch_size: Number(batchSize) || 64,
-      gamma: Number(gamma) || 0.99,
-      gae_lambda: Number(gaeLambda) || 0.95,
-      clip_range: Number(clipRange) || 0.2,
-      ent_coef: Number(entCoef) || 0,
-    };
-    template.training = {
-      ...(template.training as RecipeConfig),
-      demand_levels: [...demandLevels],
-      scenarios: [...scenarios],
-    };
-    return template;
-  }, [
-    rlQuery.data,
-    situations,
-    rewardBase,
-    personWeighted,
-    co2Weight,
-    evWeight,
-    pedWeight,
-    lr,
-    nSteps,
-    batchSize,
-    gamma,
-    gaeLambda,
-    clipRange,
-    entCoef,
-    demandLevels,
-    scenarios,
-  ]);
-
-  const llmRecipeConfig = useMemo((): RecipeConfig => {
-    const base = normalizeTemplate(llmQuery.data);
-    return {
-      ...base,
-      name: "llm",
-      provider: provider || (base.provider as string) || "groq",
-      model: model || null,
-      max_calls: Number(maxCalls) || 48,
-      call_interval_s: Number(callInterval) || 30,
-      timeout_s: Number(timeoutS) || 30,
-      attempts: Number(attempts) || 2,
-      fallback: llmFallback,
-    };
-  }, [llmQuery.data, provider, model, maxCalls, callInterval, timeoutS, attempts, llmFallback]);
-
-  const networks = catalog.data?.networks.filter((item) => item.runnable) ?? [];
-  const selectedNetwork = networks.some((item) => item.network === network)
-    ? network
-    : (networks[0]?.network ?? "");
-  const profiles = catalog.data?.agentConfigs.filter((item) => item.family === "rl") ?? [];
-  const canSubmitRl = Boolean(selectedNetwork) && !activeTrainJob && !start.isPending;
-  const canBenchmark = Boolean(selectedNetwork) && !activeCompareJob && !startCompare.isPending;
-  const seedList = [...seedSet].length ? [...seedSet].sort((a, b) => a - b) : [1];
-
-  const submitRl = () => {
-    setNotice(null);
-    start.mutate(
-      {
-        network: selectedNetwork,
-        seeds: seedList,
-        timesteps: Number(timesteps),
-        recipe: rlRecipe,
-      },
-      {
-        onSuccess: (job) =>
-          setNotice({
-            tone: "flow",
-            text: t("training.started", {
-              recipe: requestText(job.request, "recipe_id") ?? "rl",
-              network: f.networkName(selectedNetwork),
-            }),
-          }),
-        onError: (error) =>
-          setNotice({
-            tone: "jam",
-            text: error instanceof Error ? error.message : t("training.startError"),
-          }),
-      },
-    );
-  };
-
-  const submitBenchmark = () => {
-    setNotice(null);
-    const seeds = [Number(benchmarkSeeds) || 3];
-    startCompare.mutate(
-      {
-        network: selectedNetwork,
-        scenario: benchmarkScenario,
-        demand: "medium",
-        seeds,
-        methods: ["llm", "mp"],
-        quick: true,
-        overrides: { llm: { llm: llmRecipeConfig } },
-      },
-      {
-        onSuccess: (job) =>
-          setNotice({
-            tone: "flow",
-            text: t("training.benchmarkStarted", {
-              method: requestText(job.request, "anchor") ?? "LLM",
-              network: f.networkName(selectedNetwork),
-            }),
-          }),
-        onError: (error) =>
-          setNotice({
-            tone: "jam",
-            text: error instanceof Error ? error.message : t("training.startError"),
-          }),
-      },
-    );
-  };
-
-  const toggle = (set: Set<string>, value: string) => {
-    const clone = new Set(set);
-    if (clone.has(value)) {
-      clone.delete(value);
+    if (hybridLlmProvider === "gemini") {
+      setHybridLlmModel("gemini-2.5-flash");
     } else {
-      clone.add(value);
+      setHybridLlmModel("qwen/qwen3.8-27b");
     }
-    return clone;
-  };
+  }, [hybridLlmProvider]);
 
-  const toggleSeed = (value: number) =>
-    setSeedSet((current) => {
-      const clone = new Set(current);
-      if (clone.has(value)) {
-        if (clone.size > 1) clone.delete(value);
-      } else {
-        clone.add(value);
+  useEffect(() => {
+    if (llmProviderChoice === "gemini") {
+      setLlmModel("gemini-2.5-flash");
+    } else {
+      setLlmModel("qwen/qwen3.8-27b");
+    }
+  }, [llmProviderChoice]);
+
+  // Toggle seed selection
+  const toggleSeed = (seed: number) => {
+    setSelectedSeeds((prev) => {
+      if (prev.includes(seed)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((s) => s !== seed);
       }
-      return clone;
-    });
-
-  const cancelJob = (jobId: string) => {
-    setCancellingId(jobId);
-    cancel.mutate(jobId, {
-      onError: (error) =>
-        setNotice({
-          tone: "jam",
-          text: error instanceof Error ? error.message : t("training.cancelError"),
-        }),
-      onSettled: () => setCancellingId(null),
+      return [...prev, seed].sort((a, b) => a - b);
     });
   };
 
-  const deleteJob = (jobId: string) => {
-    setDeletingId(jobId);
-    remove.mutate(jobId, {
-      onError: (error) =>
-        setNotice({
-          tone: "jam",
-          text: error instanceof Error ? error.message : t("training.deleteError"),
-        }),
-      onSettled: () => setDeletingId(null),
+  const selectSeedPreset = (mode: "single" | "trio" | "five" | "all") => {
+    if (mode === "single") setSelectedSeeds([1]);
+    else if (mode === "trio") setSelectedSeeds([1, 2, 3]);
+    else if (mode === "five") setSelectedSeeds([1, 2, 3, 7, 42]);
+    else if (mode === "all") setSelectedSeeds([...AVAILABLE_SEEDS]);
+  };
+
+  // Network list from catalog fallback
+  const networkOptions =
+    catalog.data?.networks && catalog.data.networks.length > 0
+      ? catalog.data.networks
+      : [
+          { network: "sf_mission_2x2", name: "SF Mission 2×2 Corridor" },
+          { network: "sf_mission_3x3", name: "SF Mission 3×3 Grid" },
+        ];
+
+  // Validation: Check if the required API key for the chosen LLM is ready
+  const isHybridKeyReady = hybridLlmProvider === "gemini" ? geminiReady : groqReady;
+  const isFullLlmKeyReady = llmProviderChoice === "gemini" ? geminiReady : groqReady;
+
+  const handleLaunch = () => {
+    startTraining.mutate({
+      network,
+      seeds: selectedSeeds,
+      timesteps,
+      recipe_id: selected === "rl" ? "generalist" : selected === "hybrid" ? "hybrid" : "llm",
+      overrides: {
+        network,
+        archetype: selected,
+        demand,
+        model_name: modelCustomName.trim() || `kemetra_${selected}_model`,
+        run_tag: runTag.trim() || `run_${Date.now()}`,
+        ...(selected === "rl" || selected === "hybrid"
+          ? {
+              algo: rlAlgo,
+              reward: {
+                delay: rewardDelay,
+                queue: rewardQueue,
+                pressure: rewardPressure,
+                emergency: rewardEmergency,
+                switch_penalty: rewardSwitchPenalty,
+              },
+              safety: { min_green: minGreen, max_green: maxGreen },
+              checkpoint_every: checkpointEvery,
+            }
+          : {}),
+        ...(selected === "hybrid"
+          ? {
+              coupling: hybridCoupling,
+              provider: hybridLlmProvider,
+              llm_model: hybridLlmModel,
+              update_interval_s: hybridUpdateInterval,
+              base_policy: hybridBasePolicy,
+              fallback_to_rl: hybridFallback,
+              chain_of_thought: hybridCoT,
+              incident_override: hybridIncidentOverride,
+            }
+          : selected === "llm"
+          ? {
+              provider: llmProviderChoice,
+              model: llmModel,
+              temperature: llmTemperature,
+              decision_cycle_s: llmDecisionCycle,
+              persona: llmPersona,
+              explainability: llmExplainability,
+              safety_guardrails: llmSafetyGuardrails,
+              system_prompt: llmSystemPrompt,
+            }
+          : {}),
+      },
     });
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t("training.title")} description={t("training.description")} />
+    <div className="flex flex-col gap-6 w-full pb-16 pt-2 px-4">
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/70 pb-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-text">
+              Training & Model Orchestration
+            </h1>
+          </div>
+          <p className="text-xs sm:text-sm text-text-2">
+            Configure reinforcement learning workloads, hybrid supervisors, or direct LLM signal control.
+          </p>
+        </div>
 
-      <div className="flex items-center gap-2" role="tablist">
-        {(
-          [
-            ["rl", Cpu, t("training.familyRl")],
-            ["llm", Brain, t("training.familyLlm")],
-          ] as const
-        ).map(([value, Icon, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={family === value}
-            onClick={() => setFamily(value)}
-            className={
-              family === value
-                ? "inline-flex items-center gap-2 border border-accent/40 bg-accent-soft px-3 py-2 text-sm text-accent"
-                : "inline-flex items-center gap-2 border border-border bg-surface px-3 py-2 text-sm text-text-2 hover:bg-surface-3"
-            }
-          >
-            <Icon aria-hidden="true" className="size-4" />
-            {label}
-          </button>
-        ))}
+        {/* Global Network & Demand Toolbar */}
+        <div className="flex flex-wrap items-center gap-2.5 bg-surface-2 p-1.5 rounded-lg border border-border">
+          <div className="flex items-center gap-1.5 px-2">
+            <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Network:</span>
+            <SelectControl
+              ariaLabel="Network"
+              value={network}
+              options={networkOptions.map((net) => ({
+                value: net.network,
+                label: "name" in net ? net.name : f.networkName(net.network),
+              }))}
+              onChange={setNetwork}
+              className="text-xs font-medium"
+              style={{ minWidth: 180 }}
+            />
+          </div>
+
+          <div className="h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1.5 px-2">
+            <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Demand:</span>
+            <SelectControl
+              ariaLabel="Demand profile"
+              value={demand}
+              options={[
+                { value: "low", label: "Low (Off-peak)" },
+                { value: "medium", label: "Medium (Standard)" },
+                { value: "peak", label: "Peak (Congested)" },
+                { value: "emergency", label: "Emergency Incident" },
+              ]}
+              onChange={setDemand}
+              className="text-xs font-medium"
+              style={{ minWidth: 180 }}
+            />
+          </div>
+        </div>
       </div>
 
-      {notice ? (
-        <div
-          role="status"
-          className={
-            notice.tone === "flow"
-              ? "border border-flow/40 bg-flow-soft px-3 py-2 text-sm text-flow"
-              : "border border-jam/40 bg-jam-soft px-3 py-2 text-sm text-jam"
-          }
-        >
-          {notice.text}
-        </div>
-      ) : null}
-
-      <QueryState query={catalog} height={280}>
-        {(data) => {
-          const activeJob = family === "rl" ? activeTrainJob : activeCompareJob;
+      {/* 3 Choice Cards Layout with Expand / Blur effect */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch transition-all duration-300">
+        {ARCHETYPES.map((arch) => {
+          const isSelected = selected === arch.id;
+          const isDimmed = selected !== null && !isSelected;
+          const Icon = arch.icon;
 
           return (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("training.formTitle")}</CardTitle>
-                  <CardDescription>
-                    {family === "rl" ? t("training.formTextRl") : t("training.formTextLlm")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <Select
-                    label={t("training.network")}
-                    value={selectedNetwork}
-                    options={data.networks
-                      .filter((item) => item.runnable)
-                      .map((item) => ({
-                        value: item.network,
-                        label: f.networkName(item.network),
-                      }))}
-                    onChange={setNetwork}
-                  />
+            <div
+              key={arch.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelected(isSelected ? null : arch.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setSelected(isSelected ? null : arch.id);
+                }
+              }}
+              className={`
+                group relative flex flex-col rounded-xl border p-5 text-left cursor-pointer
+                transition-all duration-300 ease-out select-none
+                ${
+                  isSelected
+                    ? "border-accent bg-surface shadow-lg md:scale-[1.02] z-10 ring-2 ring-accent/40"
+                    : isDimmed
+                    ? "border-border/40 bg-surface-2/40 opacity-40 blur-[1px] grayscale-[50%] hover:opacity-60 hover:blur-none hover:grayscale-0"
+                    : "border-border bg-surface hover:border-accent/50 hover:bg-surface-2 hover:shadow-md"
+                }
+              `}
+            >
+              {/* Top Row: Icon + Badge */}
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div
+                  className={`
+                    p-2.5 rounded-lg border transition-colors
+                    ${
+                      isSelected
+                        ? "border-accent/40 bg-accent/15 text-accent"
+                        : "border-border bg-surface-2 text-text-2 group-hover:text-accent group-hover:border-accent/30"
+                    }
+                  `}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span
+                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium border ${arch.badgeTone}`}
+                >
+                  {arch.badge}
+                </span>
+              </div>
 
-                  {family === "rl" ? (
+              {/* Title & Subtitle */}
+              <div className="mb-2">
+                <h3 className="text-base font-bold text-text group-hover:text-accent transition-colors">
+                  {arch.title}
+                </h3>
+                <p className="text-[11px] font-mono text-muted tracking-tight mt-0.5">
+                  {arch.subtitle}
+                </p>
+              </div>
+
+              {/* Description */}
+              <p className="text-xs leading-relaxed text-text-2 mb-4 flex-1">
+                {arch.description}
+              </p>
+
+              {/* Highlights */}
+              <div className="border-t border-border/60 pt-3 flex flex-col gap-1.5 mb-4">
+                {arch.highlights.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-1.5 text-[11px] text-text-2">
+                    <Check
+                      className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${
+                        isSelected ? "text-accent" : "text-muted"
+                      }`}
+                    />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Selection Status Button/Indicator */}
+              <div className="mt-auto pt-1">
+                <div
+                  className={`
+                    w-full py-1.5 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all
+                    ${
+                      isSelected
+                        ? "bg-accent text-accent-ink shadow-sm font-semibold"
+                        : "bg-surface-2 text-text-2 group-hover:bg-surface-3 group-hover:text-accent border border-border"
+                    }
+                  `}
+                >
+                  {isSelected ? (
                     <>
-                      <Select
-                        label={t("training.profile")}
-                        value={profileName}
-                        options={[
-                          { value: "rl", label: t("training.profileNew") },
-                          ...profiles
-                            .filter((item) => item.name !== "rl")
-                            .map((item) => ({
-                              value: item.name,
-                              label: item.label || item.name,
-                            })),
-                        ]}
-                        onChange={setProfileName}
-                      />
-                      <Select
-                        label={t("training.profile")}
-                        value={profileName}
-                        options={[
-                          { value: "rl", label: t("training.profileNew") },
-                          ...profiles
-                            .filter((item) => item.name !== "rl")
-                            .map((item) => ({
-                              value: item.name,
-                              label: item.label || item.name,
-                            })),
-                        ]}
-                        onChange={setProfileName}
-                      />
-                      <FieldGroup label={t("training.situations")}>
-                        {SITUATIONS.map((key) => (
-                          <ChipButton
-                            key={key}
-                            on={situations.has(key)}
-                            label={t(`training.situation_${key}`)}
-                            onClick={() => setSituations(toggle(situations, key))}
-                          />
-                        ))}
-                      </FieldGroup>
-
-                      <FieldGroup label={t("training.demandProfile")}>
-                        {DEMAND_LEVELS.map((key) => (
-                          <ChipButton
-                            key={key}
-                            on={demandLevels.has(key)}
-                            label={t(`training.demand_${key}`)}
-                            onClick={() => setDemandLevels(toggle(demandLevels, key))}
-                          />
-                        ))}
-                      </FieldGroup>
-
-                      <FieldGroup label={t("training.scenarios")}>
-                        {TRAINING_SCENARIOS.map((key) => (
-                          <ChipButton
-                            key={key}
-                            on={scenarios.has(key)}
-                            label={t(`training.scenario_${key}`)}
-                            onClick={() => setScenarios(toggle(scenarios, key))}
-                          />
-                        ))}
-                      </FieldGroup>
-
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Select
-                          label={t("training.rewardBase")}
-                          value={rewardBase}
-                          options={["wait", "queue", "pressure"].map((value) => ({ value, label: t(`training.rewardBase_${value}`) }))}
-                          onChange={setRewardBase}
-                        />
-                        <NumberField label={t("training.weightEv")} value={evWeight} onChange={setEvWeight} />
-                        <NumberField label={t("training.weightPed")} value={pedWeight} onChange={setPedWeight} />
-                        <NumberField label={t("training.weightCo2")} value={co2Weight} onChange={setCo2Weight} />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <NumberField label={t("training.hpLearningRate")} value={lr} onChange={setLr} />
-                        <NumberField label={t("training.hpNSteps")} value={nSteps} onChange={setNSteps} />
-                        <NumberField label={t("training.hpBatch")} value={batchSize} onChange={setBatchSize} />
-                        <NumberField label={t("training.hpGamma")} value={gamma} onChange={setGamma} />
-                        <NumberField label={t("training.hpGaeLambda")} value={gaeLambda} onChange={setGaeLambda} />
-                        <NumberField label={t("training.hpClip")} value={clipRange} onChange={setClipRange} />
-                        <NumberField label={t("training.hpEntCoef")} value={entCoef} onChange={setEntCoef} />
-                        <Select
-                          label={t("training.timesteps")}
-                          value={timesteps}
-                          options={["1000", "5000", "25000", "100000"].map((value) => ({
-                            value,
-                            label: f.number(Number(value)),
-                          }))}
-                          onChange={setTimesteps}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <FieldGroup label={t("training.seedsMultiple")} className="flex flex-wrap gap-1">
-                          {Array.from({ length: 8 }, (_, index) => index + 1).map((seed) => (
-                            <ChipButton
-                              key={seed}
-                              on={seedSet.has(seed)}
-                              label={String(seed)}
-                              onClick={() => toggleSeed(seed)}
-                            />
-                          ))}
-                        </FieldGroup>
-                      </div>
-
-                      {activeTrainJob ? (
-                        <p className="border border-accent/30 bg-accent-soft px-3 py-2 text-xs text-accent">
-                          {t("training.oneJob")}
-                        </p>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="primary"
-                        disabled={!canSubmitRl}
-                        onClick={submitRl}
-                      >
-                        <Play aria-hidden="true" />
-                        {start.isPending ? t("training.starting") : t("training.submit")}
-                      </Button>
+                      <span>Configuring</span>
+                      <Check className="w-3.5 h-3.5" />
                     </>
                   ) : (
                     <>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Select
-                          label={t("training.llmProvider")}
-                          value={provider}
-                          options={(providersQuery.data?.providers ?? []).map((entry) => ({
-                            value: entry.id,
-                            label: entry.label + (entry.available ? "" : " (API key missing)"),
-                          }))}
-                          onChange={(value) => {
-                            setProvider(value);
-                            const first =
-                              providersQuery.data?.providers.find((entry) => entry.id === value)
-                                ?.models?.[0]?.id ?? "";
-                            setModel(first);
-                          }}
-                        />
-                        <Select
-                          label={t("training.llmModel")}
-                          value={model}
-                          options={(
-                            providersQuery.data?.providers.find((entry) => entry.id === (provider || "groq"))
-                              ?.models ?? []
-                          ).map((entry) => ({ value: entry.id, label: entry.id }))}
-                          onChange={setModel}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <NumberField label={t("training.llmMaxCalls")} value={maxCalls} onChange={setMaxCalls} />
-                        <NumberField label={t("training.llmInterval")} value={callInterval} onChange={setCallInterval} />
-                        <NumberField label={t("training.llmTimeout")} value={timeoutS} onChange={setTimeoutS} />
-                        <NumberField label={t("training.llmAttempts")} value={attempts} onChange={setAttempts} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Select
-                          label={t("training.llmFallback")}
-                          value={llmFallback}
-                          options={[
-                            { value: "mp", label: t("training.fallbackMp") },
-                            { value: "ft", label: t("training.fallbackFt") },
-                          ]}
-                          onChange={setLlmFallback}
-                        />
-                        <Select
-                          label={t("training.benchmarkScenario")}
-                          value={benchmarkScenario}
-                          options={["normal", "emergency", "pedestrians", "buses", "incident"].map(
-                            (value) => ({ value, label: t(`scenarioPage.event_${value}`, { defaultValue: value }) }),
-                          )}
-                          onChange={setBenchmarkScenario}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <NumberField label={t("training.seeds")} value={benchmarkSeeds} onChange={setBenchmarkSeeds} />
-                      </div>
-                      {activeCompareJob ? (
-                        <p className="border border-accent/30 bg-accent-soft px-3 py-2 text-xs text-accent">
-                          {t("training.oneBenchmark")}
-                        </p>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="primary"
-                        disabled={!canBenchmark}
-                        onClick={submitBenchmark}
-                      >
-                        <Play aria-hidden="true" />
-                        {startCompare.isPending ? t("training.starting") : t("training.submitBenchmark")}
-                      </Button>
+                      <span>Configure</span>
+                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </>
                   )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex-row items-center justify-between gap-2">
-                  <div className="flex flex-col gap-1">
-                    <CardTitle>
-                      {family === "rl" ? t("training.queue") : t("training.benchmarkQueue")}
-                    </CardTitle>
-                    <CardDescription>
-                      {family === "rl" ? t("training.queueText") : t("training.benchmarkQueueText")}
-                    </CardDescription>
-                  </div>
-                  {activeJob ? <Badge tone="accent">{t("training.live")}</Badge> : null}
-                </CardHeader>
-                <CardContent>
-                  <QueryState query={jobs} height={220}>
-                    {(items) => {
-                      const kind = family === "rl" ? "train" : "compare";
-                      const familyJobs = items.filter((job) => job.kind === kind);
-                      if (!familyJobs.length) {
-                        return (
-                          <EmptyData
-                            title={t("training.empty")}
-                            text={t("training.emptyText")}
-                          />
-                        );
-                      }
-                      return (
-                        <ul className="flex flex-col divide-y divide-border">
-                          {familyJobs.map((job) => (
-                            <JobRow
-                              key={job.id}
-                              job={job}
-                              cancelling={cancellingId === job.id}
-                              deleting={deletingId === job.id}
-                              onCancel={() => cancelJob(job.id)}
-                              onDelete={() => deleteJob(job.id)}
-                            />
-                          ))}
-                        </ul>
-                      );
-                    }}
-                  </QueryState>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           );
-        }}
-      </QueryState>
+        })}
+      </div>
+
+      {/* Expanded Detailed Workspace */}
+      {selected && (
+        <div className="p-6 rounded-xl border border-accent/40 bg-surface shadow-md animate-in fade-in slide-in-from-top-2 duration-300">
+          {/* Header of Workspace */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-4 mb-6">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-lg bg-accent/15 text-accent border border-accent/30">
+                {selected === "rl" && <Cpu className="w-6 h-6" />}
+                {selected === "hybrid" && <GitFork className="w-6 h-6" />}
+                {selected === "llm" && <Sparkles className="w-6 h-6" />}
+              </span>
+              <div>
+                <h3 className="text-lg font-bold text-text">
+                  {selected === "rl" && "Reinforcement Learning (PPO) Setup"}
+                  {selected === "hybrid" && "Hierarchical Hybrid (RL + LLM) Setup"}
+                  {selected === "llm" && "Full LLM Reasoning Agent Setup"}
+                </h3>
+                <p className="text-xs text-muted">
+                  {selected === "rl" && "Formulate reward signals, network actor-critics, and simulation training budgets."}
+                  {selected === "hybrid" && "Configure both tiers: High-level LLM supervisor coordination AND local RL policy weights."}
+                  {selected === "llm" && "Tune context prompts, decision cadences, zero-shot rules, and SUMO safety enforcers."}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-surface-2 text-text-2 hover:text-text transition-colors"
+            >
+              Close Panel
+            </button>
+          </div>
+
+          {/* User-Defined Naming Bar (Model Name & Run Name) */}
+          <div className="mb-6 p-4 rounded-lg border border-border bg-surface-2/40 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-text flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-accent" /> Custom Model Name
+              </label>
+              <input
+                type="text"
+                value={modelCustomName}
+                onChange={(e) => setModelCustomName(e.target.value)}
+                placeholder="e.g. Bourguiba-Adaptive-PPO-v2"
+                className="input-control text-xs font-medium"
+              />
+              <span className="text-[10px] text-muted">
+                Will be registered in the Models table and checkpoint catalog.
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-text flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-accent" /> Experiment / Run Tag
+              </label>
+              <input
+                type="text"
+                value={runTag}
+                onChange={(e) => setRunTag(e.target.value)}
+                placeholder="e.g. exp_peak_hours_tuning"
+                className="input-control text-xs font-mono"
+              />
+              <span className="text-[10px] text-muted">
+                Group and filter run metrics in the Runs and Analytics views.
+              </span>
+            </div>
+          </div>
+
+          {/* ======================= OPTION 1: RL CONFIGURATION ======================= */}
+          {selected === "rl" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Algorithm & Reward Shaping (7 cols) */}
+              <div className="lg:col-span-7 flex flex-col gap-6">
+                {/* Algorithm Selection */}
+                <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-accent" /> Policy Architecture
+                    </span>
+                    <span className="text-[11px] text-muted font-mono">PPO (Proximal Policy Optimization)</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label
+                      className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
+                        rlAlgo === "mappo"
+                          ? "border-accent bg-accent/10 text-text"
+                          : "border-border bg-surface text-muted hover:border-border-2"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-text">MAPPO (Centralized Critic)</span>
+                        <input
+                          type="radio"
+                          name="rl-algo"
+                          className="radio-control"
+                          checked={rlAlgo === "mappo"}
+                          onChange={() => setRlAlgo("mappo")}
+                        />
+                      </span>
+                      <span className="text-[11px] text-muted mt-1 leading-snug">
+                        Shared state representation across neighboring junctions for coordinated flow.
+                      </span>
+                    </label>
+
+                    <label
+                      className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
+                        rlAlgo === "ippo"
+                          ? "border-accent bg-accent/10 text-text"
+                          : "border-border bg-surface text-muted hover:border-border-2"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-text">IPPO (Decentralized Agents)</span>
+                        <input
+                          type="radio"
+                          name="rl-algo"
+                          className="radio-control"
+                          checked={rlAlgo === "ippo"}
+                          onChange={() => setRlAlgo("ippo")}
+                        />
+                      </span>
+                      <span className="text-[11px] text-muted mt-1 leading-snug">
+                        Independent local actors at each intersection observing strictly local lanes.
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Reward Shaping Knobs */}
+                <div className="flex flex-col gap-4 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Sliders className="w-4 h-4 text-accent" /> Reward Function Shaping
+                    </span>
+                    <span className="text-[11px] text-muted">SUMO TraCI Feedback Sliders</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-text font-medium">Vehicle Delay Penalty</span>
+                      <span className="font-mono text-accent">{rewardDelay.toFixed(2)}</span>
+                    </div>
+                    <RangeInput
+                      ariaLabel="Vehicle delay penalty"
+                      min={-1.5}
+                      max={0}
+                      step={0.05}
+                      value={rewardDelay}
+                      onChange={setRewardDelay}
+                    />
+                    <span className="text-[10px] text-muted">Penalizes cumulative travel time losses at red signals.</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-text font-medium">Stop-bar Queue Length Penalty</span>
+                      <span className="font-mono text-accent">{rewardQueue.toFixed(2)}</span>
+                    </div>
+                    <RangeInput
+                      ariaLabel="Stop-bar queue length penalty"
+                      min={-1.0}
+                      max={0}
+                      step={0.05}
+                      value={rewardQueue}
+                      onChange={setRewardQueue}
+                    />
+                    <span className="text-[10px] text-muted">Penalizes long lines of stationary vehicles.</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-text font-medium">Inter-junction Pressure Balance</span>
+                      <span className="font-mono text-accent">{rewardPressure.toFixed(2)}</span>
+                    </div>
+                    <RangeInput
+                      ariaLabel="Inter-junction pressure balance"
+                      min={0}
+                      max={1.0}
+                      step={0.05}
+                      value={rewardPressure}
+                      onChange={setRewardPressure}
+                    />
+                    <span className="text-[10px] text-muted">Balances upstream inflow with downstream exit capacity.</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-text font-medium">Emergency Priority Clearance</span>
+                      <span className="font-mono text-accent">+{rewardEmergency.toFixed(1)}x</span>
+                    </div>
+                    <RangeInput
+                      ariaLabel="Emergency priority clearance"
+                      min={0}
+                      max={5.0}
+                      step={0.5}
+                      value={rewardEmergency}
+                      onChange={setRewardEmergency}
+                    />
+                    <span className="text-[10px] text-muted">Reward multiplier when clearing lanes occupied by emergency vehicles.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Training Budget, Selectable Seeds & Launch (5 cols) */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Dna className="w-4 h-4 text-accent" /> Simulation Seeds Selection
+                    </span>
+                    <span className="text-[11px] font-mono text-accent font-semibold">
+                      {selectedSeeds.length} Selected
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {AVAILABLE_SEEDS.map((seed) => {
+                      const isChosen = selectedSeeds.includes(seed);
+                      return (
+                        <button
+                          key={seed}
+                          type="button"
+                          onClick={() => toggleSeed(seed)}
+                          className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-medium transition-all flex items-center gap-1.5 ${
+                            isChosen
+                              ? "border-accent bg-accent text-accent-ink shadow-sm"
+                              : "border-border bg-surface text-muted hover:border-border-2 hover:text-text"
+                          }`}
+                        >
+                          <span>Seed {seed}</span>
+                          {isChosen && <Check className="w-3 h-3 stroke-[3]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-border/60 text-[11px]">
+                    <span className="text-muted">Quick presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => selectSeedPreset("single")}
+                      className="text-text hover:text-accent font-medium underline px-1"
+                    >
+                      Single (1)
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      onClick={() => selectSeedPreset("trio")}
+                      className="text-text hover:text-accent font-medium underline px-1"
+                    >
+                      Trio (3)
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      onClick={() => selectSeedPreset("five")}
+                      className="text-text hover:text-accent font-medium underline px-1"
+                    >
+                      Five (5)
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      onClick={() => selectSeedPreset("all")}
+                      className="text-text hover:text-accent font-medium underline px-1"
+                    >
+                      All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-accent" /> Compute & Simulation Budget
+                  </span>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "pilot", label: "Pilot", steps: 25000 },
+                      { id: "standard", label: "Standard", steps: 100000 },
+                      { id: "full", label: "Full Conv.", steps: 500000 },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setRlPreset(p.id);
+                          setTimesteps(p.steps);
+                        }}
+                        className={`py-1.5 px-2 rounded border text-xs font-medium transition-all ${
+                          rlPreset === p.id
+                            ? "border-accent bg-accent/15 text-accent"
+                            : "border-border bg-surface text-muted hover:text-text"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">Total Steps:</span>
+                    <NumberField
+                      ariaLabel="Total training steps"
+                      value={timesteps}
+                      onChange={setTimesteps}
+                      min={1000}
+                      step={1000}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">Checkpoint Every (steps):</span>
+                    <NumberField
+                      ariaLabel="Checkpoint interval in steps"
+                      value={checkpointEvery}
+                      onChange={setCheckpointEvery}
+                      min={1000}
+                      step={1000}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-accent" /> Actuation Safety Boundaries
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-muted block mb-1">Min Green Time</span>
+                      <div className="flex items-center gap-1.5">
+                        <NumberField
+                          ariaLabel="Minimum green time in seconds"
+                          value={minGreen}
+                          onChange={setMinGreen}
+                          min={1}
+                          max={120}
+                        />
+                        <span className="text-muted">sec</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted block mb-1">Max Green Time</span>
+                      <div className="flex items-center gap-1.5">
+                        <NumberField
+                          ariaLabel="Maximum green time in seconds"
+                          value={maxGreen}
+                          onChange={setMaxGreen}
+                          min={1}
+                          max={180}
+                        />
+                        <span className="text-muted">sec</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLaunch}
+                  disabled={startTraining.isPending || !!activeJob}
+                  className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>{activeJob ? "Job in Progress..." : "Launch RL Policy Training"}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ======================= OPTION 2: HYBRID CONFIGURATION ======================= */}
+          {selected === "hybrid" && (
+            <div className="flex flex-col gap-6">
+              {/* Hybrid Dual-Tier Navigation Bar */}
+              <div className="flex items-center justify-between border-b border-border/80 pb-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setHybridSubTab("orchestrator")}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      hybridSubTab === "orchestrator"
+                        ? "bg-accent text-accent-ink shadow-sm"
+                        : "bg-surface-2 text-text-2 hover:text-text hover:bg-surface-3"
+                    }`}
+                  >
+                    <GitFork className="w-3.5 h-3.5" />
+                    <span>Tier 1: LLM Macro Supervisor</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setHybridSubTab("rl_core")}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      hybridSubTab === "rl_core"
+                        ? "bg-accent text-accent-ink shadow-sm"
+                        : "bg-surface-2 text-text-2 hover:text-text hover:bg-surface-3"
+                    }`}
+                  >
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span>Tier 2: Micro-RL Policy & Rewards</span>
+                  </button>
+                </div>
+
+                <span className="text-[11px] font-mono text-muted">
+                  {hybridSubTab === "orchestrator"
+                    ? "Configuring high-level supervision & arbitration"
+                    : "Configuring edge intersection RL execution & reward shaping"}
+                </span>
+              </div>
+
+              {/* TIER 1: LLM Macro Supervisor View */}
+              {hybridSubTab === "orchestrator" && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Column: Hierarchical Orchestration (7 cols) */}
+                  <div className="lg:col-span-7 flex flex-col gap-6">
+                    {/* Coupling Mode */}
+                    <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                          <GitFork className="w-4 h-4 text-accent" /> Hierarchical Coupling Mode
+                        </span>
+                        <span className="text-[11px] text-muted">Macro vs Micro Division</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {[
+                          {
+                            id: "supervisory",
+                            name: "Supervisory Dynamic Reward Reweighting",
+                            desc: "LLM monitors multi-junction congestion every K seconds and dynamically updates the reward targets of the local RL policy.",
+                          },
+                          {
+                            id: "gating",
+                            name: "Gating & Incident Arbiter",
+                            desc: "RL proposes high-frequency signal phase changes; LLM can veto or force green-wave overrides when regional bottlenecks appear.",
+                          },
+                          {
+                            id: "greenwave",
+                            name: "Corridor Green-Wave Arterial Offset",
+                            desc: "LLM calculates progression speed bands and offsets across the corridor, leaving local queue optimization to RL.",
+                          },
+                        ].map((mode) => (
+                          <label
+                            key={mode.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all flex flex-col ${
+                              hybridCoupling === mode.id
+                                ? "border-accent bg-accent/10"
+                                : "border-border bg-surface hover:border-border-2"
+                            }`}
+                          >
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-text">{mode.name}</span>
+                              <input
+                                type="radio"
+                                name="hybrid-coupling"
+                                className="radio-control"
+                                checked={hybridCoupling === mode.id}
+                                onChange={() => setHybridCoupling(mode.id as any)}
+                              />
+                            </span>
+                            <span className="text-[11px] text-muted mt-1 leading-snug">{mode.desc}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Macro Cadence & Context */}
+                    <div className="flex flex-col gap-4 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-accent" /> Macro Supervisor Decision Cadence
+                      </span>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-text font-medium">LLM Reasoning Interval</span>
+                          <span className="font-mono text-accent">Every {hybridUpdateInterval} seconds</span>
+                        </div>
+                        <RangeInput
+                          ariaLabel="LLM reasoning interval in seconds"
+                          min={10}
+                          max={120}
+                          step={5}
+                          value={hybridUpdateInterval}
+                          onChange={setHybridUpdateInterval}
+                        />
+                        <div className="flex justify-between text-[10px] text-muted">
+                          <span>10s (High reactivity)</span>
+                          <span>30s (Recommended)</span>
+                          <span>120s (Corridor macro shifts)</span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-border/60 pt-3 flex flex-col gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs text-text">
+                          <input
+                            type="checkbox"
+                            checked={hybridIncidentOverride}
+                            onChange={(e) => setHybridIncidentOverride(e.target.checked)}
+                            className="check-control"
+                          />
+                          <span>Trigger instant LLM re-evaluation upon Emergency / Stalled vehicle detection</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer text-xs text-text">
+                          <input
+                            type="checkbox"
+                            checked={hybridCoT}
+                            onChange={(e) => setHybridCoT(e.target.checked)}
+                            className="check-control"
+                          />
+                          <span>Enable Chain-of-Thought corridor diagnostics in telemetry log</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: LLM Engine with API Readiness Check & Launch (5 cols) */}
+                  <div className="lg:col-span-5 flex flex-col gap-6">
+                    {/* LLM Engine Selection */}
+                    <div className="flex flex-col gap-4 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-accent" /> Supervisor LLM Engine
+                        </span>
+                        {/* API Key Status Badge */}
+                        <div
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium border ${
+                            isHybridKeyReady
+                              ? "bg-accent/15 border-accent/40 text-accent"
+                              : "bg-jam-soft border-jam/40 text-jam"
+                          }`}
+                        >
+                          {isHybridKeyReady ? (
+                            <>
+                              <CheckCircle2 className="w-3 h-3 text-accent" />
+                              <span>API Key Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="w-3 h-3 text-jam" />
+                              <span>Missing API Key</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Provider Selector Tabs */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setHybridLlmProvider("gemini")}
+                          className={`p-2.5 rounded-lg border text-left transition-all flex flex-col ${
+                            hybridLlmProvider === "gemini"
+                              ? "border-accent bg-accent/10"
+                              : "border-border bg-surface hover:border-border-2"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="radio-mark"
+                                data-checked={hybridLlmProvider === "gemini"}
+                                aria-hidden="true"
+                              />
+                              <span className="text-xs font-bold text-text">Google Gemini</span>
+                            </div>
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                geminiReady ? "bg-accent" : "bg-jam"
+                              }`}
+                              title={geminiReady ? "GEMINI_API_KEY Configured" : "GEMINI_API_KEY Not Found"}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted mt-0.5 pl-6">Google AI Studio</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setHybridLlmProvider("groq")}
+                          className={`p-2.5 rounded-lg border text-left transition-all flex flex-col ${
+                            hybridLlmProvider === "groq"
+                              ? "border-accent bg-accent/10"
+                              : "border-border bg-surface hover:border-border-2"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="radio-mark"
+                                data-checked={hybridLlmProvider === "groq"}
+                                aria-hidden="true"
+                              />
+                              <span className="text-xs font-bold text-text">Groq Cloud</span>
+                            </div>
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                groqReady ? "bg-accent" : "bg-jam"
+                              }`}
+                              title={groqReady ? "GROQ_API_KEY Configured" : "GROQ_API_KEY Not Found"}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted mt-0.5 pl-6">LPU High-Speed Inference</span>
+                        </button>
+                      </div>
+
+                      {/* Model Selector based on provider */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted">
+                          {hybridLlmProvider === "gemini" ? "Gemini Model:" : "Groq Model:"}
+                        </span>
+                        <SelectControl
+                          ariaLabel="Supervisor model"
+                          value={hybridLlmModel}
+                          options={hybridLlmProvider === "gemini" ? GEMINI_MODELS : GROQ_MODELS}
+                          onChange={setHybridLlmModel}
+                          className="text-xs font-mono"
+                        />
+                      </div>
+
+                      {/* Missing API Key Warning Box */}
+                      {!isHybridKeyReady && (
+                        <div className="p-2.5 rounded-lg border border-jam/40 bg-jam-soft/60 flex items-start gap-2 text-xs text-jam">
+                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <div className="leading-snug">
+                            <span className="font-semibold block">
+                              {hybridLlmProvider === "gemini" ? "GEMINI_API_KEY" : "GROQ_API_KEY"} is not configured
+                            </span>
+                            Add it to your <code className="font-mono text-[11px]">.env</code> file or Settings to enable live inference.
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted">Base Micro-RL Policy Checkpoint:</span>
+                        <SelectControl
+                          ariaLabel="Base micro-RL policy checkpoint"
+                          value={hybridBasePolicy}
+                          options={BASE_POLICIES}
+                          onChange={setHybridBasePolicy}
+                          className="text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Resilient Fallback Safeguard */}
+                    <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-accent" /> High-Availability Fail-Safe
+                        </span>
+                        <span className="text-[10px] text-accent font-mono font-medium">Zero-Drop SLA</span>
+                      </div>
+
+                      <label className="flex items-start gap-2 cursor-pointer text-xs text-text">
+                        <input
+                          type="checkbox"
+                          checked={hybridFallback}
+                          onChange={(e) => setHybridFallback(e.target.checked)}
+                          className="check-control mt-0.5"
+                        />
+                        <span className="leading-snug">
+                          Automatic Fallback: If LLM API exceeds 1500ms latency or errors, smoothly switch
+                          actuation to the pure local RL policy without disrupting green splits.
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Launch Action */}
+                    <button
+                      type="button"
+                      onClick={handleLaunch}
+                      disabled={startTraining.isPending || !!activeJob || !isHybridKeyReady}
+                      className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>
+                        {activeJob
+                          ? "Job in Progress..."
+                          : !isHybridKeyReady
+                          ? "API Key Required to Launch"
+                          : "Launch Hybrid Co-Orchestration"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TIER 2: Micro-RL Policy & Reward Shaping View */}
+              {hybridSubTab === "rl_core" && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-200">
+                  <div className="lg:col-span-7 flex flex-col gap-6">
+                    <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                          <Layers className="w-4 h-4 text-accent" /> Local Edge RL Architecture
+                        </span>
+                        <span className="text-[11px] text-muted font-mono">Microsecond Phase Actuation</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <label
+                          className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
+                            rlAlgo === "mappo"
+                              ? "border-accent bg-accent/10 text-text"
+                              : "border-border bg-surface text-muted hover:border-border-2"
+                          }`}
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-text">MAPPO (Centralized Critic)</span>
+                            <input
+                              type="radio"
+                              name="rl-algo-tier2"
+                              className="radio-control"
+                              checked={rlAlgo === "mappo"}
+                              onChange={() => setRlAlgo("mappo")}
+                            />
+                          </span>
+                          <span className="text-[11px] text-muted mt-1 leading-snug">
+                            Shared critic with neighborhood coordination under LLM corridor guidance.
+                          </span>
+                        </label>
+
+                        <label
+                          className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
+                            rlAlgo === "ippo"
+                              ? "border-accent bg-accent/10 text-text"
+                              : "border-border bg-surface text-muted hover:border-border-2"
+                          }`}
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-text">IPPO (Decentralized Local Actors)</span>
+                            <input
+                              type="radio"
+                              name="rl-algo-tier2"
+                              className="radio-control"
+                              checked={rlAlgo === "ippo"}
+                              onChange={() => setRlAlgo("ippo")}
+                            />
+                          </span>
+                          <span className="text-[11px] text-muted mt-1 leading-snug">
+                            Independent local actors per intersection receiving LLM target objectives.
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                          <Sliders className="w-4 h-4 text-accent" /> Baseline RL Reward Functions
+                        </span>
+                        <span className="text-[11px] text-muted">Dynamically reweighted by LLM</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-text font-medium">Vehicle Delay Penalty</span>
+                          <span className="font-mono text-accent">{rewardDelay.toFixed(2)}</span>
+                        </div>
+                        <RangeInput
+                          ariaLabel="Vehicle delay penalty"
+                          min={-1.5}
+                          max={0}
+                          step={0.05}
+                          value={rewardDelay}
+                          onChange={setRewardDelay}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-text font-medium">Queue Length Penalty</span>
+                          <span className="font-mono text-accent">{rewardQueue.toFixed(2)}</span>
+                        </div>
+                        <RangeInput
+                          ariaLabel="Queue length penalty"
+                          min={-1.0}
+                          max={0}
+                          step={0.05}
+                          value={rewardQueue}
+                          onChange={setRewardQueue}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-text font-medium">Corridor Pressure Balance</span>
+                          <span className="font-mono text-accent">{rewardPressure.toFixed(2)}</span>
+                        </div>
+                        <RangeInput
+                          ariaLabel="Corridor pressure balance"
+                          min={0}
+                          max={1.0}
+                          step={0.05}
+                          value={rewardPressure}
+                          onChange={setRewardPressure}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-text font-medium">Emergency Priority Boost</span>
+                          <span className="font-mono text-accent">+{rewardEmergency.toFixed(1)}x</span>
+                        </div>
+                        <RangeInput
+                          ariaLabel="Emergency priority boost"
+                          min={0}
+                          max={5.0}
+                          step={0.5}
+                          value={rewardEmergency}
+                          onChange={setRewardEmergency}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-5 flex flex-col gap-6">
+                    <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                          <Dna className="w-4 h-4 text-accent" /> Evaluation Simulation Seeds
+                        </span>
+                        <span className="text-[11px] font-mono text-accent font-semibold">
+                          {selectedSeeds.length} Selected
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {AVAILABLE_SEEDS.map((seed) => {
+                          const isChosen = selectedSeeds.includes(seed);
+                          return (
+                            <button
+                              key={seed}
+                              type="button"
+                              onClick={() => toggleSeed(seed)}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-medium transition-all flex items-center gap-1.5 ${
+                                isChosen
+                                  ? "border-accent bg-accent text-accent-ink shadow-sm"
+                                  : "border-border bg-surface text-muted hover:border-border-2 hover:text-text"
+                              }`}
+                            >
+                              <span>Seed {seed}</span>
+                              {isChosen && <Check className="w-3 h-3 stroke-[3]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                      <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-accent" /> Local Edge Green Bounds
+                      </span>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-muted block mb-1">Min Green Time</span>
+                          <div className="flex items-center gap-1.5">
+                            <NumberField
+                              ariaLabel="Minimum green time in seconds"
+                              value={minGreen}
+                              onChange={setMinGreen}
+                              min={1}
+                              max={120}
+                            />
+                            <span className="text-muted">sec</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-muted block mb-1">Max Green Time</span>
+                          <div className="flex items-center gap-1.5">
+                            <NumberField
+                              ariaLabel="Maximum green time in seconds"
+                              value={maxGreen}
+                              onChange={setMaxGreen}
+                              min={1}
+                              max={180}
+                            />
+                            <span className="text-muted">sec</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleLaunch}
+                      disabled={startTraining.isPending || !!activeJob || !isHybridKeyReady}
+                      className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>
+                        {activeJob
+                          ? "Job in Progress..."
+                          : !isHybridKeyReady
+                          ? "API Key Required to Launch"
+                          : "Launch Hybrid Co-Orchestration"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================= OPTION 3: FULL LLM CONFIGURATION ======================= */}
+          {selected === "llm" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Model Settings, Persona & Prompting (7 cols) */}
+              <div className="lg:col-span-7 flex flex-col gap-6">
+                {/* Persona & Behavioral Strategy */}
+                <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-accent" /> Control Persona & Objective
+                    </span>
+                    <span className="text-[11px] text-muted">Behavioral Prioritization</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {[
+                      {
+                        id: "arterial_throughput",
+                        name: "Arterial Corridor Focus",
+                        desc: "Maximizes main avenue vehicle progression; holds side streets for platoons.",
+                      },
+                      {
+                        id: "equi_delay",
+                        name: "Fairness & Equi-Delay",
+                        desc: "Minimizes maximum waiting time variance across all approaches.",
+                      },
+                      {
+                        id: "transit_pedestrian",
+                        name: "Transit & Pedestrian First",
+                        desc: "Prioritizes bus priority corridors and crosswalk clearance windows.",
+                      },
+                      {
+                        id: "emergency_resilience",
+                        name: "Emergency Incident Corridor",
+                        desc: "Aggressive clearance of buffer zones ahead of first responders.",
+                      },
+                    ].map((persona) => (
+                      <label
+                        key={persona.id}
+                        className={`p-3 rounded-lg border cursor-pointer transition-all flex flex-col ${
+                          llmPersona === persona.id
+                            ? "border-accent bg-accent/10"
+                            : "border-border bg-surface hover:border-border-2"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-text">{persona.name}</span>
+                          <input
+                            type="radio"
+                            name="llm-persona"
+                            className="radio-control"
+                            checked={llmPersona === persona.id}
+                            onChange={() => setLlmPersona(persona.id)}
+                          />
+                        </span>
+                        <span className="text-[11px] text-muted mt-1 leading-snug">{persona.desc}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* System Prompt Customizer */}
+                <div className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Terminal className="w-4 h-4 text-accent" /> System Instructions Conditioning
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLlmSystemPrompt(
+                          "You are KEMETRA's urban traffic signal coordinator. Analyze lane queues, approach speeds, and incident telemetry. Optimize for corridor throughput while strictly adhering to safety clearances."
+                        )
+                      }
+                      className="text-[10px] text-muted hover:text-accent flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" /> Reset Default
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={4}
+                    value={llmSystemPrompt}
+                    onChange={(e) => setLlmSystemPrompt(e.target.value)}
+                    className="input-control h-auto w-full py-2.5 text-xs font-mono leading-relaxed"
+                  />
+                  <span className="text-[10px] text-muted">
+                    Variables injected at runtime: <code className="text-text-2">&#123;&#123;network&#125;&#125;</code>,{" "}
+                    <code className="text-text-2">&#123;&#123;active_queues&#125;&#125;</code>,{" "}
+                    <code className="text-text-2">&#123;&#123;emergency_lanes&#125;&#125;</code>.
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Column: Reasoning Parameters, Provider Selection & Safety (5 cols) */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                {/* Model Engine & Temperature */}
+                <div className="flex flex-col gap-4 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Cpu className="w-4 h-4 text-accent" /> Reasoning Engine & Studio
+                    </span>
+                    {/* API Key Status Badge */}
+                    <div
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium border ${
+                        isFullLlmKeyReady
+                          ? "bg-accent/15 border-accent/40 text-accent"
+                          : "bg-jam-soft border-jam/40 text-jam"
+                      }`}
+                    >
+                      {isFullLlmKeyReady ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-accent" />
+                          <span>API Ready</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-3 h-3 text-jam" />
+                          <span>Missing Key</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Provider Selection Tabs */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLlmProviderChoice("gemini")}
+                      className={`p-2.5 rounded-lg border text-left transition-all flex flex-col ${
+                        llmProviderChoice === "gemini"
+                          ? "border-accent bg-accent/10"
+                          : "border-border bg-surface hover:border-border-2"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="radio-mark"
+                            data-checked={llmProviderChoice === "gemini"}
+                            aria-hidden="true"
+                          />
+                          <span className="text-xs font-bold text-text">Google Gemini</span>
+                        </div>
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            geminiReady ? "bg-accent" : "bg-jam"
+                          }`}
+                          title={geminiReady ? "GEMINI_API_KEY Configured" : "GEMINI_API_KEY Missing"}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted mt-0.5 pl-6">AI Studio Direct API</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setLlmProviderChoice("groq")}
+                      className={`p-2.5 rounded-lg border text-left transition-all flex flex-col ${
+                        llmProviderChoice === "groq"
+                          ? "border-accent bg-accent/10"
+                          : "border-border bg-surface hover:border-border-2"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="radio-mark"
+                            data-checked={llmProviderChoice === "groq"}
+                            aria-hidden="true"
+                          />
+                          <span className="text-xs font-bold text-text">Groq Cloud</span>
+                        </div>
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            groqReady ? "bg-accent" : "bg-jam"
+                          }`}
+                          title={groqReady ? "GROQ_API_KEY Configured" : "GROQ_API_KEY Missing"}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted mt-0.5 pl-6">High-Speed LPU Engine</span>
+                    </button>
+                  </div>
+
+                  {/* Model Picker */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">
+                      {llmProviderChoice === "gemini" ? "Gemini Model:" : "Groq Model:"}
+                    </span>
+                    <SelectControl
+                      ariaLabel="Reasoning model"
+                      value={llmModel}
+                      options={llmProviderChoice === "gemini" ? GEMINI_MODELS : GROQ_MODELS}
+                      onChange={setLlmModel}
+                      className="text-xs font-mono"
+                    />
+                  </div>
+
+                  {/* Missing API Key Warning Box */}
+                  {!isFullLlmKeyReady && (
+                    <div className="p-2.5 rounded-lg border border-jam/40 bg-jam-soft/60 flex items-start gap-2 text-xs text-jam">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div className="leading-snug">
+                        <span className="font-semibold block">
+                          {llmProviderChoice === "gemini" ? "GEMINI_API_KEY" : "GROQ_API_KEY"} is not configured
+                        </span>
+                        Add the key to your backend environment or Settings to execute live inferences.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-text font-medium">Temperature (Stochasticity)</span>
+                      <span className="font-mono text-accent">{llmTemperature.toFixed(2)}</span>
+                    </div>
+                    <RangeInput
+                      ariaLabel="LLM temperature"
+                      min={0.0}
+                      max={0.7}
+                      step={0.05}
+                      value={llmTemperature}
+                      onChange={setLlmTemperature}
+                    />
+                    <div className="flex justify-between text-[10px] text-muted">
+                      <span>0.0 (Deterministic)</span>
+                      <span>0.1 (Recommended)</span>
+                      <span>0.7 (Exploration)</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-text font-medium">Decision Actuation Frequency</span>
+                      <span className="font-mono text-accent">Every {llmDecisionCycle}s</span>
+                    </div>
+                    <RangeInput
+                      ariaLabel="LLM decision actuation frequency in seconds"
+                      min={5}
+                      max={30}
+                      step={5}
+                      value={llmDecisionCycle}
+                      onChange={setLlmDecisionCycle}
+                    />
+                  </div>
+                </div>
+
+                {/* Guardrails & TraCI Safety Checks */}
+                <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-surface-2/40">
+                  <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-accent" /> Strict Safety Enforcer
+                  </span>
+
+                  <label className="flex items-start gap-2 cursor-pointer text-xs text-text">
+                    <input
+                      type="checkbox"
+                      checked={llmSafetyGuardrails}
+                      onChange={(e) => setLlmSafetyGuardrails(e.target.checked)}
+                      className="check-control mt-0.5"
+                    />
+                    <span className="leading-snug">
+                      Hard Deterministic Bounds: Enforce minimum green (7s), yellow clearance (3s), and
+                      immediate interlock against conflicting phase transitions.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer text-xs text-text">
+                    <input
+                      type="checkbox"
+                      checked={llmExplainability}
+                      onChange={(e) => setLlmExplainability(e.target.checked)}
+                      className="check-control mt-0.5"
+                    />
+                    <span className="leading-snug">
+                      Stream Natural Language Reasoning Rationale to Operator Console & Benchmark Log.
+                    </span>
+                  </label>
+                </div>
+
+                {/* Launch Action */}
+                <button
+                  type="button"
+                  onClick={handleLaunch}
+                  disabled={startTraining.isPending || !!activeJob || !isFullLlmKeyReady}
+                  className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>
+                    {activeJob
+                      ? "Job in Progress..."
+                      : !isFullLlmKeyReady
+                      ? "API Key Required to Launch"
+                      : "Launch Full LLM Controller Run"}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  );
-}
-
-function ChipButton({
-  on,
-  label,
-  onClick,
-}: {
-  on: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={
-        on
-          ? "border border-accent/40 bg-accent-soft px-2.5 py-1.5 text-xs font-medium text-accent"
-          : "border border-border bg-surface px-2.5 py-1.5 text-xs text-text-2 hover:bg-surface-3"
-      }
-    >
-      {label}
-    </button>
-  );
-}
-
-function FieldGroup({
-  label,
-  className = "flex flex-wrap gap-1",
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-[11px] text-muted">
-      <span>{label}</span>
-      <span className={className}>{children}</span>
-    </label>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-[11px] text-muted">
-      <span>{label}</span>
-      <input
-        type="number"
-        step="any"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="border border-border bg-surface px-2 py-1.5 text-sm text-text"
-      />
-    </label>
-  );
-}
-
-function JobRow({
-  job,
-  cancelling,
-  deleting,
-  onCancel,
-  onDelete,
-}: {
-  job: Job;
-  cancelling: boolean;
-  deleting: boolean;
-  onCancel: () => void;
-  onDelete: () => void;
-}) {
-  const { t } = useTranslation();
-  const f = useFormat();
-  const recipe = requestText(job.request, "label") ?? requestText(job.request, "recipe_id");
-  const network = requestText(job.request, "network");
-  const percent =
-    job.totalSteps > 0
-      ? Math.min(100, (job.step / job.totalSteps) * 100)
-      : job.status === "done"
-        ? 100
-        : 0;
-  const canCancel = job.status === "queued" || job.status === "running";
-  const canDelete = !canCancel;
-  const checkpoint = job.checkpointPath?.split(/[\\/]/).pop() ?? null;
-  const lastLog = job.log.at(-1) ?? null;
-  const methods = Array.isArray((job.request as Record<string, unknown>).methods)
-    ? ((job.request as { methods: string[] }).methods ?? []).join(" vs ")
-    : null;
-
-  return (
-    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-text">
-            {recipe ?? methods ?? t("training.title")}
-            {network ? <span className="text-muted"> · {f.networkName(network)}</span> : null}
-          </p>
-          <p className="text-[11px] text-muted">{f.date(job.createdAt)}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge tone={STATUS_TONE[job.status]}>{t(`training.${job.status}`)}</Badge>
-          {canCancel ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={cancelling}
-              onClick={onCancel}
-            >
-              <Square aria-hidden="true" />
-              {cancelling ? t("training.cancelling") : t("training.cancel")}
-            </Button>
-          ) : null}
-          {canDelete ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={t("training.delete")}
-              disabled={deleting}
-              onClick={onDelete}
-            >
-              <Trash2 aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="h-2 w-full bg-surface-3" aria-hidden="true">
-        <div
-          className={
-            job.status === "failed"
-              ? "h-full bg-jam transition-[width]"
-              : job.status === "done"
-                ? "h-full bg-flow transition-[width]"
-                : "h-full bg-accent transition-[width]"
-          }
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-2">
-        {job.kind === "train" ? (
-          <span>
-            {t("training.progress", {
-              step: f.number(job.step),
-              total: f.number(job.totalSteps),
-            })}
-          </span>
-        ) : (
-          <span>
-            {t("training.stepOf", { step: job.step, total: f.number(job.totalSteps) })}
-          </span>
-        )}
-        {job.status === "running" ? (
-          <>
-            <span>{t("training.rate", { rate: f.number(job.stepsPerS, 1) })}</span>
-            <span className="inline-flex items-center gap-1">
-              <Timer aria-hidden="true" className="size-3" />
-              {t("training.eta", { eta: f.number(job.etaS, 0) })}
-            </span>
-          </>
-        ) : null}
-        {job.reward !== null ? (
-          <span>{t("training.reward", { reward: f.number(job.reward, 2) })}</span>
-        ) : null}
-        {job.meanHalting !== null ? (
-          <span>{t("training.halting", { halting: f.number(job.meanHalting, 2) })}</span>
-        ) : null}
-        {checkpoint ? (
-          <span className="truncate" title={job.checkpointPath ?? undefined}>
-            {t("training.checkpoint", { name: checkpoint })}
-          </span>
-        ) : null}
-      </div>
-
-      {job.error ? <p className="text-xs text-jam">{job.error}</p> : null}
-      {!job.error && job.status === "running" && lastLog ? (
-        <p className="truncate text-[11px] text-muted" title={lastLog}>
-          {lastLog}
-        </p>
-      ) : null}
-    </li>
   );
 }

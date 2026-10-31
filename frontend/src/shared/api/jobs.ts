@@ -6,7 +6,16 @@ import { useSettings } from "@/features/settings/store";
 
 import { api } from "./backend";
 
-export const JobStatus = z.enum(["queued", "running", "done", "failed", "cancelled"]);
+export const JobStatus = z.enum([
+  "queued",
+  "running",
+  "done",
+  "failed",
+  "cancelled",
+  /* A campaign whose process stopped mid-flight: its completed episodes are kept and it
+   * can be resumed, so it is neither a failure nor a finished run. */
+  "interrupted",
+]);
 
 export const JobMetric = z.object({
   step: z.number(),
@@ -14,16 +23,22 @@ export const JobMetric = z.object({
   halting: z.number().nullable(),
   t: z.number(),
   seed: z.number(),
+  policyLoss: z.number().nullable().optional(),
+  valueLoss: z.number().nullable().optional(),
+  entropy: z.number().nullable().optional(),
+  approxKl: z.number().nullable().optional(),
+  explainedVariance: z.number().nullable().optional(),
 });
 
 export const Job = z.object({
   id: z.string(),
-  kind: z.enum(["train", "compare"]),
+  kind: z.enum(["train", "compare", "benchmark", "benchmark-suite"]),
   request: z.record(z.string(), z.unknown()),
   status: JobStatus,
   createdAt: z.string(),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),
+  updatedAt: z.string().nullable().optional(),
   step: z.number(),
   totalSteps: z.number(),
   stepsPerS: z.number(),
@@ -40,7 +55,20 @@ export const Job = z.object({
 export type Job = z.infer<typeof Job>;
 
 const ACTIVE: ReadonlySet<Job["status"]> = new Set(["queued", "running"]);
-const TERMINAL: ReadonlySet<Job["status"]> = new Set(["done", "failed", "cancelled"]);
+const TERMINAL: ReadonlySet<Job["status"]> = new Set([
+  "done",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
+
+/** A campaign with retained episodes that can be finished instead of restarted. */
+export function isResumableJob(job: Job | null | undefined): boolean {
+  if (!job || job.kind !== "benchmark-suite") return false;
+  if (!["interrupted", "cancelled", "failed"].includes(job.status)) return false;
+  const rows = (job.result as { rows?: { status?: string }[] } | null)?.rows ?? [];
+  return rows.some((row) => row.status === "done");
+}
 
 export function isActiveJob(job: Job | null | undefined): boolean {
   return Boolean(job && ACTIVE.has(job.status));
@@ -64,6 +92,7 @@ export type TrainRequest = {
   network: string;
   seeds: number[];
   timesteps: number;
+  overrides?: Record<string, unknown>;
 };
 
 export function useStartTraining() {
@@ -91,6 +120,46 @@ export type CompareRequest = {
   overrides?: Record<string, Record<string, unknown>>;
 };
 
+export type ModelBenchmarkRequest = {
+  network: string;
+  scenario: string;
+  demand: string;
+  seeds: number[];
+  model_versions: string[];
+  quick: boolean;
+  primary_metric?: "mean_waiting_time";
+};
+
+export type BenchmarkSuiteRequest = {
+  network: string;
+  scenarios: string[];
+  demands: string[];
+  seeds: number[];
+  model_versions: string[];
+  quick: boolean;
+};
+
+
+export function useStartBenchmarkSuite() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (request: BenchmarkSuiteRequest) =>
+      api("benchmarks/suite", Job, { method: "POST", body: JSON.stringify(request) }),
+    onSuccess: (job) => client.setQueryData<Job[]>(["jobs"], (current) => [job, ...(current ?? []).filter((item) => item.id !== job.id)]),
+  });
+}
+
+export function useStartModelBenchmark() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (request: ModelBenchmarkRequest) =>
+      api("benchmarks", Job, { method: "POST", body: JSON.stringify(request) }),
+    onSuccess: (job) => {
+      client.setQueryData<Job[]>(["jobs"], (current) => [job, ...(current ?? []).filter((item) => item.id !== job.id)]);
+    },
+  });
+}
+
 export function useStartCompare() {
   const client = useQueryClient();
   return useMutation({
@@ -115,6 +184,19 @@ export function useDeleteJob() {
     onSuccess: (_data, jobId) => {
       client.setQueryData<Job[]>(["jobs"], (current) =>
         current ? current.filter((item) => item.id !== jobId) : current,
+      );
+    },
+  });
+}
+
+export function useResumeJob() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) =>
+      api(`jobs/${jobId}/resume`, Job, { method: "POST" }),
+    onSuccess: (job) => {
+      client.setQueryData<Job[]>(["jobs"], (current) =>
+        current ? current.map((item) => (item.id === job.id ? job : item)) : [job],
       );
     },
   });

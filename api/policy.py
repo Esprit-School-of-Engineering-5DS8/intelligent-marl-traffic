@@ -31,7 +31,8 @@ _TRAINABLE_RECIPES = tuple(
 )
 LEARNED = tuple(dict.fromkeys((*CORE_LEARNED, *_TRAINABLE_RECIPES)))
 METHODS = BASELINES + LEARNED + LLM
-NETWORKS = tuple(config.available("networks"))
+# The only active deployment scenarios are San Francisco Mission 2x2 and 3x3
+NETWORKS = ("sf_mission_2x2", "sf_mission_3x3", "monaco", "tunis")
 LABELS = {
     "ft": "Fixed-time",
     "act": "Actuated",
@@ -39,16 +40,6 @@ LABELS = {
     "ev_rule": "EV rule",
     "ev_rule_mp": "EV rule + MP",
     "ped_rule_mp": "Pedestrian rule",
-    "ind": "Independent PPO",
-    "coop": "Cooperative PPO",
-    "coop_eco": "COOP eco (λ=1.0)",
-    "coop_eco05": "COOP eco (λ=0.5)",
-    "coop_full": "COOP full",
-    "dqn": "DQN",
-    "coop_ev": "COOP + EV",
-    "coop_ped": "COOP + Pedestrian",
-    "coop_ev_ped": "COOP + EV + Pedestrian",
-    "ind_ev_ped": "IND + EV + Pedestrian",
     "llm": "LLM controller",
 }
 LABELS.update(

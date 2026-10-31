@@ -109,7 +109,11 @@ def make_vec_env(network: str, agent_cfg: dict[str, Any], quick: bool = False):
     training = agent_cfg["training"]
     episode_s = protocol["quick"]["episode_s"] if quick else protocol["training"]["episode_s"]
     episodes = TrainingEpisodes(
-        network, training["demand_levels"], training["scenarios"], episode_s=float(episode_s)
+        network,
+        training["demand_levels"],
+        training["scenarios"],
+        episode_s=float(episode_s),
+        scale=float(training.get("demand_scale", 1.0)),
     )
     env = CoTrafficEnv(network, episodes, agent_cfg, protocol=protocol)
     if env.obs_cfg.forecast:

@@ -279,7 +279,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_calibrate)
 
     p = sub.add_parser("train", help="train one learned recipe (PPO, parameter sharing)")
-    p.add_argument("--agent", default="coop", help="recipe/preset name (configs/recipes or agents)")
+    p.add_argument("--agent", default="rl", help="recipe/preset name (configs/recipes or agents)")
     p.add_argument("--recipe", default=None, help="recipe name or path (overrides --agent)")
     p.add_argument("--net", default="grid3x3")
     p.add_argument("--seed", type=int, default=1)
@@ -332,7 +332,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_forecast)
 
     p = sub.add_parser("explain", help="decision log and feature-group importance of a policy")
-    p.add_argument("--agent", default="coop_full")
+    p.add_argument("--agent", default="rl")
     p.add_argument("--net", default="grid3x3")
     p.add_argument(
         "--checkpoint", default=None, help="default: results/checkpoints/<agent>/<net>/seed1.zip"

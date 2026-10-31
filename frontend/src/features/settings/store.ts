@@ -20,14 +20,7 @@ export type ControlMode = "baseline" | "learned" | "llm";
 /** Baseline `method` names accepted by the controller registry. */
 export const BASELINE_METHODS = ["mp", "ft", "act", "ev_rule_mp", "ped_rule_mp"] as const;
 /** Learned `method` names that need a trained checkpoint. */
-export const LEARNED_METHODS = [
-  "coop",
-  "ind",
-  "coop_full",
-  "coop_eco",
-  "coop_eco05",
-  "dqn",
-] as const;
+export const LEARNED_METHODS = ["rl", "llm"] as const;
 
 /** The `method` string a settings combination means on the backend. */
 export function controlMethod(settings: Settings): string {
@@ -63,7 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   llmProvider: "ollama",
   controlMode: "baseline",
   baselineMethod: "mp",
-  learnedMethod: "coop",
+  learnedMethod: "rl",
 };
 
 export const useSettings = create<SettingsStore>()(

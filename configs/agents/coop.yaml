@@ -1,5 +1,0 @@
-name: coop
-extends: base
-description: Cooperative agents - local observation plus messages from upstream neighbours.
-observation:
-  neighbours: true

@@ -41,9 +41,9 @@ SCENARIO_METRIC = {
 SCENARIO_DEMAND = {"pedestrians": "medium", "buses": "medium"}
 HELP = (
     "Je réponds à partir des résultats du projet. Exemples : « Quel contrôleur est le "
-    "meilleur à la pointe sur la grille ? », « Compare COOP et MP sur le quartier », « Quel "
-    "est le retard des ambulances avec EV-RULE-MP ? », « Pourquoi COOP-FULL garde le vert au "
-    "carrefour C1 à 600 s ? », « Sur quoi COOP-FULL fonde ses décisions ? », « Explique "
+    "meilleur à la pointe sur la grille ? », « Compare RL et MP sur le quartier », « Quel "
+    "est le retard des ambulances avec EV-RULE-MP ? », « Pourquoi le LLM garde le vert au "
+    "carrefour C1 à 600 s ? », « Sur quoi RL fonde ses décisions ? », « Explique "
     "F-014 »."
 )
 
@@ -151,14 +151,14 @@ _EXAMPLES = [
         },
     ),
     (
-        "COOP fait-il mieux que Max-Pressure sur le quartier ?",
+        "RL fait-il mieux que Max-Pressure sur le quartier ?",
         {
             "intent": "compare",
             "network": "tunis",
             "scenario": UNSPECIFIED,
             "demand": UNSPECIFIED,
             "metric": UNSPECIFIED,
-            "methods": ["coop", "mp"],
+            "methods": ["rl", "mp"],
         },
     ),
 ]
@@ -169,8 +169,9 @@ ROUTER_PROMPT = (
     "controllers), decision (why an agent chose a phase at a junction and time), importance "
     "(which inputs an agent relies on), failure (an entry F-0xx of the failure log), help "
     "(anything else). Controllers: ft fixed-time, act actuated, mp Max-Pressure, ev_rule and "
-    "ev_rule_mp emergency preemption, ped_rule_mp pedestrian rule, ind, coop, coop_eco, "
-    "coop_full, coop_forecast learned agents. Networks: grid3x3 (the grid, 16 junctions), "
+    "ev_rule_mp emergency preemption, ped_rule_mp pedestrian rule, plus the learned models: "
+    "rl is an RL profile trained in the editor and llm is the language-model controller. "
+    "Networks: grid3x3 (the grid, 16 junctions), "
     'monaco (64 junctions), tunis (the Tunis district). Use "unspecified" when '
     "the question does not say. Examples:\n"
     + "\n".join(f"{q!r} -> {json.dumps(a)}" for q, a in _EXAMPLES)
@@ -251,10 +252,10 @@ def lookup(q: Query) -> knowledge.Finding:
         return knowledge.failure(q.failure_code)
     if q.intent == "importance":
         return knowledge.importance(
-            q.methods[0] if q.methods else "coop_full", q.network or "grid3x3"
+            q.methods[0] if q.methods else "llm", q.network or "grid3x3"
         )
     if q.intent == "decision":
-        agent = next((m for m in q.methods if m in ("ind", "coop", "coop_full")), "coop_full")
+        agent = next((m for m in q.methods if m in ("rl", "llm")), "llm")
         return knowledge.decision(agent, q.network or "grid3x3", q.time_s, q.junction)
     if q.intent == "help":
         return knowledge.Finding(HELP)
@@ -361,8 +362,8 @@ agents d'apprentissage). Réponds en français, en 2 à 4 phrases claires, uniqu
 des FAITS fournis. Recopie les nombres exactement comme dans les faits, avec leur signe ; \
 n'invente aucun nombre, aucune méthode, aucun résultat. Si les faits ne répondent pas à la \
 question, dis-le simplement. FT (feux fixes), ACT (feux actionnés), MP (Max-Pressure), \
-EV-RULE, EV-RULE-MP et PED-RULE-MP sont des contrôleurs classiques ; IND, COOP, COOP-ECO, \
-COOP-FULL et COOP + forecast sont des agents d'apprentissage."""
+EV-RULE, EV-RULE-MP et PED-RULE-MP sont des contrôleurs classiques ; RL (noms comme rl_<hash> \
+ou « rl ») et LLM sont des contrôleurs appris ou piloté par modèle de langage."""
 
 
 def phrase(question: str, finding: knowledge.Finding, llm: LocalLLM) -> str:

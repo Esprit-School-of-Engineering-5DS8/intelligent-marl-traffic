@@ -26,9 +26,9 @@ export const useFilters = create<FiltersStore>()(
   persist(
     (set) => ({
       cell: DEFAULT_CELL,
-      controller: "coop_full",
-      reference: "ft",
-      controllers: ["ft", "act", "mp", "coop", "coop_full"],
+      controller: "rl",
+      reference: "mp",
+      controllers: ["mp", "llm", "rl"],
       metric: "mean_waiting_time",
       setCell: (cell) => set({ cell }),
       setController: (controller) => set({ controller }),

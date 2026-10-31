@@ -1,0 +1,61 @@
+name: generalist_shortpilot
+observation:
+  neighbours: true
+  emergency: true
+  pedestrians: true
+  buses: true
+  forecast: false
+reward:
+  person_weighted: true
+  co2: 1.0
+  ev: 2.0
+  ped: 1.0
+  clip: 5.0
+  base: wait
+ppo:
+  learning_rate: 0.0003
+  n_steps: 256
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  net_arch:
+  - 64
+  - 64
+training:
+  total_timesteps: 4096
+  checkpoint_every: 1024
+  progress_every_s: 15
+  demand_levels:
+  - low
+  - medium
+  - peak
+  - rush_profile
+  scenarios:
+  - normal
+  - emergency
+  - pedestrians
+  - buses
+  - incident
+  quick_timesteps: 1024
+validation:
+  seeds:
+  - 1000
+  demands:
+  - medium
+  - peak
+  last_checkpoints: 4
+description: 'End-to-end RL controller: one parameter-shared PPO policy trained across
+  all demand levels (low/medium/peak/rush) and all event scenarios (normal, emergency,
+  pedestrians, buses, incident), with neighbours, EV, pedestrian and bus observations
+  and CO2/emergency/pedestrian penalties all active in the reward. One weights file
+  per seed; evaluated everywhere, specialized nowhere.'
+algorithm: ppo
+runtime:
+  overlays: []
+llm: null
+label: Generalist short pilot

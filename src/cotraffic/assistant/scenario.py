@@ -1,7 +1,7 @@
 """Turn a request in plain words into a run of the side-by-side demo.
 
-"Montre MP contre COOP-FULL à Tunis avec un accident et des piétons" becomes the
-command ``python scripts/demo_side_by_side.py --left mp --right coop_full --net
+"Montre MP contre LLM à Tunis avec un accident et des piétons" becomes the
+command ``python scripts/demo_side_by_side.py --left mp --right llm --net
 tunis --scenarios emergency buses pedestrians incident --follow-incident``.
 
 Keyword matching reads the request; when it recognises nothing, the language model fills a
@@ -17,6 +17,7 @@ import sys
 from dataclasses import dataclass, field
 
 from cotraffic.assistant.llm import LLMUnavailableError, LocalLLM
+from cotraffic.controllers.registry import LEARNED
 from cotraffic.assistant.vocabulary import (
     DEMANDS,
     METHODS,
@@ -29,7 +30,6 @@ from cotraffic.assistant.vocabulary import (
 from cotraffic.paths import REPO_ROOT, default_checkpoint
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
-LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "coop_forecast")
 DEMO_NETWORKS = ("grid3x3", "monaco", "tunis", "tunis")
 DEMO_SCENARIOS = ("emergency", "buses", "pedestrians", "incident", "sensor_noise")
 DEMO_DEMANDS = ("low", "medium", "peak", "rush_profile")
@@ -38,7 +38,7 @@ DEMO_DEMANDS = ("low", "medium", "peak", "rush_profile")
 @dataclass
 class DemoSpec:
     left: str = "mp"
-    right: str = "coop_full"
+    right: str = "llm"
     network: str = "tunis"
     demand: str = "peak"
     scenarios: list[str] = field(default_factory=lambda: ["emergency", "buses"])
@@ -131,13 +131,13 @@ def _schema() -> dict:
 PROMPT = """You configure a traffic-simulation demo that shows two signal controllers side \
 by side on the same traffic. Return JSON only. Controllers: ft fixed-time, act actuated, mp \
 Max-Pressure, ev_rule_mp Max-Pressure with emergency preemption, ped_rule_mp Max-Pressure \
-with a pedestrian rule, ind / coop / coop_full learned agents (coop_full handles emergency \
-vehicles, pedestrians and buses). "left" is the classical controller, "right" the learned \
+with a pedestrian rule, rl (an RL profile trained in the editor) and llm (the \
+language-model controller). "left" is the classical controller, "right" the learned \
 agent, unless the request says otherwise. Networks: tunis (Tunis district), \
 tunis (Tunis with sidewalks, needed for pedestrians), grid3x3, monaco. \
 Scenarios: emergency (ambulances), buses, pedestrians, incident (accident), sensor_noise. \
 follow_ev: camera follows ambulances. follow_incident: camera on the accident. quick: short \
-episode. Defaults: left mp, right coop_full, network tunis, demand peak, scenarios \
+episode. Defaults: left mp, right llm, network tunis, demand peak, scenarios \
 emergency and buses, seed 3."""
 
 
@@ -172,9 +172,9 @@ def check(spec: DemoSpec) -> list[str]:
     for side in ("left", "right"):
         method = getattr(spec, side)
         if method in LEARNED and not default_checkpoint(method, spec.network).is_file():
-            setattr(spec, side, "coop_full")
+            setattr(spec, side, "llm")
             notes.append(
-                f"{method} n'est pas entraîné pour {spec.network} : remplacé par coop_full."
+                f"{method} n'est pas entraîné pour {spec.network} : remplacé par llm."
             )
     if spec.left == spec.right:
         spec.left = "mp" if spec.right != "mp" else "ft"

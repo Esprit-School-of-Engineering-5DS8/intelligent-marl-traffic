@@ -10,17 +10,28 @@ from typing import Any
 import numpy as np
 
 from cotraffic import config
+from cotraffic.recipes import normalize_recipe
 from cotraffic.controllers.base import Controller
 
 
 def checkpoint_agent_config(method: str, checkpoint: Path) -> dict[str, Any]:
     """Agent config stored next to a selected checkpoint, else the current config file."""
-    sidecar = Path(checkpoint).with_suffix(".json")
-    if sidecar.is_file():
-        data = json.loads(sidecar.read_text(encoding="utf-8"))
-        if "config" in data:
-            return data["config"]
-    return config.load_agent(method)
+    checkpoint = Path(checkpoint)
+    sidecars = (checkpoint.with_suffix(".json"), Path(str(checkpoint) + ".json"))
+    for sidecar in sidecars:
+        if sidecar.is_file():
+            data = json.loads(sidecar.read_text(encoding="utf-8"))
+            if "config" in data:
+                return data["config"]
+    try:
+        return config.load_agent(method)
+    except FileNotFoundError:
+        # Models registered from standalone recipes retain their full config in the
+        # checkpoint sidecar; a registered policy should not depend on a legacy agent
+        # YAML being present just to resolve its name.
+        from cotraffic.recipes import load_recipe
+
+        return load_recipe(method)
 
 
 class LearnedPolicy(Controller):
@@ -34,7 +45,10 @@ class LearnedPolicy(Controller):
         self.checkpoint = Path(checkpoint)
         if not self.checkpoint.is_file():
             raise FileNotFoundError(f"checkpoint not found: {self.checkpoint}")
-        self.agent_cfg = checkpoint_agent_config(method, self.checkpoint)
+        self.agent_cfg = normalize_recipe(checkpoint_agent_config(method, self.checkpoint))
+        # Saved recipes are self-contained; the normalizer must not replace them with a
+        # lookup of configs/agents/<method>.yaml based on the old method identifier.
+        self.agent_cfg["name"] = method
         algorithm = algorithm_class(self.agent_cfg.get("algorithm", "ppo"))
         self.model = algorithm.load(self.checkpoint, device="cpu")
 

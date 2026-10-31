@@ -50,12 +50,14 @@ class TrainingEpisodes:
         scenarios: Sequence[str] = (),
         episode_s: float = 3600.0,
         pool_size: int = 50,
+        scale: float = 1.0,
     ):
         self.network = network
         self.levels = list(demand_levels)
         excluded = unsupported(network)
         self.scenarios, _ = split_scenarios([s for s in scenarios if s not in excluded])
         self.episode_s = float(episode_s)
+        self.scale = float(scale)
         self.pool = [TRAINING_SEED_BASE + i for i in range(pool_size)]
         self.net_file = ensure_network(network)
 
@@ -63,7 +65,9 @@ class TrainingEpisodes:
         level = self.levels[int(rng.integers(len(self.levels)))]
         seed = self.pool[int(rng.integers(len(self.pool)))]
         bundle = generate(
-            DemandRequest(self.network, level, self.scenarios, seed, 0.0, self.episode_s)
+            DemandRequest(
+                self.network, level, self.scenarios, seed, 0.0, self.episode_s, self.scale
+            )
         )
         return Episode(
             self.net_file,
@@ -72,7 +76,12 @@ class TrainingEpisodes:
             sumo_seed=seed,
             measure_from=0.0,
             measure_to=self.episode_s,
-            info={"demand": level, "seed": seed, "scenarios": list(self.scenarios)},
+            info={
+                "demand": level,
+                "scale": self.scale,
+                "seed": seed,
+                "scenarios": list(self.scenarios),
+            },
         )
 
 

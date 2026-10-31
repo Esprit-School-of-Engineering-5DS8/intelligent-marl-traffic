@@ -146,6 +146,31 @@ const RecipeResponse = z.object({
 
 export type RecipeResponse = z.infer<typeof RecipeResponse>;
 
+/** The recipes the training form can start from: files in configs/recipes plus legacy presets. */
+const RecipeSummary = z.object({
+  id: z.string(),
+  label: z.string(),
+  source: z.string().optional(),
+  description: z.string().optional(),
+  algorithm: z.string().optional(),
+  trainable: z.boolean().optional(),
+  error: z.string().nullish(),
+  hash: z.string().optional(),
+});
+
+export type RecipeSummary = z.infer<typeof RecipeSummary>;
+
+export function useRecipes() {
+  const live = useSettings((s) => s.dataSource) === "live";
+  return useQuery({
+    queryKey: ["recipes"],
+    queryFn: () => api("recipes", z.array(RecipeSummary)),
+    enabled: live,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 export function useRecipe(recipeId: string) {
   const live = useSettings((s) => s.dataSource) === "live";
   return useQuery({

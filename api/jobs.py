@@ -51,6 +51,9 @@ class JobRecord:
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
     started_at: str | None = None
     ended_at: str | None = None
+    # Heartbeat: written on every persist, so an abandoned campaign is distinguishable
+    # from one that is still working.
+    updated_at: str | None = None
     step: int = 0
     total_steps: int = 0
     steps_per_s: float = 0.0
@@ -69,6 +72,7 @@ def public_job(job: JobRecord) -> dict[str, Any]:
     data["createdAt"] = data.pop("created_at")
     data["startedAt"] = data.pop("started_at")
     data["endedAt"] = data.pop("ended_at")
+    data["updatedAt"] = data.pop("updated_at")
     data["totalSteps"] = data.pop("total_steps")
     data["stepsPerS"] = data.pop("steps_per_s")
     data["etaS"] = data.pop("eta_s")
@@ -104,6 +108,7 @@ class JobRunner:
                         created_at=data.get("createdAt", ""),
                         started_at=data.get("startedAt"),
                         ended_at=data.get("endedAt"),
+                        updated_at=data.get("updatedAt"),
                         step=data.get("step", 0),
                         total_steps=data.get("totalSteps", 0),
                         steps_per_s=data.get("stepsPerS", 0.0),
@@ -112,23 +117,44 @@ class JobRunner:
                         mean_halting=data.get("meanHalting"),
                         checkpoint_path=data.get("checkpointPath"),
                         result=data.get("result"),
-                        metrics_ring=data.get("metricsRing", []),
+                        metrics_ring=[
+                            {key: value for key, value in point.items() if key in {"step", "reward", "halting", "t", "seed", "policyLoss", "valueLoss", "entropy", "approxKl", "explainedVariance"}}
+                            for point in data.get("metricsRing", [])
+                        ],
                         log=data.get("log", []),
                         error=data.get("error"),
                     )
+                    if job.status in ("queued", "running"):
+                        # A campaign that finished episodes before the process stopped is not a
+                        # failure: the retained rows are valid evidence and the rest is a resume
+                        # away. Everything else has to restart from zero.
+                        rows = (job.result or {}).get("rows") if isinstance(job.result, dict) else None
+                        completed = sum(1 for row in rows or [] if row.get("status") == "done")
+                        job.ended_at = datetime.now(UTC).isoformat(timespec="seconds")
+                        if job.kind == "benchmark-suite" and completed:
+                            job.status = "interrupted"
+                            job.step = completed
+                            job.error = (
+                                f"Interrupted after {completed} of {job.total_steps} episodes; "
+                                f"completed episodes are retained. Resume to run the remaining {job.total_steps - completed}."
+                            )
+                        else:
+                            job.status = "failed"
+                            job.error = "API restarted before the job completed; progress was retained but there is nothing to resume."
+                        self._persist(job)
                     self.jobs[job.id] = job
                 except Exception:
                     continue
-        except Exception:
-            pass
+        except OSError:
+            raise
 
     def _persist(self, job: JobRecord) -> None:
-        try:
-            path = JOBS_DIR / f"{job.id}.json"
-            pub = public_job(job)
-            path.write_text(json.dumps(pub, indent=2), encoding="utf-8")
-        except Exception:
-            pass
+        job.updated_at = datetime.now(UTC).isoformat(timespec="seconds")
+        path = JOBS_DIR / f"{job.id}.json"
+        pub = public_job(job)
+        temp = path.with_suffix(".json.tmp")
+        temp.write_text(json.dumps(pub, indent=2), encoding="utf-8")
+        os.replace(temp, path)
 
     def list(self) -> list[dict[str, Any]]:
         with self.lock:
@@ -182,7 +208,10 @@ class JobRunner:
                 # as rl_<hash> so the checkpoints land per profile instead of
                 # overwriting whatever the shared `rl` preset last produced.
                 cfg = recipes.normalize_recipe({**cfg, "name": "rl"})
-                profile = f"rl_{recipes.recipe_hash(cfg)[:8]}"
+                # The hash (and therefore the checkpoint folder) must ignore the human
+                # label: renaming “Tunis agent v1” to “Tunis agent v2” keeps the same
+                # profile and weights instead of forking an empty copy.
+                profile = f"rl_{recipes.recipe_hash({k: v for k, v in cfg.items() if k != 'label'})[:8]}"
                 cfg["name"] = profile
                 try:
                     recipes.save_recipe(cfg, overwrite=True)
@@ -197,6 +226,26 @@ class JobRunner:
                 raise ValueError("at least one training seed is required")
             if len(seeds) > 8:
                 raise ValueError("at most 8 training seeds per job")
+            if overrides and isinstance(overrides.get("training"), dict):
+                training_overrides = overrides["training"]
+                valid_demands = {"low", "medium", "peak", "rush_profile"}
+                valid_scenarios = {"normal", "emergency", "pedestrians", "buses", "incident"}
+                if "demand_levels" in training_overrides:
+                    values = set(training_overrides["demand_levels"])
+                    if values and not values <= valid_demands:
+                        raise ValueError(f"unsupported training demand levels: {sorted(values - valid_demands)}")
+                    if values:
+                        cfg["training"]["demand_levels"] = sorted(values)
+                if "scenarios" in training_overrides:
+                    values = set(training_overrides["scenarios"])
+                    if values and not values <= valid_scenarios:
+                        raise ValueError(f"unsupported training scenarios: {sorted(values - valid_scenarios)}")
+                    from cotraffic.envs.episodes import unsupported
+                    invalid = values & unsupported(network)
+                    if invalid:
+                        raise ValueError(f"{network} does not support training scenarios: {sorted(invalid)}")
+                    if values:
+                        cfg["training"]["scenarios"] = sorted(values)
             total = int(
                 timesteps
                 or cfg["training"].get("quick_timesteps")
@@ -225,6 +274,112 @@ class JobRunner:
             self._persist(job)
             self.queue.put(job_id)
             return public_job(job)
+
+    def submit_model_benchmark(
+        self,
+        network: str,
+        scenario: str,
+        demand: str,
+        seeds: list[int],
+        models: list[dict[str, Any]],
+        quick: bool = True,
+    ) -> dict[str, Any]:
+        """Queue a paired comparison of explicit, immutable saved checkpoints."""
+        with self.lock:
+            if network not in NETWORKS:
+                raise ValueError(f"Unknown network: {network}")
+            if len(models) < 1 or len(models) > 5:
+                raise ValueError("benchmark requires 1–5 saved model versions")
+        seeds = sorted({int(seed) for seed in seeds})
+        if not seeds or len(seeds) > 100:
+            raise ValueError("benchmark requires 1–100 shared evaluation seeds")
+        if not isinstance(scenario, str) or not isinstance(demand, str):
+            raise ValueError("scenario and demand must be strings")
+        if scenario != "normal":
+            try:
+                config.load("scenarios", scenario)
+            except (FileNotFoundError, ValueError) as error:
+                raise ValueError(f"unknown benchmark scenario {scenario}") from error
+            from cotraffic.envs.episodes import unsupported
+            if scenario in unsupported(network):
+                raise ValueError(f"{network} does not support scenario {scenario}")
+        if demand not in {"low", "medium", "peak", "rush_profile"}:
+            raise ValueError(f"unknown demand profile {demand}")
+        for model in models:
+            path = Path(model["checkpoint"]).resolve()
+            if not path.is_file() or path.suffix != ".zip":
+                raise ValueError(f"checkpoint unavailable for {model.get('label', model.get('id'))}")
+            if model.get("network") != network:
+                raise ValueError(f"{model.get('label', model.get('id'))} was trained for {model.get('network')}, not {network}")
+        job_id = f"bench_{network}_{uuid.uuid4().hex[:8]}"
+        job = JobRecord(
+            id=job_id,
+            kind="benchmark",
+            request={
+                "network": network,
+                "scenario": scenario,
+                "demand": demand,
+                "seeds": seeds,
+                "models": models,
+                "quick": bool(quick),
+                "primaryMetric": "mean_waiting_time",
+            },
+            total_steps=len(models) * len(seeds),
+        )
+        self.jobs[job_id] = job
+        self._persist(job)
+        self.queue.put(job_id)
+        return public_job(job)
+
+    def submit_benchmark_suite(
+        self,
+        network: str,
+        scenarios: list[str],
+        demands: list[str],
+        seeds: list[int],
+        models: list[dict[str, Any]],
+        quick: bool = True,
+    ) -> dict[str, Any]:
+        if network not in NETWORKS:
+            raise ValueError(f"Unknown network: {network}")
+        if len(models) < 2 or len(models) > 5:
+            raise ValueError("benchmark requires 2–5 saved model versions")
+        allowed_scenarios = {"normal", "emergency", "pedestrians", "buses", "incident"}
+        allowed_demands = {"low", "medium", "peak", "rush_profile"}
+        if not scenarios or not set(scenarios) <= allowed_scenarios:
+            raise ValueError("benchmark suite includes an unknown or empty scenario selection")
+        if not demands or not set(demands) <= allowed_demands:
+            raise ValueError("benchmark suite includes an unknown or empty demand selection")
+        if len(set(scenarios)) != len(scenarios) or len(set(demands)) != len(demands):
+            raise ValueError("benchmark suite scenarios and demands must be unique")
+        from cotraffic.envs.episodes import unsupported
+        invalid_scenarios = set(scenarios) & unsupported(network)
+        if invalid_scenarios:
+            raise ValueError(f"{network} does not support scenarios: {sorted(invalid_scenarios)}")
+        seeds = sorted({int(seed) for seed in seeds})
+        if not seeds or len(seeds) > 100:
+            raise ValueError("benchmark suite requires 1–100 unique evaluation seeds")
+        for model in models:
+            checkpoint = Path(model["checkpoint"]).resolve()
+            if not checkpoint.is_file() or checkpoint.suffix != ".zip":
+                raise ValueError(f"checkpoint unavailable for {model.get('label', model.get('id'))}")
+            if model.get("network") != network:
+                raise ValueError(f"{model.get('label', model.get('id'))} was trained for {model.get('network')}, not {network}")
+        conditions = [{"scenario": scenario, "demand": demand} for scenario in scenarios for demand in demands]
+        if len(conditions) * len(seeds) * len(models) > 2000:
+            raise ValueError("benchmark suite exceeds the 2,000 episode campaign limit")
+        job_id = f"suite_{network}_{uuid.uuid4().hex[:8]}"
+        job = JobRecord(
+            id=job_id,
+            kind="benchmark-suite",
+            request={"network": network, "conditions": conditions, "seeds": seeds, "models": models, "quick": bool(quick), "primaryMetric": "mean_waiting_time"},
+            total_steps=len(conditions) * len(seeds) * len(models),
+        )
+        with self.lock:
+            self.jobs[job_id] = job
+            self._persist(job)
+            self.queue.put(job_id)
+        return public_job(job)
 
     def submit_compare(
         self,
@@ -307,6 +462,35 @@ class JobRunner:
                 return True
         return False
 
+    def resume(self, job_id: str) -> dict[str, Any]:
+        """Requeue a benchmark campaign that still owns completed episodes.
+
+        The suite runner seeds itself from the retained rows and skips every cell already
+        recorded as done, so resuming costs only the missing episodes and keeps the shared
+        seeds intact.
+        """
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            if job.kind != "benchmark-suite":
+                raise ValueError("Only benchmark campaigns can be resumed")
+            if job.status not in ("interrupted", "cancelled", "failed"):
+                raise ValueError(f"Job {job_id} is {job.status}, not resumable")
+            rows = (job.result or {}).get("rows") if isinstance(job.result, dict) else None
+            completed = sum(1 for row in rows or [] if row.get("status") == "done")
+            if not completed:
+                raise ValueError(f"Job {job_id} has no completed episodes to resume from")
+            job.status = "queued"
+            job.error = None
+            job.ended_at = None
+            job.step = completed
+            job.log.append(f"Resumed: skipping {completed} completed episodes of {job.total_steps}.")
+            self._persist(job)
+            self._notify(job)
+            self.queue.put(job_id)
+            return public_job(job)
+
     def subscribe(self, job_id: str) -> queue.Queue[dict[str, Any]]:
         with self.lock:
             q: queue.Queue[dict[str, Any]] = queue.Queue()
@@ -346,8 +530,12 @@ class JobRunner:
             try:
                 if job.kind == "train":
                     self._run_training(job)
+                elif job.kind == "benchmark-suite":
+                    self._run_benchmark_suite(job)
                 elif job.kind == "compare":
                     self._run_compare(job)
+                elif job.kind == "benchmark":
+                    self._run_model_benchmark(job)
             except Exception as e:
                 with self.lock:
                     if self.cancel_event.is_set():
@@ -421,8 +609,14 @@ class JobRunner:
                                 "halting": job.mean_halting,
                                 "t": round(elapsed, 1),
                                 "seed": self.seed,
+                                "policyLoss": self.model.logger.name_to_value.get("train/policy_gradient_loss"),
+                                "valueLoss": self.model.logger.name_to_value.get("train/value_loss"),
+                                "entropy": self.model.logger.name_to_value.get("train/entropy_loss"),
+                                "approxKl": self.model.logger.name_to_value.get("train/approx_kl"),
+                                "explainedVariance": self.model.logger.name_to_value.get("train/explained_variance"),
                             }
                             job.metrics_ring = [*job.metrics_ring[-199:], point]
+                        self._persist(job)
                         runner_self._notify(job)
                     self.last_report = now
                 return True
@@ -479,6 +673,328 @@ class JobRunner:
                 job.status = "cancelled"
             else:
                 job.status = "done"
+            job.ended_at = datetime.now(UTC).isoformat(timespec="seconds")
+            self._persist(job)
+            self._notify(job)
+
+    def _run_benchmark_suite(self, job: JobRecord) -> None:
+        """Evaluate each saved model on every shared scenario/demand/seed cell."""
+        from cotraffic.evaluation.matrix import _dirs
+        from cotraffic.evaluation.runner import run_episode
+
+        request = job.request
+        network, seeds, models = request["network"], request["seeds"], request["models"]
+        conditions = request["conditions"]
+        quick = bool(request["quick"])
+        raw_dir, logs_dir = _dirs(quick)
+        # Resuming: the retained rows are the campaign's own history, so they are the starting
+        # point and every cell already recorded as done is skipped instead of re-simulated.
+        retained = (job.result or {}).get("rows") if isinstance(job.result, dict) else None
+        rows: list[dict[str, Any]] = [row for row in (retained or []) if row.get("status") == "done"]
+        completed = {
+            (row["modelId"], row["scenario"], row["demand"], int(row["evaluationSeed"]))
+            for row in rows
+        }
+        total = len(conditions) * len(seeds) * len(models)
+
+        def suite_summaries() -> dict[str, Any]:
+            """Per condition × model summary over every tracked metric. The first model
+            of each condition is the reference; the others carry paired improvements on
+            the shared evaluation seeds plus Cliff's delta."""
+            metric_specs = (
+                ("mean_waiting_time", "Mean waiting time", "s", True),
+                ("median_waiting_time", "Median waiting time", "s", True),
+                ("p95_waiting_time", "95th percentile waiting time", "s", True),
+                ("mean_travel_time", "Mean travel time", "s", True),
+                ("mean_time_loss", "Mean time loss", "s", True),
+                ("person_weighted_delay", "Person-weighted delay", "s", True),
+                ("stops_per_vehicle", "Stops per vehicle", "", True),
+                ("throughput_per_h", "Throughput", "vehicles/hour", False),
+                ("mean_queue", "Mean queue", "vehicles", True),
+                ("co2_total_kg", "CO₂ emissions", "kg", True),
+                ("ssm_conflicts_per_1000_veh", "SSM conflicts per 1 000 vehicles", "", True),
+                ("ev_delay", "Emergency-vehicle delay", "s", True),
+                ("ped_mean_waiting_time", "Pedestrian waiting time", "s", True),
+            )
+            cells = []
+            for condition_index, condition in enumerate(conditions):
+                condition_rows = [row for row in rows if row["scenario"] == condition["scenario"] and row["demand"] == condition["demand"] and row.get("status") == "done"]
+                reference_values: dict[str, dict[float, float]] = {}
+                model_entries = []
+                for model_index, model in enumerate(models):
+                    metric_entries = {}
+                    for metric, label, unit, lower_is_better in metric_specs:
+                        values_by_seed = {float(row["evaluationSeed"]): float(row[metric]) for row in condition_rows if row["modelId"] == model["id"] and isinstance(row.get(metric), (int, float))}
+                        values = list(values_by_seed.values())
+                        mean, lo, hi = bootstrap_ci(values, seed=400 + condition_index * 100 + model_index) if values else (None, None, None)
+                        paired_improvement = None
+                        paired_ci = None
+                        cliffs = None
+                        p_value = None
+                        if model_index == 0:
+                            reference_values[metric] = values_by_seed
+                            paired_improvement = 0.0
+                        else:
+                            refs = reference_values.get(metric, {})
+                            shared = sorted(set(values_by_seed) & set(refs))
+                            reference_mean = sum(refs.values()) / len(refs) if refs else 0.0
+                            if len(shared) >= 2 and abs(reference_mean) > 1e-12:
+                                raw_delta, raw_lo, raw_hi = paired_change_ci([list(refs[s] for s in shared)], [values_by_seed[s] for s in shared], seed=600 + condition_index * 100 + model_index)
+                                orientation = -1 if lower_is_better else 1
+                                paired_improvement = orientation * raw_delta
+                                paired_ci = sorted((orientation * raw_lo, orientation * raw_hi))
+                                diffs = [values_by_seed[s] - refs[s] for s in shared]
+                                if all(value == 0 for value in diffs):
+                                    p_value = 1.0
+                                else:
+                                    try:
+                                        from scipy.stats import wilcoxon
+                                        p_value = float(wilcoxon(diffs, alternative="two-sided").pvalue)
+                                    except Exception:
+                                        p_value = None
+                                cliffs = cliffs_delta([values_by_seed[s] for s in shared], [refs[s] for s in shared])
+                        metric_entries[metric] = {
+                            "label": label, "unit": unit, "lowerIsBetter": lower_is_better,
+                            "n": len(values), "mean": mean,
+                            "ci95": [lo, hi] if len(values) >= 2 and len(values) else None,
+                            "pairedImprovementPct": paired_improvement,
+                            "pairedImprovementCi95": paired_ci,
+                            "pValue": p_value, "cliffsDelta": cliffs,
+                            "perSeed": [[seed, value] for seed, value in sorted(values_by_seed.items())],
+                        }
+                    model_entries.append({"modelId": model["id"], "label": model["label"], "version": model["version"], "metrics": metric_entries})
+                cells.append({"scenario": condition["scenario"], "demand": condition["demand"], "n": len(condition_rows), "models": model_entries})
+            return {"conditions": cells, "metricSpecs": [{"key": m, "label": l, "unit": u, "lowerIsBetter": lb} for m, l, u, lb in metric_specs]}
+
+        from cotraffic.analysis.stats import bootstrap_ci, cliffs_delta, paired_change_ci
+
+        for condition in conditions:
+            for model in models:
+                for seed in seeds:
+                    if (model["id"], condition["scenario"], condition["demand"], int(seed)) in completed:
+                        continue
+                    if self.cancel_event.is_set():
+                        with self.lock:
+                            job.status = "cancelled"
+                            job.ended_at = datetime.now(UTC).isoformat(timespec="seconds")
+                            job.result = {"rows": rows, "models": models, "conditions": conditions, "seeds": seeds, "network": network, "quick": quick, "summaries": suite_summaries(), "evidence": "smoke" if quick else "exploratory", "warning": "Campaign cancelled; completed episode rows are retained."}
+                            self._persist(job)
+                            self._notify(job)
+                        return
+                    scenario, demand = condition["scenario"], condition["demand"]
+                    scenarios = [] if scenario == "normal" else [scenario]
+                    with self.lock:
+                        job.log.append(f"{model['label']} · {scenario}/{demand} · seed {seed} ({len(rows)+1}/{total})")
+                        job.step = len(rows)
+                        self._notify(job)
+                    try:
+                        result = run_episode(method=str(model["method"]), network=network, demand=demand, scenarios=scenarios, seed=seed, checkpoint=Path(model["checkpoint"]).resolve(), quick=quick, raw_dir=raw_dir, logs_dir=logs_dir, tag=f"{job.id}_{model['id']}_{scenario}_{demand}_{seed}", agent_overrides=model.get("recipe"))
+                        rows.append({"modelId": model["id"], "modelLabel": model["label"], "version": model["version"], "scenario": scenario, "demand": demand, "evaluationSeed": seed, "status": "done", **result})
+                    except Exception as error:
+                        rows.append({"modelId": model["id"], "modelLabel": model["label"], "version": model["version"], "scenario": scenario, "demand": demand, "evaluationSeed": seed, "status": "failed", "error": str(error)})
+                        job.log.append(f"FAILED {model['label']} · {scenario}/{demand} · seed {seed}: {error}")
+                    with self.lock:
+                        job.step = len(rows)
+                        job.result = {"rows": rows, "models": models, "conditions": conditions, "network": network, "seeds": seeds, "quick": quick, "summaries": suite_summaries(), "evidence": "smoke" if quick else "exploratory" if len(seeds) < 10 else "reportable"}
+                        self._persist(job)
+                        self._notify(job)
+        with self.lock:
+            failed = any(row.get("status") == "failed" for row in rows)
+            job.status = "failed" if failed and not any(row.get("status") == "done" for row in rows) else "done"
+            if failed and job.status == "failed":
+                job.error = "All benchmark episodes failed; inspect the retained per-episode errors."
+            # Recompute from the full row set: a resumed campaign has rows from before the
+            # restart, so the summaries must reflect all of them, not only this run's episodes.
+            job.result = {
+                "rows": rows,
+                "models": models,
+                "conditions": conditions,
+                "seeds": seeds,
+                "network": network,
+                "quick": quick,
+                "summaries": suite_summaries(),
+                "evidence": "smoke" if quick else "exploratory" if len(seeds) < 10 else "reportable",
+            }
+            job.step = total
+            job.ended_at = datetime.now(UTC).isoformat(timespec="seconds")
+            self._persist(job)
+            self._notify(job)
+
+    def _run_model_benchmark(self, job: JobRecord) -> None:
+        """Evaluate saved checkpoints on exactly the same scenario/demand/seeds."""
+        from cotraffic.analysis.stats import bootstrap_ci, cliffs_delta, cliffs_magnitude, holm, paired_change_ci
+        from cotraffic.evaluation.matrix import _dirs
+        from cotraffic.evaluation.runner import run_episode
+
+        request = job.request
+        network, scenario, demand = request["network"], request["scenario"], request["demand"]
+        seeds, models, quick = request["seeds"], request["models"], bool(request["quick"])
+        scenarios = [] if scenario == "normal" else [scenario]
+        raw_dir, logs_dir = _dirs(quick)
+        rows: list[dict[str, Any]] = []
+        total = len(models) * len(seeds)
+
+        def summarize(completed: list[dict[str, Any]]) -> dict[str, Any]:
+            summaries = []
+            primary = "mean_waiting_time"
+            reference = models[0]
+            reference_values = {
+                int(row["evaluationSeed"]): float(row[primary])
+                for row in completed
+                if row["modelId"] == reference["id"] and isinstance(row.get(primary), (int, float))
+            }
+            for model_index, model in enumerate(models):
+                values_by_seed = {
+                    int(row["evaluationSeed"]): float(row[primary])
+                    for row in completed
+                    if row["modelId"] == model["id"] and isinstance(row.get(primary), (int, float))
+                }
+                values = list(values_by_seed.values())
+                mean, lo, hi = bootstrap_ci(values, seed=200 + model_index) if values else (None, None, None)
+                metric_summary = {}
+                for metric, label, unit, lower_is_better in (
+                    ("mean_waiting_time", "Mean waiting time", "s", True),
+                    ("mean_travel_time", "Mean travel time", "s", True),
+                    ("throughput_per_h", "Throughput", "vehicles/hour", False),
+                    ("co2_total_kg", "CO₂ emissions", "kg", True),
+                    ("stops_per_vehicle", "Stops per vehicle", "", True),
+                    ("teleports_total", "Teleports", "", True),
+                    ("collisions", "Collisions", "", True),
+                ):
+                    metric_values = {
+                        int(row["evaluationSeed"]): float(row[metric])
+                        for row in completed
+                        if row["modelId"] == model["id"]
+                        and isinstance(row.get(metric), (int, float))
+                    }
+                    metric_mean, metric_lo, metric_hi = bootstrap_ci(
+                        list(metric_values.values()), seed=500 + model_index
+                    ) if metric_values else (None, None, None)
+                    reference_metric_values = {
+                        int(row["evaluationSeed"]): float(row[metric])
+                        for row in completed
+                        if row["modelId"] == reference["id"]
+                        and isinstance(row.get(metric), (int, float))
+                    }
+                    common_seeds = sorted(set(metric_values) & set(reference_metric_values))
+                    paired_improvement = None
+                    paired_ci = None
+                    if model["id"] == reference["id"]:
+                        paired_improvement = 0.0
+                        paired_ci = [0.0, 0.0] if len(common_seeds) >= 2 else None
+                    elif len(common_seeds) >= 2:
+                        raw_delta, raw_lo, raw_hi = paired_change_ci(
+                            [[metric_values[seed] for seed in common_seeds]],
+                            [reference_metric_values[seed] for seed in common_seeds],
+                            seed=700 + model_index,
+                        )
+                        orientation = -1 if lower_is_better else 1
+                        paired_improvement = orientation * raw_delta
+                        paired_ci = sorted((orientation * raw_lo, orientation * raw_hi))
+                    paired_values = [metric_values[seed] for seed in common_seeds]
+                    paired_reference = [reference_metric_values[seed] for seed in common_seeds]
+                    raw_paired_delta = None
+                    if model["id"] != reference["id"] and len(common_seeds) >= 2:
+                        differences = [left - right for left, right in zip(paired_values, paired_reference, strict=True)]
+                        if all(value == 0 for value in differences):
+                            raw_paired_delta = 1.0
+                        else:
+                            from scipy.stats import wilcoxon
+                            raw_paired_delta = float(wilcoxon(differences, alternative="two-sided").pvalue)
+                    metric_summary[metric] = {
+                        "label": label, "unit": unit, "lowerIsBetter": lower_is_better,
+                        "n": len(metric_values), "mean": metric_mean,
+                        "ci95": [metric_lo, metric_hi] if len(metric_values) >= 2 else None,
+                        "pairedSeeds": len(common_seeds),
+                        "pairedImprovementPct": paired_improvement,
+                        "pairedImprovementCi95": paired_ci,
+                        "pValue": raw_paired_delta,
+                        "cliffsDelta": cliffs_delta(paired_values, paired_reference) if paired_values and paired_reference else None,
+                    }
+                shared = sorted(set(values_by_seed) & set(reference_values))
+                delta = delta_lo = delta_hi = None
+                if model["id"] != reference["id"] and shared:
+                    raw_delta, raw_lo, raw_hi = paired_change_ci(
+                        [[values_by_seed[seed] for seed in shared]],
+                        [reference_values[seed] for seed in shared],
+                        seed=300 + model_index,
+                    )
+                    delta, delta_lo, delta_hi = -raw_delta, -raw_hi, -raw_lo
+                summaries.append({
+                    "modelId": model["id"], "label": model["label"], "n": len(values),
+                    "meanWaitingTime": mean, "ci95": [lo, hi] if len(values) >= 2 else None,
+                    "pairedImprovementPct": 0.0 if model["id"] == reference["id"] else delta,
+                    "pairedImprovementCi95": [delta_lo, delta_hi] if len(shared) >= 2 and model["id"] != reference["id"] else None,
+                    "referenceModelId": reference["id"],
+                    "metrics": metric_summary,
+                })
+            test_entries = [
+                metric for item in summaries for metric in item["metrics"].values()
+                if item["modelId"] != reference["id"] and isinstance(metric.get("pValue"), (int, float))
+            ]
+            adjusted = holm([entry["pValue"] for entry in test_entries])
+            for entry, p_holm in zip(test_entries, adjusted, strict=True):
+                entry["pHolm"] = p_holm
+                entry["significant"] = bool(p_holm < 0.05)
+                entry["effect"] = cliffs_magnitude(entry["cliffsDelta"]) if isinstance(entry.get("cliffsDelta"), (int, float)) else ""
+            for item in summaries:
+                for metric, entry in zip(item["metrics"].keys(), item["metrics"].values(), strict=True):
+                    if item["modelId"] != reference["id"]:
+                        entry.setdefault("pHolm", None)
+                        entry.setdefault("significant", False)
+                        entry.setdefault("effect", "")
+            evidence = "smoke" if quick else ("exploratory" if len(seeds) < 10 else "reportable")
+            return {"summaries": summaries, "primaryMetric": primary,
+                    "evidence": evidence, "winner": None,
+                    "verdict": "not enough seeds to call a winner" if len(seeds) < 10 else "tests are exploratory; interpret confidence intervals, Holm-adjusted p-values and effect sizes together",
+                    "metrics": [
+                        {"key": key, "label": label, "unit": unit,
+                         "lowerIsBetter": lower}
+                        for key, label, unit, lower in (
+                            ("mean_waiting_time", "Mean waiting time", "s", True),
+                            ("mean_travel_time", "Mean travel time", "s", True),
+                            ("throughput_per_h", "Throughput", "vehicles/hour", False),
+                            ("co2_total_kg", "CO₂ emissions", "kg", True),
+                            ("stops_per_vehicle", "Stops per vehicle", "", True),
+                            ("teleports_total", "Teleports", "", True),
+                            ("collisions", "Collisions", "", True),
+                        )
+                    ]}
+
+        for model in models:
+            for seed in seeds:
+                if self.cancel_event.is_set():
+                    with self.lock:
+                        job.status = "cancelled"
+                        job.ended_at = datetime.now(UTC).isoformat(timespec="seconds")
+                        job.result = {"rows": rows, "models": models, "network": network, "scenario": scenario, "demand": demand, "seeds": seeds, "quick": quick, "warning": "Campaign cancelled; completed episode rows are retained.", **summarize(rows)}
+                        self._persist(job)
+                        self._notify(job)
+                    return
+                with self.lock:
+                    job.log.append(f"{model['label']} · evaluation seed {seed} ({len(rows) + 1}/{total})")
+                    job.step = len(rows)
+                    self._notify(job)
+                checkpoint = Path(model["checkpoint"]).resolve()
+                # A named model is an immutable checkpoint plus its training recipe.
+                # Pass that config explicitly so evaluation never consults the mutable
+                # current recipe stored under the source agent name.
+                result = run_episode(
+                    method=str(model["method"]), network=network, demand=demand,
+                    scenarios=scenarios, seed=seed, checkpoint=checkpoint,
+                    quick=quick, raw_dir=raw_dir, logs_dir=logs_dir,
+                    tag=f"{job.id}_{model['id']}",
+                    agent_overrides=model.get("recipe"),
+                )
+                rows.append({"modelId": model["id"], "modelLabel": model["label"], "version": model["version"], "evaluationSeed": seed, **result})
+                with self.lock:
+                    job.step = len(rows)
+                    job.result = {"rows": rows, "models": models, "network": network, "scenario": scenario, "demand": demand, "seeds": seeds, "quick": quick, **summarize(rows)}
+                    self._persist(job)
+                    self._notify(job)
+        with self.lock:
+            job.status = "done"
+            job.step = total
             job.ended_at = datetime.now(UTC).isoformat(timespec="seconds")
             self._persist(job)
             self._notify(job)

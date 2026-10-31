@@ -60,7 +60,8 @@
     },
     "simulation3d": {
       "title": "3D simulation",
-      "description": "The same scenario replayed side by side: classical controller against agent."
+      "description": "The same recorded episode replayed in 3D for two saved policies: separate scenes, one shared clock.",
+      "empty": "No 2×2 or 3×3 replay recorded yet"
     },
     "scenarios": {
       "title": "Scenarios",

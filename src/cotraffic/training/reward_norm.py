@@ -40,7 +40,7 @@ def calibrate_rewards(
     from cotraffic.demand.generator import DemandRequest, generate
     from cotraffic.networks.build import ensure_network
 
-    agent = config.load_agent("coop_full")
+    agent = config.load_agent("rl")
     excluded = unsupported(network)
     scenarios = tuple(sc for sc in agent["training"]["scenarios"] if sc not in excluded)
     samples: dict[str, list[float]] = {t: [] for t in TERMS}

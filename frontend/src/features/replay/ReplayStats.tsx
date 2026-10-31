@@ -25,16 +25,17 @@ export function ReplayStats({ replay, sides }: { replay: Replay; sides: Side[] }
     <div className="grid gap-3 md:grid-cols-2">
       {sides.map((side) => {
         const data = replay.sides[side];
+        const name = data.label ?? f.methodName(data.method);
         const stats = sceneStats(sceneAt(replay, side, time));
         const kpis = KPIS.filter((k) => data.kpis[k] !== null && data.kpis[k] !== undefined);
         return (
           <section
             key={side}
-            aria-label={f.methodName(data.method)}
+            aria-label={name}
             className="rounded-lg border border-border bg-surface p-3"
             style={{ borderTopColor: methodColor(data.method), borderTopWidth: 3 }}
           >
-            <h3 className="mb-2 text-sm font-semibold text-text">{f.methodName(data.method)}</h3>
+            <h3 className="mb-2 text-sm font-semibold text-text">{name}</h3>
             <dl className="tabular grid grid-cols-4 gap-2 text-xs">
               <Stat label={t("replay.vehicles")} value={f.number(stats.vehicles, 0)} />
               <Stat

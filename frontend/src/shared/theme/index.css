@@ -319,6 +319,174 @@
     }
   }
 
+  /* Checkboxes match the control set: same box, border and hover as .select-control,
+     with the accent fill and a crisp check when selected. */
+  .check-control {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    background-color: var(--surface-2);
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .check-control:hover {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+  }
+  .check-control:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+    border-color: var(--focus);
+  }
+  .check-control:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .check-control:checked {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px;
+  }
+
+  /* Radios share the checkbox box; the selected state shows an accent square inside the
+     border instead of the check mark. */
+  .radio-control {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    background-color: var(--surface-2);
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .radio-control:hover {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+  }
+  .radio-control:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+    border-color: var(--focus);
+  }
+  .radio-control:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .radio-control:checked {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    box-shadow: inset 0 0 0 3px var(--surface);
+  }
+
+  /* Decorative counterpart used inside card-style options that cannot nest an input. */
+  .radio-mark {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-strong);
+    background-color: var(--surface-2);
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  .radio-mark[data-checked="true"] {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    box-shadow: inset 0 0 0 3px var(--surface);
+  }
+
+  /* Sliders: square accent thumb on a track that fills to the current value. */
+  .range-control {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 18px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .range-control::-webkit-slider-runnable-track {
+    height: 4px;
+    border: 1px solid var(--border);
+    background: linear-gradient(
+      to right,
+      var(--accent) 0 var(--range-fill, 0%),
+      var(--surface-3) var(--range-fill, 0%) 100%
+    );
+  }
+  .range-control::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -6px;
+    border: 2px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+  .range-control:hover::-webkit-slider-thumb,
+  .range-control:focus-visible::-webkit-slider-thumb {
+    background: var(--accent);
+  }
+  .range-control:focus-visible {
+    outline: none;
+  }
+  .range-control:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .range-control:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .range-control::-moz-range-track {
+    height: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface-3);
+  }
+  .range-control::-moz-range-progress {
+    height: 4px;
+    background: var(--accent);
+  }
+  .range-control::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--accent);
+    border-radius: 0;
+    background: var(--surface);
+  }
+  .range-control:hover::-moz-range-thumb,
+  .range-control:focus-visible::-moz-range-thumb {
+    background: var(--accent);
+  }
+  [dir="rtl"] .range-control::-webkit-slider-runnable-track {
+    background: linear-gradient(
+      to left,
+      var(--accent) 0 var(--range-fill, 0%),
+      var(--surface-3) var(--range-fill, 0%) 100%
+    );
+  }
+  [dir="rtl"] .range-control::-moz-range-progress {
+    margin-left: auto;
+  }
+
   /* text and number fields share the select's box so a form reads as one control set */
   .input-control {
     height: 36px;
@@ -342,6 +510,59 @@
   }
   .input-control[aria-invalid="true"] {
     border-color: var(--jam);
+  }
+
+  /* Number fields keep the text field's box but swap the OS spinner for the same
+     chevron language as .select-control. */
+  .number-control {
+    appearance: textfield;
+    -moz-appearance: textfield;
+    padding-right: 34px;
+  }
+  .number-control::-webkit-outer-spin-button,
+  .number-control::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .number-stepper {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    display: flex;
+    flex-direction: column;
+    width: 26px;
+    border-left: 1px solid var(--border-strong);
+    z-index: 1;
+  }
+  .number-stepper button {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .number-stepper button:first-child {
+    border-bottom: 1px solid var(--border);
+  }
+  .number-stepper button:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .number-stepper button:active {
+    background: var(--accent-soft);
+  }
+  [dir="rtl"] .number-control {
+    padding-right: 10px;
+    padding-left: 34px;
+  }
+  [dir="rtl"] .number-stepper {
+    right: auto;
+    left: 1px;
+    border-left: 0;
+    border-right: 1px solid var(--border-strong);
   }
 }
 

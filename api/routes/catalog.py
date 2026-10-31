@@ -22,26 +22,26 @@ from cotraffic.paths import CHECKPOINTS_DIR, default_checkpoint
 
 router = APIRouter(tags=["catalog"])
 
-# Measured baseline wall times for 3-minute runs (from BENCHMARK_REDESIGN.md)
+# Measured baseline wall times for 3-minute runs
 MEASURED_SECONDS_3MIN = {
-    "grid2x2": 52,
-    "grid3x3": 136,
-    "tunis": 125,
+    "sf_mission_2x2": 48,
+    "sf_mission_3x3": 115,
     "monaco": 74,
+    "tunis": 125,
 }
 
 NETWORK_TITLES = {
-    "grid2x2": "Grid 2×2",
-    "grid3x3": "Grid 3×3",
-    "tunis": "Tunis Corridor",
+    "sf_mission_2x2": "SF Mission 2×2",
+    "sf_mission_3x3": "SF Mission 3×3",
     "monaco": "Monaco Principality",
+    "tunis": "Tunis Corridor",
 }
 
 NETWORK_DESCRIPTIONS = {
-    "grid2x2": "4 intersections, synthetic arterial grid for rapid debugging and demonstration.",
-    "grid3x3": "9 intersections, standard small benchmark grid for MARL coordination.",
-    "tunis": "Central Tunis city network (lake, medina, Bourguiba, El Menzah — 13 TLS).",
+    "sf_mission_2x2": "San Francisco Mission & Howard corridor (2×2 intersections).",
+    "sf_mission_3x3": "San Francisco Mission & Howard corridor (3×3 intersections).",
     "monaco": "Port Hercule to Monte-Carlo arterial network with complex geometry.",
+    "tunis": "Central Tunis city network (lake, medina, Bourguiba, El Menzah — 13 TLS).",
 }
 
 

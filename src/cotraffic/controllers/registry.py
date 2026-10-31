@@ -7,9 +7,28 @@ from pathlib import Path
 from cotraffic.controllers.base import Controller
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")
-LEARNED = ("ind", "coop", "coop_eco", "coop_eco05", "coop_full", "dqn")
 LLM = ("llm",)
 NO_CHECKPOINT = BASELINES + LLM
+
+
+def _trainable_recipe_ids() -> tuple[str, ...]:
+    """Trainable learned agents = the editable recipes themselves (rl templates and
+    every rl_<hash> profile frozen by the training editor). Legacy preset ids are gone."""
+    from cotraffic import recipes
+
+    out: list[str] = []
+    for entry in recipes.list_recipes():
+        rid = entry.get("id", "")
+        if entry.get("error"):
+            continue
+        kind = entry.get("source")
+        trainable = entry.get("trainable")
+        if kind == "recipe" and trainable and rid not in ("base", "llm"):
+            out.append(rid)
+    return tuple(out)
+
+
+LEARNED = _trainable_recipe_ids()
 
 
 def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Controller:

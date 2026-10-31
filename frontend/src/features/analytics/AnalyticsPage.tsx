@@ -53,27 +53,34 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
   const tx = useTx();
   const f = useFormat();
   const rtl = useRtl();
-  const { controller, reference, setController, setReference } = useFilters();
+  const { controller: controllerChoice, reference, setController, setReference } = useFilters();
   const metrics = [...new Set(rows.map((r) => r.metric))];
   const [metric, setMetric] = useState(
     metrics.includes("mean_waiting_time") ? "mean_waiting_time" : (metrics[0] ?? ""),
   );
   const [network, setNetwork] = useState("all");
   const [family, setFamily] = useState("all");
-
+  // Clamp the shared filter store to the methods actually present in the
+  // exported comparisons: a stored choice (default "rl") that no longer has
+  // rows must not blank the page.
+  const references = sortMethods(new Set(rows.map((r) => r.reference)));
+  const ref = references.includes(reference) ? reference : (references[0] ?? "");
   const scoped = useMemo(
     () =>
       rows.filter(
         (r) =>
           r.metric === metric &&
-          r.reference === reference &&
+          r.reference === ref &&
           (network === "all" || r.network === network) &&
           (family === "all" || r.family === family),
       ),
-    [rows, metric, reference, network, family],
+    [rows, metric, ref, network, family],
   );
-  const references = sortMethods(new Set(rows.map((r) => r.reference)));
   const methods = sortMethods(new Set(scoped.map((r) => r.method)));
+  const controller = methods.includes(controllerChoice) ? controllerChoice : (methods[0] ?? "");
+  void setController;
+  void setReference;
+
   const networks = [...new Set(rows.map((r) => r.network))];
   const families = [...new Set(rows.map((r) => r.family))];
 
@@ -137,7 +144,7 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
           />
           <MethodSelect
             label={t("filters.reference")}
-            value={reference}
+            value={ref}
             methods={references}
             onChange={setReference}
           />
@@ -167,7 +174,7 @@ function Analytics({ meta, rows }: { meta: Meta; rows: Comparison[] }) {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard
-          title={`${t("analytics.forest")} · ${f.methodName(controller)} ${t("kpi.vs", { ref: f.methodName(reference) })}`}
+          title={`${t("analytics.forest")} · ${f.methodName(controller)} ${t("kpi.vs", { ref: f.methodName(ref) })}`}
           description={t("analytics.forestText")}
           table={mine.map((r) => ({
             [t("analytics.cell")]: f.cellName(r),

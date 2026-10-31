@@ -286,8 +286,6 @@ def export_training(out: Path) -> list[dict[str, Any]]:
         p for p in TRAINING.iterdir() if p.is_dir() and not p.name.startswith("_")
     ):
         for net_dir in sorted(p for p in agent_dir.iterdir() if p.is_dir()):
-            if net_dir.name == "grid2x2":  # smoke-test runs, not part of the study
-                continue
             runs = []
             for seed_dir in sorted(net_dir.glob("seed*")):
                 ep = seed_dir / "episodes.csv"
@@ -526,6 +524,158 @@ def prune_stale(out: Path, networks: Sequence[str]) -> list[str]:
     return removed
 
 
+# --- runs registry (the experiment-platform core) ----------------------------------------
+
+# Metrics the runs table shows as flat columns; anything else stays in the drawer.
+RUN_COLUMNS = [
+    "mean_waiting_time", "throughput_per_h", "co2_total_kg",
+    "teleports_total", "stops_per_vehicle", "emergency_stops", "ev_red_stops",
+]
+
+# The registry is model-centric: scripted baselines + LLM + the generalist only.
+# The ablation variants (coop_ped, coop_ev, coop_full, ind_*, dqn, ...) stay in
+# summary.json / comparatives for the study's attribution analysis; they are
+# deliberately excluded here so the Runs/Models pages never present them as models.
+REGISTRY_METHODS = frozenset({
+    "ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp", "llm", "generalist",
+})
+
+
+def _registry_method(name: str) -> bool:
+    return name in REGISTRY_METHODS or name.startswith("generalist")
+
+
+def export_run_registry(out: Path, summary: pd.DataFrame) -> dict[str, Any]:
+    """One Run entity per training seed and per evaluation cell, as runs.json.
+
+    MLflow's mental model: every job is a run with an identity, its metrics, its
+    hyperparameters and its artifacts, not a metric-row permutation. The registry merges
+    (a) the training runs found under results/training and (b) the evaluation cells of
+    summary.csv, so the dashboard table has one row per thing that was launched.
+    """
+    runs_index: dict[str, dict[str, Any]] = {}
+
+    #Runs deleted from the dashboard stay deleted across re-exports.
+    tombstone_path = ROOT / "results" / "registry_hidden.json"
+    hidden: set[str] = set()
+    if tombstone_path.is_file():
+        try:
+            hidden = set(json.loads(tombstone_path.read_text()))
+        except (OSError, ValueError):
+            hidden = set()
+
+    for agent_dir in sorted(p for p in TRAINING.iterdir() if p.is_dir() and not p.name.startswith("_")):
+        for net_dir in sorted(p for p in agent_dir.iterdir() if p.is_dir()):
+            for seed_dir in sorted(net_dir.glob("seed*")):
+                ep = seed_dir / "episodes.csv"
+                if not ep.exists():
+                    continue
+                df = pd.read_csv(ep)
+                if df.empty:
+                    continue
+                info_file = seed_dir / "run_info.json"
+                info = json.loads(info_file.read_text()) if info_file.exists() else {}
+                hp = info.get("config", {}) or {}
+                seed = int(seed_dir.name.removeprefix("seed"))
+                run_id = f"train__{agent_dir.name}__{net_dir.name}__s{seed}"
+                if run_id in hidden:
+                    continue
+                is_current_policy = agent_dir.name.startswith("generalist") or agent_dir.name in {"rl", "rl_shortpilot"}
+                runs_index[run_id] = {
+                    "runId": run_id,
+                    "name": f"{agent_dir.name} · {net_dir.name} · seed {seed}",
+                    "kind": "training",
+                    "method": "generalist" if agent_dir.name.startswith("generalist") else agent_dir.name,
+                    "legacy": not is_current_policy,
+                    "legacyReason": "historical specialist or ablation run; retained but hidden by default" if not is_current_policy else None,
+                    "source": "historical_training_export",
+                    "type": "rl",
+                    "model": None,
+                    "network": net_dir.name,
+                    "seed": seed,
+                    "seeds": [seed],
+                    "hyperparameters": {k: v for k, v in hp.items() if isinstance(v, (int, float, str, bool))},
+                    "status": "finished",
+                    "algorithm": info.get("config", {}).get("algorithm", "ppo"),
+                    "totalTimesteps": info.get("total_timesteps"),
+                    "episodes": len(df),
+                    "finalReward": round(float(df["episode_reward"].tail(20).mean()), 4),
+                    "metrics": {"episodeReward": round(float(df["episode_reward"].tail(20).mean()), 4)},
+                    "artifacts": {
+                        "curves": f"training/{agent_dir.name}__{net_dir.name}",
+                        "checkpoint": str(seed_dir.name),
+                    },
+                }
+
+    eval_metrics = summary[summary["metric"].isin(RUN_COLUMNS)][
+        ["network", "scenario", "demand", "method", "metric", "mean", "ci_lo", "ci_hi", "n"]
+    ]
+    raw_root = ROOT / "results" / "raw"
+    raw_parts = []
+    for raw_file in sorted(raw_root.glob("*.csv")):
+        try:
+            frame = pd.read_csv(raw_file)
+            if {"network", "scenario", "demand", "method", "seed"}.issubset(frame.columns):
+                raw_parts.append(frame)
+        except (OSError, ValueError, pd.errors.ParserError):
+            continue
+    raw_data = pd.concat(raw_parts, ignore_index=True) if raw_parts else pd.DataFrame()
+    for (network, scenario, demand, method), group in eval_metrics.groupby(
+        ["network", "scenario", "demand", "method"]
+    ):
+        is_current_policy = _registry_method(str(method))
+        metrics: dict[str, Any] = {}
+        stats: dict[str, dict[str, Any]] = {}
+        for rec in group.to_dict("records"):
+            metrics[rec["metric"]] = rec["mean"]
+            stats[rec["metric"]] = {
+                "ciLo": rec["ci_lo"], "ciHi": rec["ci_hi"], "n": rec["n"]
+            }
+        raw_cell = raw_data[(raw_data.network == network) & (raw_data.scenario == scenario) & (raw_data.demand == demand) & (raw_data.method == method)] if not raw_data.empty else pd.DataFrame()
+        seeds = sorted(int(seed) for seed in raw_cell["seed"].dropna().unique()) if "seed" in raw_cell else []
+        if not raw_cell.empty:
+            for metric in RUN_COLUMNS:
+                if metric in raw_cell:
+                    values = pd.to_numeric(raw_cell[metric], errors="coerce").dropna()
+                    if not values.empty:
+                        metrics[metric] = float(values.mean())
+                        stats[metric] = {"ciLo": float(values.mean() - 1.96 * values.std(ddof=1) / len(values) ** 0.5) if len(values) > 1 else float(values.iloc[0]), "ciHi": float(values.mean() + 1.96 * values.std(ddof=1) / len(values) ** 0.5) if len(values) > 1 else float(values.iloc[0]), "n": len(values)}
+        kind = "evaluation"
+        run_id = f"eval__{method}__{network}__{scenario}__{demand}"
+        if run_id in hidden:
+            continue
+        runs_index[run_id] = {
+            "runId": run_id,
+            "name": f"{method} · {network} · {scenario} · {demand}",
+            "kind": kind,
+            "legacy": not is_current_policy,
+            "legacyReason": "historical specialist or ablation run; retained but hidden by default" if not is_current_policy else None,
+            "source": "historical_evaluation_export",
+            "type": "eval",
+            "model": None,
+            "network": network,
+            "scenario": scenario,
+            "demand": demand,
+            "method": method,
+            "seed": None,
+            "seeds": sorted(set(seeds)),
+            "hyperparameters": {},
+            "status": "finished",
+            "episodes": None,
+            "metrics": metrics,
+            "metricStats": stats,
+            "artifacts": {},
+        }
+
+    payload = {
+        "generatedAt": datetime.now(UTC).isoformat(timespec="seconds"),
+        "columns": RUN_COLUMNS,
+        "runs": sorted(runs_index.values(), key=lambda r: (r["kind"], r["runId"])),
+    }
+    write(out, "runs.json", payload)
+    return {"runs": len(runs_index)}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -544,6 +694,7 @@ def main() -> None:
     training = export_training(out)
     export_pedestrian_greens(out)
     export_emergency_log(out)
+    registry = export_run_registry(out, summary)
     networks = []
     if not args.skip_networks:
         for name in NETWORKS:
@@ -560,6 +711,7 @@ def main() -> None:
             "decisions": decisions,
             "training": training,
             "networks": networks,
+            "registry": registry,
         },
     )
 

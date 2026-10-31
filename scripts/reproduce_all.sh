@@ -19,18 +19,11 @@ done
 [ -f results/forecasting/ridge_grid3x3.json ] || $PY -m cotraffic forecast --net grid3x3
 
 if [ "${TRAIN:-0}" = "1" ]; then
-  for agent in ind coop coop_eco05 coop_eco coop_full coop_forecast; do
-    for seed in 1 2 3; do
-      [ -f "results/checkpoints/$agent/grid3x3/seed$seed.zip" ] || $PY -m cotraffic train --agent "$agent" --net grid3x3 --seed "$seed"
-    done
-  done
-  for agent in coop_full_ev1 coop_full_ev4; do  # sensitivity: one training run each
-    [ -f "results/checkpoints/$agent/grid3x3/seed1.zip" ] || $PY -m cotraffic train --agent "$agent" --net grid3x3 --seed 1
-  done
-  for agent in ind coop coop_full; do
-    for seed in 1 2 3; do
-      [ -f "results/checkpoints/$agent/tunis/seed$seed.zip" ] || $PY -m cotraffic train --agent "$agent" --net tunis --seed "$seed"
-    done
+  # Learned models are trained as recipes now (the rl template and rl_<hash> profiles
+  # frozen by the dashboard's training editor); legacy coop/ind presets are gone.
+  for seed in 1 2 3; do
+    [ -f "results/checkpoints/rl/grid3x3/seed$seed.zip" ] || $PY -m cotraffic train --agent rl --net grid3x3 --seed "$seed"
+    [ -f "results/checkpoints/rl/tunis/seed$seed.zip" ] || $PY -m cotraffic train --agent rl --net tunis --seed "$seed"
   done
   $PY -m cotraffic select --jobs "$JOBS"
 fi
@@ -38,9 +31,8 @@ fi
 $PY -m cotraffic evaluate --experiment full_matrix --jobs "$JOBS"
 $PY -m cotraffic evaluate --experiment sensitivity --jobs "$JOBS"
 $PY -m cotraffic aggregate
-# feature importance (figure 12): training run t1 of each variant, test seeds 0-4
-[ -f results/summary/importance_coop_full_grid3x3.csv ] || $PY -m cotraffic explain --agent coop_full --net grid3x3 --demand peak --scenarios emergency
-[ -f results/summary/importance_coop_grid3x3.csv ] || $PY -m cotraffic explain --agent coop --net grid3x3 --demand peak --scenarios normal
+# feature importance (figure 12): training run t1 of the primal model, test seeds 0-4
+[ -f results/summary/importance_rl_grid3x3.csv ] || $PY -m cotraffic explain --agent rl --net grid3x3 --demand peak --scenarios normal
 $PY -m cotraffic figures
 $PY -m cotraffic tables
 

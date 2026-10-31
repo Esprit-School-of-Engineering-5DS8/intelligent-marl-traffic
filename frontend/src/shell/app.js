@@ -1,6 +1,6 @@
 import mapboxgl from 'mapbox-gl';
+import * as THREE from 'three';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { mountSumoLiveMap } from './sumo-env.js';
 import { mountBenchmarkView, setBenchmarkTab } from './benchmark-mount.jsx';
 import { mountGauges } from './gauge.js';
 import { initModes } from './modes/index.js';
@@ -17,51 +17,48 @@ const SCENARIO_KEY = 'sumo.scenario';
 
 const SCENARIOS = {
   'grid-2x2': {
-    label: '2×2 Grid',
-    title: 'East Austin · 2×2',
-    menuSub: 'Poquito / Alamo corridor',
-    place: 'Poquito & E 14th, Austin',
-    zone: 'Poquito corridor',
-    queuedRoad: 'Poquito · Eastbound',
-    mapCenter: [-97.7219, 30.2673],
-    mapZoom: 15.6,
-    liveCenter: [-97.7219, 30.2673],
-    liveZoom: 15.8,
-    // Poquito / Alamo / Coleto with the E 13th–E 14th cross streets.
+    label: 'SF Mission 2×2',
+    title: 'San Francisco · Mission 2×2',
+    menuSub: 'Mission / Howard × 6th / 7th',
+    place: 'Mission & 6th, San Francisco',
+    zone: 'SoMa corridor',
+    queuedRoad: 'Mission · Westbound',
+    mapCenter: [-122.4091, 37.7796],
+    mapZoom: 16,
+    liveCenter: [-122.4091, 37.7796],
+    liveZoom: 16.2,
     route: [
-      [-97.7245, 30.2689], [-97.7192, 30.2689],
-      [-97.7192, 30.2670], [-97.7245, 30.2670],
-      [-97.7245, 30.2649], [-97.7192, 30.2649]
+      [-122.4109, 37.7792], [-122.4087, 37.7810],
+      [-122.4072, 37.7797], [-122.4094, 37.7780],
+      [-122.4109, 37.7792]
     ],
     crossRoute: [
-      [-97.7245, 30.2704], [-97.7245, 30.2649],
-      [-97.7192, 30.2704], [-97.7192, 30.2649]
+      [-122.4072, 37.7797], [-122.4094, 37.7780],
+      [-122.4087, 37.7810], [-122.4109, 37.7792]
     ]
   },
   'grid-3x3': {
-    label: '3×3 Grid',
-    title: 'East Austin · 3×3',
-    menuSub: 'Chicon / Coleto corridor',
-    place: 'Chicon & E 13th, Austin',
-    zone: 'Chicon corridor',
-    queuedRoad: 'Chicon · Northbound',
-    mapCenter: [-97.7219, 30.2675],
-    mapZoom: 15.2,
-    liveCenter: [-97.7219, 30.2675],
-    liveZoom: 15.4,
-    // Expanded Chicon / Poquito / Alamo / Coleto corridor.
+    label: 'SF Mission 3×3',
+    title: 'San Francisco · Mission 3×3',
+    menuSub: 'Mission / Howard / Folsom × 6th / 7th / 8th',
+    place: 'Mission & 7th, San Francisco',
+    zone: 'SoMa corridor',
+    queuedRoad: 'Mission · Westbound',
+    mapCenter: [-122.4094, 37.7781],
+    mapZoom: 15.7,
+    liveCenter: [-122.4094, 37.7781],
+    liveZoom: 16,
     route: [
-      [-97.7262, 30.2712], [-97.7168, 30.2712],
-      [-97.7168, 30.2689], [-97.7262, 30.2689],
-      [-97.7262, 30.2670], [-97.7168, 30.2670],
-      [-97.7168, 30.2649], [-97.7262, 30.2649]
+      [-122.4132, 37.7775], [-122.4087, 37.7810],
+      [-122.4056, 37.7785], [-122.4101, 37.7750],
+      [-122.4132, 37.7775]
     ],
     crossRoute: [
-      [-97.7262, 30.2712], [-97.7262, 30.2649],
-      [-97.7219, 30.2712], [-97.7219, 30.2649],
-      [-97.7168, 30.2712], [-97.7168, 30.2649]
+      [-122.4072, 37.7797], [-122.4094, 37.7780], [-122.4116, 37.7762],
+      [-122.4101, 37.7750], [-122.4079, 37.7768], [-122.4056, 37.7785]
     ]
-  },
+  }
+,
   monaco: {
     label: 'Monaco',
     title: 'Monaco',
@@ -73,7 +70,6 @@ const SCENARIOS = {
     mapZoom: 14,
     liveCenter: [7.4246, 43.7384],
     liveZoom: 15.6,
-    // Monte-Carlo circuit streets.
     route: [
       [7.4208, 43.73831], [7.42312, 43.73848], [7.42316, 43.73852], [7.42315, 43.73855],
       [7.42312, 43.73858], [7.42305, 43.73859], [7.42301, 43.73866], [7.42294, 43.73893],
@@ -84,11 +80,6 @@ const SCENARIOS = {
       [7.42806, 43.74047], [7.42816, 43.74041], [7.42827, 43.74039], [7.4287, 43.74043],
       [7.42885, 43.74042], [7.429, 43.74036], [7.42917, 43.74024], [7.42927, 43.74013],
       [7.42937, 43.73985], [7.42931, 43.73952], [7.42943, 43.7394], [7.42942, 43.73931],
-      [7.42931, 43.73916], [7.42912, 43.73896], [7.42896, 43.7388], [7.42884, 43.73877],
-      [7.42875, 43.73868], [7.42872, 43.73858], [7.42845, 43.73835]
-    ],
-    crossRoute: [
-      [7.42438, 43.74012], [7.42443, 43.74015], [7.4246, 43.74033], [7.42485, 43.74061],
       [7.42493, 43.74067], [7.42501, 43.74068], [7.42504, 43.74068], [7.42512, 43.74068],
       [7.4252, 43.74066], [7.42548, 43.7405], [7.4255, 43.74049], [7.4256, 43.74045],
       [7.42551, 43.7403], [7.42547, 43.74025], [7.42545, 43.74021], [7.42537, 43.74009]
@@ -105,7 +96,6 @@ const SCENARIOS = {
     mapZoom: 12.9,
     liveCenter: [10.197, 36.806],
     liveZoom: 13.4,
-    // Avenue Jean Jaurès corridor, Tunis.
     route: [
       [10.17761, 36.80653], [10.17751, 36.80637], [10.17745, 36.80618], [10.17748, 36.80584],
       [10.177, 36.80579], [10.17693, 36.80572], [10.17694, 36.80566], [10.17698, 36.80562],
@@ -118,10 +108,8 @@ const SCENARIOS = {
       [10.18113, 36.80619], [10.18141, 36.80622], [10.18148, 36.80585], [10.18149, 36.80578],
       [10.18149, 36.80572]
     ]
-  }
-};
-
-let activeScenario = 'monaco';
+  }};
+let activeScenario = 'grid-2x2';
 try {
   const savedScenario = localStorage.getItem(SCENARIO_KEY);
   if (savedScenario && SCENARIOS[savedScenario]) activeScenario = savedScenario;
@@ -130,13 +118,14 @@ try {
 }
 
 function getScenario() {
-  return SCENARIOS[activeScenario] || SCENARIOS.monaco;
+  return SCENARIOS[activeScenario] || SCENARIOS['grid-2x2'];
 }
 
 let map = null;
 let benchmarkMounted = false;
-let benchmarkTab = 'scenarios';
+let benchmarkTab = 'models';
 let mapFocusMarker = null;
+let simulationSeeded = false;
 
 function resolveToken() {
   return localStorage.getItem(TOKEN_KEY)
@@ -244,22 +233,23 @@ function scenarioOptionMarkup(key, scenario) {
         </button>`;
 }
 
-/* Every menu offers all four scenarios. The two headless SUMO grids are grouped
-   apart because they draw the TraCI network on the canvas scene (and their own 3D
-   environment) instead of the Mapbox basemap, so the layer toggles do not apply. */
+/* Every menu offers the scenarios. The two headless SUMO grids (San Francisco
+   Mission corridors) are grouped apart because they draw the TraCI network on
+   the canvas scene over a Mapbox basemap instead of the live map layers. */
 function renderScenarioMenus() {
   scenarioMenus.forEach((menu) => {
-    const places = Object.entries(SCENARIOS).filter(([key]) => !key.startsWith('grid-'));
-    const grids = Object.entries(SCENARIOS).filter(([key]) => key.startsWith('grid-'));
+    const all = Object.entries(SCENARIOS);
+    const places = [];
+    const grids = all;
     menu.innerHTML = `
       <div class="scenario-menu-head" role="presentation">
         <span>Simulation scenario</span>
-      <small>${places.length + grids.length} available</small>
+      <small>${all.length} available</small>
       </div>
       ${places.map(([key, scenario]) => scenarioOptionMarkup(key, scenario)).join('')}
       ${
         grids.length
-          ? `<div class="scenario-menu-group" role="presentation"><span>SUMO grids</span><small>Live TraCI</small></div>
+          ? `<div class="scenario-menu-group" role="presentation"><span>San Francisco grids</span><small>Live TraCI · OSM</small></div>
       ${grids.map(([key, scenario]) => scenarioOptionMarkup(key, scenario)).join('')}`
           : ''
       }
@@ -297,21 +287,13 @@ function toggleScenarioMenu(trigger) {
   setScenarioMenuOpen(menu, willOpen);
 }
 
-/* The Mapbox basemap is disabled product-wide: the live map shows only our SUMO road
-   layout (netconvert network) plus the simulation layers on a plain dark canvas.
-   Keep the menu item visible but inert so the choice is explained, not just missing. */
+/* Mapbox layers are available for every scenario, including the SF SUMO grids. */
 function syncLayerMenuAvailability() {
-  document.querySelectorAll('[data-map-layer]').forEach((option) => {
-    const layer = option.dataset.mapLayer;
-    if (layer === 'basemap') {
-      option.disabled = true;
-      option.classList.add('is-disabled');
-      option.setAttribute('aria-disabled', 'true');
-      option.title = 'Disabled — only the SUMO road layout is shown';
-      option.setAttribute('aria-checked', 'false');
-      option.classList.remove('is-selected');
-      setMapLayerVisibility('basemap', false);
-    }
+  document.querySelectorAll('[data-map-layer="basemap"]').forEach((option) => {
+    option.disabled = false;
+    option.classList.remove('is-disabled');
+    option.removeAttribute('aria-disabled');
+    option.title = '';
   });
 }
 
@@ -334,7 +316,11 @@ function applyScenarioChrome() {
   if (liveCanvas) liveCanvas.setAttribute('aria-label', `3D live traffic map of ${scenario.place}`);
   const simStart = $('simulationStart');
   if (simStart) {
-    const gridLabel = activeScenario === 'grid-3x3' ? '3×3' : '2×2';
+    const labels = {
+      'grid-2x2': '2×2',
+      'grid-3x3': '3×3'
+    };
+    const gridLabel = labels[activeScenario] || '2×2';
     simStart.innerHTML = `<svg class="ico"><use href="#i-refresh"/></svg>Start ${gridLabel}`;
   }
   document.querySelectorAll('[data-scenario-option]').forEach((option) => {
@@ -699,6 +685,108 @@ document.addEventListener('keydown', (event) => {
   accountToggle?.focus();
 });
 
+const ROUTE_BASES = {
+  'Live Map': '/live-map',
+  'Roles & Permissions': '/access',
+  Benchmark: '/benchmark',
+  Dashboard: '/',
+  Message: '/messages',
+  'Rules Engine': '/rules',
+  Settings: '/settings',
+  'Activity log': '/activity-log',
+};
+const BENCHMARK_TABS = ['training', 'models', 'runs', 'compare', 'simulation'];
+const LIVE_TABS = ['events', 'optimize', 'predict', 'roam'];
+const ACCESS_TABS = ['roles', 'permissions'];
+const SETTINGS_TABS = ['general', 'notifications', 'workspace', 'integrations', 'members', 'security', 'billing'];
+
+function routeFor(view, subtab) {
+  const base = ROUTE_BASES[view] || '/';
+  if (view === 'Benchmark' && BENCHMARK_TABS.includes(subtab)) return `${base}/${subtab}`;
+  if (view === 'Live Map' && LIVE_TABS.includes(subtab)) return `${base}/${subtab}`;
+  if (view === 'Roles & Permissions' && ACCESS_TABS.includes(subtab)) return `${base}/${subtab}`;
+  if (view === 'Settings' && SETTINGS_TABS.includes(subtab)) return `${base}/${subtab}`;
+  return base;
+}
+
+function setRoute(view, subtab, { replace = false } = {}) {
+  const path = routeFor(view, subtab);
+  const url = new URL(window.location.href);
+  url.pathname = path;
+  url.searchParams.delete('view');
+  url.searchParams.delete('tab');
+  // compareRuns is intentional state shared between Runs and Compare; keep it while routing.
+  if (replace) window.history.replaceState({ view, subtab }, '', url);
+  else window.history.pushState({ view, subtab }, '', url);
+}
+
+function routeFromLocation() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const [section, subtab] = parts;
+  if (section === 'benchmark') return { view: 'Benchmark', subtab: BENCHMARK_TABS.includes(subtab) ? subtab : 'runs' };
+  if (section === 'live-map') return { view: 'Live Map', subtab: LIVE_TABS.includes(subtab) ? subtab : 'events' };
+  if (section === 'access') return { view: 'Roles & Permissions', subtab: ACCESS_TABS.includes(subtab) ? subtab : 'roles' };
+  if (section === 'messages') return { view: 'Message', subtab: null };
+  if (section === 'rules') return { view: 'Rules Engine', subtab: null };
+  if (section === 'settings') return { view: 'Settings', subtab: SETTINGS_TABS.includes(subtab) ? subtab : 'general' };
+  if (section === 'activity-log') return { view: 'Activity log', subtab: null };
+  if (section === 'dashboard' || parts.length === 0) return { view: 'Dashboard', subtab: null };
+  return null;
+}
+
+function navigateTo(view, subtab, { replace = false } = {}) {
+  if (view === 'Live Map') {
+    activeLiveTab = LIVE_TABS.includes(subtab) ? subtab : 'events';
+    setRoute(view, activeLiveTab, { replace });
+    setActiveNav(view);
+    setActiveViewTab('Dashboard');
+    showView(view);
+    setLiveSubnavActive(activeLiveTab);
+    liveMapView?.classList.toggle('live-roam-mode', activeLiveTab === 'roam');
+    if (activeLiveTab === 'roam') {
+      if (roamRestoreCollapsed === null) roamRestoreCollapsed = liveMapView?.classList.contains('live-panels-collapsed') ? 1 : 0;
+      liveMapView?.classList.add('live-panels-collapsed');
+    } else if (roamRestoreCollapsed !== null) {
+      liveMapView?.classList.toggle('live-panels-collapsed', roamRestoreCollapsed === 1);
+      roamRestoreCollapsed = null;
+    }
+    document.dispatchEvent(new CustomEvent('sumo:livetabchange', { detail: { tab: activeLiveTab } }));
+    return;
+  }
+  if (view === 'Settings') {
+    const settingsTab = SETTINGS_TABS.includes(subtab) ? subtab : 'general';
+    setRoute(view, settingsTab, { replace });
+    setActiveNav('Settings');
+    setActiveViewTab('Settings');
+    showView(view);
+    setSettingsTab(settingsTab, false);
+    return;
+  }
+  if (view === 'Roles & Permissions') {
+    setRoute(view, ACCESS_TABS.includes(subtab) ? subtab : 'roles', { replace });
+    setActiveNav(view);
+    setActiveViewTab('Dashboard');
+    showView(view);
+    setAccessTab(ACCESS_TABS.includes(subtab) ? subtab : 'roles', false);
+    return;
+  }
+  if (view === 'Benchmark') {
+    benchmarkTab = BENCHMARK_TABS.includes(subtab) ? subtab : 'runs';
+    setRoute(view, benchmarkTab, { replace });
+    setActiveNav(view);
+    setActiveViewTab('Dashboard');
+    showView(view);
+    setBenchmarkNavOpen(true);
+    setBenchmarkTab(benchmarkTab);
+    document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((item) => item.classList.toggle('is-active', item.dataset.benchmarkTab === benchmarkTab));
+    return;
+  }
+  setRoute(view, null, { replace });
+  setActiveNav(view === 'Settings' ? 'Settings' : view);
+  setActiveViewTab(view === 'Settings' ? 'Settings' : 'Dashboard');
+  showView(view);
+}
+
 function setLiveSubnavActive(tabName) {
   liveLinks.forEach((link) => {
     const active = link.dataset.liveTab === tabName;
@@ -715,29 +803,7 @@ function setLiveSubnavActive(tabName) {
 }
 
 function selectLiveTab(tabName) {
-  activeLiveTab = ['events', 'optimize', 'predict', 'roam'].includes(tabName) ? tabName : 'events';
-  setActiveNav('Live Map');
-  setActiveViewTab('Dashboard');
-  if (liveMapView?.hidden) showView('Live Map');
-  setLiveSubnavActive(activeLiveTab);
-  liveMapView?.classList.toggle('live-roam-mode', activeLiveTab === 'roam');
-  if (activeLiveTab === 'roam') {
-    if (roamRestoreCollapsed === null) {
-      roamRestoreCollapsed = liveMapView?.classList.contains('live-panels-collapsed') ? 1 : 0;
-    }
-    liveMapView?.classList.add('live-panels-collapsed');
-  } else if (roamRestoreCollapsed !== null) {
-    liveMapView?.classList.toggle('live-panels-collapsed', roamRestoreCollapsed === 1);
-    roamRestoreCollapsed = null;
-  }
-
-  const url = new URL(window.location.href);
-  url.searchParams.set('view', 'live-map');
-  if (activeLiveTab) url.searchParams.set('tab', activeLiveTab);
-  else url.searchParams.delete('tab');
-  window.history.replaceState(null, '', url);
-
-  document.dispatchEvent(new CustomEvent('sumo:livetabchange', { detail: { tab: activeLiveTab } }));
+  navigateTo('Live Map', tabName || 'events');
 }
 
 function setLiveNavOpen(open) {
@@ -802,7 +868,42 @@ function setLiveMapMode(active) {
   resizeLiveMapThroughTransition();
 }
 
+let liveMapPollTimer = null;
+function startLiveMapSimulationPolling() {
+  if (liveMapPollTimer) return;
+  connectSimulationSocket();
+  const poll = async () => {
+    try {
+      const res = await simulationFetch('/api/simulation/state');
+      if (res.ok) {
+        const state = await res.json();
+        if (state && state.status === 'idle') {
+          // If simulation is not running yet, automatically start it on the active scenario
+          const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+          await simulationFetch('/api/simulation/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenario, speed: simulationSpeed || 1 })
+          });
+        } else if (state) {
+          updateSimulationState(state);
+        }
+      }
+    } catch {}
+  };
+  poll();
+  liveMapPollTimer = setInterval(poll, 1000);
+}
+
+function stopLiveMapSimulationPolling() {
+  if (liveMapPollTimer) {
+    clearInterval(liveMapPollTimer);
+    liveMapPollTimer = null;
+  }
+}
+
 function ensureLiveMap() {
+  startLiveMapSimulationPolling();
   if (liveMap) {
     liveMap.resize();
     return;
@@ -852,9 +953,15 @@ function showView(name) {
 
 document.querySelectorAll('[data-benchmark-tab]').forEach((tab) => tab.addEventListener('click', () => {
   document.querySelectorAll('[data-benchmark-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
-  benchmarkTab = tab.dataset.benchmarkTab || 'overview';
+  benchmarkTab = tab.dataset.benchmarkTab || 'runs';
   setBenchmarkTab(benchmarkTab);
 }));
+
+window.addEventListener('benchmark:navigate', (event) => {
+  const tab = event.detail;
+  if (!BENCHMARK_TABS.includes(tab)) return;
+  navigateTo('Benchmark', tab);
+});
 
 const ACTIVITY_LOG = [
   {
@@ -1073,12 +1180,7 @@ function setActiveViewTab(name) {
 
 document.querySelectorAll('.primary-nav .nav-item').forEach((item) => {
   if (item.classList.contains('nav-parent')) return;
-  item.addEventListener('click', () => {
-    const name = item.dataset.nav;
-    setActiveNav(name);
-    setActiveViewTab(name === 'Settings' ? 'Settings' : 'Dashboard');
-    showView(name);
-  });
+  item.addEventListener('click', () => navigateTo(item.dataset.nav || 'Dashboard'));
 });
 
 accessNavParent?.addEventListener('click', () => {
@@ -1095,12 +1197,7 @@ accessNavParent?.addEventListener('click', () => {
 });
 
 accessLinks.forEach((link) => {
-  link.addEventListener('click', () => {
-    setActiveNav('Roles & Permissions');
-    setActiveViewTab('Dashboard');
-    showView('Roles & Permissions');
-    setAccessTab(link.dataset.accessLink);
-  });
+  link.addEventListener('click', () => navigateTo('Roles & Permissions', link.dataset.accessLink));
 });
 
 liveNavParent?.addEventListener('click', () => {
@@ -1120,14 +1217,7 @@ benchmarkNavParent?.addEventListener('click', () => {
 });
 
 document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((link) => {
-  link.addEventListener('click', () => {
-    setActiveNav('Benchmark'); setActiveViewTab('Dashboard'); showView('Benchmark');
-    benchmarkTab = link.dataset.benchmarkTab || 'overview';
-    setBenchmarkTab(benchmarkTab);
-    document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((item) => {
-      item.classList.toggle('is-active', item === link);
-    });
-  });
+  link.addEventListener('click', () => navigateTo('Benchmark', link.dataset.benchmarkTab || 'runs'));
 });
 
 document.addEventListener('sumo:open-training', () => {
@@ -1144,26 +1234,12 @@ liveModeTabs.forEach((tab) => {
 });
 
 document.querySelectorAll('.view-tab').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    const name = tab.dataset.view || 'Dashboard';
-    setActiveViewTab(name);
-    setActiveNav(name === 'Settings' ? 'Settings' : 'Dashboard');
-    showView(name);
-  });
+  tab.addEventListener('click', () => navigateTo(tab.dataset.view || 'Dashboard'));
 });
 
 function exitLiveMap() {
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-  setActiveNav('Dashboard');
-  setActiveViewTab('Dashboard');
-  showView('Dashboard');
-
-  const url = new URL(window.location.href);
-  if (url.searchParams.get('view') === 'live-map') {
-    url.searchParams.delete('view');
-    url.searchParams.delete('tab');
-    window.history.replaceState(null, '', url);
-  }
+  navigateTo('Dashboard');
 }
 
 document.querySelectorAll('[data-live-exit]').forEach((button) => {
@@ -1212,7 +1288,6 @@ if (token) {
 
 const LIVE_FOCUS = [-97.7325, 30.2663];
 const LIVE_VIEW = { center: LIVE_FOCUS, zoom: 16.05, pitch: 58, bearing: -26 };
-let sumo3d = null;
 let liveMap3dOn = true;
 let liveSceneMarkers = [];
 const LIVE_ROUTE_OVERLAYS_ENABLED = false;
@@ -1294,11 +1369,16 @@ simulationTrack?.addEventListener('pointerdown', () => simulationTrack.classList
 let simulationSocket = null;
 let simulationSpeed = 1;
 let latestSimulationState = null;
-let simulationSeeded = false;
+let previousVehicleFrame = null;
+let currentVehicleFrame = null;
+let vehicleFrameTime = 0;
+let vehicleAnimationFrame = 0;
+let simulationSignalFeatures = [];
+const simulationSignalMarkers = new Map();
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
 const SIMULATION_BOUNDS = {
-  'grid-2x2': { west: -97.7245, east: -97.7192, south: 30.2649, north: 30.2704, width: 400, height: 400 },
-  'grid-3x3': { west: -97.7262, east: -97.7168, south: 30.2649, north: 30.2712, width: 600, height: 600 }
+  'grid-2x2': { west: -122.4109, east: -122.4072, south: 37.778, north: 37.781, width: 330, height: 340 },
+  'grid-3x3': { west: -122.4132, east: -122.4056, south: 37.775, north: 37.781, width: 700, height: 660 }
 };
 
 function simulationFetch(path, options) {
@@ -1313,30 +1393,298 @@ function simulationPoint(scenario, x, y) {
   ];
 }
 
+function refreshSimulationSignals(state) {
+  if (!liveMap) return;
+  const active = new Map((state?.signals || []).map((signal) => [signal.id, signal.state || '']));
+  simulationSignalFeatures.forEach((signal) => {
+    const stateString = active.get(signal.signalId) || '';
+    const signalState = (signal.linkIndices || []).map((index) => stateString[index]).find((value) => value === 'G' || value === 'g')
+      || (signal.linkIndices || []).map((index) => stateString[index]).find((value) => value === 'y' || value === 'Y')
+      || 'r';
+    const marker = simulationSignalMarkers.get(signal.key);
+    if (!marker) return;
+    marker.querySelectorAll('[data-lamp]').forEach((lamp) => {
+      const lit = lamp.dataset.lamp === lampForSignalState(signalState);
+      lamp.classList.toggle('is-lit', lit);
+    });
+    marker.title = `Traffic light · ${signalState === 'G' || signalState === 'g' ? 'Green' : signalState === 'y' || signalState === 'Y' ? 'Yellow' : 'Red'}`;
+  });
+}
+
+function lampForSignalState(state) {
+  if (state === 'G' || state === 'g') return 'green';
+  if (state === 'y' || state === 'Y') return 'yellow';
+  return 'red';
+}
+
+function setSimulationSignalMarkers(signals) {
+  simulationSignalMarkers.forEach((marker) => marker.remove());
+  simulationSignalMarkers.clear();
+  simulationSignalFeatures = signals;
+  if (!liveMap) return;
+  signals.forEach((signal) => {
+    const root = document.createElement('div');
+    root.className = 'sumo-signal-marker';
+    root.setAttribute('role', 'img');
+    root.setAttribute('aria-label', 'Traffic light');
+    root.innerHTML = '<span class="sumo-signal-housing"><i data-lamp="red"></i><i data-lamp="yellow"></i><i data-lamp="green"></i></span>';
+    simulationSignalMarkers.set(signal.key, root);
+    new mapboxgl.Marker({ element: root, anchor: 'center' })
+      .setLngLat(signal.coordinates)
+      .addTo(liveMap);
+  });
+  refreshSimulationSignals(latestSimulationState);
+}
+
+const VEHICLE_RENDER = {
+  passenger: { label: 'Car', color: '#4f9fd8', length: 4.5, width: 1.9, height: 1.55 },
+  taxi: { label: 'Taxi', color: '#e9b83f', length: 4.5, width: 1.9, height: 1.6 },
+  bus: { label: 'Bus', color: '#35a77a', length: 11.5, width: 2.5, height: 3.25 },
+  truck: { label: 'Truck', color: '#9babb7', length: 7.2, width: 2.45, height: 3.0 },
+  emergency: { label: 'Emergency', color: '#f2f1ec', length: 5.4, width: 2.1, height: 2.15 },
+  bicycle: { label: 'Bicycle', color: '#ee9f37', length: 1.9, width: 0.65, height: 1.25 },
+  motorcycle: { label: 'Motorcycle', color: '#555d68', length: 2.2, width: 0.8, height: 1.35 },
+  pedestrian: { label: 'Pedestrian', color: '#8464d8', length: 0.65, width: 0.65, height: 1.7 },
+};
+
+function vehicleRenderClass(vehicle) {
+  const source = `${vehicle.vehicleClass || ''} ${vehicle.type || ''}`.toLowerCase();
+  if (/emergency|ambulance|fire|police/.test(source)) return 'emergency';
+  if (/bus|coach/.test(source)) return 'bus';
+  if (/taxi/.test(source)) return 'taxi';
+  if (/truck|delivery|trailer/.test(source)) return 'truck';
+  if (/bicycle|bike/.test(source)) return 'bicycle';
+  if (/motorcycle|moped/.test(source)) return 'motorcycle';
+  return 'passenger';
+}
+
+function vehicleFootprint(center, angle, length, width) {
+  const radians = Number(angle || 0) * Math.PI / 180;
+  // SUMO angle is clockwise from north. Build a true lane-aligned footprint,
+  // then convert its local metre offsets to geographic coordinates.
+  const forward = [Math.sin(radians), Math.cos(radians)];
+  const right = [Math.cos(radians), -Math.sin(radians)];
+  const cosLat = Math.cos(center[1] * Math.PI / 180);
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+  return [corners.map(([along, across]) => {
+    const east = forward[0] * along * length / 2 + right[0] * across * width / 2;
+    const north = forward[1] * along * length / 2 + right[1] * across * width / 2;
+    return [center[0] + east / (111320 * Math.max(cosLat, 0.01)), center[1] + north / 111320];
+  })];
+}
+
+const vehicleClassVisibility = new Map(Object.keys(VEHICLE_RENDER).map((kind) => [kind, true]));
+const vehicleInstances = new Map();
+let selectedVehicleId = null;
+
+// Three.js 3D Vehicle Renderer on Mapbox
+let threeScene = null;
+let threeCamera = null;
+let threeRenderer = null;
+let threeVehicleGroup = null;
+let threeLayerInstalled = false;
+
+// Reusable 3D box geometries for all vehicle classes, bicycles and pedestrians
+const BOX_GEOMETRIES = {
+  passenger: new THREE.BoxGeometry(1.9, 4.5, 1.5),
+  taxi: new THREE.BoxGeometry(1.9, 4.5, 1.5),
+  bus: new THREE.BoxGeometry(2.6, 11.5, 3.2),
+  truck: new THREE.BoxGeometry(2.5, 7.5, 2.9),
+  emergency: new THREE.BoxGeometry(2.2, 5.2, 2.1),
+  bicycle: new THREE.BoxGeometry(0.7, 1.9, 1.2),
+  motorcycle: new THREE.BoxGeometry(0.8, 2.2, 1.3),
+  pedestrian: new THREE.BoxGeometry(0.65, 0.65, 1.7),
+};
+
+function create3DVehicleMesh(vehicleClass, colorHex) {
+  const geo = BOX_GEOMETRIES[vehicleClass] || BOX_GEOMETRIES.passenger;
+  const color = new THREE.Color(colorHex);
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.35,
+    metalness: 0.2
+  });
+  const mesh = new THREE.Mesh(geo, material);
+  // Center mesh so bottom sits on the ground (z=0)
+  const h = (VEHICLE_RENDER[vehicleClass] || VEHICLE_RENDER.passenger).height || 1.5;
+  mesh.position.z = h / 2;
+  mesh.castShadow = true;
+
+  const container = new THREE.Group();
+  container.add(mesh);
+  return container;
+}
+
+const customThreeVehicleLayer = {
+  id: 'three-3d-vehicles',
+  type: 'custom',
+  renderingMode: '3d',
+  onAdd: function (mapInstance, gl) {
+    threeCamera = new THREE.Camera();
+    threeScene = new THREE.Scene();
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    threeScene.add(ambientLight);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    sunLight.position.set(50, -80, 100).normalize();
+    threeScene.add(sunLight);
+
+    threeVehicleGroup = new THREE.Group();
+    threeScene.add(threeVehicleGroup);
+
+    threeRenderer = new THREE.WebGLRenderer({
+      canvas: mapInstance.getCanvas(),
+      context: gl,
+      antialias: true
+    });
+    threeRenderer.autoClear = false;
+  },
+  render: function (gl, matrix) {
+    if (!threeRenderer || !threeScene || !threeCamera || !liveMap) return;
+
+    // Synchronize vehicle meshes with vehicleInstances
+    if (threeVehicleGroup) {
+      // Clear previous frame meshes
+      while (threeVehicleGroup.children.length > 0) {
+        const obj = threeVehicleGroup.children.pop();
+        if (obj.geometry) obj.geometry.dispose();
+      }
+
+      for (const vehicle of vehicleInstances.values()) {
+        if (!vehicle.position || !vehicleClassVisibility.get(vehicle.renderClass)) continue;
+
+        const coords = vehicle.position;
+        const modelAsMercator = mapboxgl.MercatorCoordinate.fromLngLat(
+          { lng: coords[0], lat: coords[1] },
+          0
+        );
+
+        const meterScale = modelAsMercator.meterInMercatorCoordinateUnits();
+        const vMesh = create3DVehicleMesh(vehicle.renderClass, vehicle.color);
+
+        // Position in Mapbox Mercator coordinate space
+        vMesh.position.set(modelAsMercator.x, modelAsMercator.y, modelAsMercator.z);
+        // Scale to real-world meters
+        vMesh.scale.set(meterScale, meterScale, meterScale);
+        // Rotate: SUMO heading is degrees clockwise from North.
+        // Three.js Z-axis is up in Mercator, Y is South, X is East
+        const rad = -(Number(vehicle.angle || 0)) * Math.PI / 180;
+        vMesh.rotation.z = rad;
+
+        threeVehicleGroup.add(vMesh);
+      }
+    }
+
+    const m = new THREE.Matrix4().fromArray(matrix);
+    threeCamera.projectionMatrix = m;
+    threeRenderer.resetState();
+    threeRenderer.render(threeScene, threeCamera);
+    if (liveMap) liveMap.triggerRepaint();
+  }
+};
+
 function refreshSimulationVehicles(state) {
   if (!liveMap || !state?.scenario) return;
   const source = liveMap.getSource('live-vehicles');
-  if (!source) return;
-  source.setData({
-    type: 'FeatureCollection',
-    features: (state.vehicles || []).map((vehicle) => ({
+  vehicleInstances.clear();
+  const timestamp = Number(state.simulationTime || 0);
+
+  const addVehicle = (object, pedestrian = false) => {
+    const renderClass = pedestrian ? 'pedestrian' : vehicleRenderClass(object);
+    if (!vehicleClassVisibility.get(renderClass)) return;
+    const style = VEHICLE_RENDER[renderClass];
+    const center = Number.isFinite(Number(object.lng)) && Number.isFinite(Number(object.lat))
+      ? [Number(object.lng), Number(object.lat)]
+      : simulationPoint(state.scenario, object.x, object.y);
+    const angle = Number(object.angle || 0);
+    const id = String(object.id || renderClass + "-" + vehicleInstances.size);
+    const waiting = Boolean(object.waiting);
+    const data = {
+      id, vehicleClass: renderClass, classLabel: style.label, speed: Number(object.speed || 0),
+      waiting, emergency: renderClass === 'emergency', color: waiting ? '#d45c52' : style.color,
+      height: style.height, simulationTime: timestamp,
+    };
+    vehicleInstances.set(id, { ...data, position: center, angle, renderClass, length: style.length, width: style.width, height: style.height, selected: id === selectedVehicleId });
+  };
+
+  (state.vehicles || []).slice(0, 5000).forEach((vehicle) => addVehicle(vehicle));
+  (state.pedestrians || []).slice(0, 2000).forEach((person) => addVehicle(person, true));
+
+  if (source) {
+    const features = [...vehicleInstances.values()].map((vehicle) => ({
       type: 'Feature',
-      properties: { waiting: Boolean(vehicle.waiting), speed: Number(vehicle.speed || 0), id: vehicle.id },
-      geometry: { type: 'Point', coordinates: Number.isFinite(Number(vehicle.lng)) && Number.isFinite(Number(vehicle.lat)) ? [Number(vehicle.lng), Number(vehicle.lat)] : simulationPoint(state.scenario, vehicle.x, vehicle.y) }
-    }))
-  });
+      id: vehicle.id,
+      properties: {
+        ...vehicle,
+        angle: vehicle.angle,
+        height: vehicle.height || 1.6,
+        base_height: 0,
+        color: vehicle.color
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: vehicleFootprint(vehicle.position, vehicle.angle, vehicle.length || 4.5, vehicle.width || 1.9)
+      }
+    }));
+    source.setData({ type: 'FeatureCollection', features });
+  }
+
+  if (liveMap) {
+    liveMap.triggerRepaint();
+  }
+}
+
+function interpolateVehicleFrame(now) {
+  if (!currentVehicleFrame || !liveMap) return;
+  const elapsed = Math.max(0, now - vehicleFrameTime);
+  const alpha = Math.min(1, elapsed / Math.max(100, 1000 / Math.max(simulationSpeed, 0.25)));
+  if (previousVehicleFrame && alpha < 1) {
+    const priorVehicles = new Map((previousVehicleFrame.vehicles || []).map((vehicle) => [String(vehicle.id), vehicle]));
+    const priorPeople = new Map((previousVehicleFrame.pedestrians || []).map((person) => [String(person.id), person]));
+    const blend = (items, oldItems) => (items || []).map((item) => {
+      const old = oldItems.get(String(item.id));
+      if (!old) return item;
+      const delta = ((Number(item.angle || 0) - Number(old.angle || 0) + 540) % 360) - 180;
+      return { ...item,
+        x: Number(old.x) + (Number(item.x) - Number(old.x)) * alpha,
+        y: Number(old.y) + (Number(item.y) - Number(old.y)) * alpha,
+        lng: Number.isFinite(Number(old.lng)) && Number.isFinite(Number(item.lng)) ? Number(old.lng) + (Number(item.lng) - Number(old.lng)) * alpha : item.lng,
+        lat: Number.isFinite(Number(old.lat)) && Number.isFinite(Number(item.lat)) ? Number(old.lat) + (Number(item.lat) - Number(old.lat)) * alpha : item.lat,
+        angle: Number(old.angle || 0) + delta * alpha,
+      };
+    });
+    refreshSimulationVehicles({ ...currentVehicleFrame, vehicles: blend(currentVehicleFrame.vehicles, priorVehicles), pedestrians: blend(currentVehicleFrame.pedestrians, priorPeople) });
+  } else {
+    refreshSimulationVehicles(currentVehicleFrame);
+    previousVehicleFrame = currentVehicleFrame;
+  }
+  vehicleAnimationFrame = window.requestAnimationFrame(interpolateVehicleFrame);
+}
+function install3dVehicleLayer() {
+  if (!liveMap || threeLayerInstalled) return;
+  if (!liveMap.getLayer('three-3d-vehicles')) {
+    try {
+      liveMap.addLayer(customThreeVehicleLayer);
+      threeLayerInstalled = true;
+    } catch (err) {
+      console.warn('Three.js vehicle layer mount error:', err);
+    }
+  }
 }
 
 function updateSimulationState(state) {
   if (!state) return;
   latestSimulationState = state;
-  if (sumo3d) sumo3d.update({ ...state, scenario: activeScenario });
   if (simulationClock) simulationClock.textContent = state.clock || '00:00:00';
   setSimulationStatus(state.status);
-  if (simulationMetrics) simulationMetrics.textContent = `${state.metrics?.vehicles || 0} vehicles`;
+  if (simulationMetrics) simulationMetrics.textContent = `${state.metrics?.vehicles || 0} vehicles · ${state.metrics?.pedestrians || 0} pedestrians`;
   if (simulationTime && Number.isFinite(Number(state.simulationTime))) simulationTime.value = state.simulationTime;
   paintSimulationTimeline(simulationTime?.value || 0);
-  refreshSimulationVehicles(state);
+  previousVehicleFrame = currentVehicleFrame;
+  currentVehicleFrame = state;
+  vehicleFrameTime = performance.now();
+  if (!vehicleAnimationFrame) vehicleAnimationFrame = window.requestAnimationFrame(interpolateVehicleFrame);
+  refreshSimulationSignals(state);
 }
 
 function formatSimulationClock(seconds) {
@@ -1373,40 +1721,6 @@ document.getElementById('simulationPlay')?.addEventListener('click', async (even
     showToast('Simulation service is offline.');
   }
 });
-
-/* The 3D scene's own SUMO strip: start / pause / single-step / speed. */
-async function handleSumoSceneAction(action, extra = {}) {
-  const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
-  const status = simulationStatus?.dataset.state;
-  const post = async (path, body) => {
-    connectSimulationSocket();
-    try {
-      const response = await simulationFetch(
-        path,
-        body
-          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-          : { method: 'POST' }
-      );
-      if (!response.ok) throw new Error(`simulation ${response.status}`);
-      updateSimulationState(await response.json());
-    } catch {
-      showToast('Simulation service is offline.');
-    }
-  };
-
-  if (action === 'start') return post('/api/simulation/start', { scenario, speed: simulationSpeed });
-  if (action === 'pause') {
-    return post(status === 'paused' ? '/api/simulation/resume' : '/api/simulation/pause');
-  }
-  if (action === 'step') return post('/api/simulation/step', { scenario, count: 1 });
-  if (action === 'speed') {
-    simulationSpeed = Number(extra.speed) || 1;
-    const chip = document.getElementById('simulationSpeed');
-    if (chip) chip.textContent = `${simulationSpeed}×`;
-    return post('/api/simulation/speed', { scenario, speed: simulationSpeed });
-  }
-  return undefined;
-}
 
 function connectSimulationSocket() {
   if (simulationSocket || !window.WebSocket) return;
@@ -1592,18 +1906,12 @@ function addLiveSceneMarkers(scene) {
 }
 
 function refreshLiveMapScenario() {
-  if (['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
-    initLiveMap();
-    return;
-  }
   if (!liveMap) {
     initLiveMap();
     return;
   }
   const container = $('liveMap');
-  const sumoScene = $('sumo3dScene');
   if (container) { container.hidden = false; container.style.display = ''; }
-  if (sumoScene) { sumoScene.hidden = true; sumoScene.style.display = 'none'; }
   liveMap.flyTo({ ...getLiveScenarioView(), duration: 1000, essential: true });
 
   const routeSource = liveMap.getSource('live-route');
@@ -1682,40 +1990,163 @@ function buildLiveMapScene() {
     liveMap.addSource('live-cross-route', { type: 'geojson', data: crossRoute });
   }
 
-  if (!liveMap.getSource('live-sumo-road')) {
-    liveMap.addSource('live-sumo-road', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  }
-  if (!liveMap.getLayer('live-mapbox-layout')) {
-    liveMap.addLayer({
-      id: 'live-mapbox-layout', type: 'line', source: 'live-route',
-      layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'visible' },
-      paint: { 'line-color': '#6f91a4', 'line-width': 5, 'line-opacity': 0.34 }
-    });
-  }
+  if (liveMap.getLayer('live-sumo-road')) liveMap.removeLayer('live-sumo-road');
+  if (liveMap.getSource('live-sumo-road')) liveMap.removeSource('live-sumo-road');
+  if (liveMap.getLayer('live-mapbox-layout')) liveMap.removeLayer('live-mapbox-layout');
   if (!liveMap.getLayer('live-sumo-road')) {
     liveMap.addLayer({
-      id: 'live-sumo-road', type: 'line', source: 'live-sumo-road',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#5f9c2b', 'line-width': 3.2, 'line-opacity': 0.92 }
+      id: 'live-sumo-road', type: 'line', source: 'live-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
+      paint: {
+        'line-color': '#4f8428',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0.8, 17, 1.15, 20, 1.5],
+        'line-opacity': 0.84
+      }
+    });
+  }
+  /* Corridor borders for the SF grids: the bbox the SUMO networks are clipped
+     to, drawn as a dashed operational boundary under the route overlays. */
+  if (!liveMap.getSource('live-net-bounds')) {
+    liveMap.addSource('live-net-bounds', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
+  if (!liveMap.getLayer('live-net-bounds')) {
+    liveMap.addLayer({
+      id: 'live-net-bounds', type: 'line', source: 'live-net-bounds',
+      paint: {
+        'line-color': '#8fd14f',
+        'line-width': 2.4,
+        'line-opacity': 0.75,
+        'line-dasharray': [2.4, 1.8]
+      }
     });
   }
   if (!liveMap.getSource('live-vehicles')) {
     liveMap.addSource('live-vehicles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   }
-  if (!liveMap.getLayer('live-vehicles')) {
+  install3dVehicleLayer();
+  if (!liveMap.getLayer('live-vehicles-extrusion')) {
     liveMap.addLayer({
-      id: 'live-vehicles', type: 'circle', source: 'live-vehicles',
+      id: 'live-vehicles-extrusion',
+      type: 'fill-extrusion',
+      source: 'live-vehicles',
       paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 3.5, 17, 6],
-        'circle-color': ['case', ['get', 'waiting'], '#e66b52', '#3b9d7d'],
-        'circle-stroke-color': '#fffdf5', 'circle-stroke-width': 1.4,
-        'circle-opacity': 0.96
+        'fill-extrusion-color': ['coalesce', ['get', 'color'], '#4f9fd8'],
+        'fill-extrusion-height': ['coalesce', ['get', 'height'], 1.6],
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.95,
+        'fill-extrusion-vertical-gradient': true
       }
     });
   }
-  if (liveMap.getLayer('live-sumo-road')) liveMap.setLayoutProperty('live-sumo-road', 'visibility', 'visible');
+  const ensureMapIcon = (name, width, height, draw) => {
+    if (liveMap.hasImage(name)) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    draw(canvas.getContext('2d'));
+    liveMap.addImage(name, { width, height, data: new Uint8Array(canvas.getContext('2d').getImageData(0, 0, width, height).data) }, { sdf: true });
+  };
+  ensureMapIcon('vehicle-rectangle', 56, 32, (context) => {
+    // Top-down vehicle silhouette with visible cabin, windshield and wheels.
+    context.fillStyle = '#151a20';
+    context.beginPath();
+    context.roundRect(4, 2, 48, 28, 8);
+    context.fill();
+    context.fillStyle = '#fff';
+    context.beginPath();
+    context.moveTo(8, 7); context.lineTo(15, 5); context.lineTo(18, 3);
+    context.lineTo(39, 3); context.lineTo(43, 6); context.lineTo(49, 8);
+    context.lineTo(49, 24); context.lineTo(43, 26); context.lineTo(39, 29);
+    context.lineTo(18, 29); context.lineTo(15, 26); context.lineTo(8, 24);
+    context.closePath(); context.fill();
+    context.fillStyle = '#151a20';
+    context.beginPath(); context.roundRect(17, 8, 22, 16, 4); context.fill();
+    context.fillStyle = '#bce8f3';
+    context.beginPath(); context.moveTo(19, 9); context.lineTo(37, 9); context.lineTo(37, 14); context.lineTo(19, 14); context.closePath(); context.fill();
+    context.fillStyle = '#d4edf3';
+    context.fillRect(19, 17, 18, 5);
+    context.fillStyle = '#ef5c52'; context.fillRect(5, 6, 3, 5); context.fillRect(5, 21, 3, 5);
+    context.fillStyle = '#ffe39a'; context.fillRect(48, 6, 3, 5); context.fillRect(48, 21, 3, 5);
+  });
+  ensureMapIcon('bus-rectangle', 64, 34, (context) => {
+    context.fillStyle = '#252a30'; context.beginPath(); context.roundRect(3, 2, 58, 30, 7); context.fill();
+    context.fillStyle = '#fff'; context.beginPath(); context.roundRect(6, 3, 52, 28, 5); context.fill();
+    context.fillStyle = '#bce8f3';
+    for (let x = 11; x < 52; x += 9) context.fillRect(x, 6, 6, 8);
+    context.fillStyle = '#f3c844'; context.fillRect(10, 17, 44, 9);
+    context.fillStyle = '#292f35'; context.fillRect(10, 27, 8, 5); context.fillRect(47, 27, 8, 5);
+    context.fillStyle = '#ef5c52'; context.fillRect(5, 5, 3, 5); context.fillRect(5, 24, 3, 5);
+  });
+  ensureMapIcon('emergency-rectangle', 56, 32, (context) => {
+    context.fillStyle = '#252a30'; context.beginPath(); context.roundRect(4, 2, 48, 28, 7); context.fill();
+    context.fillStyle = '#e83c49'; context.beginPath(); context.roundRect(7, 4, 42, 24, 5); context.fill();
+    context.fillStyle = '#bce8f3'; context.beginPath(); context.roundRect(18, 9, 20, 13, 3); context.fill();
+    context.fillStyle = '#fff'; context.fillRect(10, 14, 36, 3);
+    context.fillStyle = '#3888f5'; context.fillRect(21, 5, 7, 3);
+    context.fillStyle = '#fff'; context.fillRect(28, 5, 7, 3);
+    context.fillStyle = '#ffe39a'; context.fillRect(48, 6, 3, 5); context.fillRect(48, 21, 3, 5);
+  });
+  ensureMapIcon('bicycle-rectangle', 40, 32, (context) => {
+    context.strokeStyle = '#fff'; context.lineWidth = 3;
+    context.beginPath(); context.arc(8, 22, 6, 0, Math.PI * 2); context.arc(31, 22, 6, 0, Math.PI * 2); context.stroke();
+    context.strokeStyle = '#20262c'; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(8, 22); context.lineTo(16, 10); context.lineTo(22, 22); context.lineTo(8, 22); context.lineTo(27, 10); context.lineTo(31, 22); context.lineTo(22, 22); context.stroke();
+    context.fillStyle = '#e7a82e'; context.beginPath(); context.arc(21, 7, 3, 0, Math.PI * 2); context.fill();
+  });
+  ensureMapIcon('pedestrian-rectangle', 24, 24, (context) => {
+    context.fillStyle = '#26252d'; context.beginPath(); context.arc(12, 12, 11, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#fff'; context.beginPath(); context.arc(12, 6, 3, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff'; context.lineWidth = 3; context.lineCap = 'round';
+    context.beginPath(); context.moveTo(12, 10); context.lineTo(12, 17); context.moveTo(12, 12); context.lineTo(7, 15); context.moveTo(12, 12); context.lineTo(17, 14); context.moveTo(12, 17); context.lineTo(8, 22); context.moveTo(12, 17); context.lineTo(16, 22); context.stroke();
+  });
+  if (!liveMap.getLayer('live-vehicles')) {
+    liveMap.addLayer({
+      id: 'live-vehicles', type: 'symbol', source: 'live-vehicles',
+      filter: ['!', ['get', 'pedestrian']],
+      layout: {
+        'icon-image': ['match', ['get', 'vehicleClass'], 'bus', 'bus-rectangle', 'emergency', 'emergency-rectangle', 'bicycle', 'bicycle-rectangle', 'vehicle-rectangle'],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.78, 17, 1.12],
+        'icon-rotate': ['get', 'angle'],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true
+      },
+      paint: {
+        'icon-color': ['case', ['get', 'emergency'], ['case', ['==', ['%', ['floor', ['*', ['to-number', ['get', 'simulationTime']], 2]], 2], 0], '#ed2939', '#1769ff'], ['get', 'color']],
+        'icon-halo-color': ['case', ['get', 'waiting'], '#f1b84b', '#ffffff'],
+        'icon-halo-width': ['case', ['get', 'waiting'], 1.8, 0.8],
+        'icon-opacity': 1
+      }
+    });
+  }
+  if (!liveMap.getLayer('live-pedestrians')) {
+    liveMap.addLayer({
+      id: 'live-pedestrians', type: 'symbol', source: 'live-vehicles',
+      filter: ['==', ['get', 'pedestrian'], true],
+      layout: {
+        'icon-image': 'pedestrian-rectangle',
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.9, 17, 1.2],
+        'icon-rotate': ['get', 'angle'],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true
+      },
+      paint: {
+        'icon-color': '#7b4ce2',
+        'icon-halo-color': '#ffffff',
+        'icon-halo-width': 0.9,
+        'icon-opacity': 1
+      }
+    });
+  }
+  // The symbol layers above are kept only as a compatibility scaffold for
+  // old styles; the visible vehicle representation is the 3D extrusion.
+  ['live-vehicles', 'live-pedestrians'].forEach((id) => {
+    if (liveMap.getLayer(id)) liveMap.removeLayer(id);
+  });
   loadSimulationNetwork(activeScenario);
   refreshSimulationVehicles(latestSimulationState);
+  refreshSimulationSignals(latestSimulationState);
 
   if (!liveMap.getSource('live-fog')) {
     liveMap.addSource('live-fog', {
@@ -1777,12 +2208,14 @@ function buildLiveMapScene() {
     });
   }
 
-  ['live-fog', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route'].forEach((layerId) => {
+  ['live-fog', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route', 'live-sumo-road'].forEach((layerId) => {
     if (liveMap.getLayer(layerId)) {
       liveMap.setLayoutProperty(
         layerId,
         'visibility',
-        (layerId === 'live-fog' ? LIVE_FOG_ENABLED : LIVE_ROUTE_OVERLAYS_ENABLED) ? 'visible' : 'none'
+        layerId === 'live-sumo-road'
+          ? 'none'
+          : (layerId === 'live-fog' ? LIVE_FOG_ENABLED : LIVE_ROUTE_OVERLAYS_ENABLED) ? 'visible' : 'none'
       );
     }
   });
@@ -1797,56 +2230,103 @@ async function loadSimulationNetwork(scenario) {
     const response = await simulationFetch(`/api/simulation/network/${scenario}`);
     if (!response.ok) return;
     const data = await response.json();
-    liveMap.getSource('live-sumo-road')?.setData(data);
+    const signalLaneByKey = new Map();
+    (data.signals || []).forEach((signal) => {
+      (signal.lanes || []).forEach((lane) => {
+        const coordinates = Number.isFinite(Number(lane.lng)) && Number.isFinite(Number(lane.lat))
+          ? [Number(lane.lng), Number(lane.lat)]
+          : simulationPoint(scenario, lane.x, lane.y);
+        const key = `${signal.id}:${lane.lane}`;
+        const existing = signalLaneByKey.get(key);
+        const linkIndices = Array.isArray(lane.linkIndices)
+          ? lane.linkIndices.map(Number).filter(Number.isInteger)
+          : Number.isInteger(Number(lane.index)) ? [Number(lane.index)] : [];
+        if (existing) existing.linkIndices.push(...linkIndices);
+        else signalLaneByKey.set(key, {
+          key,
+          signalId: signal.id,
+          linkIndices,
+          coordinates
+        });
+      });
+    });
+    setSimulationSignalMarkers([...signalLaneByKey.values()]);
+    liveMap.getSource('live-net-bounds')?.setData(networkBoundsFeature(scenario, data));
+    syncNetworkBoundsVisibility();
   } catch {
     // The map remains usable when the SUMO service is offline.
   }
 }
 
+/* The corridor limits we clipped the SUMO nets to: the bounding box of the
+   projected lane geometry, padded so the dashed border frames the roads. */
+function networkBoundsFeature(scenario, data) {
+  if (!scenario.startsWith('grid-')) {
+    return { type: 'FeatureCollection', features: [] };
+  }
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+  (data.features || []).forEach((feature) => {
+    const lines = feature.geometry?.type === 'MultiLineString'
+      ? feature.geometry.coordinates
+      : [feature.geometry?.coordinates];
+    lines.forEach((line) => {
+      (line || []).forEach(([lng, lat]) => {
+        if (typeof lng !== 'number' || typeof lat !== 'number') return;
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      });
+    });
+  });
+  if (!Number.isFinite(minLng)) return { type: 'FeatureCollection', features: [] };
+  const padLng = (maxLng - minLng) * 0.02 + 0.00008;
+  const padLat = (maxLat - minLat) * 0.02 + 0.0001;
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { scenario },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [minLng - padLng, minLat - padLat],
+            [maxLng + padLng, minLat - padLat],
+            [maxLng + padLng, maxLat + padLat],
+            [minLng - padLng, maxLat + padLat],
+            [minLng - padLng, minLat - padLat]
+          ]]
+        }
+      }
+    ]
+  };
+}
+
+/* Borders live in the sumo-road layer group: they show only for the SF grids
+   while the operator keeps the road-layout toggle enabled. */
+function syncNetworkBoundsVisibility() {
+  if (!liveMap || !liveMap.getLayer('live-net-bounds')) return;
+  const enabled = document.querySelector('[data-map-layer="sumo-road"]')?.getAttribute('aria-checked') !== 'false';
+  liveMap.setLayoutProperty(
+    'live-net-bounds',
+    'visibility',
+    enabled && activeScenario.startsWith('grid-') ? 'visible' : 'none'
+  );
+}
+
 function initLiveMap() {
   const container = $('liveMap');
   if (!container) return;
-  const sumoScene = $('sumo3dScene');
-  if (['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
-    container.closest('.live-map-view')?.classList.add('is-sumo-3d');
-    container.hidden = true;
-    container.style.display = 'none';
-    if (liveMap) liveMap.getContainer().style.display = 'none';
-    const vignette = document.querySelector('.live-map-vignette');
-    if (vignette) vignette.style.display = 'none';
-    if (sumoScene) {
-      sumoScene.hidden = false;
-      sumoScene.style.display = 'block';
-      sumoScene.classList.add('is-grid-mode');
-      const gridState = { ...(latestSimulationState || {}), scenario: activeScenario, vehicles: latestSimulationState?.vehicles || [] };
-      /* A run may already be live, so pick up the stream and one snapshot
-         instead of waiting for the operator to press Start again. */
-      connectSimulationSocket();
-      if (!simulationSeeded) {
-        simulationSeeded = true;
-        simulationFetch('/api/simulation/state')
-          .then((response) => (response.ok ? response.json() : null))
-          .then((sim) => sim && updateSimulationState(sim))
-          .catch(() => { simulationSeeded = false; });
-      }
-      if (sumo3d?.scenario && sumo3d.scenario !== activeScenario) { sumo3d.destroy?.(); sumo3d = null; }
-      sumo3d ||= mountSumoLiveMap(sumoScene, gridState, { onSimAction: handleSumoSceneAction });
-      sumo3d.update(gridState);
-      window.requestAnimationFrame(() => sumo3d?.update({ ...gridState, scenario: activeScenario }));
-    }
-    return;
-  }
-  container.closest('.live-map-view')?.classList.remove('is-sumo-3d');
   container.hidden = false;
   container.style.display = '';
-  if (liveMap) liveMap.getContainer().style.display = '';
   const vignette = document.querySelector('.live-map-vignette');
   if (vignette) vignette.style.display = '';
-  if (sumoScene) { sumoScene.hidden = true; sumoScene.style.display = 'none'; sumoScene.classList.remove('is-grid-mode'); }
-  /* Leaving a grid tears the WebGL scene down instead of keeping it mounted
-     off-screen, so its render loop and the map tools stay with the map. */
-  if (sumo3d) { sumo3d.destroy?.(); sumo3d = null; }
   if (liveMap) {
+    liveMap.getContainer().style.display = '';
     liveMap.resize();
     return;
   }
@@ -1864,7 +2344,12 @@ function initLiveMap() {
     antialias: true,
     attributionControl: false,
     style: 'mapbox://styles/mapbox/standard',
-    config: { basemap: { lightPreset: MAP_STYLES[activeMapStyle].preset } },
+    config: {
+      basemap: {
+        lightPreset: MAP_STYLES[activeMapStyle].preset,
+        showPedestrianRoads: false
+      }
+    },
     maxPitch: 72
   });
 
@@ -1874,7 +2359,6 @@ function initLiveMap() {
   liveMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
   liveMap.on('load', () => {
     hideLiveMapFallback();
-    // Basemap stays hidden product-wide; re-apply after the style is ready.
     syncLayerMenuAvailability();
     buildLiveMapScene();
     document.dispatchEvent(new CustomEvent('sumo:livemapready'));
@@ -1903,6 +2387,7 @@ function applyLiveMapStyle(styleName) {
   if (!style || !liveMap || styleName === activeMapStyle) return;
   activeMapStyle = styleName;
   liveMap.setConfigProperty('basemap', 'lightPreset', style.preset);
+  liveMap.setConfigProperty('basemap', 'showPedestrianRoads', false);
   document.querySelectorAll('[data-map-style]').forEach((option) => {
     const selected = option.dataset.mapStyle === styleName;
     option.classList.toggle('is-selected', selected);
@@ -1920,13 +2405,6 @@ function resetLiveMapView() {
 document.querySelectorAll('[data-live-map-action]').forEach((button) => {
   button.addEventListener('click', () => {
     const action = button.dataset.liveMapAction;
-    /* In a SUMO grid the same buttons drive the 3D environment's camera. */
-    if (sumo3d && ['grid-2x2', 'grid-3x3'].includes(activeScenario)) {
-      if (action === 'zoom-in') sumo3d.zoomIn();
-      if (action === 'zoom-out') sumo3d.zoomOut();
-      if (action === 'reset') sumo3d.reset();
-      return;
-    }
     if (!liveMap) {
       showLiveMapFallback('Connect a Mapbox token to use the live map.');
       return;
@@ -2046,29 +2524,60 @@ document.querySelectorAll('[data-map-style]').forEach((option) => {
   });
 });
 
+function setVehicleClassVisibility(kind, enabled) {
+  vehicleClassVisibility.set(kind, Boolean(enabled));
+  if (latestSimulationState) refreshSimulationVehicles(latestSimulationState);
+}
+
+document.querySelectorAll('[data-vehicle-class]').forEach((option) => {
+  option.addEventListener('click', () => {
+    const enabled = option.getAttribute('aria-checked') !== 'true';
+    option.setAttribute('aria-checked', String(enabled));
+    option.classList.toggle('is-selected', enabled);
+    setVehicleClassVisibility(option.dataset.vehicleClass, enabled);
+  });
+});
+
 function setMapLayerVisibility(layerName, enabled) {
   if (!liveMap) return;
+  if (layerName === 'vehicles') {
+    if (threeVehicleGroup) threeVehicleGroup.visible = enabled;
+    if (liveMap.getLayer('live-vehicles-extrusion')) {
+      liveMap.setLayoutProperty('live-vehicles-extrusion', 'visibility', enabled ? 'visible' : 'none');
+    }
+    document.querySelectorAll('[data-vehicle-class]').forEach((option) => { option.disabled = !enabled; });
+    simulationSignalMarkers.forEach((marker) => marker.getElement().classList.toggle('is-hidden', !enabled));
+    if (liveMap) liveMap.triggerRepaint();
+    return;
+  }
   if (layerName === 'basemap') {
     liveMap.getStyle().layers.forEach((layer) => {
       if (!layer.id.startsWith('live-')) liveMap.setLayoutProperty(layer.id, 'visibility', enabled ? 'visible' : 'none');
     });
   }
   if (layerName === 'sumo-road') {
-    ['live-sumo-road', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route'].forEach((id) => {
+    ['live-net-bounds', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route', 'live-sumo-road'].forEach((id) => {
       if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
     });
   }
   if (layerName === 'vehicles') {
     // Toggle vehicle / model layers produced by the SUMO live feed
-    ['live-vehicles', 'live-vehicle-labels', 'live-vehicle-models'].forEach((id) => {
+    ['live-vehicles', 'live-pedestrians', 'live-vehicle-labels', 'live-vehicle-models'].forEach((id) => {
       if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
     });
+  }
+  if (layerName === 'signals') {
+    simulationSignalMarkers.forEach((marker) => marker.getElement().classList.toggle('is-hidden', !enabled));
   }
 }
 
 document.querySelectorAll('[data-map-layer]').forEach((option) => {
   option.addEventListener('click', () => {
     if (option.disabled) return;
+    if (!resolveToken()) {
+      showToast('Add a Mapbox token to show the map layers.');
+      return;
+    }
     const enabled = option.getAttribute('aria-checked') !== 'true';
     option.setAttribute('aria-checked', String(enabled));
     option.classList.toggle('is-selected', enabled);
@@ -2077,13 +2586,7 @@ document.querySelectorAll('[data-map-layer]').forEach((option) => {
   });
 });
 
-document.querySelectorAll('[data-live-panels-toggle]').forEach((toggle) => toggle.addEventListener('click', (event) => {
-  const collapsed = liveMapView?.classList.toggle('live-panels-collapsed');
-  event.currentTarget.setAttribute('aria-label', collapsed ? 'Expand panels' : 'Collapse panels');
-  event.currentTarget.setAttribute('title', collapsed ? 'Expand panels' : 'Collapse panels');
-  event.currentTarget.textContent = collapsed ? 'Panels' : 'Panels';
-}));
-document.getElementById('simulationResetView')?.addEventListener('click', () => sumo3d?.reset());
+document.getElementById('simulationResetView')?.addEventListener('click', resetLiveMapView);
 
 function setPanelTheme(light) {
   const enabled = liveMapView ? liveMapView.classList.toggle('live-panels-light', Boolean(light)) : Boolean(light);
@@ -2378,12 +2881,7 @@ function setAccessTab(name, updateUrl = true) {
   setAccessSubnavActive(tabName);
   if (accessView && !accessView.hidden) setAccessNavOpen(true);
   accessView?.scrollTo({ top: 0, behavior: 'smooth' });
-  if (updateUrl) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('view', 'access');
-    url.searchParams.set('tab', tabName);
-    window.history.replaceState(null, '', url);
-  }
+  if (updateUrl) setRoute('Roles & Permissions', tabName);
 }
 
 accessTabs.forEach((tab) => {
@@ -2397,19 +2895,50 @@ if (initialParams.get('view') === 'access') {
   setAccessTab(initialParams.get('tab') === 'permissions' ? 'permissions' : 'roles', false);
 }
 
-document.querySelectorAll('[data-settings-tab]').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('[data-settings-tab]').forEach((node) => {
-      const active = node === tab;
-      node.classList.toggle('is-active', active);
-      node.setAttribute('aria-selected', String(active));
-    });
-    document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
-      panel.hidden = panel.dataset.settingsPanel !== tab.dataset.settingsTab;
-    });
-    settingsView?.scrollTo({ top: 0, behavior: 'smooth' });
+function setSettingsTab(name, updateUrl = true) {
+  const tabName = document.querySelector(`[data-settings-tab="${name}"]`) ? name : 'general';
+  document.querySelectorAll('[data-settings-tab]').forEach((node) => {
+    const active = node.dataset.settingsTab === tabName;
+    node.classList.toggle('is-active', active);
+    node.setAttribute('aria-selected', String(active));
   });
+  document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.settingsPanel !== tabName;
+  });
+  settingsView?.scrollTo({ top: 0, behavior: 'smooth' });
+  if (updateUrl) setRoute('Settings', tabName);
+}
+
+document.querySelectorAll('[data-settings-tab]').forEach((tab) => {
+  tab.addEventListener('click', () => setSettingsTab(tab.dataset.settingsTab));
 });
+
+function applyLocationRoute({ replaceLegacy = false } = {}) {
+  const legacy = new URLSearchParams(window.location.search);
+  const legacyView = legacy.get('view');
+  const legacyRoute = legacyView === 'live-map'
+    ? { view: 'Live Map', subtab: legacy.get('tab') || 'events' }
+    : legacyView === 'access'
+      ? { view: 'Roles & Permissions', subtab: legacy.get('tab') || 'roles' }
+      : legacyView === 'message'
+        ? { view: 'Message', subtab: null }
+        : legacyView === 'settings'
+          ? { view: 'Settings', subtab: 'general' }
+          : null;
+  const route = legacyRoute || routeFromLocation() || (() => {
+    const view = legacy.get('view');
+    if (view === 'live-map') return { view: 'Live Map', subtab: legacy.get('tab') || 'events' };
+    if (view === 'access') return { view: 'Roles & Permissions', subtab: legacy.get('tab') || 'roles' };
+    if (view === 'message') return { view: 'Message', subtab: null };
+    if (view === 'settings') return { view: 'Settings', subtab: 'general' };
+    return { view: 'Dashboard', subtab: null };
+  })();
+  navigateTo(route.view, route.subtab, { replace: replaceLegacy });
+  if (route.view === 'Message' && legacy.get('chat')) openConversation(legacy.get('chat'));
+}
+
+window.addEventListener('popstate', () => applyLocationRoute({ replaceLegacy: true }));
+applyLocationRoute({ replaceLegacy: true });
 
 const avatarInput = $('avatarInput');
 const avatarImage = $('avatarImage');

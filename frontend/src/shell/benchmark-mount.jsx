@@ -1,13 +1,3 @@
-/**
- * Benchmark view entry.
- *
- * Renders one React page at a time into `#benchmarkView`. Navigation lives in the
- * dashboard sidebar (`[data-benchmark-tab]`), so this file has no tab bar of its own —
- * it replaces the old `benchmark-rami.jsx` shell that duplicated it.
- *
- * The KEMETRA visual system comes from the shared tokens, in the same order as
- * `src/main.tsx`: Astryx base CSS, then its KEMETRA overrides, then the Tailwind theme.
- */
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource/ibm-plex-sans/400.css';
@@ -21,20 +11,17 @@ import '@/shared/theme/index.css';
 import { Providers } from '@/app/providers';
 import '@/shared/i18n';
 import { useSettings } from '@/features/settings/store';
-import OverviewPage from '@/features/overview/OverviewPage';
-import AgentsPage from '@/features/agents/AgentsPage';
-import LiveMapPage from '@/features/live-map/LiveMapPage';
-import AnalyticsPage from '@/features/analytics/AnalyticsPage';
-import CatalogScenariosPage from '@/features/scenarios/CatalogScenariosPage';
+import UnifiedModelsRunsPage from '@/features/models/UnifiedModelsRunsPage';
+import FreshCompare from '@/features/analytics/FreshCompare';
 import TrainingPage from '@/features/training/TrainingPage';
 
+/* Unified Benchmark navigation */
 const PAGES = {
-  scenarios: CatalogScenariosPage,
+  models: UnifiedModelsRunsPage,
+  runs: UnifiedModelsRunsPage,
   training: TrainingPage,
-  overview: OverviewPage,
-  agents: AgentsPage,
-  live: LiveMapPage,
-  compare: AnalyticsPage,
+  compare: FreshCompare,
+  simulation: FreshCompare,
 };
 
 /** The benchmark pages read the backend, not the bundled export. */
@@ -45,7 +32,7 @@ function LiveDataMode() {
 }
 
 function View({ tab }) {
-  const Page = PAGES[tab] || OverviewPage;
+  const Page = PAGES[tab] || UnifiedModelsRunsPage;
   return (
     <>
       <LiveDataMode />
@@ -58,22 +45,15 @@ function View({ tab }) {
 
 let root = null;
 
-export function mountBenchmarkView(container, tab = 'scenarios') {
-  // The benchmark always renders on the KEMETRA light system, even when the rest of the
-  // dashboard is set to the dark control-room theme: the tokens are re-declared for this
-  // subtree, so no page here inherits the dark palette.
+export function mountBenchmarkView(container, tab = 'models') {
   container.dataset.theme = 'light';
   container.dataset.astryxTheme = 'kemetra';
   container.classList.add('kemetra-light');
   root = createRoot(container);
   root.render(<View tab={tab} />);
-  return () => {
-    root?.unmount();
-    root = null;
-  };
 }
 
 /** Switch the rendered page; called by the sidebar's benchmark sub-items. */
 export function setBenchmarkTab(tab) {
-  root?.render(<View tab={tab || 'scenarios'} />);
+  root?.render(<View tab={tab || 'models'} />);
 }

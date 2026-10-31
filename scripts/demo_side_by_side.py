@@ -5,11 +5,11 @@ status quo) on the left and COOP-FULL on the right. Record the screen. For the s
 classical controller use ``--left mp``, or ``--left ev_rule_mp`` for Max-Pressure with
 emergency-vehicle preemption (report, section 8.2).
 
-    python scripts/demo_side_by_side.py [--left ft] [--right coop_full]
-        [--checkpoint results/checkpoints/coop_full/tunis/seed1.zip]
+    python scripts/demo_side_by_side.py [--left ft] [--right llm]
+        [--checkpoint results/checkpoints/rl_<hash>/grid3x3/seed1.zip]
         [--net tunis] [--demand peak] [--scenarios ...] [--seed 3]
 
-    python scripts/demo_side_by_side.py --left llm --right coop --net grid2x2 --demand medium
+    python scripts/demo_side_by_side.py --left llm --right rl --net grid2x2 --demand medium
 
 Scenarios by default: emergency vehicles and buses, plus pedestrians on the networks that
 have sidewalks. The district's OpenStreetMap import has almost none (FAILURES F-011);
@@ -594,7 +594,7 @@ def run(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--left", default="ft")
-    parser.add_argument("--right", default="coop_full")
+    parser.add_argument("--right", default="llm")
     parser.add_argument(
         "--checkpoint",
         default=None,

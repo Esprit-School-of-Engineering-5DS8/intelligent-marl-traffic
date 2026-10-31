@@ -100,12 +100,9 @@
         <div class="nav-group" data-nav-group="benchmark">
           <button class="nav-item nav-parent" data-nav="Benchmark" aria-expanded="false" aria-controls="benchmarkSubnav"><svg class="ico"><use href="#i-activity"/></svg><span>Benchmark</span><svg class="ico nav-caret"><use href="#i-chevron"/></svg></button>
           <div class="nav-submenu" id="benchmarkSubnav" aria-hidden="true">
-            <button type="button" class="nav-subitem is-active" data-benchmark-tab="scenarios">Scénarios</button>
-            <button type="button" class="nav-subitem" data-benchmark-tab="training">Entraînement</button>
-            <button type="button" class="nav-subitem" data-benchmark-tab="agents">Agents RL</button>
-            <button type="button" class="nav-subitem" data-benchmark-tab="live">Carte en direct</button>
-            <button type="button" class="nav-subitem" data-benchmark-tab="compare">Analyse comparative</button>
-            <button type="button" class="nav-subitem" data-benchmark-tab="overview">Vue d’ensemble</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="training">Train</button>
+            <button type="button" class="nav-subitem is-active" data-benchmark-tab="models">Models & Runs</button>
+            <button type="button" class="nav-subitem" data-benchmark-tab="compare">Compare</button>
           </div>
         </div>
         <div class="nav-group" data-nav-group="live">
@@ -114,6 +111,7 @@
             <button type="button" class="nav-subitem" data-live-tab="events">Events</button>
             <button type="button" class="nav-subitem" data-live-tab="optimize">Optimize</button>
             <button type="button" class="nav-subitem" data-live-tab="predict">Predict</button>
+            <button type="button" class="nav-subitem" data-live-tab="roam">Roam</button>
           </div>
         </div>
         <button class="nav-item" data-nav="Message"><svg class="ico"><use href="#i-chat"/></svg><span>Message</span></button>
@@ -128,7 +126,6 @@
         <button class="nav-item" data-nav="Settings"><svg class="ico"><use href="#i-gear"/></svg><span>Settings</span></button>
       </nav>
       <div class="sidebar-footer">
-        <button class="nav-item"><svg class="ico"><use href="#i-store"/></svg><span>Store</span></button>
         <button class="nav-item"><svg class="ico"><use href="#i-help"/></svg><span>Get Help</span></button>
         <button type="button" class="nav-item sidebar-collapse" id="sidebarToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
           <svg class="ico sidebar-collapse-icon"><use href="#i-chevron"/></svg>
@@ -144,7 +141,7 @@
         <div class="site-card" id="scenarioCard">
           <button class="ghost-btn site-caret" aria-label="Collapse location"><svg class="ico"><use href="#i-chevron"/></svg></button>
           <button type="button" class="site-copy scenario-trigger" data-scenario-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="scenarioMenu">
-            <span class="site-title" id="siteTitle">Central Austin · 2×2</span>
+            <span class="site-title" id="siteTitle">San Francisco · Mission 3×3</span>
             <span class="site-status"><span class="online-dot"></span>Online <span class="meta-sep">Update 20-32</span></span>
           </button>
           <button class="ghost-btn star-btn" aria-label="Favorite location"><svg class="ico"><use href="#i-star"/></svg></button>
@@ -305,34 +302,36 @@
 
       <main class="content" id="dashboardView">
         <section class="map-column">
-          <div class="map-meta">
-            <div>
-              <span>Location</span>
-              <strong><i class="tiny-dot"></i><span id="mapLocationName">East 7th</span></strong>
-            </div>
-            <div>
-              <span>Substation</span>
-              <strong>7th &amp; Comal (Segment ID:7C2) <svg class="ico meta-caret"><use href="#i-chevron"/></svg></strong>
-            </div>
-          </div>
-          <div class="map-frame">
-            <div id="map" aria-label="Map of Central Austin"></div>
-            <div class="map-controls">
-              <button data-map-action="zoom-in" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
-              <button data-map-action="zoom-out" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
-              <button data-map-action="reset" aria-label="Reset map view"><svg class="ico"><use href="#i-expand"/></svg></button>
-            </div>
-            <div class="map-token" id="tokenPanel" hidden>
-              <p class="token-message">Mapbox access token required for the live map.</p>
-              <input type="password" id="tokenInput" placeholder="pk.eyJ1…" autocomplete="off">
-              <div class="token-actions">
-                <button id="tokenSave">Connect</button>
-                <button id="tokenSkip">Skip for now</button>
+          <div class="map-column-inner">
+            <div class="map-meta">
+              <div>
+                <span>Location</span>
+                <strong><i class="tiny-dot"></i><span id="mapLocationName">East 7th</span></strong>
+              </div>
+              <div>
+                <span>Substation</span>
+                <strong>7th &amp; Comal (Segment ID:7C2) <svg class="ico meta-caret"><use href="#i-chevron"/></svg></strong>
               </div>
             </div>
-            <div class="map-offline" id="mapOffline" hidden>
-              <strong>Live map offline</strong>
-              <span>Add a Mapbox token to enable the street view.</span>
+            <div class="map-frame">
+              <div id="map" aria-label="Map of the live corridor"></div>
+              <div class="map-controls">
+                <button data-map-action="zoom-in" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+                <button data-map-action="zoom-out" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+                <button data-map-action="reset" aria-label="Reset map view"><svg class="ico"><use href="#i-expand"/></svg></button>
+              </div>
+              <div class="map-token" id="tokenPanel" hidden>
+                <p class="token-message">Mapbox access token required for the live map.</p>
+                <input type="password" id="tokenInput" placeholder="pk.eyJ1…" autocomplete="off">
+                <div class="token-actions">
+                  <button id="tokenSave">Connect</button>
+                  <button id="tokenSkip">Skip for now</button>
+                </div>
+              </div>
+              <div class="map-offline" id="mapOffline" hidden>
+                <strong>Live map offline</strong>
+                <span>Add a Mapbox token to enable the street view.</span>
+              </div>
             </div>
           </div>
         </section>
@@ -530,8 +529,8 @@
       </main>
 
       <main class="live-map-view live-panels-light" id="liveMapView" hidden>
-        <div class="live-map-canvas" id="liveMap" aria-label="3D live traffic map of East 7th, Austin"></div>
-        <div class="sumo-3d-canvas-wrap" id="sumo3dScene" aria-label="3D SUMO simulation environment" hidden></div>
+<div class="live-map-canvas" id="liveMap" aria-label="3D live traffic map of the active corridor"></div>
+<div class="sumo-3d-canvas-wrap" id="sumo3dScene" aria-label="3D SUMO simulation environment" hidden></div>
         <div class="live-map-vignette" aria-hidden="true"></div>
 
         <div class="live-map-overlay">
@@ -542,7 +541,7 @@
                 <button type="button" class="live-place-card" data-scenario-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="livePlaceMenu">
                   <span class="live-place-icon" id="liveWeatherIcon" role="img" aria-label="Current weather" title="Current weather"><svg class="ico"><use href="#i-cloud-sun"/></svg></span>
                   <div>
-                    <strong id="livePlaceName">East 7th, Austin</strong>
+                    <strong id="livePlaceName">Mission &amp; 7th, San Francisco</strong>
                     <span>Thursday, 22 October · 20:32</span>
                   </div>
                   <span class="live-status"><i></i>Live</span>
@@ -571,9 +570,20 @@
                   <button type="button" class="live-tool" data-live-action="layers" aria-label="Map geographic layers" title="Geographic layers" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-layers"/></svg></button>
                   <div class="live-style-menu live-layer-menu" role="menu" aria-label="Geographic layers" hidden>
                     <span class="live-style-menu-title">Map layers</span>
-                    <button type="button" class="live-layer-option is-disabled" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="false" aria-disabled="true" disabled title="Disabled — only the SUMO road layout is shown"><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Disabled — only the SUMO road layout is shown</small></span></button>
+                    <button type="button" class="live-layer-option" data-map-layer="basemap" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Mapbox basemap</strong><small>Streets map under the road network (grid scenarios)</small></span></button>
                     <button type="button" class="live-layer-option is-selected" data-map-layer="sumo-road" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>SUMO road layout</strong><small>Netconvert network projected on the map</small></span></button>
-                    <button type="button" class="live-layer-option is-selected" data-map-layer="vehicles" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Vehicles</strong><small>Live vehicle models from simulation</small></span></button>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="vehicles" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Vehicles &amp; pedestrians</strong><small>3D lane-aligned vehicle bodies; filter by class below</small></span></button>
+                    <div class="live-layer-class-filters" role="group" aria-label="Vehicle class filters">
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="passenger" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Cars</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="taxi" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Taxis</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="bus" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Buses</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="truck" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Trucks</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="emergency" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Emergency</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="bicycle" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Bicycles</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="motorcycle" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Motorcycles</strong></span></button>
+                      <button type="button" class="live-layer-option is-selected" data-vehicle-class="pedestrian" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Pedestrians</strong></span></button>
+                    </div>
+                    <button type="button" class="live-layer-option is-selected" data-map-layer="signals" role="menuitemcheckbox" aria-checked="true"><span class="layer-toggle"></span><span><strong>Traffic lights</strong><small>Per-lane signal states from SUMO</small></span></button>
                   </div>
                 </div>
                 <div class="live-style-picker">
@@ -592,7 +602,6 @@
                 <button type="button" class="live-tool" data-live-action="fullscreen" aria-label="Toggle fullscreen"><svg class="ico"><use href="#i-expand"/></svg></button>
               </div>
               <button type="button" class="live-round-btn" data-panels-menu aria-haspopup="true" aria-expanded="false" aria-label="Panels" title="Panels"><svg class="ico"><use href="#i-layers"/></svg></button>
-              <button type="button" class="live-round-btn" data-live-panels-toggle aria-label="Collapse panels" title="Collapse panels"><svg class="ico"><use href="#i-minus"/></svg></button>
             </div>
           </div>
 
@@ -607,7 +616,6 @@
                 <button type="button" class="sim-chip sim-chip--speed" id="simulationSpeed" aria-label="Simulation speed">1×</button>
                 <span class="sim-sep" aria-hidden="true"></span>
                 <button type="button" class="sim-icon" id="simulationResetView" aria-label="Center map" title="Center map"><svg class="ico"><use href="#i-crosshair"></use></svg></button>
-                <button type="button" class="sim-icon" data-live-panels-toggle aria-label="Collapse panels" title="Collapse panels"><svg class="ico"><use href="#i-minus"></use></svg></button>
               </div>
             </div>
             <div class="sim-rail">
@@ -1271,7 +1279,7 @@
                 </div>
                 <div class="settings-group-body">
                   <form class="settings-form" data-settings-form="Workspace settings saved.">
-                    <label class="form-field"><span>Workspace Name</span><input type="text" id="workspaceName" placeholder="Central Austin Operations" value="Central Austin Operations"></label>
+                    <label class="form-field"><span>Workspace Name</span><input type="text" id="workspaceName" placeholder="Mission District Operations" value="Mission District Operations"></label>
                     <label class="form-field"><span>App ID</span><input type="text" id="workspaceAppId" value="kem-0b1c2d3e" readonly></label>
                     <label class="form-field">
                       <span>Timezone</span>
@@ -1316,20 +1324,20 @@
                       <label for="workspaceUrl">Workspace URL</label>
                       <div class="affix-input">
                         <span class="affix">https://</span>
-                        <input type="text" id="workspaceUrl" placeholder="central-austin" value="central-austin">
+                        <input type="text" id="workspaceUrl" placeholder="mission-district" value="mission-district">
                         <span class="affix">.sumo.app</span>
                       </div>
                     </div>
 
                     <div class="form-field">
                       <label for="workspaceSlug">Workspace Slug</label>
-                      <input type="text" id="workspaceSlug" placeholder="central-austin" value="central-austin">
+                      <input type="text" id="workspaceSlug" placeholder="mission-district" value="mission-district">
                       <p class="field-hint">Only lowercase letters, numbers, and hyphens. Max 48 characters</p>
                     </div>
 
                     <div class="form-field">
                       <label for="workspaceDescription">Workspace Description</label>
-                      <textarea id="workspaceDescription" placeholder="Describe your workspace">Traffic operations workspace for the Central Austin corridor.</textarea>
+                      <textarea id="workspaceDescription" placeholder="Describe your workspace">Traffic operations workspace for the Mission District corridors.</textarea>
                     </div>
 
                     <div class="settings-actions"><button type="submit" class="settings-primary">Save Changes</button></div>
@@ -1498,7 +1506,7 @@
                       </div>
                       <div class="integration-card-copy">
                         <h3>Mapbox</h3>
-                        <p>Live basemap and geocoding for Central Austin.</p>
+                        <p>Live basemap and geocoding for the Mission District.</p>
                       </div>
                       <button type="button" class="integration-view" data-toast="Mapbox integration details opened.">View Integration<svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
                     </article>
@@ -1729,8 +1737,8 @@
                   </div>
                   <h3 class="subhead">Active sessions</h3>
                   <div class="session-list">
-                    <div class="session-row"><div><strong>Chrome on Windows</strong><small>Austin, TX · Current session</small></div><span class="connection-status is-online"><i></i>Active</span></div>
-                    <div class="session-row"><div><strong>SUMO Mobile</strong><small>Austin, TX · Last active 2 hours ago</small></div><button type="button" class="settings-btn" data-toast="Session revoked.">Revoke</button></div>
+                    <div class="session-row"><div><strong>Chrome on Windows</strong><small>San Francisco, CA · Current session</small></div><span class="connection-status is-online"><i></i>Active</span></div>
+                    <div class="session-row"><div><strong>SUMO Mobile</strong><small>San Francisco, CA · Last active 2 hours ago</small></div><button type="button" class="settings-btn" data-toast="Session revoked.">Revoke</button></div>
                   </div>
                 </div>
               </div>
@@ -1755,7 +1763,7 @@
                     <div class="bill-row">
                       <div>
                         <h3>Traffic Operations plan</h3>
-                        <p>Base plan for Central Austin operations</p>
+                        <p>Base plan for Mission District operations</p>
                       </div>
                       <span class="bill-amount">$249</span>
                     </div>

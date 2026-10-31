@@ -25,7 +25,7 @@ const replay: Replay = {
   start: 900,
   signals: ["A0"],
   kinds: ["car", "bus", "emergency", "incident"],
-  sides: { left: side("ft"), right: side("coop_full") },
+  sides: { left: side("ft"), right: side("llm") },
 };
 
 describe("replay scene", () => {

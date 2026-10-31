@@ -1,0 +1,66 @@
+# San Francisco Mission-district 3x3 — real SoMa arterials, built from OSM.
+#
+# Nine signalised crossings (the whole SoMa grid is diagonal):
+#   Mission / Howard / Folsom  x  6th / 7th / 8th
+#
+# Built by `python -m cotraffic networks sf_mission_3x3 --force`.
+# keep_names keeps exactly the six target arterials of the extract; signals
+# end up only where two of them meet (the nine crossings).
+
+name: sf_mission_3x3
+kind: osm
+description: >
+  San Francisco SoMa 3x3: Mission/Howard/Folsom between 6th and 8th. Six
+  arterials of a generous extract are kept and clipped to the corridor.
+
+osm:
+  # generous supply extract; the corridor itself is defined by the crossings
+  bbox: [-122.4150, 37.7720, -122.4040, 37.7815]
+  road_types:            # the six arterials are primary/secondary in OSM
+    - primary
+    - primary_link
+    - secondary
+    - secondary_link
+  keep_names:
+    - Mission Street
+    - Howard Street
+    - Folsom Street
+    - 6th Street
+    - 7th Street
+    - 8th Street
+  corridor_crossings:    # lon/lat of the nine target junctions (OSM shared nodes)
+    - [-122.4087, 37.7810] # Mission x 6th
+    - [-122.4109, 37.7792] # Mission x 7th
+    - [-122.4132, 37.7775] # Mission x 8th
+    - [-122.4072, 37.7797] # Howard x 6th
+    - [-122.4094, 37.7780] # Howard x 7th
+    - [-122.4116, 37.7762] # Howard x 8th
+    - [-122.4056, 37.7785] # Folsom x 6th
+    - [-122.4079, 37.7768] # Folsom x 7th
+    - [-122.4101, 37.7750] # Folsom x 8th
+  corridor_margin_lon: 0.0006
+  corridor_margin_lat: 0.0009
+  join_dist_m: 15
+  signal_dist_m: 25
+  tls_join_dist_m: 30
+  guess_tls: false
+  tls_set: []
+  tls_unset: []
+
+pedestrians: true
+
+padding:
+  lanes_per_side: 4
+  max_phases: 8
+  max_crossings: 8
+  extra_crossings_unobserved: true
+
+neighbours:
+  max_distance_m: 400
+
+demand:
+  # placeholder until `cotraffic calibrate-demand --net sf_mission_3x3` runs
+  peak_vehicles_per_hour: 2600
+  origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
+  opposite_side_prob: 0.5
+  route_random_factor: 1.2

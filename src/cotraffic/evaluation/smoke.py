@@ -147,20 +147,20 @@ def _training() -> str:
 
     from cotraffic.training.train import list_checkpoints, run_dir, train
 
-    folder = run_dir("coop", "grid2x2", 0) / "quick"
+    folder = run_dir("rl", "grid2x2", 0) / "quick"
     shutil.rmtree(folder, ignore_errors=True)
-    train("coop", "grid2x2", 0, quick=True, total_timesteps=1024)
-    train("coop", "grid2x2", 0, quick=True, total_timesteps=2048)
+    train("rl", "grid2x2", 0, quick=True, total_timesteps=1024)
+    train("rl", "grid2x2", 0, quick=True, total_timesteps=2048)
     steps = [s for s, _ in list_checkpoints(folder / "checkpoints")]
     assert steps and steps[-1] >= 2048, steps
     from cotraffic.controllers.rl_policy import LearnedPolicy
 
-    ctrl = LearnedPolicy("coop", list_checkpoints(folder / "checkpoints")[-1][1])
-    row = _quick("coop", "grid2x2", ["emergency"], controller=ctrl)
+    ctrl = LearnedPolicy("rl", list_checkpoints(folder / "checkpoints")[-1][1])
+    row = _quick("rl", "grid2x2", ["emergency"], controller=ctrl)
     from cotraffic.explainability.explain import explain_episode
 
     log = explain_episode(
-        "coop", ctrl.checkpoint, "grid2x2", "medium", ["emergency"], 7, max_rows=200
+        "rl", ctrl.checkpoint, "grid2x2", "medium", ["emergency"], 7, max_rows=200
     )
     assert log.is_file()
     log.unlink()
@@ -215,7 +215,7 @@ def _assistant() -> str:
 
     reply = ask("Quel est le meilleur contrôleur à la pointe sur la grille ?", llm=None)
     assert reply.finding.found and reply.finding.table is not None, reply.text
-    plan = plan_demo("MP contre COOP-FULL à Tunis avec un accident et des piétons", llm=None)
+    plan = plan_demo("MP contre LLM à Tunis avec un accident et des piétons", llm=None)
     assert plan.spec.network == "tunis" and "--follow-incident" in plan.command
     return f"best on grid3x3 peak: {reply.finding.table.iloc[0, 0]}; demo: {plan.spec.network}"
 
@@ -235,7 +235,7 @@ def _dashboard() -> str:
         body = policy.json()
         assert body["available"] is True, body
         methods = {item["method"] for item in body["catalog"]}
-        assert {"mp", "coop", "llm"} <= methods, methods
+        assert {"mp", "llm"} <= methods, methods
     return f"api ok, policy {body['method']} on {body['network']}"
 
 

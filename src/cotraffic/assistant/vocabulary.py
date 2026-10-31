@@ -2,7 +2,9 @@
 
 Used to read a request without the language model (keyword matching) and to name things
 in answers. Patterns are tried in order, so a specific name comes before a general one
-(``coop_full`` before ``coop``, ``ev_rule_mp`` before ``mp``).
+(``ev_rule_mp`` before ``mp``). Legacy controller ids (coop/ind variants) are gone:
+named RL models are dynamic ``rl_<hash>`` profile ids, added to METHODS at import time so
+the assistant can still name any model you saved.
 """
 
 from __future__ import annotations
@@ -15,12 +17,7 @@ METHODS: list[tuple[str, tuple[str, ...]]] = [
     ("ev_rule_mp", (r"ev[ -_]?rule[ -_]?mp", r"preemption (sur|avec|\+) ?(mp|max)")),
     ("ped_rule_mp", (r"ped[ -_]?rule", r"regle (des |pour les )?pietons?")),
     ("ev_rule", (r"ev[ -_]?rule", r"preemption")),
-    ("coop_forecast", (r"coop[ -_]?forecast", r"prevision", r"forecast")),
-    ("coop_full", (r"coop[ -_]?full", r"agent complet", r"cooperati\w* complet")),
-    ("coop_eco05", (r"coop[ -_]?eco[ -_]?0?[.,]?5", r"lambda ?=? ?0[.,]5")),
-    ("coop_eco", (r"coop[ -_]?eco", r"\beco\b")),
-    ("coop", (r"\bcoop\b", r"cooperati")),
-    ("ind", (r"\bind\b", r"independant")),
+    ("llm", (r"\bllm\b", r"modele de langage", r"\bgpt\b", r"claude")),
     ("mp", (r"\bmp\b", r"max[ -]?pressure", r"max pression")),
     ("act", (r"\bact\b", r"actionne", r"actuated")),
     ("ft", (r"\bft\b", r"feux? fixes?", r"temps fixe", r"fixed[ -]time", r"webster")),
@@ -103,6 +100,20 @@ def normalise(text: str) -> str:
     """Lower case without accents, so that "Piétons" and "pietons" match the same pattern."""
     decomposed = unicodedata.normalize("NFKD", text.lower())
     return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _extend_methods_with_learned() -> None:
+    """Register the current trainable recipes (rl templates and rl_<hash> profiles) in
+    METHODS, with a tiny pattern list, so the keyword reader can name them too."""
+    from cotraffic.controllers.registry import LEARNED
+
+    for method in LEARNED:
+        if any(value == method for value, _ in METHODS):
+            continue
+        METHODS.append((method, (rf"\b{re.escape(method)}\b",)))
+
+
+_extend_methods_with_learned()
 
 
 def find_all(text: str, table: list[tuple[str, tuple[str, ...]]]) -> list[str]:

@@ -1,0 +1,1 @@
+{"agent":"generalist_shortpilot","network":"sf_mission_2x2","runs":[{"seed":41,"totalTimesteps":4096,"algorithm":"ppo","timesteps":[2880],"episodeReward":[-3577.5],"meanHalting":[95.228],"demand":["rush_profile"],"switches":[395],"shieldMinGreen":[133]}]}

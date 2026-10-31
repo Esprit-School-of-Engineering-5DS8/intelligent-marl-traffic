@@ -1,0 +1,1 @@
+{"agent":"rl","network":"sf_mission_2x2","runs":[{"seed":41,"totalTimesteps":null,"algorithm":"ppo","timesteps":[2880,5760,8640],"episodeReward":[-3590.0,-3588.125,-3593.75],"meanHalting":[127.849,77.703,99.169],"demand":["peak","medium","medium"],"switches":[426,413,393],"shieldMinGreen":[143,161,150]}]}

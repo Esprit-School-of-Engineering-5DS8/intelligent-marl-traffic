@@ -7,9 +7,15 @@ real run. The window starts 30 s before the first emergency vehicle departs when
 one, otherwise 20 min into the measured hour.
 
     python scripts/record_replay.py --net grid3x3 --scenarios emergency --demand peak \
-        --left ft --right coop_full [--seed 3] [--window 480] [--every 2]
+        --left ft --right llm [--seed 3] [--window 480] [--every 2]
 
-Output: frontend/public/data/replays/<net>__<scenarios>__<demand>__s<seed>.json
+A side may also name a version saved in the model registry, so the dashboard can play the
+user's own policies rather than a baseline:
+
+    --left model:generalist-shortpilot --right model:rl-shortpilot
+    --left model:rl-shortpilot@v2 --right ft
+
+Output: frontend/public/data/replays/<net>__<scenarios>__<demand>__s<seed>[_<sides>].json
 (positions in decimetres, speeds in dm/s, angles in degrees: integers keep the file small).
 """
 
@@ -109,8 +115,43 @@ class Recorder:
         )
 
 
-def record(method: str, args: argparse.Namespace) -> dict[str, Any]:
-    checkpoint = default_checkpoint(method, args.net) if method in LEARNED else None
+def resolve_source(spec: str) -> dict[str, Any]:
+    """``model:<name>[@vN]`` - a version from results/models.json - or a controller id."""
+    if not spec.startswith("model:"):
+        return {"method": spec, "label": None, "checkpoint": None}
+    raw = spec.split(":", 1)[1]
+    name, _, version = raw.partition("@")
+    registry: dict[str, Any] = {"models": {}}
+    for path in (ROOT / "results" / "models.json", ROOT / "frontend" / "public" / "data" / "models.json"):
+        if path.is_file():
+            registry = json.loads(path.read_text(encoding="utf-8"))
+            break
+    versions = registry.get("models", {}).get(name) or []
+    if not versions:
+        known = ", ".join(sorted(registry.get("models", {}))) or "none"
+        raise SystemExit(f"unknown model {name!r} (registered: {known})")
+    if version:
+        wanted = int(version.lstrip("v"))
+        entry = next((v for v in versions if int(v.get("version", 0)) == wanted), None)
+        if entry is None:
+            raise SystemExit(f"{name} has no version {wanted}")
+    else:
+        entry = max(versions, key=lambda v: int(v.get("version", 0)))
+    checkpoint = ROOT / str(entry.get("checkpoint", "")).replace("\\", "/")
+    if not checkpoint.is_file():
+        raise SystemExit(f"{name} v{entry.get('version')} has no saved checkpoint ({checkpoint})")
+    return {
+        "method": name,
+        "label": f"{name} v{entry.get('version')}",
+        "checkpoint": checkpoint,
+    }
+
+
+def record(source: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    method = source["method"]
+    checkpoint = source["checkpoint"]
+    if checkpoint is None and method in LEARNED:
+        checkpoint = default_checkpoint(method, args.net)
     controller = make_controller(method, checkpoint)
     recorder = Recorder(args.window, args.every)
     hooks = controller.step_hooks
@@ -129,9 +170,10 @@ def record(method: str, args: argparse.Namespace) -> dict[str, Any]:
         logs_dir=scratch / "logs",
         controller=controller,
     )
-    print(f"  {method}: {len(recorder.frames)} frames, {len(recorder.ids)} vehicles")
+    print(f"  {source['label'] or method}: {len(recorder.frames)} frames, {len(recorder.ids)} vehicles")
     return {
         "method": method,
+        "label": source["label"],
         "kpis": {k: row.get(k) for k in KPIS},
         "frames": recorder.frames,
         "events": recorder.events,
@@ -146,17 +188,21 @@ def main() -> None:
     parser.add_argument("--scenarios", nargs="*", default=["emergency"])
     parser.add_argument("--demand", default="peak")
     parser.add_argument("--seed", type=int, default=3)
-    parser.add_argument("--left", default="ft")
-    parser.add_argument("--right", default="coop_full")
+    parser.add_argument("--left", default="ft", help="controller id or model:<name>[@vN]")
+    parser.add_argument("--right", default="llm", help="controller id or model:<name>[@vN]")
     parser.add_argument("--window", type=float, default=480.0)
     parser.add_argument("--every", type=int, default=2)
     args = parser.parse_args()
 
     scen = "+".join(args.scenarios) or "normal"
     replay_id = f"{args.net}__{scen}__{args.demand}__s{args.seed}"
+    sides = (args.left, args.right)
+    if any(side.startswith("model:") for side in sides):
+        tag = "-vs-".join(side.removeprefix("model:").replace("@", "v") for side in sides)
+        replay_id = f"{replay_id}__{tag.replace(':', '-')}"
     print(f"recording {replay_id}: {args.left} | {args.right}")
-    left = record(args.left, args)
-    right = record(args.right, args)
+    left = record(resolve_source(args.left), args)
+    right = record(resolve_source(args.right), args)
     payload = {
         "id": replay_id,
         "network": args.net,

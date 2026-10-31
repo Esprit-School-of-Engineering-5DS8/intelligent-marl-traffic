@@ -33,28 +33,24 @@ from cotraffic.networks.build import ensure_network
 from cotraffic.paths import RESULTS_DIR
 
 # The dashboard's scenario ids → cotraffic network names (configs/networks/<name>.yaml).
-# The grids are synthetic (no geography of their own), the OSM networks are real.
+# The grids are the real San Francisco Mission corridors; monaco and tunis are OSM too.
 SCENARIOS = {
-    "grid-2x2": "grid2x2",
-    "grid-3x3": "grid3x3",
+    "grid-2x2": "sf_mission_2x2",
+    "grid-3x3": "sf_mission_3x3",
     "monaco": "monaco",
     "tunis": "tunis",
 }
 DEMAND = "medium"
 
-# Where the synthetic grids are drawn: a plausible Austin block, so roads and vehicles share
-# a projection. Real networks use the CRS in their own ``<location>`` tag (see
-# ``_geo_projection``).
-GRID_BOUNDS = {
-    "grid-2x2": {"west": -97.7245, "east": -97.7192, "south": 30.2649, "north": 30.2704},
-    "grid-3x3": {"west": -97.7262, "east": -97.7168, "south": 30.2649, "north": 30.2712},
-}
+# Real networks use the CRS in their own ``<location>`` tag (see
+# ``_geo_projection``); this map is empty because every scenario now has geography.
+GRID_BOUNDS = {}
 
 _osm_bounds: dict[str, dict[str, float]] = {}
 
 
 def _bounds(scenario: str) -> dict[str, float]:
-    """Fallback map extent: the Austin block for grids, the configured bbox otherwise."""
+    """Fallback map extent: the configured OSM bbox for the scenario."""
     if scenario in GRID_BOUNDS:
         return GRID_BOUNDS[scenario]
     network = SCENARIOS[scenario]
@@ -101,9 +97,10 @@ def _extent(scenario: str) -> tuple[float, float, float, float]:
 
 @lru_cache(maxsize=4)
 def _geo_projection(scenario: str) -> tuple[pyproj.Proj, tuple[float, float]] | None:
-    """The network's projected CRS and SUMO's net offset, or ``None`` for a synthetic grid.
+    """The network's projected CRS and SUMO's net offset, or ``None`` if missing.
 
-    Real networks are built in a projected CRS (UTM zone 32 for both Monaco and Tunis) and
+    Real networks are built in a projected CRS (UTM zone 32 for Monaco and Tunis, zone 10
+    for the San Francisco grids) and
     SUMO stores their coordinates shifted by ``netOffset``. The net's ``<location>`` tag
     names that CRS, so inverting it is what puts the roads on the basemap. Stretching the
     network's bounding box onto the geographic extent instead ignores the meridian
@@ -147,26 +144,125 @@ def network_geojson(scenario: str) -> dict[str, Any]:
         if edge_id.startswith(":"):
             continue
         for lane in edge.findall("lane"):
+            if "pedestrian" in (lane.get("allow") or "").split():
+                continue
             points = []
             for pair in (lane.get("shape") or "").split():
                 point = _xy(pair)
-                if point is None:
-                    continue
-                points.append(_project(scenario, *point))
+                if point is not None:
+                    points.append(_project(scenario, *point))
             if len(points) >= 2:
-                features.append(
-                    {
-                        "type": "Feature",
-                        "properties": {
-                            "id": lane.get("id", edge_id),
-                            "edge": edge_id,
-                            "laneIndex": lane.get("index", "0"),
-                            "width": lane.get("width", "3.2"),
-                        },
-                        "geometry": {"type": "LineString", "coordinates": points},
-                    }
-                )
-    return {"type": "FeatureCollection", "features": features}
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "id": lane.get("id", edge_id),
+                        "edge": edge_id,
+                        "laneIndex": lane.get("index", "0"),
+                        "width": lane.get("width", "3.2"),
+                    },
+                    "geometry": {"type": "LineString", "coordinates": points},
+                })
+
+    signals_meta: list[dict[str, Any]] = []
+    for junction in root.findall("junction"):
+        if junction.get("type") != "traffic_light":
+            continue
+        try:
+            x, y = float(junction.get("x", "")), float(junction.get("y", ""))
+        except ValueError:
+            continue
+        longitude, latitude = _project(scenario, x, y)
+        signals_meta.append({
+            "id": junction.get("id", ""), "x": x, "y": y, "lng": longitude, "lat": latitude,
+            "lanes": signalLanePositions(scenario).get(junction.get("id", ""), []),
+        })
+
+    # Supply exact motor-vehicle lane geometry for the Three.js view; leave
+    # pedestrian lanes out of the road overlay entirely.
+    sumo_lanes: list[dict[str, Any]] = []
+    for edge in root.findall("edge"):
+        edge_id = edge.get("id", "")
+        if edge_id.startswith(":"):
+            continue
+        for lane in edge.findall("lane"):
+            if "pedestrian" in (lane.get("allow") or "").split():
+                continue
+            points = []
+            for pair in (lane.get("shape") or "").split():
+                point = _xy(pair)
+                if point is not None:
+                    points.append([point[0], point[1]])
+            if len(points) < 2:
+                continue
+            lane_data = {
+                "id": lane.get("id", edge_id),
+                "laneIndex": int(lane.get("index", "0") or 0),
+                "width": float(lane.get("width", "3.2") or 3.2),
+                "shape": points,
+            }
+            lane_data["allow"] = (lane.get("allow") or "").split()
+            lane_data["disallow"] = (lane.get("disallow") or "").split()
+            sumo_lanes.append(lane_data)
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "signals": signals_meta,
+        "sumoLanes": sumo_lanes,
+    }
+
+
+@lru_cache(maxsize=4)
+def signalLanePositions(scenario: str) -> dict[str, list[dict[str, Any]]]:
+    """Per-lane light positions: for each signalised junction, one entry per
+    controlled lane (in TLS state-string order) at its stop-line end, in SUMO x/y.
+    """
+    import sumolib
+
+    root = ET.parse(_net_file(scenario)).getroot()
+    net = sumolib.net.readNet(str(_net_file(scenario)))
+    result: dict[str, list[dict[str, Any]]] = {
+        tls.getID(): [] for tls in net.getTrafficLights()
+    }
+    # Gather movement links by their incoming lane, then emit exactly one
+    # signal head for every drivable inbound lane at each signalized junction.
+    # Some imported lanes have no legal SUMO connection at that node; keep a
+    # visible head for those too, with an empty linkIndices list (red fallback).
+    controlled: dict[str, dict[str, set[int]]] = {
+        tls_id: {} for tls_id in result
+    }
+    for elem in root.iter("connection"):
+        tls_id = elem.get("tl")
+        if tls_id not in controlled or elem.get("dir", "") == "s":
+            continue
+        lane_id = f"{elem.get('from', '')}_{elem.get('fromLane', '0')}"
+        controlled[tls_id].setdefault(lane_id, set()).add(int(elem.get("linkIndex", "0")))
+
+    for tls_id in result:
+        node = net.getNode(tls_id)
+        entries: list[dict[str, Any]] = []
+        for edge in node.getIncoming():
+            for lane in edge.getLanes():
+                if not lane.allows("passenger"):
+                    continue
+                shape = lane.getShape()
+                if not shape:
+                    continue
+                # Lane shapes are net-local — the same space vehicles arrive
+                # in from TraCI — so use their stop-line endpoint directly.
+                x, y = shape[-1][0], shape[-1][1]
+                longitude, latitude = _project(scenario, x, y)
+                entries.append({
+                    "lane": lane.getID(),
+                    "laneIndex": lane.getIndex(),
+                    "linkIndices": sorted(controlled[tls_id].get(lane.getID(), set())),
+                    "x": x,
+                    "y": y,
+                    "lng": longitude,
+                    "lat": latitude,
+                    "edge": edge.getID(),
+                })
+        result[tls_id] = entries
+    return result
 
 
 class SimulationSession:
@@ -186,6 +282,7 @@ class SimulationSession:
             "speed": 1,
             "method": None,
             "vehicles": [],
+            "pedestrians": [],
             "signals": [],
             "metrics": {},
         }
@@ -221,6 +318,7 @@ class SimulationSession:
                     "speed": speed,
                     "method": method,
                     "vehicles": [],
+                    "pedestrians": [],
                     "signals": [],
                     "metrics": {},
                 }
@@ -262,7 +360,7 @@ class SimulationSession:
             self.thread.join(timeout=5)
         self._close_traci()
         with self.lock:
-            self.state.update({"status": "idle", "vehicles": [], "signals": []})
+            self.state.update({"status": "idle", "vehicles": [], "pedestrians": [], "signals": []})
         return self.snapshot()
 
     def set_speed(self, speed: float) -> dict[str, Any]:
@@ -300,8 +398,30 @@ class SimulationSession:
                     "angle": conn.vehicle.getAngle(vehicle_id),
                     "speed": speed,
                     "waiting": speed < 0.1,
+                    "type": conn.vehicle.getTypeID(vehicle_id),
+                    "vehicleClass": conn.vehicle.getVehicleClass(vehicle_id),
                 }
             )
+        pedestrians = []
+        for person_id in conn.person.getIDList():
+            x, y = conn.person.getPosition(person_id)
+            longitude, latitude = _project(scenario, x, y)
+            try:
+                speed = conn.person.getSpeed(person_id)
+                angle = conn.person.getAngle(person_id)
+            except Exception:
+                speed = 0.0
+                angle = 0.0
+            pedestrians.append({
+                "id": person_id,
+                "x": x,
+                "y": y,
+                "lng": longitude,
+                "lat": latitude,
+                "speed": speed,
+                "angle": angle,
+                "waiting": speed < 0.1,
+            })
         signals = []
         for tls_id in conn.trafficlight.getIDList():
             try:
@@ -320,9 +440,11 @@ class SimulationSession:
                     "simulationTime": sim_time,
                     "clock": f"{sim_time // 3600:02d}:{sim_time % 3600 // 60:02d}:{sim_time % 60:02d}",
                     "vehicles": vehicles,
+                    "pedestrians": pedestrians,
                     "signals": signals,
                     "metrics": {
                         "vehicles": len(vehicles),
+                        "pedestrians": len(pedestrians),
                         "arrived": int(conn.simulation.getArrivedNumber()),
                     },
                 }
@@ -334,10 +456,11 @@ class SimulationSession:
             protocol = config.load_protocol()
             network = SCENARIOS[scenario]
             controller = make_controller(method, checkpoint)
+            live_scenarios = ("pedestrians",) if config.load("networks", network).get("pedestrians", False) else ()
             episode = evaluation_episode(
                 network,
                 DEMAND,
-                (),
+                live_scenarios,
                 seed=0,
                 output_dir=RESULTS_DIR / "tmp" / f"live-{scenario}",
                 ssm=False,

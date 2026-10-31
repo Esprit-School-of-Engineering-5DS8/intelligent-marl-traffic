@@ -25,8 +25,8 @@ QUESTIONS = [
         dict(intent="best", network="grid3x3", scenario="normal", demand="peak"),
     ),
     (
-        "Compare COOP et MP sur le quartier à la pointe",
-        dict(intent="compare", network="tunis", demand="peak", methods=["coop", "mp"]),
+        "Compare RL et MP sur le quartier à la pointe",
+        dict(intent="compare", network="tunis", demand="peak", methods=["rl", "mp"]),
     ),
     (
         "Quel est le retard des ambulances avec EV-RULE-MP ?",
@@ -41,29 +41,29 @@ QUESTIONS = [
         dict(intent="best", scenario="sensor_noise"),
     ),
     (
-        "Est-ce que l'agent coopératif complet fait mieux que Max-Pressure avec les bus ?",
-        dict(intent="compare", scenario="buses", methods=["coop_full", "mp"]),
+        "Est-ce que le LLM fait mieux que Max-Pressure avec les bus ?",
+        dict(intent="compare", scenario="buses", methods=["llm", "mp"]),
     ),
     (
-        "Combien de CO2 émet IND à la pointe sur la grille ?",
+        "Combien de CO2 émet RL à la pointe sur la grille ?",
         dict(
             intent="values",
             network="grid3x3",
             demand="peak",
             metric="co2_total_kg",
-            methods=["ind"],
+            methods=["rl"],
         ),
     ),
     (
-        "Pourquoi COOP-FULL passe au vert au carrefour B2 vers 20 min ?",
-        dict(intent="decision", junction="B2", time_s=1200.0, methods=["coop_full"]),
+        "Pourquoi le LLM passe au vert au carrefour B2 vers 20 min ?",
+        dict(intent="decision", junction="B2", time_s=1200.0, methods=["llm"]),
     ),
     (
-        "L'agent qui gère aussi les piétons et les urgences est-il meilleur que MP en cas "
+        "Le LLM qui gère aussi les piétons et les urgences est-il meilleur que MP en cas "
         "d'accident ?",
-        dict(intent="compare", scenario="incident", methods=["coop_full", "mp"]),
+        dict(intent="compare", scenario="incident", methods=["llm", "mp"]),
     ),
-    ("Sur quoi COOP s'appuie pour décider ?", dict(intent="importance", methods=["coop"])),
+    ("Sur quoi RL s'appuie pour décider ?", dict(intent="importance", methods=["rl"])),
     ("Explique l'échec F-009", dict(intent="failure", failure_code="F-009")),
     (
         "Quel contrôleur est le plus rapide sur la grande grille de 64 carrefours ?",
@@ -84,26 +84,26 @@ QUESTIONS = [
         ),
     ),
     (
-        "Quel est l'écart entre feux fixes et COOP-FULL à Tunis en heure de pointe ?",
-        dict(intent="compare", network="tunis", demand="peak", methods=["ft", "coop_full"]),
+        "Quel est l'écart entre feux fixes et LLM à Tunis en heure de pointe ?",
+        dict(intent="compare", network="tunis", demand="peak", methods=["ft", "llm"]),
     ),
 ]
 DEMOS = [
     (
-        "Montre MP contre COOP-FULL à Tunis avec un accident et des piétons",
+        "Montre MP contre LLM à Tunis avec un accident et des piétons",
         dict(
             left="mp",
-            right="coop_full",
+            right="llm",
             network="tunis",
             follow_incident=True,
             has={"incident", "pedestrians"},
         ),
     ),
     (
-        "Ambulances sur la grille, préemption sur MP face à COOP-FULL, caméra sur les ambulances",
+        "Ambulances sur la grille, préemption sur MP face à LLM, caméra sur les ambulances",
         dict(
             left="ev_rule_mp",
-            right="coop_full",
+            right="llm",
             network="grid3x3",
             follow_ev=True,
             has={"emergency"},
@@ -113,10 +113,10 @@ DEMOS = [
         "Une démo rapide avec des bus à demande moyenne",
         dict(demand="medium", quick=True, has={"buses"}),
     ),
-    ("Feux fixes contre IND sur la grande grille", dict(left="ft", right="ind", network="monaco")),
+    ("Feux fixes contre RL sur la grande grille", dict(left="ft", right="rl", network="monaco")),
     (
-        "Compare l'agent indépendant et le coopératif sur le quartier",
-        dict(left="ind", right="coop", network="tunis"),
+        "Compare RL et LLM sur le quartier",
+        dict(left="rl", right="llm", network="tunis"),
     ),
     (
         "Tunis à l'heure de pointe avec un accident, graine 2",

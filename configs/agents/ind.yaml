@@ -1,3 +1,0 @@
-name: ind
-extends: base
-description: Independent agents - local observation only, no communication.
