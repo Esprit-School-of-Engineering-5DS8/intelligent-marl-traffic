@@ -113,6 +113,7 @@ The pre-commit hook (Husky + lint-staged) formats and lints staged files; the
 `frontend` GitHub workflow runs all of the above.
 
 Accessibility: keyboard navigation everywhere (skip link, focus rings, Space to play a
-replay, Ctrl+K for the assistant), labelled controls, every chart has a text alternative
+replay, Ctrl+K for the command palette: every page, the theme, the language and the
+assistant), labelled controls, every chart has a text alternative
 and a data table, colour is never the only cue (traffic states also carry a label or an
 icon), reduced motion respected, right-to-left layout for Arabic.

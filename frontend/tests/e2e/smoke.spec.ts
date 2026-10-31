@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("smoke", () => {
-  test("opens the overview without console errors", async ({ page }) => {
+  test("opens the home page without console errors", async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") errors.push(msg.text());
@@ -9,8 +9,13 @@ test.describe("smoke", () => {
     page.on("pageerror", (err) => errors.push(err.message));
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "Vue d'ensemble" })).toBeVisible();
-    await expect(page).toHaveTitle("Vue d'ensemble - CoTraffic");
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Le meilleur compromis, pas le meilleur partout.",
+      }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page).toHaveTitle("Accueil - CoTraffic");
     expect(errors).toEqual([]);
   });
 
@@ -19,14 +24,17 @@ test.describe("smoke", () => {
     const nav = page.getByRole("navigation", { name: "Navigation principale" });
     const links = nav.getByRole("link");
     const count = await links.count();
-    expect(count).toBe(11);
+    expect(count).toBe(13);
 
     for (let i = 0; i < count; i += 1) {
       const link = links.nth(i);
       const name = (await link.innerText()).trim();
       await link.click();
       await expect(link).toHaveAttribute("aria-current", "page");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+      // every page names the browser tab after its sidebar entry (the home page's heading
+      // is its message, not its name)
+      await expect(page).toHaveTitle(`${name} - CoTraffic`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     }
   });
 

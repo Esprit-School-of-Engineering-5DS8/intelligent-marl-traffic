@@ -28,7 +28,10 @@ Vérifier :
 
 ## Déroulé
 
-### 1. Vue d'ensemble (2 min)
+### 1. Étude principale (2 min)
+
+Menu **Résultats > Étude principale** (l'ancienne « Vue d'ensemble » ; l'accueil présente
+maintenant le contrôleur final de l'étude combinée).
 
 Grille 4x4, trafic normal, pointe ; COOP-FULL contre FT (feux à temps fixe, Webster).
 
@@ -95,7 +98,8 @@ scénarios. Tableau des tests : export CSV.
 
 ### 7. Assistant (2 min)
 
-Ctrl+K depuis n'importe quelle page :
+Depuis n'importe quelle page : bouton « Assistant » en haut à droite, ou Ctrl+K (la palette de
+commandes), taper « assistant », Entrée. Ctrl+K ouvre aussi n'importe quelle page :
 
 1. « COOP-FULL est-il meilleur que FT sur l'attente en pointe dans le quartier réel ? »
    (réponse chiffrée, intervalle de confiance, p de Holm, fichiers sources) ;
@@ -171,7 +175,7 @@ python scripts/demo_side_by_side.py --net grid4x4 --scenarios emergency --left e
 # les mêmes comparaisons, chiffrées sur les 5 graines de test
 python -m cotraffic ask "Compare COOP-FULL et MP sur la grille à la pointe" --no-llm --table
 
-# puis le tableau de bord : Vue d'ensemble, puis Analyse comparative (forest plot, carte des gains)
+# puis le tableau de bord : Étude principale, puis Analyse comparative (forest plot, carte des gains)
 cd frontend
 npm run dev
 ```

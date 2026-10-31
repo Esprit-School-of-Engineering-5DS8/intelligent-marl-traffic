@@ -402,8 +402,8 @@ WebSocket). Détails : [frontend/README.md](frontend/README.md) ; contrat des do
 
 ## 8. L'assistant (modèle de langage local)
 
-L'assistant répond en français aux questions sur les résultats, dans le tableau de bord (Ctrl+K)
-et en ligne de commande. Un petit modèle tourne sur le portable via [Ollama](https://ollama.com) :
+L'assistant répond en français aux questions sur les résultats, dans le tableau de bord (bouton
+« Assistant » en haut à droite, ou Ctrl+K puis « assistant ») et en ligne de commande. Un petit modèle tourne sur le portable via [Ollama](https://ollama.com) :
 gratuit, hors ligne, sans compte.
 
 ```bash

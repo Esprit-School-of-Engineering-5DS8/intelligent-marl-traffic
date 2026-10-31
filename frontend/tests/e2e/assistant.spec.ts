@@ -5,10 +5,19 @@ import { fr, mean, summary, test as stat } from "./data";
 // The assistant without backend: every answer must carry the numbers of the result files,
 // its sources, and never start an action by itself.
 
+/** Ctrl+K opens the command palette; its action "open the assistant" opens the panel
+ * (the word "assistant" alone first finds the assistant page). */
+async function fromPalette(page: Page, query = "ouvrir assistant") {
+  await page.keyboard.press("Control+k");
+  const palette = page.getByRole("dialog").filter({ has: page.getByRole("combobox") });
+  await palette.getByRole("combobox").fill(query);
+  await palette.getByRole("combobox").press("Enter");
+}
+
 async function openAssistant(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 20_000 });
-  await page.keyboard.press("Control+k");
+  await fromPalette(page);
   const panel = page.getByRole("dialog", { name: "Assistant" });
   await expect(panel).toBeVisible();
   // the suggestions become clickable once the results are loaded
@@ -118,7 +127,7 @@ test.describe("assistant (no backend)", () => {
     await page.goto("/settings");
     await page.getByRole("main").getByLabel("Langue").selectOption("en");
     await page.getByRole("main").getByRole("button", { name: "Enregistrer" }).click();
-    await page.keyboard.press("Control+k");
+    await fromPalette(page, "open assistant");
     const panel = page.getByRole("dialog", { name: "Assistant" });
     await expect(panel.getByRole("button", { name: /^Compare COOP-FULL and FT/ })).toBeEnabled({
       timeout: 20_000,

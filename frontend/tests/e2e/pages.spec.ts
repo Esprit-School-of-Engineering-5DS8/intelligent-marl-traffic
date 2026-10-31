@@ -13,8 +13,8 @@ async function open(page: Page, path: string, title: string) {
 const main = (page: Page) => page.getByRole("main");
 
 test.describe("pages", () => {
-  test("overview: KPIs of COOP-FULL against FT, from the results", async ({ page }) => {
-    await open(page, "/", "Vue d'ensemble");
+  test("main study: KPIs of COOP-FULL against FT, from the results", async ({ page }) => {
+    await open(page, "/overview", "Étude principale");
     const wait = mean("grid4x4", "normal", "peak", "coop_full", "mean_waiting_time");
     const ref = mean("grid4x4", "normal", "peak", "ft", "mean_waiting_time");
     const gain = stat("grid4x4", "normal", "peak", "coop_full", "ft", "mean_waiting_time");
@@ -30,8 +30,8 @@ test.describe("pages", () => {
     await expect(main(page).getByText("Provenance des données")).toBeVisible();
   });
 
-  test("overview: changing the network updates the numbers", async ({ page }) => {
-    await open(page, "/", "Vue d'ensemble");
+  test("main study: changing the network updates the numbers", async ({ page }) => {
+    await open(page, "/overview", "Étude principale");
     await main(page).getByLabel("Réseau").selectOption("real_district");
     const wait = mean("real_district", "normal", "peak", "coop_full", "mean_waiting_time");
     await expect(
@@ -162,9 +162,21 @@ test.describe("pages", () => {
     await expect(messages).toContainText(`${peak.faster} / ${peak.total}`);
     const shown = final.tests.best + final.tests.noninf;
     await expect(messages).toContainText(`${shown} / ${final.tests.total}`);
-    for (const name of [/pire écart de 12 %/, /Forest plot/, /Barres : la candidate/]) {
-      await expect(main(page).getByRole("img", { name })).toBeVisible();
-    }
+    // one forest chart per group of situations, the compromise as a table, the ambulances
+    await expect(
+      main(page).getByRole("group", { name: /^Forest plot des 36 tests/ }),
+    ).toBeVisible();
+    await expect(
+      main(page).getByRole("img", { name: /^Grille 4x4 · cas principaux :/ }),
+    ).toBeVisible();
+    const matrix = main(page).getByRole("region", {
+      name: "Tableau : Aucun contrôleur n'est le meilleur partout",
+    });
+    await expect(matrix.getByRole("rowheader", { name: /Candidate/ })).toBeVisible();
+    await expect(matrix).toContainText(`+${worst.format(final.worstGap.candidate)} %`);
+    await expect(
+      main(page).getByRole("img", { name: /^Retard moyen des ambulances, demande Pointe/ }),
+    ).toBeVisible();
     const demo = main(page).getByRole("img", { name: /Deux vues SUMO/ });
     await expect(demo).toHaveAttribute("src", /demo\.png$/);
     await main(page).getByRole("button", { name: "Lancer l'enregistrement" }).click();
@@ -177,7 +189,7 @@ test.describe("pages", () => {
     await main(page).getByRole("button", { name: "Enregistrer" }).click();
     await page
       .getByRole("navigation", { name: "Navigation principale" })
-      .getByRole("link", { name: "Vue d'ensemble" })
+      .getByRole("link", { name: "Étude principale" })
       .click();
     const minutes = mean("grid4x4", "normal", "peak", "coop_full", "mean_waiting_time") / 60;
     await expect(

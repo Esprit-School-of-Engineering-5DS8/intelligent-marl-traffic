@@ -4,8 +4,10 @@ import { expect, test } from "@playwright/test";
 // WCAG 2.1 A and AA rules on every page, in the dark (default) and light themes
 const PAGES = [
   "/",
+  "/overview",
   "/analytics",
   "/final-controller",
+  "/robustness",
   "/agents",
   "/pedestrians",
   "/emergency",
