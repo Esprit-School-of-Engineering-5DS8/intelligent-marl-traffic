@@ -78,7 +78,7 @@ def controllers(network: str, scenario: str) -> list[tuple[str, float | None, li
     if scenario == "pedestrians":
         out += [("coop_full_pedrule_switch", None, RUNS), ("ped_rule_mp", None, [0])]
     if scenario in ("emergency", "pedestrians"):
-        out.append(("team_rules", None, [0]))
+        out.append(("team_rules", None, [0]))  # our teammate's work (llm_team/PROVENANCE.md)
     return out
 
 

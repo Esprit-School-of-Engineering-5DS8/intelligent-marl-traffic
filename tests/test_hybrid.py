@@ -115,6 +115,7 @@ def test_team_role_guide_keeps_only_its_roles():
     env = FakeEnv()
     env.now = 5.0
     env.ev_states = [EVState("ev0", "edge", "lane", 10.0, (UpcomingTLS("B0", 2, 20.0, "r"),))]
+    # the rules of our teammate's work (controllers/llm_team/PROVENANCE.md)
     emergency, pedestrian = TeamRoleGuide(("emergency",)), TeamRoleGuide(("pedestrian",))
     emergency.reset(env)
     pedestrian.reset(env)

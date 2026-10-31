@@ -34,7 +34,7 @@ OUT = RESULTS_DIR / "exploration" / "combined"
 METRICS = ("mean_travel_time", "mean_waiting_time")
 NO_PARAM = -1.0
 BETTER, UNCERTAIN, WORSE = "≥", "?", "✗"
-REFS = ("mp", "ev_rule_mp", "coop_full", "team_rules", "ped_rule_mp")
+REFS = ("mp", "ev_rule_mp", "coop_full", "team_rules", "ped_rule_mp")  # team_rules: teammate's work
 # a variant -> what it reduces to where its guide has nothing to do: (scenario test, method)
 REDUCES = {
     "coop_full_evrule_switch": [(lambda s: s != "emergency", "coop_full")],

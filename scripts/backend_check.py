@@ -32,7 +32,7 @@ SAVED = ce.OUT  # the saved rows; a worker moves ce.OUT to its temporary folder
 # (method, network, scenario, demand, seed, training run, parameter), all saved on TraCI
 TASKS = [
     ("mp", "grid4x4", "normal", "peak", 1001, 0, None),
-    ("team_rules", "real_district", "emergency", "peak", 1001, 0, None),
+    ("team_rules", "real_district", "emergency", "peak", 1001, 0, None),  # teammate's work
     ("ped_rule_mp", "grid4x4", "pedestrians", "medium", 1002, 0, None),
     ("coop_full", "grid4x4", "incident", "medium", 1002, 2, None),
     ("coop_full_evrule_switch", "real_district", "emergency", "medium", 1002, 2, None),

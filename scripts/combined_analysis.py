@@ -45,7 +45,7 @@ from cotraffic.paths import RESULTS_DIR  # noqa: E402
 
 METRICS = {"mean_travel_time": "trajet", "mean_waiting_time": "attente"}
 MARGIN, ALPHA, N_BOOT = 2.0, 0.025, 10_000
-REFS = ("mp", "ev_rule_mp", "coop_full", "team_rules", "ped_rule_mp")
+REFS = ("mp", "ev_rule_mp", "coop_full", "team_rules", "ped_rule_mp")  # team_rules: teammate's work
 CANDIDATE = ("hybrid_h2", 4.0)
 OTHERS = [
     ("hybrid_h1", 90.0),

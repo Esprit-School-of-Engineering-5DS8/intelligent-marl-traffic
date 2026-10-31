@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pytest
 from test_llm_team_controller import FakeEnv
 
-from cotraffic.controllers.combined import EvRuleGuide, GuidedPolicy, TeamGuide
+from cotraffic.controllers.combined import (
+    EvRuleGuide,
+    GuidedPolicy,
+    TeamGuide,
+)  # TeamGuide: teammate's work
 from cotraffic.envs.ev import EVState, UpcomingTLS
 
 

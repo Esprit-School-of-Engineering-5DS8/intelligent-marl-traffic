@@ -20,7 +20,7 @@ NAMES = {
     "ev_rule_mp": "EV-RULE-MP",
     "coop_full": "COOP-FULL",
     "coop_full_llm": "COOP-FULL + conseiller",
-    "team_rules": "TEAM-RULES",
+    "team_rules": "TEAM-RULES",  # our teammate's work (controllers/llm_team/PROVENANCE.md)
     "team_qwen": "TEAM-QWEN",
 }
 CELLS = [(s, d) for s in ("normal", "emergency", "incident") for d in ("medium", "peak")]

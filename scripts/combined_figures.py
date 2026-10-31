@@ -65,7 +65,7 @@ CONTROLLERS = [
     ("mp", None, "MP"),
     ("ev_rule_mp", None, "EV-RULE-MP"),
     ("coop_full", None, "COOP-FULL"),
-    ("team_rules", None, "TEAM-RULES"),
+    ("team_rules", None, "TEAM-RULES"),  # our teammate's work (controllers/llm_team/PROVENANCE.md)
 ]
 VERDICTS = {  # label, colour, marker, filled
     "best": ("Prouvée meilleure", GOOD, "o", True),
