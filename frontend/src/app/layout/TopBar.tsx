@@ -8,7 +8,6 @@ import { useConnection, type ConnectionStatus } from "@/shared/api/connection";
 import { LANGUAGES } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Kbd } from "@/shared/ui/kbd";
 
 const STATUS_TONE: Record<ConnectionStatus, "neutral" | "dense" | "flow"> = {
   offline: "neutral",
@@ -26,7 +25,7 @@ export function TopBar() {
   const openAssistant = useUi((s) => s.setAssistantOpen);
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur md:px-6">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <Badge tone="accent" title={t("topbar.dataSource")}>
           <Database aria-hidden="true" />
@@ -70,13 +69,9 @@ export function TopBar() {
         variant="secondary"
         onClick={() => openAssistant(true)}
         title={t("topbar.openAssistant")}
-        aria-keyshortcuts="Control+K"
       >
         <Bot aria-hidden="true" />
         <span className="sr-only sm:not-sr-only">{t("topbar.assistant")}</span>
-        <Kbd aria-hidden="true" className="hidden md:inline">
-          Ctrl K
-        </Kbd>
       </Button>
     </header>
   );

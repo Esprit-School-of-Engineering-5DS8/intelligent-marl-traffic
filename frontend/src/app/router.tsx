@@ -3,11 +3,13 @@ import type { RouteObject } from "react-router";
 
 import { ErrorPanel } from "./ErrorBoundary";
 import { Shell } from "./layout/Shell";
-import { NAV, type PageKey } from "./nav";
+import { NAV_ITEMS, type PageKey } from "./nav";
 import { NotFound } from "./NotFound";
 
 // one chunk per page: the first screen only downloads the shell and the page it shows
 const PAGES: Record<PageKey, LazyExoticComponent<ComponentType>> = {
+  home: lazy(() => import("@/features/home/HomePage")),
+  robustness: lazy(() => import("@/features/robustness/RobustnessPage")),
   overview: lazy(() => import("@/features/overview/OverviewPage")),
   liveMap: lazy(() => import("@/features/live-map/LiveMapPage")),
   simulation3d: lazy(() => import("@/features/simulation-3d/Simulation3dPage")),
@@ -21,7 +23,7 @@ const PAGES: Record<PageKey, LazyExoticComponent<ComponentType>> = {
   settings: lazy(() => import("@/features/settings/SettingsPage")),
 };
 
-const pageRoutes: RouteObject[] = NAV.flatMap((group) => group.items).map(({ key, path }) => {
+const pageRoutes: RouteObject[] = NAV_ITEMS.map(({ key, path }) => {
   const Page = PAGES[key];
   return path === "/" ? { index: true, element: <Page /> } : { path, element: <Page /> };
 });
