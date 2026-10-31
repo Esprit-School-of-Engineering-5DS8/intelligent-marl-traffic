@@ -82,6 +82,37 @@ Le tableau par référence (combien de critères meilleurs, égaux ou moins bons
   réseau ; dans les cas saturés, il sous-estime ce qu'une stratégie pourrait gagner. Sa
   conclusion vaut donc pour les cas non saturés.
 
+## Comparaison indirecte avec la version LLM de notre coéquipier (exploratoire)
+
+Sa meilleure version utilise un LLM hébergé (DeepSeek V4.1 Flash, appelé par une API). Elle
+n'a pas été évaluée dans notre étude, qui n'utilise qu'un LLM local. On ne peut donc comparer
+que de façon **indirecte** : chacun par rapport à Max-Pressure, sur real_district, le seul
+réseau qu'il a mesuré. Gain par rapport à Max-Pressure, positif = mieux :
+
+| Situation (real_district) | Son équipe LLM (API), son compte rendu | Notre candidate, graines de test 0 à 4 |
+|---|---|---|
+| normal, demande moyenne | trajet +0,2 % ; attente +2,4 % | trajet 0,0 % ; attente **+8,8 %** |
+| urgences, demande moyenne | trajet +0,5 % ; attente +4,4 % ; ambulances +2,2 % | trajet +0,3 % ; attente **+10,9 %** ; ambulances **+21,7 %** |
+| incident, demande moyenne | trajet +0,4 % ; attente +3,6 % | trajet +0,4 % ; attente **+11,4 %** |
+| normal, pointe | trajet −8,9 % ; attente −29,4 % | trajet −2,6 % ; attente −11,1 % |
+| urgences, pointe | trajet −3,8 % ; attente −15,6 % ; ambulances −30,8 % | trajet −2,7 % ; attente −10,2 % ; ambulances +13,3 % |
+
+Lecture : en demande moyenne, les deux font comme Max-Pressure sur le temps de trajet, et la
+candidate fait nettement mieux sur l'attente et les ambulances ; en pointe, les deux perdent
+contre Max-Pressure, mais la candidate perd beaucoup moins.
+
+**Limites, à dire avant le chiffre.**
+
+- Ce n'est pas le même essai : ses chiffres viennent de son propre compte rendu, avec son
+  protocole (sa version de l'environnement, ses durées d'épisode, ses graines 0 à 2) ; nous ne
+  les avons pas rejoués. Seuls les écarts à Max-Pressure sont comparés, pas les valeurs.
+- Son échantillon est petit : 3 graines en demande moyenne, **une seule** en pointe ; aucun
+  intervalle de confiance de son côté. Les nôtres sont larges en pointe (par exemple
+  l'attente en pointe normale : intervalle de −32 % à +8 %).
+- Un seul réseau, cinq situations.
+- Hors pré-enregistrement : c'est une indication, pas une preuve. Une comparaison directe
+  demanderait de faire tourner sa version API dans notre protocole.
+
 ## La rigueur
 
 - **Pré-enregistrement** : contrôleurs, situations, graines, tests et règles de décision écrits
