@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import i18n, { applyLanguage } from "@/shared/i18n";
+import i18n, { applyLanguage, PENDING } from "@/shared/i18n";
 
 import ar from "./locales/ar.json";
 import en from "./locales/en.json";
@@ -30,6 +30,19 @@ describe("translations", () => {
         return typeof value !== "string" || value.trim() === "";
       });
       expect(empty, language).toEqual([]);
+    }
+  });
+
+  it("pages awaiting translation show French in English and Arabic, never a key", () => {
+    const pending = keys(PENDING);
+    expect(pending.filter((key) => key in fr || key.split(".")[0]! in fr)).toEqual([]);
+    for (const language of ["en", "ar"] as const) {
+      const t = i18n.getFixedT(language);
+      const shown = pending.filter((key) => {
+        const value = t(key as never) as unknown;
+        return typeof value !== "string" || value === key || value.trim() === "";
+      });
+      expect(shown, language).toEqual([]);
     }
   });
 

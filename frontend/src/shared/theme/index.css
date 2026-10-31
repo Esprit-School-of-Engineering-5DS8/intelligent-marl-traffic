@@ -3,23 +3,28 @@
 /* Themes are switched with data-theme on <html> (dark by default, a control-room look). */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* Design tokens. Surfaces step up in lightness; traffic colours are reserved for traffic
-   states (never for decoration) and always come with an icon or a label. */
+/* Design tokens. The interface itself is neutral (graphite and ink): colour is kept for the
+   data. Each controller has one fixed colour, the same in every chart (checked with the
+   palette validator: lightness band, colour-blind separation, contrast, light and dark).
+   Status colours (verdicts, traffic states) are reserved and always come with an icon or
+   a label. */
 :root {
   color-scheme: light;
-  --bg: #f4f6f8;
+  --bg: #f3f5f7;
   --surface: #ffffff;
-  --surface-2: #f0f3f6;
-  --surface-3: #e5eaef;
-  --border: #d3dbe3;
-  --border-strong: #b5c1cd;
-  --text: #0e1621;
-  --text-2: #445566;
-  --muted: #5e6d7c;
-  --accent: #5b4bd6;
-  --accent-soft: #ebe8fd;
+  --surface-2: #eff2f5;
+  --surface-3: #e4e9ee;
+  --border: #d6dde4;
+  --border-strong: #b3bfcb;
+  --text: #0d1520;
+  --text-2: #3f4f60;
+  --muted: #5a6979;
+  /* neutral interface accent: never mistaken for a controller */
+  --accent: #1b2632;
+  --accent-soft: #e3e8ee;
   --accent-ink: #ffffff;
-  --focus: #5b4bd6;
+  --focus: #0d1520;
+  --glow: rgba(42, 120, 214, 0.1);
   /* traffic states */
   --flow: #126b3f;
   --dense: #8a5208;
@@ -29,23 +34,52 @@
   --dense-soft: #fbefdc;
   --jam-soft: #fbe5e5;
   --emergency-soft: #e2ecfc;
+  /* verdicts of the tests (marks; text uses the ink variants) */
+  --good: #0ca30c;
+  --good-ink: #0b6b1d;
+  --good-soft: #e4f5e4;
+  --critical: #d03b3b;
+  --critical-ink: #a8262a;
+  --critical-soft: #fbe5e5;
+  --wide: #898781;
+  /* the controllers (identity, never rank) */
+  --ctl-candidate: #2a78d6;
+  --ctl-mp: #eb6834;
+  --ctl-coop-full: #1baf7a;
+  --ctl-ev-rule-mp: #eda100;
+  --ctl-team: #e87ba4;
+  --ctl-llm: #4a3aa7;
+  --ctl-neutral: #8f8d88;
+  --ctl-placebo: #b8b6b0;
+  --ctl-oracle: #52514e;
+  /* sequential ramp (one hue, magnitude): lighter = closer to the best */
+  --seq-0: #f4f8fd;
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #184f95;
+  --seq-ink: #0d1520;
+  --seq-ink-strong: #ffffff;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0a0f14;
-  --surface: #111921;
-  --surface-2: #17212b;
-  --surface-3: #1f2b37;
-  --border: #26323f;
-  --border-strong: #3a4a5a;
-  --text: #e6edf3;
-  --text-2: #a7b6c4;
-  --muted: #8193a4;
-  --accent: #9a8cff;
-  --accent-soft: #241f45;
-  --accent-ink: #0a0f14;
-  --focus: #b3a8ff;
+  --bg: #080c11;
+  --surface: #0f151c;
+  --surface-2: #151d26;
+  --surface-3: #1d2732;
+  --border: #232e3a;
+  --border-strong: #364555;
+  --text: #e8eef4;
+  --text-2: #a9b7c5;
+  --muted: #8495a6;
+  --accent: #e8eef4;
+  --accent-soft: #1d2732;
+  --accent-ink: #080c11;
+  --focus: #f4f7fa;
+  --glow: rgba(57, 135, 229, 0.16);
   --flow: #38c980;
   --dense: #f2a33a;
   --jam: #f06063;
@@ -54,6 +88,32 @@
   --dense-soft: #2e2210;
   --jam-soft: #321617;
   --emergency-soft: #142440;
+  --good: #0ca30c;
+  --good-ink: #4fd35f;
+  --good-soft: #10261a;
+  --critical: #d03b3b;
+  --critical-ink: #f37b7b;
+  --critical-soft: #331718;
+  --wide: #8a8984;
+  --ctl-candidate: #3987e5;
+  --ctl-mp: #d95926;
+  --ctl-coop-full: #199e70;
+  --ctl-ev-rule-mp: #c98500;
+  --ctl-team: #d55181;
+  --ctl-llm: #7a4cc6;
+  --ctl-neutral: #8a8984;
+  --ctl-placebo: #5f5e5a;
+  --ctl-oracle: #c3c2b7;
+  /* the same ramp stepped for the dark surface: small values recede into it */
+  --seq-0: #13202d;
+  --seq-1: #16304a;
+  --seq-2: #1b4268;
+  --seq-3: #225889;
+  --seq-4: #2a64a0;
+  --seq-5: #5a93d6;
+  --seq-6: #9cc2f0;
+  --seq-ink: #e8eef4;
+  --seq-ink-strong: #080c11;
 }
 
 @theme inline {
@@ -81,10 +141,19 @@
   --color-dense-soft: var(--dense-soft);
   --color-jam-soft: var(--jam-soft);
   --color-emergency-soft: var(--emergency-soft);
+  --color-good: var(--good);
+  --color-good-ink: var(--good-ink);
+  --color-good-soft: var(--good-soft);
+  --color-critical: var(--critical);
+  --color-critical-ink: var(--critical-ink);
+  --color-critical-soft: var(--critical-soft);
+  --color-wide: var(--wide);
+  --color-candidate: var(--ctl-candidate);
 
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
+  --radius-xl: 14px;
 }
 
 @layer base {
@@ -107,11 +176,49 @@
   }
 }
 
+@layer components {
+  /* the faint grid of a control room, behind the hero and the presentation */
+  .bg-grid {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--border) 55%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--border) 55%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 32px 32px;
+  }
+  .bg-glow {
+    background: radial-gradient(60% 80% at 15% 0%, var(--glow), transparent 70%);
+  }
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  :where([dir="rtl"]) .eyebrow {
+    letter-spacing: 0;
+  }
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

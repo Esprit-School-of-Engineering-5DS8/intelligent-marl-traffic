@@ -1,0 +1,390 @@
+{
+  "ui": {
+    "evidence": {
+      "prereg": {
+        "label": "Pré-enregistré",
+        "hint": "Test fixé et figé avant toute graine de test, avec la correction de Holm."
+      },
+      "descriptive": {
+        "label": "Descriptif",
+        "hint": "Mesuré sur les graines de test, sans test statistique pré-enregistré."
+      },
+      "exploratory": {
+        "label": "Exploratoire",
+        "hint": "Hors pré-enregistrement : une indication, pas une preuve."
+      },
+      "validation": {
+        "label": "Validation",
+        "hint": "Graines de validation : elles ont servi à choisir la candidate, jamais à l'évaluer."
+      },
+      "secondary": {
+        "label": "Mesure secondaire",
+        "hint": "Mesurée sur les graines de test, sans test de Holm."
+      },
+      "stopped": {
+        "label": "Arrêté",
+        "hint": "Tentative arrêtée avant toute graine de test : ce n'est pas un résultat d'évaluation."
+      }
+    },
+    "verdicts": {
+      "best": "Prouvée meilleure",
+      "noninf": "Prouvée non inférieure",
+      "loss": "Vraie perte",
+      "lossBeyond": "Vraie perte, au-delà de −2 %",
+      "wide": "Trop large pour conclure",
+      "notSup": "Supériorité non démontrée"
+    },
+    "claims": {
+      "can": "Ce qu'on peut affirmer",
+      "cannot": "Ce qu'on ne peut pas affirmer"
+    },
+    "plain": "En simple",
+    "source": "Source :",
+    "teammate": "le travail de notre coéquipier",
+    "tableOf": "Tableau : {{title}}"
+  },
+  "home": {
+    "eyebrow": "CoTraffic · étude combinée · évaluation finale unique",
+    "title": "Le meilleur compromis, pas le meilleur partout.",
+    "lead": "Un contrôleur de feux qui réunit un agent PPO coopératif, Max-Pressure (β = {{beta}}) et la priorité aux ambulances, sous un bouclier de sécurité. Évalué une seule fois, sur des graines de test jamais utilisées pour le régler.",
+    "cta": {
+      "results": "Voir les résultats",
+      "robustness": "Robustesse et généralisation",
+      "palette": "pour aller partout"
+    },
+    "rigour": {
+      "label": "La rigueur de l'évaluation",
+      "prereg": "Pré-enregistré et figé avant le test (commit {{commit}})",
+      "episodes": "{{n}} épisodes de {{minutes}} min de trafic simulé",
+      "seeds": "Graines de test {{first}} à {{last}}, jamais vues pendant les réglages",
+      "models": "{{n}} modèles PPO entraînés indépendamment",
+      "tests": "{{n}} tests, correction de Holm, marge de {{margin}} %",
+      "variants": "{{n}} variantes essayées, toutes rapportées"
+    },
+    "numbers": {
+      "title": "Trois chiffres à retenir",
+      "text": "Lus dans les résultats de l'évaluation finale ; chacun dit d'où il vient et ce qu'il prouve.",
+      "source": "pré-enregistrement {{commit}}, graines de test",
+      "worst": {
+        "label": "Pire écart au meilleur contrôleur, tous critères confondus",
+        "context": "contre {{min}} à {{max}} pour les autres contrôleurs : jamais loin du meilleur, là où chacun des autres a un point faible."
+      },
+      "ambulances": {
+        "label": "Trajets d'ambulance plus rapides qu'avec Max-Pressure",
+        "context": "Grille, heure de pointe : {{perModel}} ambulances × {{models}} modèles, même ambulance et même trafic des deux côtés ; {{gain}} s gagnées en médiane."
+      },
+      "sensors": {
+        "label": "Attente sous capteurs bruités, contre la meilleure référence",
+        "context": "Intervalle à 95 % : de {{low}} à {{high}}, contre {{reference}}, avec la correction de Holm.",
+        "margin": "marge {{margin}} %"
+      }
+    },
+    "architecture": {
+      "title": "Comment décide la candidate",
+      "text": "Toutes les {{every}} s, à chaque feu, {{n}} couches dans cet ordre ; la dernière a toujours le dernier mot.",
+      "step": "Couche {{n}}",
+      "layers": {
+        "policy": {
+          "title": "COOP-FULL propose",
+          "text": "L'agent PPO coopératif (réseau partagé) note chaque phase à partir des files, des attentes et des messages de ses voisins."
+        },
+        "bias": {
+          "title": "Biais Max-Pressure (β = {{beta}})",
+          "text": "On ajoute {{beta}} au score de la phase que choisirait Max-Pressure : la préférence de l'agent est poussée vers une règle éprouvée, sans la remplacer."
+        },
+        "ambulance": {
+          "title": "Priorité ambulance",
+          "text": "Une ambulance à moins de {{range}} m du feu prend le vert sur son approche (règle EV-RULE)."
+        },
+        "shield": {
+          "title": "Bouclier de sécurité",
+          "text": "Vert minimal de {{minGreen}} s, jamais plus de {{maxRed}} s de rouge pour une file qui attend : aucune décision ne peut le contourner."
+        }
+      },
+      "plain": "L'agent appris propose, une règle simple le corrige, l'ambulance passe avant tout, et la sécurité tranche.",
+      "llm": "n'est pas dans la décision : il a été testé à part, comme conseiller."
+    },
+    "claims": {
+      "title": "Ce que l'évaluation permet de dire",
+      "can": {
+        "holds": "Pas moins bonne que la meilleure référence, à {{margin}} % près, dans {{n}} comparaisons sur {{total}}, dont {{best}} où elle est prouvée meilleure.",
+        "sensors": "Meilleure sous capteurs bruités : temps de trajet {{travel}}, attente {{waiting}}.",
+        "ambulances": "Retard des ambulances divisé par {{ratio}} par rapport à Max-Pressure à l'heure de pointe sur la grille ({{candidate}} s contre {{mp}} s, mesure secondaire)."
+      },
+      "cannot": {
+        "everywhere": "« Jamais moins bonne » n'est pas démontré : {{n}} comparaisons sur {{total}} ne passent pas.",
+        "losses": "{{n}} vraies pertes, petites, toutes contre Max-Pressure : de {{min}} à {{max}} %.",
+        "wide": "{{n}} intervalles trop larges pour conclure, dont {{real}} sur real_district en pointe.",
+        "city": "La généralisation à une grande ville n'est pas testée : les tentatives ont été arrêtées avant toute graine de test."
+      },
+      "plain": "Aucun contrôleur ne gagne partout. Le nôtre n'est jamais loin du meilleur ; chacun des autres a un vrai point faible : Max-Pressure fait attendre les ambulances, la règle ambulances souffre des capteurs bruités, l'agent seul s'engorge en pointe."
+    },
+    "explore": {
+      "title": "Aller plus loin",
+      "final": {
+        "title": "Contrôleur final",
+        "text": "Chaque test un par un, le compromis, les ambulances et l'ablation des couches."
+      },
+      "robustness": {
+        "title": "Robustesse et généralisation",
+        "text": "Capteurs bruités, pertes de messages, bus, grid8x8, et la grande ville arrêtée."
+      },
+      "demo": {
+        "title": "Démo et replays",
+        "text": "Rejouer un épisode côte à côte, sur la carte ou en 3D."
+      }
+    }
+  },
+  "final": {
+    "eyebrow": "Résultats · évaluation finale unique",
+    "lead": "La candidate contre la meilleure référence de chaque situation, sur les graines de test : chaque test pré-enregistré, le compromis entre critères, les ambulances, et ce que chaque couche apporte.",
+    "prereg": "pré-enregistrement {{commit}}",
+    "tabs": {
+      "label": "Vues de la page",
+      "results": "Résultats",
+      "ablation": "Ablation des couches"
+    },
+    "metrics": {
+      "travel": "trajet",
+      "waiting": "attente"
+    },
+    "criteria": {
+      "travel": "Trajet",
+      "waiting": "Attente",
+      "ambulances": "Ambulances",
+      "pedestrians": "Piétons",
+      "sensors": "Capteurs bruités"
+    },
+    "groups": {
+      "main": "Grille 4x4 · cas principaux",
+      "district": "Quartier réel (OSM)",
+      "robustness": "Robustesse · grille 4x4",
+      "generalisation": "Généralisation · grille 8x8, sans réentraînement"
+    },
+    "filters": {
+      "network": "Réseau",
+      "metric": "Mesure",
+      "verdicts": "Verdicts",
+      "all": "Tous"
+    },
+    "messages": {
+      "holds": {
+        "label": "Comparaisons où la candidate est prouvée non inférieure",
+        "context": "à {{margin}} % près, avec la correction de Holm ; dont {{best}} prouvées meilleures. {{loss}} vraies pertes, {{wide}} intervalles trop larges pour conclure."
+      },
+      "worst": {
+        "label": "Pire écart au meilleur, tous critères confondus",
+        "context": "contre {{min}} à {{max}} pour les autres contrôleurs : le meilleur compromis, pas le meilleur partout."
+      },
+      "ambulances": {
+        "label": "Ambulances plus rapides qu'avec Max-Pressure (grille, pointe)",
+        "context": "avec les {{models}} modèles, {{gain}} s gagnées en médiane ; avec le modèle de la démo : {{run1}}."
+      }
+    },
+    "forest": {
+      "title": "Les {{n}} tests de non-infériorité",
+      "text": "Gain sur la meilleure référence de chaque situation (positif = mieux) et son intervalle à 95 %. Une comparaison passe quand tout l'intervalle est au-dessus de la marge de −{{margin}} %. Survolez un point pour le détail.",
+      "alt": "Forest plot des {{total}} tests : {{best}} prouvées meilleures, {{noninf}} prouvées non inférieures, {{loss}} vraies pertes, {{wide}} trop larges pour conclure.",
+      "groupAlt": "{{group}} : {{n}} tests ; {{best}} prouvées meilleures, {{noninf}} non inférieures, {{loss}} vraies pertes, {{wide}} trop larges.",
+      "empty": "Aucun test ne correspond à ces filtres.",
+      "reading": "Point : gain moyen ; trait : intervalle à 95 % (bootstrap croisé modèles × graines). Axe complet, jamais coupé : les intervalles très larges sont montrés en entier. Ligne rouge : la marge de {{margin}} %.",
+      "vs": "contre {{reference}}",
+      "gain": "Gain",
+      "interval": "Intervalle à 95 %",
+      "means": "Moyennes (candidate / référence)",
+      "pHolm": "p Holm (non-infériorité)",
+      "pHolmSup": "p Holm (supériorité)",
+      "margin": "marge {{margin}} %",
+      "zero": "0 : autant que la référence"
+    },
+    "claims": {
+      "can": {
+        "holds": "Pas moins bonne que la meilleure référence, à {{margin}} % près, dans {{n}} comparaisons sur {{total}}.",
+        "best": "Prouvée meilleure dans {{n}} : {{list}}."
+      },
+      "cannot": {
+        "losses": "{{n}} vraies pertes, petites, de {{min}} à {{max}} % : tout leur intervalle est sous 0.",
+        "wide": "{{n}} intervalles trop larges pour conclure, dont {{real}} sur real_district en pointe.",
+        "unfavourable": "Remarque honnête : parmi ces cas trop larges, l'estimation est nettement défavorable (sous la marge) dans : {{list}}. La candidate y fait probablement moins bien que Max-Pressure ; {{seeds}} graines de test ne suffisent pas à le démontrer."
+      }
+    },
+    "compromise": {
+      "title": "Aucun contrôleur n'est le meilleur partout",
+      "text": "Écart moyen de chaque contrôleur au meilleur des contrôleurs comparés, par critère (plus petit = mieux). Dernière colonne : son pire écart, la mesure du compromis.",
+      "caption": "Écart au meilleur des contrôleurs comparés, en pourcentage, par critère, et pire écart de chaque contrôleur.",
+      "controller": "Contrôleur",
+      "worst": "Pire écart",
+      "best": "le meilleur",
+      "smallest": "le plus petit",
+      "legend": "plus marqué = plus loin du meilleur",
+      "plain": "Chaque contrôleur a un critère où il décroche nettement ; la candidate n'en a pas : son pire écart est le plus petit de tous."
+    },
+    "ambulances": {
+      "title": "Retard des ambulances (grille, urgences)",
+      "text": "À l'heure de pointe : {{candidate}} s de retard moyen avec la candidate, contre {{mp}} s avec Max-Pressure ; ambulance par ambulance, la candidate est plus rapide dans {{faster}} trajets sur {{total}}.",
+      "alt": "Retard moyen des ambulances, demande {{demand}} : {{items}}.",
+      "mean": "Retard moyen"
+    },
+    "bilan": {
+      "title": "Bilan contre chaque référence",
+      "text": "Pour chaque référence, sur combien de critères (situation × mesure) la candidate est meilleure, sans écart démontré, ou moins bonne. Intervalles à 95 % sans correction de Holm : une lecture d'ensemble, pas une preuve.",
+      "caption": "Nombre de critères où la candidate est meilleure, sans écart démontré ou moins bonne, contre chaque référence.",
+      "split": "Répartition",
+      "better": "Meilleure",
+      "same": "Pas d'écart démontré",
+      "worseSmall": "Moins bonne, de moins de 2 %",
+      "worseLarge": "Moins bonne, de 2 % ou plus"
+    },
+    "table": {
+      "title": "Tableau final",
+      "text": "Chaque test pré-enregistré, avec les mêmes filtres que le forest plot.",
+      "caption": "Tests de non-infériorité de la candidate contre la meilleure référence.",
+      "columns": {
+        "situation": "Situation",
+        "metric": "Mesure",
+        "reference": "Référence",
+        "gain": "Gain",
+        "interval": "IC à 95 %",
+        "pHolm": "p Holm",
+        "verdict": "Verdict"
+      }
+    },
+    "llm": {
+      "title": "Le LLM et le crédit"
+    },
+    "ablation": {
+      "variant": "Variante",
+      "notPlayed": "non jouée dans cette situation",
+      "nTests": "{{n}} tests",
+      "layerNames": {
+        "coop_full_evrule_switch": "+ préemption (V1)",
+        "hybrid_h2": "+ biais MP (candidate)",
+        "hybrid_h3": "+ bascule sur saturation (H3)"
+      },
+      "layers": {
+        "title": "Ce que chaque couche apporte",
+        "text": "Gain de chaque couche ajoutée à COOP-FULL seul, par situation, sur les graines de test (moyennes des épisodes, sans test). H3 n'a pas été jouée dans les situations ajoutées à la fin (retirée du pré-enregistrement).",
+        "axis": "gain sur COOP-FULL seul (%) · 0 = COOP-FULL seul",
+        "alt": "Gain de chaque couche sur COOP-FULL seul, mesure {{metric}}, par situation.",
+        "plain": "La préemption seule ne change presque rien au trafic ; c'est le biais Max-Pressure qui apporte le gain, surtout là où l'agent seul s'engorge : avec piétons en pointe, {{travel}} % de trajet et {{waiting}} % d'attente par rapport à COOP-FULL seul."
+      },
+      "tests": {
+        "title": "Les autres variantes finales, testées comme la candidate",
+        "text": "Même règle de non-infériorité contre la meilleure référence, dans les situations où chaque variante diffère des autres par construction.",
+        "caption": "Nombre de tests de non-infériorité passés, de vraies pertes et d'intervalles trop larges, par variante."
+      },
+      "kinds": {
+        "noninf": "Prouvée non inférieure",
+        "loss": "Vraie perte",
+        "wide": "Trop large pour conclure"
+      },
+      "variants": {
+        "hybrid_h2": {
+          "name": "H2 β = {{beta}}, la candidate",
+          "text": "COOP-FULL + biais Max-Pressure + EV-RULE"
+        },
+        "hybrid_h3": {
+          "name": "H3 (quantile 90 %)",
+          "text": "la candidate, et Max-Pressure partout quand l'entrée du réseau sature"
+        },
+        "hybrid_h1": {
+          "name": "H1 (quantile 90 %)",
+          "text": "COOP-FULL ou Max-Pressure selon la congestion"
+        },
+        "coop_full_evrule_switch": {
+          "name": "V1",
+          "text": "COOP-FULL + préemption des ambulances"
+        },
+        "coop_full_pedrule_switch": {
+          "name": "V1 + PED-RULE",
+          "text": "COOP-FULL + préemption + règle piétons"
+        }
+      },
+      "names": {
+        "beta": "H2 β = {{value}}",
+        "hybrid_h3": "H3, bascule au quantile {{value}} %",
+        "hybrid_h1": "H1, commutation au quantile {{value}} %",
+        "coop_full": "COOP-FULL seul",
+        "coop_full_evrule_switch": "V1 : COOP-FULL + EV-RULE",
+        "coop_full_pedrule_switch": "COOP-FULL + EV-RULE + PED-RULE",
+        "coop_full_teamped_switch": "COOP-FULL + EV-RULE + règles piétons de notre coéquipier"
+      },
+      "validation": {
+        "title": "Comment la candidate a été choisie",
+        "text": "Toutes les variantes essayées ({{n}}), sur les graines de validation {{seeds}}, avant toute graine de test : rang et score par graine. Les variantes éliminées dès la première graine n'ont pas été rejouées.",
+        "caption": "Rang et score de chaque variante sur chaque graine de validation.",
+        "seed": "Graine {{seed}}",
+        "chosen": "retenue",
+        "notRun": "non rejouée",
+        "score": "{{better}} cases meilleures ou égales, {{uncertain}} incertaines, {{worse}} pires",
+        "short": "≥ {{better}} · ? {{uncertain}} · ✗ {{worse}}",
+        "legend": "≥ : meilleure ou égale à la meilleure référence ; ? : incertaine ; ✗ : pire ({{cells}} cases par graine). Règles fixées à l'avance (pré-enregistrement, section 0).",
+        "can": {
+          "choice": "H2 β = {{beta}} est première ou à égalité avec la première sur chaque graine (rangs {{ranks}}).",
+          "beta8": "Un biais plus fort (β = {{beta}}) fait moins bien (rangs {{ranks}}) : pousser davantage vers Max-Pressure n'aide pas."
+        },
+        "cannot": {
+          "test": "Ce classement ne prouve rien sur les graines de test : il sert seulement à choisir, avant l'évaluation.",
+          "h3": "H3 égale la candidate presque partout parce qu'elle a les mêmes épisodes ; elle n'a été départagée que là où elle s'en écarte."
+        }
+      }
+    }
+  },
+  "robustness": {
+    "eyebrow": "Résultats · robustesse et généralisation",
+    "lead": "La candidate quand les conditions se dégradent (capteurs, communication), avec des bus, et sur un réseau plus grand que celui de l'entraînement. Mêmes tests pré-enregistrés que les cas principaux, mêmes graines de test.",
+    "interval": "IC à 95 % : [{{low}} ; {{high}}]",
+    "same": "{{list}} : identiques à {{as}} dans cette situation, par construction (mêmes épisodes).",
+    "mean": "Moyenne",
+    "episodes": "Épisodes",
+    "alt": "{{metric}} moyen par contrôleur : {{items}}.",
+    "claimsTitle": "Ce que ces situations permettent de dire",
+    "claim": "{{situation}}, {{metric}} : {{gain}}, {{verdict}}.",
+    "situations": {
+      "sensors": {
+        "title": "Capteurs bruités",
+        "what": "Chaque comptage de file est faussé (bruit d'écart-type {{std}} véhicules) et {{failed}} % des détecteurs renvoient 0 pendant tout l'épisode.",
+        "plain": "Quand les capteurs mentent, la règle Max-Pressure, qui ne voit que ce qui est détecté, se trompe ; l'agent appris aussi. Leur combinaison résiste le mieux : c'est là que la candidate est prouvée meilleure."
+      },
+      "dropout": {
+        "title": "Pertes de messages ({{loss}} %)",
+        "what": "Chaque message d'un feu voisin est perdu avec une probabilité de {{loss}} % ; l'agent garde alors la dernière valeur reçue.",
+        "plain": "Sans une partie des messages des voisins, la candidate reste proche de Max-Pressure, qui n'en a pas besoin ; sur le temps de trajet, la petite perte est réelle."
+      },
+      "buses": {
+        "title": "Avec des bus",
+        "what": "Les lignes de bus du réseau circulent (un bus toutes les {{period}} min par ligne et par sens) ; le retard est aussi compté par personne.",
+        "plain": "Les bus ne déstabilisent pas la candidate : elle tient sur le trajet et sur l'attente, et attend moins que Max-Pressure."
+      },
+      "generalisation": {
+        "title": "Grille 8x8, sans réentraînement",
+        "what": "{{lights}} feux, avec les modèles entraînés sur la {{trainedOn}} ({{trainedLights}} feux), sans aucun réglage.",
+        "plain": "Sur un réseau jamais vu, avec {{lights}} feux au lieu de {{trainedLights}}, la candidate perd un peu contre Max-Pressure, et l'intervalle est assez étroit pour l'affirmer : c'est une vraie perte, petite."
+      }
+    },
+    "city": {
+      "title": "Une grande ville : tentative arrêtée (F-016)",
+      "text": "Deux villes importées d'OpenStreetMap, avec seulement les feux réellement étiquetés. L'étude a été arrêtée avant toute graine de test : ces chiffres viennent de la graine de validation {{seed}} et ne sont pas des résultats d'évaluation.",
+      "names": {
+        "barcelona": "Barcelone (Eixample et Diagonal)",
+        "paris": "Paris (République et Grands Boulevards)"
+      },
+      "lights": "{{lights}} feux, dont {{driven}} lisibles par les modèles ({{pctLights}} % des feux, {{pctLanes}} % des voies à feux).",
+      "verdicts": {
+        "barcelona": "Le réseau se bloque sous tous les contrôleurs, temps fixe compris, même à faible demande : carrefours fusionnés aux longs programmes et insertions sans feu.",
+        "paris": "Max-Pressure s'effondre dès la plus faible demande essayée, là où le temps fixe fonctionne : un test y mesurerait cette défaillance, pas la qualité du contrôle."
+      },
+      "axisX": "demande (véhicules par heure)",
+      "axisY": "attente moyenne (s)",
+      "alt": "Paris, attente moyenne selon la demande : {{items}}.",
+      "chartNote": "Paris, graine de validation, épisodes complets, temps fixe (FT) et Max-Pressure seulement : le calibrage qui a conduit à l'arrêt. À la plus faible demande, Max-Pressure attend déjà bien plus que le temps fixe ; plus haut, les deux se bloquent.",
+      "can": "Le protocole sait détecter un réseau qui ne mesure pas la qualité du contrôle, et l'arrêter avant d'en tirer un chiffre.",
+      "cannot": {
+        "result": "La généralisation à une grande ville n'est pas testée : aucun chiffre de cette carte n'est un résultat d'évaluation.",
+        "why": "Un vrai test demanderait un réseau nettoyé (carrefours réparés, plans de feux validés), une demande réelle et probablement un réentraînement par ville."
+      },
+      "more": "Le détail des tentatives est dans"
+    },
+    "allTests": "Voir tous les tests, situation par situation, dans Contrôleur final"
+  }
+}

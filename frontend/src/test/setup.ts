@@ -21,10 +21,22 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 };
+// nor intersection: animated numbers show their final value (as with reduced motion)
+globalThis.IntersectionObserver ??= class {
+  readonly root = null;
+  readonly rootMargin = "";
+  readonly thresholds = [];
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+} as unknown as typeof IntersectionObserver;
 
 afterEach(() => {
   cleanup();
   useSettings.getState().reset();
-  useUi.setState({ sidebarCollapsed: false, assistantOpen: false });
+  useUi.setState({ sidebarCollapsed: false, assistantOpen: false, paletteOpen: false });
   window.localStorage.clear();
 });
