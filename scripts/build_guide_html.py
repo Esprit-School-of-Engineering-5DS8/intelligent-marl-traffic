@@ -8,6 +8,7 @@ code, light and dark themes, no external resource (readable offline).
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import re
 from pathlib import Path
@@ -60,6 +61,7 @@ th, td {{ border: 1px solid var(--line); padding: 6px 10px; vertical-align: top;
           text-align: left; }}
 th {{ background: var(--soft); }}
 hr {{ border: 0; border-top: 1px solid var(--line); margin: 32px 0; }}
+img {{ max-width: 100%; height: auto; background: #fcfcfb; border-radius: 6px; }}
 .top {{ font-size: 13px; color: var(--muted); }}
 @media (max-width: 900px) {{
   .layout {{ grid-template-columns: 1fr; }}
@@ -107,6 +109,19 @@ def deepen_lists(text: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def inline_images(body: str, base: Path) -> str:
+    """PNG images next to the guide put into the page itself (it stays one file)."""
+
+    def embed(match: re.Match) -> str:
+        path = base / html.unescape(match.group(2))
+        if path.suffix.lower() != ".png" or not path.is_file():
+            return match.group(0)  # other files and links stay as they are
+        data = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f'{match.group(1)}data:image/png;base64,{data}"'
+
+    return re.sub(r'(<img[^>]*?src=")([^":]+)"', embed, body)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("source", type=Path)
@@ -120,7 +135,7 @@ def main() -> None:
             "codehilite": {"guess_lang": False, "css_class": "codehilite"},
         },
     )
-    body = md.convert(deepen_lists(text))
+    body = inline_images(md.convert(deepen_lists(text)), args.source.parent)
     title = re.search(r"^# (.+)$", text, re.M)
     styles = set(get_all_styles())
     dark = "github-dark" if "github-dark" in styles else "monokai"

@@ -10,9 +10,10 @@ première fois qu'il apparaît, et un lexique se trouve à la fin.
 - chaque chiffre cite le fichier d'où il vient ;
 - chaque `fichier:ligne` a été vérifié dans le code. Les commentaires `# [Exigence N]`
   ajoutés ensuite sont en fin de ligne et n'ont décalé aucune ligne ;
-- tous les résultats viennent de la **graine de validation 1000**. Une graine est le numéro
-  qui fixe le hasard d'une simulation : même graine, même trafic. Les graines de test 0 à 4
-  n'ont pas encore été utilisées.
+- les résultats des parties 0 à 4 (le conseiller LLM) viennent de la **graine de validation
+  1000**. Une graine est le numéro qui fixe le hasard d'une simulation : même graine, même
+  trafic. La **partie 5** présente l'évaluation finale de l'étude combinée, faite une seule
+  fois sur les graines de test 0 à 4.
 
 Toutes les commandes se lancent dans PowerShell, depuis le dossier du projet :
 
@@ -1455,6 +1456,14 @@ ollama list                                                   # qwen2.5:3b doit 
 | SUMO ne démarre pas | Montrer d'abord les tests (`test_llm_tools.py`, puis `test_llm.py -k refused`), puis la sortie enregistrée de la démo |
 | La commande `code` ne répond pas | Dans VS Code, Ctrl+P, puis taper `advised.py:189` et Entrée |
 
+**Version longue, 5 minutes de plus : le contrôleur final (partie 5).**
+
+| Durée | Quoi dire | Commande ou fichier |
+|---|---|---|
+| 1 min | Le compromis : aucun n'est le meilleur partout ; pire écart 12 % contre 35 à 99 % | `docs\report\figures\combined\fig_compromis.png` |
+| 3 min | La démo : une ambulance, Max-Pressure contre la candidate ; 23 ambulances sur 24 plus rapides | commande de la partie 5 (secours : `docs\demo\ambulance_mp_vs_candidate.gif`) |
+| 1 min | Ce qu'on peut affirmer et ce qu'on ne peut pas ; le LLM, résultat négatif mesuré | `docs\report\figures\combined\fig_forest.png` |
+
 ---
 
 ## Partie 3 : tableau récapitulatif
@@ -1485,10 +1494,11 @@ ollama list                                                   # qwen2.5:3b doit 
   - Un petit modèle (0,5B), et peu d'exemples : 169 en entraînement.
   - Seulement 15 situations « conseil » en validation, et des étiquettes bruitées.
   - Ils ne donnent pas de gain mesurable : +0,05 % et −0,09 %.
-- **Les graines de test 0 à 4 ne sont pas lancées.** Tous les chiffres sont des chiffres de
-  validation, sur une seule graine. Les tests de Mann-Whitney et la correction de Holm ne
-  sont donc pas encore appliqués à la partie LLM. L'évaluation est pré-enregistrée, et
-  demande environ 24 à 28 h de calcul.
+- **L'évaluation pré-enregistrée du conseiller seul (COOP-FULL + LLM) sur les graines de test
+  n'est pas lancée.** Les chiffres des parties 0 à 4 sont des chiffres de validation, sur une
+  seule graine. Le conseiller n'a été jugé sur les graines de test que dans l'étude combinée,
+  ajouté à la candidate, sur une seule situation (partie 5) : il y fait un peu moins bien
+  qu'elle.
 - **Le gain sur les scores n'est pas mesurable.**
   - Le LLM fait à peu près comme le placebo.
   - L'oracle montre que la marge de progrès, pour n'importe quel conseiller, est d'environ
@@ -1509,6 +1519,181 @@ ollama list                                                   # qwen2.5:3b doit 
    pas : l'état au-delà des voisins, une prévision de la demande.
 4. Réaliser le changement de mode pendant les urgences, puisque LoRA a appris à intervenir
    surtout à ces moments-là.
+
+---
+
+## Partie 5 : le contrôleur final (étude combinée, graines de test)
+
+Cette partie présente la suite du travail : assembler toutes nos briques (COOP-FULL,
+Max-Pressure, la préemption des ambulances, les règles piétons, le LLM) en un seul contrôleur,
+puis le juger **une seule fois** sur les graines de test 0 à 4. Le résumé d'une page est
+`docs\report\combined_resume.md` ; le tableau des 36 tests, `docs\report\combined_tableau_final.md`.
+
+### En une phrase
+
+Notre contrôleur final n'est pas le meilleur partout, et aucun contrôleur ne l'est : c'est
+**le meilleur compromis**, le seul qui ne tombe jamais loin du meilleur, sans LLM dans la
+décision.
+
+### Le contrôleur
+
+**H2 β = 4** : toutes les 5 s, COOP-FULL propose une phase ; on ajoute un bonus de 4 au score
+de la phase que choisirait Max-Pressure (MP sert de guide) ; une ambulance à moins de 200 m
+d'un feu prend la priorité (EV-RULE) ; le bouclier garde le dernier mot. Choisi parmi 15
+variantes sur les graines de validation 1000, 1001 et 1002, avec une règle de classement
+écrite avant les résultats.
+
+### Les trois messages à retenir
+
+1. **Le meilleur compromis, pas le meilleur partout.** Sur cinq critères (trajet, attente,
+   ambulances, piétons, capteurs bruités), aucun contrôleur n'est premier partout. Le pire
+   écart au meilleur est de **12 % pour la candidate, contre 35 à 99 %** pour MP, EV-RULE-MP,
+   COOP-FULL et TEAM-RULES.
+2. **Les ambulances passent plus vite.** Face à Max-Pressure, la candidate fait gagner du
+   temps à **23 ambulances sur 24** (grille, heure de pointe) ; le retard moyen est divisé par
+   plus de deux (44 s contre 106 s en pointe, 23 s contre 52 s en demande moyenne).
+3. **Le LLM : un résultat négatif, mesuré.** Même un choix parfait de stratégie ne rapporte
+   au plus que 2,2 % de temps de trajet ; le conseiller LLM ajouté à la candidate fait un peu
+   moins bien qu'elle (−1,4 % de trajet sur sa case de test).
+
+![Aucun contrôleur n'est le meilleur partout](report/figures/combined/fig_compromis.png)
+
+### Les résultats, dits honnêtement
+
+Contre la meilleure référence de chaque situation, 36 comparaisons (18 situations x trajet et
+attente), correction de Holm, marge de non-infériorité de 2 % :
+
+| Verdict | Nombre | Où |
+|---|---|---|
+| Prouvée meilleure | 6 | attente en demande moyenne sur la grille (+2 à +3 %) ; capteurs bruités : trajet +6 %, attente +14 % |
+| Prouvée non inférieure (à 2 % près) | 9 | le trajet en demande moyenne (grille et real_district), l'attente en urgences moyenne |
+| Vraie perte (l'intervalle entier sous 0) | 5 | trajet en pointe contre MP (−1,2 à −1,7 %) ; grid8x8 (trajet −2,1 %, attente −1,5 %) |
+| Trop large pour conclure | 16 | surtout real_district en pointe, et l'attente sur real_district |
+
+![Les 36 tests de non-infériorité](report/figures/combined/fig_forest.png)
+
+**À dire avant qu'on le demande :** sur real_district en pointe et sur la grille avec piétons
+en pointe, l'estimation est nettement défavorable (−0,4 à −11 %, et −6,6 % / −12,9 %). La
+candidate y fait probablement moins bien que Max-Pressure ; 5 graines ne suffisent pas à le
+démontrer.
+
+![Retard des ambulances](report/figures/combined/fig_ambulances.png)
+
+### La démo (3 minutes)
+
+Max-Pressure à gauche, la candidate à droite, même trafic ; on suit une ambulance. Elle a été
+choisie parce que son gain (55 s) est le plus proche de la médiane des 24 ambulances : ce
+n'est pas le meilleur cas.
+
+```powershell
+.venv\Scripts\python scripts\demo_side_by_side.py --left mp --right hybrid_h2 --net grid4x4 --demand peak --scenarios emergency --seed 0 --only-ev ev_1 --ev-view-width 160 --no-chart
+```
+
+Ce qu'on voit : vers 75 s, l'ambulance de Max-Pressure est bloquée dans une file avant un
+carrefour, celle de la candidate passe. Arrivée après 173 s avec Max-Pressure, 119 s avec la
+candidate (exactement les temps de l'évaluation). **Plan de secours** : l'enregistrement
+`docs\demo\ambulance_mp_vs_candidate.gif` (s'ouvre dans le navigateur).
+
+### La rigueur, en cinq points
+
+1. **Pré-enregistrement** : tout figé avant la première graine de test
+   (`docs\COMBINED_PREREGISTRATION.md`, commit `2c0dd1d`) ; le script refusait de démarrer si
+   un fichier figé avait changé.
+2. **Évaluation unique** : 1 265 épisodes de 1 h 30 simulée, 5 graines de test, 3 modèles PPO,
+   18 situations (dont capteurs bruités, pertes de messages, bus, grid8x8 sans réentraînement) ;
+   aucun plantage, aucun épisode rejoué.
+3. **Statistiques** : bootstrap croisé (modèles x graines), Holm, marge de 2 %, et la
+   distinction fixée d'avance entre « vraie perte » et « trop large pour conclure ».
+4. **Reproductibilité** : une simulation rejouée donne exactement le même épisode ; libsumo et
+   TraCI donnent les mêmes épisodes (8 épisodes, 53 à 110 mesures chacun, toutes identiques).
+5. **Tout est rapporté** : les 15 variantes essayées, les pertes, et la limite de l'oracle.
+
+### Questions difficiles du jury, avec réponses
+
+**« Votre contrôleur n'est pas meilleur partout. À quoi sert-il ? »**
+Aucun ne l'est (figure de compromis). Le nôtre est le seul qui ne s'effondre nulle part : son
+pire écart est de 12 %, contre 35 à 99 % pour les autres. Sur le terrain, on ne change pas de
+contrôleur selon la situation : on veut celui qui tient partout.
+
+**« Pourquoi pas simplement Max-Pressure, plus simple et plus rapide en trajet ? »**
+Max-Pressure gagne 1 à 2 % de trajet en pointe. En échange, ses ambulances attendent plus de
+deux fois plus longtemps, ses piétons attendent plus, et sous capteurs bruités il est à 35 % du
+meilleur, quand la candidate est la meilleure.
+
+**« Avez-vous choisi la candidate en regardant les graines de test ? »**
+Non. Tout a été choisi sur les graines de validation 1000 à 1002, puis figé dans le
+pré-enregistrement (commit `2c0dd1d`). Les graines de test n'ont servi qu'une fois, pour les
+1 265 épisodes, et le script refusait de démarrer si un fichier figé avait changé.
+
+**« Cinq graines, c'est peu. »**
+C'est le protocole de toute l'étude, et nous en tenons compte : 16 comparaisons sur 36 sont
+déclarées « trop larges pour conclure », pas gagnées. Nous n'affirmons que ce que les
+intervalles permettent.
+
+**« Pourquoi une marge de 2 % ? »**
+Fixée par l'équipe avant tout résultat. Sur des trajets de 2 à 3 minutes, 2 % font 3 à 4 s :
+un écart qu'un usager ne perçoit pas.
+
+**« Une vraie perte, qu'est-ce que c'est ? »**
+L'intervalle de confiance entier est sous 0 : nous sommes sûrs, à 95 %, que la candidate fait
+moins bien. Nos 5 vraies pertes vont de −1,2 à −2,1 %, sur le trajet en pointe contre
+Max-Pressure et sur grid8x8.
+
+**« Et real_district en pointe ? »**
+L'estimation y est défavorable et nous le disons. Max-Pressure y empêche la file de se former à
+l'entrée du réseau. Nous avons essayé H3, qui passe à Max-Pressure quand cette file se forme :
+c'est trop tard, H3 fait moins bien.
+
+**« Pourquoi pas de LLM dans le contrôleur final ? »**
+Parce que les données ne le justifient pas. L'oracle (un choix parfait de stratégie toutes les
+5 minutes) ne gagne au plus que 2,2 % de trajet ; le critère fixé d'avance n'était rempli que
+dans 3 situations sur 14 (il en fallait 4). Et le conseiller LLM, testé sur les graines de test,
+fait un peu moins bien que la candidate seule, alors qu'il fonctionne techniquement (100 % de
+JSON valides, 7,9 s par réponse).
+
+**« Votre oracle est-il un vrai plafond ? »**
+Hors saturation, oui. En saturation, non : son coût ne comptait pas les voitures bloquées à
+l'entrée du réseau, il sous-estime donc la marge dans ces cas. C'est écrit dans les limites.
+
+**« La démo est-elle choisie pour vous avantager ? »**
+Non : l'ambulance montrée a le gain le plus proche de la médiane, et la candidate est plus
+rapide pour 23 ambulances sur 24. La démo reproduit exactement l'évaluation (173 s et 119 s).
+
+**« Vos résultats dépendent-ils de la façon de lancer SUMO ? »**
+Non : libsumo et TraCI donnent exactement les mêmes épisodes (vérifié sur 8 épisodes), et
+chaque ligne de résultat enregistre le commit du code qui l'a produite.
+
+**« Qu'apporte le travail de votre coéquipier ? »**
+Son équipe de LLM, avec ses règles écrites en code, est l'une des quatre références
+(TEAM-RULES) ; ses règles piétons valent la nôtre ; ses ambulances passent un peu plus vite que
+celles de la candidate en pointe sur la grille (42 s contre 44 s). Sa version avec un LLM
+hébergé n'a pas été évaluée ici (LLM local uniquement) ; une comparaison indirecte,
+exploratoire, est dans le résumé.
+
+**« Pourquoi H2 β = 4, et pas H3 ou β = 8 ? »**
+Par la règle de classement écrite avant les résultats : β = 8 est sous β = 4 sur les trois
+graines de validation ; H3 a les mêmes épisodes que H2 β = 4 dans 106 cas sur 126, et fait
+moins bien dans les 20 autres.
+
+**« Combien de calcul ? »**
+1 265 épisodes de 1 h 30 simulée, environ 13 h sur un portable à 4 cœurs, grâce à libsumo
+(3 à 4 fois plus rapide que TraCI, mêmes épisodes).
+
+**« Le contrôleur final peut-il contourner le bouclier ? »**
+Non : comme pour le LLM (exigence 9), le bouclier s'applique à chaque décision dans
+l'environnement, quel que soit le contrôleur (`traffic_env.py:190`).
+
+### Où trouver chaque chiffre
+
+| Chiffre | Fichier |
+|---|---|
+| Les 36 tests, verdicts et intervalles | `docs\report\combined_tableau_final.md`, `results\combined\analysis.md` |
+| Pire écart 12 % contre 35 à 99 % | `docs\report\figures\combined\fig_compromis.csv` |
+| Retard des ambulances | `docs\report\figures\combined\fig_ambulances.csv` |
+| 23 ambulances sur 24, médiane 53 s | `results\combined\raw\*grid4x4__emergency__peak*` (colonne `ev_delays`), `docs\DEMO_GUIDE.md` |
+| Bilan par référence | `results\combined\bilan_references.md` |
+| Choix sur la validation | `results\exploration\combined\rank_s1000.md`, `rank_s1001.md`, `rank_s1002.md` |
+| Oracle de stratégie | `results\exploration\combined\oracle_s1000.md` |
 
 ---
 
