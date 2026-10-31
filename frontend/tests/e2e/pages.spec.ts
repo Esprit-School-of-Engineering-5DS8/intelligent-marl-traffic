@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { fr, mean, meta, test as stat } from "./data";
+import { fr, mean, meta, read, test as stat } from "./data";
 
 // Every page, with the real numbers it must show (read from the exported results).
 async function open(page: Page, path: string, title: string) {
@@ -144,6 +144,31 @@ test.describe("pages", () => {
     await expect(
       main(page).getByRole("img", { name: "Effet sur les autres usagers" }),
     ).toBeVisible();
+  });
+
+  test("final controller: key messages, figures and demo from the results", async ({ page }) => {
+    const final = read<{
+      tests: { total: number; best: number; noninf: number };
+      worstGap: { candidate: number };
+      ambulances: { peak: { faster: number; total: number } };
+    }>("final_controller.json");
+    await open(page, "/final-controller", "Contrôleur final");
+    const messages = main(page).getByRole("region", { name: "Messages clés" });
+    const worst = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
+    await expect(messages).toContainText(`${worst.format(final.worstGap.candidate)} %`, {
+      timeout: 20_000,
+    });
+    const peak = final.ambulances.peak;
+    await expect(messages).toContainText(`${peak.faster} / ${peak.total}`);
+    const shown = final.tests.best + final.tests.noninf;
+    await expect(messages).toContainText(`${shown} / ${final.tests.total}`);
+    for (const name of [/pire écart de 12 %/, /Forest plot/, /Barres : la candidate/]) {
+      await expect(main(page).getByRole("img", { name })).toBeVisible();
+    }
+    const demo = main(page).getByRole("img", { name: /Deux vues SUMO/ });
+    await expect(demo).toHaveAttribute("src", /demo\.png$/);
+    await main(page).getByRole("button", { name: "Lancer l'enregistrement" }).click();
+    await expect(demo).toHaveAttribute("src", /demo\.gif$/);
   });
 
   test("settings: minutes are applied everywhere", async ({ page }) => {

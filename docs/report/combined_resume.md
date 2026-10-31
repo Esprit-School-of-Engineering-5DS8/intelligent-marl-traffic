@@ -43,7 +43,9 @@ trajet et attente), avec la correction de Holm :
   capteurs bruités, le trajet (+6 %) et l'attente (+14 %) ;
 - **les ambulances** (sans test, mesure secondaire) : retard divisé par deux par rapport à
   Max-Pressure sur la grille (23 s contre 52 s en demande moyenne, 44 s contre 106 s en pointe),
-  proche de la meilleure règle dédiée (EV-RULE-MP : 21 s et 38 s).
+  proche de la meilleure règle dédiée (EV-RULE-MP : 21 s et 38 s). Ambulance par ambulance, à
+  l'heure de pointe, la candidate est plus rapide que Max-Pressure pour **71 trajets sur 72**
+  (24 ambulances x 3 modèles ; 53 s gagnées en médiane) et pour 68 sur 72 en demande moyenne.
 
 ![Retard des ambulances](figures/combined/fig_ambulances.png)
 

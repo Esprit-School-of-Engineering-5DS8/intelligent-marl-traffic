@@ -279,8 +279,9 @@ Pendant la démo 1, il faut montrer :
 Le contrôleur retenu par l'étude combinée (`docs/report/combined_resume.md`) contre
 Max-Pressure, sur exactement le même trafic : grille 4x4, heure de pointe, graine de test 0.
 On suit l'ambulance `ev_1`, choisie parce que son gain est le plus proche de la médiane des
-24 ambulances de cette situation (55 s de gain ; médiane 53 s ; la candidate est plus rapide
-pour 23 ambulances sur 24). Ce n'est donc pas le meilleur cas.
+24 ambulances de cette situation avec ce modèle (55 s de gain ; médiane 53 s ; la candidate est
+plus rapide pour 23 ambulances sur 24 avec ce modèle, 71 sur 72 avec les trois modèles). Ce
+n'est donc pas le meilleur cas.
 
 ```powershell
 python scripts/demo_side_by_side.py --left mp --right hybrid_h2 --net grid4x4 --demand peak --scenarios emergency --seed 0 --only-ev ev_1 --ev-view-width 160 --no-chart

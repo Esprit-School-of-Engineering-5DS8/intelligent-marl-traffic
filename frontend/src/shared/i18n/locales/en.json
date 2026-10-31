@@ -23,7 +23,8 @@
     "settings": "Settings",
     "collapse": "Collapse menu",
     "expand": "Expand menu",
-    "assistant": "Assistant"
+    "assistant": "Assistant",
+    "finalController": "Final controller"
   },
   "topbar": {
     "dataSource": "Data source",
@@ -81,6 +82,10 @@
     "assistant": {
       "title": "Assistant",
       "description": "Plain-language questions about the results; every number comes from the result files."
+    },
+    "finalController": {
+      "title": "Final controller",
+      "description": "The controller chosen by the combined study (COOP-FULL guided by Max-Pressure, with emergency-vehicle pre-emption), judged once on test seeds 0 to 4."
     }
   },
   "common": {
@@ -450,5 +455,82 @@
     "comm_dropout_10": "Message loss 10%",
     "comm_dropout_30": "Message loss 30%",
     "comm_dropout_50": "Message loss 50%"
+  },
+  "finalController": {
+    "messages": "Key messages",
+    "worstGap": {
+      "title": "Worst gap to the best, over five criteria",
+      "text": "against {{min}} to {{max}} for the other controllers: the best trade-off, not the best everywhere."
+    },
+    "ambulances": {
+      "title": "Emergency vehicles faster than with Max-Pressure (grid, peak)",
+      "text": "emergency trips faster with the three models, a median of {{gain}} s saved; with the model of the demo: {{run1}}."
+    },
+    "tests": {
+      "title": "Non-inferiority shown (Holm, 2 % margin)",
+      "text": "of which {{best}} shown better; {{loss}} true losses and {{wide}} intervals too wide to conclude."
+    },
+    "canSay": {
+      "title": "What we can state",
+      "one": "Not worse than the best reference, within 2 %, everywhere at medium demand on the grid, and on travel time in real_district at medium demand.",
+      "two": "Better on waiting time at medium demand (+2 to +3 %) and with noisy sensors (travel +6 %, waiting +14 %).",
+      "three": "Emergency-vehicle delay more than halved compared with Max-Pressure on the grid."
+    },
+    "cannotSay": {
+      "title": "What we cannot state",
+      "one": "“Never worse anywhere”: 21 comparisons out of 36 do not pass.",
+      "two": "5 true losses, small ones: travel time at peak against Max-Pressure (−1.2 to −1.7 %) and grid8x8 (−2.1 % and −1.5 %).",
+      "three": "16 intervals too wide to conclude, mostly in real_district at peak."
+    },
+    "figures": {
+      "compromise": "No controller is the best everywhere",
+      "compromiseText": "Mean gap to the best of the five controllers, per criterion (smaller is better); last column: the worst gap.",
+      "compromiseAlt": "Matrix: the candidate has a worst gap of 12 %, against 35 to 99 % for MP, EV-RULE-MP, COOP-FULL and TEAM-RULES.",
+      "forest": "The 36 non-inferiority tests",
+      "forestText": "Gain over the best reference of each situation, with its 95 % interval; red line: the −2 % margin.",
+      "forestAlt": "Forest plot: 6 comparisons shown better, 9 shown non-inferior, 5 true losses, 16 too wide to conclude.",
+      "ambulances": "Emergency-vehicle delay (grid, emergencies)",
+      "ambulancesText": "Mean over episodes and 95 % interval, at medium demand and at peak.",
+      "ambulancesAlt": "Bars: the candidate has a delay of 23 s at medium demand and 44 s at peak, against 52 s and 106 s for Max-Pressure."
+    },
+    "demo": {
+      "title": "The demo: one emergency vehicle, Max-Pressure against the candidate",
+      "text": "The same traffic on both sides. Vehicle {{vehicle}}, test seed {{seed}}, chosen because its gain is the closest to the median. Delay: {{mp}} with Max-Pressure, {{candidate}} with the candidate.",
+      "play": "Play the recording",
+      "stop": "Stop",
+      "alt": "Two SUMO views side by side, Max-Pressure on the left and the candidate on the right; the camera follows the same emergency vehicle.",
+      "command": "For the live demo, from the project folder:"
+    },
+    "honest": {
+      "title": "To say before being asked",
+      "text": "In real_district at peak and on the grid with pedestrians at peak, the estimate is clearly unfavourable (−0.4 to −11 %, and −6.6 % / −12.9 %): the candidate is probably worse than Max-Pressure there, though 5 seeds are not enough to show it."
+    },
+    "llm": "The LLM: a measured negative result. Even a perfect choice of strategy brings at most 2.2 % of travel time, and the LLM advisor added to the candidate does slightly worse than the candidate alone on its test situation.",
+    "credit": "TEAM-RULES is our teammate's controller (his LLM team with its rules, without calling the model); the other controllers and the whole combined study are our work.",
+    "criteria": {
+      "travel": "Travel",
+      "waiting": "Waiting",
+      "ambulances": "Emergency vehicles",
+      "pedestrians": "Pedestrians",
+      "sensors": "Noisy sensors",
+      "worst": "Worst gap"
+    },
+    "columns": {
+      "controller": "Controller",
+      "situation": "Situation",
+      "metric": "Measure",
+      "reference": "Reference",
+      "gain": "Gain",
+      "interval": "95 % CI",
+      "verdict": "Verdict",
+      "demand": "Demand",
+      "delay": "Mean delay"
+    },
+    "verdicts": {
+      "best": "Shown better",
+      "noninf": "Shown non-inferior",
+      "loss": "True loss",
+      "wide": "Too wide to conclude"
+    }
   }
 }

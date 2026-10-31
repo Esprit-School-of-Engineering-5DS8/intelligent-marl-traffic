@@ -164,6 +164,58 @@ export const EmergencyVehicle = z
   .catchall(z.union([z.number(), z.string(), z.boolean(), z.null()]));
 export const EmergencyLog = z.object({ vehicles: z.array(EmergencyVehicle) });
 
+/** The final controller of the combined study (scripts/combined_figures.py, test seeds). */
+const Verdict = z.enum(["best", "noninf", "loss", "wide"]);
+const AmbulanceCount = z.object({
+  faster: num,
+  total: num,
+  medianGainS: num,
+  run1Faster: num,
+  run1Total: num,
+});
+export const FinalController = z.object({
+  source: z.string(),
+  tests: z.object({ total: num, best: num, noninf: num, loss: num, wide: num }),
+  worstGap: z.object({ candidate: num, othersMin: num, othersMax: num }),
+  ambulances: z.object({ peak: AmbulanceCount, medium: AmbulanceCount }),
+  demo: Cell.omit({ scenario: true }).extend({
+    seed: num,
+    vehicle: z.string(),
+    delayMpS: num,
+    delayCandidateS: num,
+  }),
+  compromise: z.array(
+    z.object({
+      controller: z.string(),
+      travel: num,
+      waiting: num,
+      ambulances: num,
+      pedestrians: num,
+      sensors: num,
+      worst: num,
+    }),
+  ),
+  ambulanceDelays: z.array(
+    z.object({
+      demand: z.string(),
+      controller: z.string(),
+      mean: num,
+      low: num,
+      high: num,
+    }),
+  ),
+  tests36: z.array(
+    Cell.extend({
+      metric: z.enum(["travel", "waiting"]),
+      reference: z.string(),
+      gain: num,
+      low: num,
+      high: num,
+      verdict: Verdict,
+    }),
+  ),
+});
+
 /** Network geometry, SUMO coordinates in metres. */
 export const Point = z.tuple([num, num]);
 export const Lane = z.object({
@@ -291,6 +343,7 @@ export type Training = z.infer<typeof Training>;
 export type TrainingRun = z.infer<typeof TrainingRun>;
 export type PedestrianGreens = z.infer<typeof PedestrianGreens>;
 export type EmergencyLog = z.infer<typeof EmergencyLog>;
+export type FinalController = z.infer<typeof FinalController>;
 export type NetworkGeometry = z.infer<typeof NetworkGeometry>;
 export type Replay = z.infer<typeof Replay>;
 export type ReplayFrame = z.infer<typeof ReplayFrame>;

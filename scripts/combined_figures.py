@@ -418,6 +418,93 @@ def tableau_final(table: pd.DataFrame) -> str:
     ]) + "\n"  # fmt: skip
 
 
+FRONT = REPO_ROOT / "frontend" / "public"
+KINDS = {v[0]: k for k, v in VERDICTS.items()}  # French label -> code of the dashboard
+CRITERIA = ["travel", "waiting", "ambulances", "pedestrians", "sensors"]
+
+
+def ambulance_counts(df: pd.DataFrame, demand: str) -> dict:
+    """How many emergency vehicles the candidate gets through faster than Max-Pressure
+    (same vehicle, same test seed), with the three training runs and with run 1 (the demo)."""
+    cell = df[(df.network == "grid4x4") & (df.scenario == "emergency") & (df.demand == demand)]
+    mp = cell[cell.method == "mp"].set_index("seed")
+
+    def parse(s) -> dict[str, float]:
+        return {k: float(v) for k, v in (x.split(":") for x in str(s).split())}
+
+    gains: dict[int, list[float]] = {1: [], 2: [], 3: []}
+    for _, r in cell[(cell.method == "hybrid_h2") & (cell.param == 4.0)].iterrows():
+        dc, dm = parse(r.ev_delays), parse(mp.loc[r.seed, "ev_delays"])
+        gains[int(r.run)] += [dm[e] - dc[e] for e in dc if e in dm]
+    every = np.concatenate([np.array(g) for g in gains.values()])
+    run1 = np.array(gains[1])
+    return {
+        "faster": int((every > 0).sum()), "total": int(every.size),
+        "medianGainS": round(float(np.median(every)), 1),
+        "run1Faster": int((run1 > 0).sum()), "run1Total": int(run1.size),
+    }  # fmt: skip
+
+
+def dashboard(df, forest_table, gaps, amb) -> None:
+    """The page "Contrôleur final" of the dashboard: its data (codes, translated by the
+    page) and its pictures, copied from the report and the demonstration."""
+    import json
+    import shutil
+
+    controllers = {name: m for m, _, name in CONTROLLERS}
+    kinds = forest_table["verdict"].map(KINDS)
+    worst = gaps["pire écart"]
+    others = worst.drop(CANDIDATE[2])
+    cells = {k: g for k, g in df.groupby(["network", "scenario", "demand"])}
+    cell = cells[("grid4x4", "emergency", "peak")]
+    ev = {}
+    for m, p in (("mp", None), ("hybrid_h2", 4.0)):
+        rows = cell[(cell.method == m) & (cell.seed == 0)]
+        rows = rows[rows.run == 1] if p else rows
+        ev[m] = float(dict(x.split(":") for x in str(rows.iloc[0].ev_delays).split())["ev_1"])
+    data = {
+        "source": "results/combined, preregistration 2c0dd1d, test seeds 0-4",
+        "tests": {"total": int(len(kinds)), **{k: int((kinds == k).sum()) for k in VERDICTS}},
+        "worstGap": {"candidate": round(float(worst[CANDIDATE[2]]), 1),
+                     "othersMin": round(float(others.min()), 1),
+                     "othersMax": round(float(others.max()), 1)},
+        "ambulances": {d: ambulance_counts(df, d) for d in ("peak", "medium")},
+        "demo": {"network": "grid4x4", "demand": "peak", "seed": 0, "vehicle": "ev_1",
+                 "delayMpS": ev["mp"], "delayCandidateS": ev["hybrid_h2"]},
+        "compromise": [
+            {"controller": controllers[name],
+             **{c: round(float(v), 2) for c, v in zip(CRITERIA, gaps.loc[name].iloc[:5],
+                                                      strict=True)},
+             "worst": round(float(worst[name]), 2)}
+            for name in gaps.index
+        ],
+        "ambulanceDelays": [
+            {"demand": "medium" if r["demande"] == "moyenne" else "peak",
+             "controller": controllers.get(r["contrôleur"], r["contrôleur"]),
+             "mean": r["retard moyen (s)"], "low": r["IC bas"], "high": r["IC haut"]}
+            for r in amb.to_dict("records")
+        ],
+        "tests36": [
+            {"network": r["case"].split()[0], "scenario": r["case"].split()[1],
+             "demand": r["case"].split()[2], "metric": "travel" if r["métrique"] == "trajet"
+             else "waiting", "reference": r["référence"], "gain": round(float(r["gain (%)"]), 2),
+             "low": round(float(r["IC bas"]), 2), "high": round(float(r["IC haut"]), 2),
+             "verdict": KINDS[r["verdict"]]}
+            for r in forest_table.to_dict("records")
+        ],
+    }  # fmt: skip
+    (FRONT / "data" / "final_controller.json").write_text(json.dumps(data, indent=1) + "\n",
+                                                           encoding="utf-8")  # fmt: skip
+    pictures = FRONT / "combined"
+    pictures.mkdir(parents=True, exist_ok=True)
+    for name in ("fig_forest", "fig_compromis", "fig_ambulances"):
+        shutil.copyfile(FIG / f"{name}.png", pictures / f"{name}.png")
+    demo = REPO_ROOT / "docs" / "demo" / "ambulance_mp_vs_candidate"
+    for ext in (".gif", ".png"):
+        if demo.with_suffix(ext).is_file():
+            shutil.copyfile(demo.with_suffix(ext), pictures / f"demo{ext}")
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     style()
@@ -432,6 +519,7 @@ def main() -> None:
     g.to_csv(FIG / "fig_compromis.csv")
     a.to_csv(FIG / "fig_ambulances.csv", index=False)
     d.to_csv(OUT / "bilan_detail.csv", index=False)
+    dashboard(df, f, g, a)
     lines = [
         "# Bilan de la candidate contre chaque référence", "",
         "Graines de test 0 à 4. Un critère = une case et une mesure (trajet, attente ; "

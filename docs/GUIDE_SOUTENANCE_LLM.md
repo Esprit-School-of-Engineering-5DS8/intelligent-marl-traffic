@@ -1461,7 +1461,7 @@ ollama list                                                   # qwen2.5:3b doit 
 | Durée | Quoi dire | Commande ou fichier |
 |---|---|---|
 | 1 min | Le compromis : aucun n'est le meilleur partout ; pire écart 12 % contre 35 à 99 % | `docs\report\figures\combined\fig_compromis.png` |
-| 3 min | La démo : une ambulance, Max-Pressure contre la candidate ; 23 ambulances sur 24 plus rapides | commande de la partie 5 (secours : `docs\demo\ambulance_mp_vs_candidate.gif`) |
+| 3 min | La démo : une ambulance, Max-Pressure contre la candidate ; 71 trajets d'ambulance sur 72 plus rapides | commande de la partie 5 (secours : `docs\demo\ambulance_mp_vs_candidate.gif`) |
 | 1 min | Ce qu'on peut affirmer et ce qu'on ne peut pas ; le LLM, résultat négatif mesuré | `docs\report\figures\combined\fig_forest.png` |
 
 ---
@@ -1550,8 +1550,9 @@ variantes sur les graines de validation 1000, 1001 et 1002, avec une règle de c
    écart au meilleur est de **12 % pour la candidate, contre 35 à 99 %** pour MP, EV-RULE-MP,
    COOP-FULL et TEAM-RULES.
 2. **Les ambulances passent plus vite.** Face à Max-Pressure, la candidate fait gagner du
-   temps à **23 ambulances sur 24** (grille, heure de pointe) ; le retard moyen est divisé par
-   plus de deux (44 s contre 106 s en pointe, 23 s contre 52 s en demande moyenne).
+   temps à **71 trajets d'ambulance sur 72** (grille, heure de pointe, les trois modèles ; 23
+   sur 24 avec le modèle de la démo) ; le retard moyen est divisé par plus de deux (44 s contre
+   106 s en pointe, 23 s contre 52 s en demande moyenne).
 3. **Le LLM : un résultat négatif, mesuré.** Même un choix parfait de stratégie ne rapporte
    au plus que 2,2 % de temps de trajet ; le conseiller LLM ajouté à la candidate fait un peu
    moins bien qu'elle (−1,4 % de trajet sur sa case de test).
@@ -1657,7 +1658,8 @@ l'entrée du réseau, il sous-estime donc la marge dans ces cas. C'est écrit da
 
 **« La démo est-elle choisie pour vous avantager ? »**
 Non : l'ambulance montrée a le gain le plus proche de la médiane, et la candidate est plus
-rapide pour 23 ambulances sur 24. La démo reproduit exactement l'évaluation (173 s et 119 s).
+rapide pour 71 trajets d'ambulance sur 72 (23 sur 24 avec le modèle de la démo). La démo
+reproduit exactement l'évaluation (173 s et 119 s).
 
 **« Vos résultats dépendent-ils de la façon de lancer SUMO ? »**
 Non : libsumo et TraCI donnent exactement les mêmes épisodes (vérifié sur 8 épisodes), et
@@ -1690,7 +1692,7 @@ l'environnement, quel que soit le contrôleur (`traffic_env.py:190`).
 | Les 36 tests, verdicts et intervalles | `docs\report\combined_tableau_final.md`, `results\combined\analysis.md` |
 | Pire écart 12 % contre 35 à 99 % | `docs\report\figures\combined\fig_compromis.csv` |
 | Retard des ambulances | `docs\report\figures\combined\fig_ambulances.csv` |
-| 23 ambulances sur 24, médiane 53 s | `results\combined\raw\*grid4x4__emergency__peak*` (colonne `ev_delays`), `docs\DEMO_GUIDE.md` |
+| 71 trajets d'ambulance sur 72 (23 sur 24 avec le modèle de la démo), médiane 53 s | `results\combined\raw\*grid4x4__emergency__peak*` (colonne `ev_delays`), `docs\DEMO_GUIDE.md` |
 | Bilan par référence | `results\combined\bilan_references.md` |
 | Choix sur la validation | `results\exploration\combined\rank_s1000.md`, `rank_s1001.md`, `rank_s1002.md` |
 | Oracle de stratégie | `results\exploration\combined\oracle_s1000.md` |

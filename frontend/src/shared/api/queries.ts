@@ -8,6 +8,7 @@ import {
   Decisions,
   DistributionCell,
   EmergencyLog,
+  FinalController,
   Meta,
   NetworkGeometry,
   PedestrianGreens,
@@ -36,6 +37,7 @@ export const useSummary = () => useData("summary", Summary);
 export const useComparisons = () => useData("comparisons", Comparisons);
 export const usePedestrianGreens = () => useData("pedestrian_greens", PedestrianGreens, true);
 export const useEmergencyLog = () => useData("emergency_log", EmergencyLog, true);
+export const useFinalController = () => useData("final_controller", FinalController, true);
 
 export const useTimeseries = (cell: Cell | null) =>
   useData(cell ? `timeseries/${cellKey(cell)}` : null, TimeseriesCell, true);

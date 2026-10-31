@@ -1908,7 +1908,7 @@ toutes les 3 min, les piétons perdent 24,8 %.</p>
 </tr>
 <tr>
 <td>3 min</td>
-<td>La démo : une ambulance, Max-Pressure contre la candidate ; 23 ambulances sur 24 plus rapides</td>
+<td>La démo : une ambulance, Max-Pressure contre la candidate ; 71 trajets d'ambulance sur 72 plus rapides</td>
 <td>commande de la partie 5 (secours : <code>docs\demo\ambulance_mp_vs_candidate.gif</code>)</td>
 </tr>
 <tr>
@@ -2080,8 +2080,9 @@ variantes sur les graines de validation 1000, 1001 et 1002, avec une règle de c
       écart au meilleur est de <strong>12 % pour la candidate, contre 35 à 99 %</strong> pour MP, EV-RULE-MP,
       COOP-FULL et TEAM-RULES.</li>
 <li><strong>Les ambulances passent plus vite.</strong> Face à Max-Pressure, la candidate fait gagner du
-      temps à <strong>23 ambulances sur 24</strong> (grille, heure de pointe) ; le retard moyen est divisé par
-      plus de deux (44 s contre 106 s en pointe, 23 s contre 52 s en demande moyenne).</li>
+      temps à <strong>71 trajets d'ambulance sur 72</strong> (grille, heure de pointe, les trois modèles ; 23
+      sur 24 avec le modèle de la démo) ; le retard moyen est divisé par plus de deux (44 s contre
+      106 s en pointe, 23 s contre 52 s en demande moyenne).</li>
 <li><strong>Le LLM : un résultat négatif, mesuré.</strong> Même un choix parfait de stratégie ne rapporte
       au plus que 2,2 % de temps de trajet ; le conseiller LLM ajouté à la candidate fait un peu
       moins bien qu'elle (−1,4 % de trajet sur sa case de test).</li>
@@ -2191,7 +2192,8 @@ Hors saturation, oui. En saturation, non : son coût ne comptait pas les voiture
 l'entrée du réseau, il sous-estime donc la marge dans ces cas. C'est écrit dans les limites.</p>
 <p><strong>« La démo est-elle choisie pour vous avantager ? »</strong>
 Non : l'ambulance montrée a le gain le plus proche de la médiane, et la candidate est plus
-rapide pour 23 ambulances sur 24. La démo reproduit exactement l'évaluation (173 s et 119 s).</p>
+rapide pour 71 trajets d'ambulance sur 72 (23 sur 24 avec le modèle de la démo). La démo
+reproduit exactement l'évaluation (173 s et 119 s).</p>
 <p><strong>« Vos résultats dépendent-ils de la façon de lancer SUMO ? »</strong>
 Non : libsumo et TraCI donnent exactement les mêmes épisodes (vérifié sur 8 épisodes), et
 chaque ligne de résultat enregistre le commit du code qui l'a produite.</p>
@@ -2233,7 +2235,7 @@ l'environnement, quel que soit le contrôleur (<code>traffic_env.py:190</code>).
 <td><code>docs\report\figures\combined\fig_ambulances.csv</code></td>
 </tr>
 <tr>
-<td>23 ambulances sur 24, médiane 53 s</td>
+<td>71 trajets d'ambulance sur 72 (23 sur 24 avec le modèle de la démo), médiane 53 s</td>
 <td><code>results\combined\raw\*grid4x4__emergency__peak*</code> (colonne <code>ev_delays</code>), <code>docs\DEMO_GUIDE.md</code></td>
 </tr>
 <tr>

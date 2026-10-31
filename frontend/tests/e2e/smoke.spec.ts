@@ -19,7 +19,7 @@ test.describe("smoke", () => {
     const nav = page.getByRole("navigation", { name: "Navigation principale" });
     const links = nav.getByRole("link");
     const count = await links.count();
-    expect(count).toBe(10);
+    expect(count).toBe(11);
 
     for (let i = 0; i < count; i += 1) {
       const link = links.nth(i);

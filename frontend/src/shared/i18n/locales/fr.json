@@ -23,7 +23,8 @@
     "settings": "Paramètres",
     "collapse": "Réduire le menu",
     "expand": "Déplier le menu",
-    "assistant": "Assistant"
+    "assistant": "Assistant",
+    "finalController": "Contrôleur final"
   },
   "topbar": {
     "dataSource": "Source des données",
@@ -81,6 +82,10 @@
     "assistant": {
       "title": "Assistant",
       "description": "Questions en langage courant sur les résultats ; chaque chiffre vient des fichiers de résultats."
+    },
+    "finalController": {
+      "title": "Contrôleur final",
+      "description": "Le contrôleur retenu par l'étude combinée (COOP-FULL guidé par Max-Pressure, avec préemption des ambulances), jugé une seule fois sur les graines de test 0 à 4."
     }
   },
   "common": {
@@ -450,5 +455,82 @@
     "comm_dropout_10": "Pertes de messages 10 %",
     "comm_dropout_30": "Pertes de messages 30 %",
     "comm_dropout_50": "Pertes de messages 50 %"
+  },
+  "finalController": {
+    "messages": "Messages clés",
+    "worstGap": {
+      "title": "Pire écart au meilleur, sur cinq critères",
+      "text": "contre {{min}} à {{max}} pour les autres contrôleurs : le meilleur compromis, pas le meilleur partout."
+    },
+    "ambulances": {
+      "title": "Ambulances plus rapides qu'avec Max-Pressure (grille, pointe)",
+      "text": "trajets d'ambulance plus rapides avec les trois modèles, {{gain}} s gagnées en médiane ; avec le modèle de la démo : {{run1}}."
+    },
+    "tests": {
+      "title": "Non-infériorité prouvée (Holm, marge de 2 %)",
+      "text": "dont {{best}} prouvées meilleures ; {{loss}} vraies pertes et {{wide}} intervalles trop larges pour conclure."
+    },
+    "canSay": {
+      "title": "Ce qu'on peut affirmer",
+      "one": "Pas moins bonne que la meilleure référence, à 2 % près, partout en demande moyenne sur la grille, et sur le temps de trajet de real_district en demande moyenne.",
+      "two": "Meilleure sur l'attente en demande moyenne (+2 à +3 %) et sous capteurs bruités (trajet +6 %, attente +14 %).",
+      "three": "Un retard des ambulances divisé par plus de deux par rapport à Max-Pressure sur la grille."
+    },
+    "cannotSay": {
+      "title": "Ce qu'on ne peut pas affirmer",
+      "one": "« Jamais moins bonne partout » : 21 comparaisons sur 36 ne passent pas.",
+      "two": "5 vraies pertes, petites : le trajet en pointe contre Max-Pressure (−1,2 à −1,7 %) et grid8x8 (−2,1 % et −1,5 %).",
+      "three": "16 intervalles trop larges pour conclure, surtout sur real_district en pointe."
+    },
+    "figures": {
+      "compromise": "Aucun contrôleur n'est le meilleur partout",
+      "compromiseText": "Écart moyen au meilleur des cinq contrôleurs, par critère (plus petit = mieux) ; dernière colonne : le pire écart.",
+      "compromiseAlt": "Matrice : la candidate a un pire écart de 12 %, contre 35 à 99 % pour MP, EV-RULE-MP, COOP-FULL et TEAM-RULES.",
+      "forest": "Les 36 tests de non-infériorité",
+      "forestText": "Gain sur la meilleure référence de chaque situation, avec son intervalle à 95 % ; ligne rouge : la marge de −2 %.",
+      "forestAlt": "Forest plot : 6 comparaisons prouvées meilleures, 9 prouvées non inférieures, 5 vraies pertes, 16 trop larges pour conclure.",
+      "ambulances": "Retard des ambulances (grille, urgences)",
+      "ambulancesText": "Moyenne des épisodes et intervalle à 95 %, en demande moyenne et à l'heure de pointe.",
+      "ambulancesAlt": "Barres : la candidate a 23 s de retard en demande moyenne et 44 s en pointe, contre 52 s et 106 s pour Max-Pressure."
+    },
+    "demo": {
+      "title": "La démo : une ambulance, Max-Pressure contre la candidate",
+      "text": "Même trafic des deux côtés. Ambulance {{vehicle}}, graine de test {{seed}}, choisie parce que son gain est le plus proche de la médiane. Retard : {{mp}} avec Max-Pressure, {{candidate}} avec la candidate.",
+      "play": "Lancer l'enregistrement",
+      "stop": "Arrêter",
+      "alt": "Deux vues SUMO côte à côte, Max-Pressure à gauche et la candidate à droite ; la caméra suit la même ambulance.",
+      "command": "Pour la démo en direct, depuis le dossier du projet :"
+    },
+    "honest": {
+      "title": "À dire avant qu'on le demande",
+      "text": "Sur real_district en pointe et sur la grille avec piétons en pointe, l'estimation est nettement défavorable (−0,4 à −11 %, et −6,6 % / −12,9 %) : la candidate y fait probablement moins bien que Max-Pressure, sans que 5 graines suffisent à le démontrer."
+    },
+    "llm": "Le LLM : un résultat négatif, mesuré. Même un choix parfait de stratégie ne rapporte au plus que 2,2 % de temps de trajet, et le conseiller LLM ajouté à la candidate fait un peu moins bien qu'elle sur sa situation de test.",
+    "credit": "TEAM-RULES est le contrôleur de notre coéquipier (son équipe de LLM avec ses règles, sans appel au modèle) ; les autres contrôleurs et toute l'étude combinée sont notre travail.",
+    "criteria": {
+      "travel": "Trajet",
+      "waiting": "Attente",
+      "ambulances": "Ambulances",
+      "pedestrians": "Piétons",
+      "sensors": "Capteurs bruités",
+      "worst": "Pire écart"
+    },
+    "columns": {
+      "controller": "Contrôleur",
+      "situation": "Situation",
+      "metric": "Mesure",
+      "reference": "Référence",
+      "gain": "Gain",
+      "interval": "IC à 95 %",
+      "verdict": "Verdict",
+      "demand": "Demande",
+      "delay": "Retard moyen"
+    },
+    "verdicts": {
+      "best": "Prouvée meilleure",
+      "noninf": "Prouvée non inférieure",
+      "loss": "Vraie perte",
+      "wide": "Trop large pour conclure"
+    }
   }
 }

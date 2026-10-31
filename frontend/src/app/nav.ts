@@ -7,6 +7,7 @@ import {
   Footprints,
   LayoutDashboard,
   MapPinned,
+  Scale,
   Settings,
   Siren,
   type LucideIcon,
@@ -21,6 +22,7 @@ export type PageKey =
   | "pedestrians"
   | "emergency"
   | "analytics"
+  | "finalController"
   | "assistant"
   | "settings";
 
@@ -50,6 +52,7 @@ export const NAV: NavGroup[] = [
     items: [
       { key: "agents", path: "/agents", icon: BrainCircuit },
       { key: "analytics", path: "/analytics", icon: ChartColumn },
+      { key: "finalController", path: "/final-controller", icon: Scale },
       { key: "assistant", path: "/assistant", icon: Bot },
     ],
   },
