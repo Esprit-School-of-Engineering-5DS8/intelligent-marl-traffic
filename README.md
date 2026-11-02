@@ -87,6 +87,19 @@ cd frontend && npm install && npm run dev            # Vite on :5173
 python scripts/export_dashboard_data.py              # refresh served result files
 ```
 
+### Screenshots
+
+| Dashboard | Benchmark - Models & Runs |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Benchmark](docs/screenshots/benchmark.png) |
+
+![Live map](docs/screenshots/live-map-events.png)
+
+Captured from `npm run dev` with the API on `:8000`. These are shell captures, not a
+populated run: the live map asks for a Mapbox access token in the browser (no token is
+committed), and the model registry is empty until a checkpoint is trained, selected and
+promoted.
+
 ### Controller methods
 | `method` | Description |
 |------|-------------|
