@@ -617,5 +617,88 @@
     "empty": "Aucune partie ne contient ces mots.",
     "code": "Voir le code ({{n}})",
     "codeHint": "Les lignes exactes, lues dans les fichiers du projet au moment de l’export."
+  },
+  "explore": {
+    "scopeStudy": "Exploration · la première étude, avant le contrôleur final",
+    "scopeReplay": "Exploration · simulations rejouées",
+    "toFinal": "Voir le contrôleur final",
+    "toReplay": "Voir en simulation",
+    "toScenarios": "Créer un scénario",
+    "overview": {
+      "answer": "Les indicateurs de chaque contrôleur de la première étude dans la situation que vous choisissez, comparés à une référence.",
+      "tips": {
+        "t1": "Choisissez un réseau, un scénario et une demande : toute la page se met à jour.",
+        "t2": "Un gain positif veut dire mieux que la référence ; l'intervalle donne l'incertitude.",
+        "t3": "Le contrôleur final est jugé à part, sur la page « Le contrôleur final »."
+      }
+    },
+    "analytics": {
+      "answer": "Toutes les comparaisons deux à deux de la première étude, avec leurs intervalles de confiance et les tests corrigés pour les comparaisons multiples.",
+      "tips": {
+        "t1": "Choisissez un indicateur, puis le contrôleur et sa référence.",
+        "t2": "Un écart n'est retenu que si le test corrigé (Holm) le confirme.",
+        "t3": "Les barres montrent l'intervalle de confiance de chaque gain."
+      }
+    },
+    "liveMap": {
+      "answer": "Un épisode réel rejoué vu du ciel : chaque véhicule, chaque piéton et l'état de chaque feu, côte à côte pour deux contrôleurs qui jouent exactement la même demande.",
+      "tips": {
+        "t1": "Lancez la lecture, puis cliquez sur un carrefour pour voir ses feux et sa file.",
+        "t2": "« Suivre l'ambulance » garde la caméra sur le véhicule d'urgence.",
+        "t3": "Quand le LLM pilote un côté, son mode et sa raison s'affichent à droite."
+      }
+    },
+    "simulation3d": {
+      "answer": "La même simulation dans une ville en 3D : immeubles, trottoirs, piétons, feux sur poteaux, ambulances et bus reconnaissables.",
+      "tips": {
+        "t1": "Glissez pour tourner, molette pour zoomer vers le curseur.",
+        "t2": "Ambulance blanche à gyrophare, bus violet, piétons sur les trottoirs.",
+        "t3": "Quand le LLM pilote un côté, son mode et sa raison s'affichent sous la vue."
+      }
+    },
+    "scenarios": {
+      "answer": "Créez votre propre scénario : la ville (grilles 4x4 et 8x8, Tunis, Paris, Barcelone), les événements (ambulances, piétons, incident, bus) et deux contrôleurs, dont notre candidat et sa version avec LLM.",
+      "tips": {
+        "t1": "Choisissez la ville, les événements et deux contrôleurs, puis lancez (backend en direct).",
+        "t2": "Les piétons ne sont possibles que sur les réseaux qui ont des trottoirs.",
+        "t3": "Chaque simulation devient un replay ; ceux déjà prêts sont plus bas, en 2D ou en 3D."
+      }
+    },
+    "emergency": {
+      "answer": "Ce que vit chaque ambulance de la première étude : son retard, son temps de trajet, ses arrêts au rouge, et le retard qu'elle impose aux autres usagers.",
+      "tips": {
+        "t1": "Choisissez la situation, puis le contrôleur et sa référence.",
+        "t2": "Le graphique du bas montre le prix payé par les autres véhicules.",
+        "t3": "Le journal liste chaque ambulance, une par ligne."
+      }
+    },
+    "pedestrians": {
+      "answer": "L'attente des piétons aux passages, les traversées terminées pendant le vert et la durée du vert piéton, pour chaque contrôleur de la première étude.",
+      "tips": {
+        "t1": "Choisissez la situation, puis le contrôleur et sa référence.",
+        "t2": "Le compromis du bas : moins d'attente pour les piétons, plus pour les voitures ?",
+        "t3": "Pour voir les piétons bouger, ouvrez un replay avec piétons."
+      }
+    },
+    "agents": {
+      "answer": "Comment les agents ont appris : les courbes d'entraînement, la décomposition de leur récompense, et les décisions prises pendant un épisode.",
+      "tips": {
+        "t1": "La courbe monte quand l'agent apprend ; elle se stabilise à la fin.",
+        "t2": "La récompense additionne plusieurs objectifs : attente, ambulances, piétons…",
+        "t3": "Le contrôleur final garde cet agent, guidé par Max-Pressure."
+      }
+    }
+  },
+  "strategyPanel": {
+    "title": "Le LLM stratège",
+    "now": "Mode en cours",
+    "since": "depuis {{time}}",
+    "reason": "Sa raison :",
+    "start": "mode de départ",
+    "invalid": "réponse invalide : le mode reste",
+    "timeline": "Ses décisions pendant la fenêtre",
+    "latency": "réponse en {{s}} s",
+    "none": "Aucune décision dans la fenêtre enregistrée : le mode de départ s'applique.",
+    "note": "Le LLM choisit seulement le mode : l'ambulance prioritaire et le bouclier de sécurité restent actifs quoi qu'il dise."
   }
 }

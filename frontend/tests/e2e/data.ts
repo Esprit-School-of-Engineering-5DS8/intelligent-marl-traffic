@@ -29,7 +29,10 @@ export const read = <T>(file: string): T =>
 
 export const summary = read<Row[]>("summary.json");
 export const comparisons = read<Test[]>("comparisons.json");
-export const meta = read<{ replays: { id: string; left: string; right: string }[] }>("meta.json");
+export const meta = read<{
+  replays: { id: string; left: string; right: string; llm?: boolean }[];
+  creation: { networks: { network: string }[]; candidate: string; llm: string };
+}>("meta.json");
 
 export function mean(
   network: string,

@@ -56,7 +56,34 @@ export const Meta = z.object({
   runs: z.number().nullable(),
   extraRuns: num,
   dqnAvailable: z.boolean(),
-  replays: z.array(z.object({ id: z.string(), left: z.string(), right: z.string(), window: num })),
+  replays: z.array(
+    z.object({
+      id: z.string(),
+      left: z.string(),
+      right: z.string(),
+      window: num,
+      scale: num.optional(),
+      llm: z.boolean().optional(),
+    }),
+  ),
+  /** What the "new scenario" form offers (cotraffic/scenario_catalog.py). */
+  creation: z
+    .object({
+      networks: z.array(
+        z.object({
+          network: z.string(),
+          events: z.array(z.string()),
+          methods: z.array(z.string()),
+          scale: num,
+          window: num,
+          bigCity: z.boolean(),
+        }),
+      ),
+      demands: z.array(z.string()),
+      candidate: z.string(),
+      llm: z.string(),
+    })
+    .optional(),
   timeseries: z.array(z.string()),
   decisions: z.array(
     z.object({
@@ -255,11 +282,22 @@ export const ReplayFrame = z.object({
   p: z.array(num),
   s: z.array(z.string()),
 });
+/** One call of the LLM strategist during a replay (times from the start of the window). */
+export const StrategyCall = z.object({
+  t: num,
+  asked: num,
+  mode: z.string(),
+  previous: z.string(),
+  valid: z.boolean(),
+  reason: z.string(),
+  latency: num,
+});
 export const ReplaySide = z.object({
   method: z.string(),
   kpis: z.record(z.string(), maybe),
   frames: z.array(ReplayFrame),
   events: z.array(z.object({ t: num, type: z.string(), id: z.string() })),
+  strategy: z.array(StrategyCall).optional(),
 });
 export const Replay = z.object({
   id: z.string(),
@@ -269,6 +307,7 @@ export const Replay = z.object({
   seed: num,
   every: num,
   window: num,
+  scale: num.optional(),
   start: num,
   signals: z.array(z.string()),
   kinds: z.array(z.string()),
@@ -276,7 +315,14 @@ export const Replay = z.object({
 });
 
 /** A scenario to run on the backend: the options of scripts/record_replay.py. */
-export const NETWORKS = ["grid4x4", "real_district"] as const;
+export const NETWORKS = [
+  "grid4x4",
+  "grid8x8",
+  "real_district",
+  "real_district_ped",
+  "paris",
+  "barcelona",
+] as const;
 export const EVENTS = ["emergency", "pedestrians", "incident", "buses"] as const;
 export const DEMANDS = ["low", "medium", "peak"] as const;
 export const ScenarioRequest = z
@@ -346,6 +392,7 @@ export type EmergencyLog = z.infer<typeof EmergencyLog>;
 export type FinalController = z.infer<typeof FinalController>;
 export type NetworkGeometry = z.infer<typeof NetworkGeometry>;
 export type Replay = z.infer<typeof Replay>;
+export type StrategyCall = z.infer<typeof StrategyCall>;
 export type ReplayFrame = z.infer<typeof ReplayFrame>;
 export type ScenarioRequest = z.infer<typeof ScenarioRequest>;
 export type Run = z.infer<typeof Run>;

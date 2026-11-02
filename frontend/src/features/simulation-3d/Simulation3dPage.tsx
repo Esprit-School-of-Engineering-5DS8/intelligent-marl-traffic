@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { ReplayControls, ReplayPicker } from "@/features/replay/ReplayControls";
 import { ReplayStats } from "@/features/replay/ReplayStats";
+import { StrategyPanel } from "@/features/replay/StrategyPanel";
 import { usePlayback, usePlaybackClock } from "@/features/replay/store";
 import { useMeta, useNetwork, useReplay } from "@/shared/api/queries";
 import { QueryState } from "@/shared/components/QueryState";
@@ -14,7 +15,7 @@ import type { NetworkGeometry, Replay } from "@/shared/schemas";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 import { Legend3D } from "./Legend3D";
 import { Scene3D } from "./Scene3D";
@@ -40,10 +41,7 @@ export default function Simulation3dPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={t("pages.simulation3d.title")}
-        description={t("pages.simulation3d.description")}
-      />
+      <ExploreHeader page="simulation3d" scope="replay" />
       {!webgl ? (
         <EmptyState icon={MonitorX} title={t("replay.webglMissing")} />
       ) : (
@@ -120,6 +118,7 @@ function View({ net, replay }: { net: NetworkGeometry; replay: Replay }) {
           </Button>
         </div>
       </div>
+      <StrategyPanel replay={replay} sides={[...sides]} />
       <Legend3D />
       <ReplayStats replay={replay} sides={[...sides]} />
     </div>

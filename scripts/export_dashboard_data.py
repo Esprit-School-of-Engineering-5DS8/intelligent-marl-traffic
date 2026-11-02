@@ -30,6 +30,7 @@ from typing import Any
 
 import pandas as pd
 
+from cotraffic import scenario_catalog
 from cotraffic.networks.build import net_file
 from cotraffic.paths import RESULTS_DIR
 
@@ -39,7 +40,8 @@ SUMMARY = RESULTS_DIR / "summary"
 LOGS = RESULTS_DIR / "logs"
 EXTRA = RESULTS_DIR / "extra"
 TRAINING = RESULTS_DIR / "training"
-NETWORKS = ["grid4x4", "grid8x8", "real_district"]
+# every network of the "new scenario" form (cotraffic/scenario_catalog.py)
+NETWORKS = list(scenario_catalog.NETWORKS)
 RUN_ID = re.compile(r"^(?P<method>[^_]+(?:_[^_]+)*?)__(?P<network>[^_]+(?:_[^_]+)*?)__")
 
 
@@ -467,6 +469,8 @@ def export_meta(out: Path, summary: pd.DataFrame, extras: dict[str, Any]) -> Non
                 "left": rec["sides"]["left"]["method"],
                 "right": rec["sides"]["right"]["method"],
                 "window": rec["window"],
+                "scale": rec.get("scale", 1.0),
+                "llm": any("strategy" in side for side in rec["sides"].values()),
             }
         )
     payload = {
@@ -481,6 +485,8 @@ def export_meta(out: Path, summary: pd.DataFrame, extras: dict[str, Any]) -> Non
         "extraRuns": extra_runs,
         "dqnAvailable": bool((summary["method"] == "dqn").any()),
         "replays": replays,
+        # what the "new scenario" form offers: networks, their events and controllers
+        "creation": scenario_catalog.catalog(sorted(summary["method"].unique().tolist())),
         **extras,
     }
     write(out, "meta.json", payload)

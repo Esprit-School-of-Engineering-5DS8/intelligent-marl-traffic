@@ -19,6 +19,8 @@ question, la réponse en une phrase en haut, le détail replié pour les experts
 | `08-simulation-3d-*.png`, `09-simulation-3d-zoom-*.png` | La ville 3D : immeubles, arbres, trottoirs, feux sur poteaux, voitures |
 | `10-palette-ctrl-k-*.png` | La palette de commandes (Ctrl+K) |
 | `11-resume-technique-*.png` | Le résumé technique : chaque partie, ses calculs et les extraits du vrai code |
+| `12-nouveau-scenario-*.png` | Créer un scénario : la ville (grilles 4x4 et 8x8, Tunis, Paris, Barcelone), les événements permis par le réseau, notre candidat et sa version avec LLM |
+| `13-carte-llm-paris-*.png` | Un replay avec le LLM dans la boucle : le mode choisi, sa raison et ses décisions, à côté de la carte |
 
 Lancer le tableau de bord :
 

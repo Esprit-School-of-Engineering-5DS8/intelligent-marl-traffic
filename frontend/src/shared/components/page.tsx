@@ -160,3 +160,57 @@ export function Spotlight({
     </section>
   );
 }
+
+/**
+ * The top of an exploration page: what the page shows in one sentence, which data it reads
+ * (the first study or replays), how to read it, and where to go next.
+ */
+export function ExploreHero({
+  title,
+  answer,
+  scope,
+  tips,
+  actions,
+}: {
+  title: string;
+  answer: ReactNode;
+  scope: ReactNode;
+  tips: ReactNode[];
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="relative overflow-hidden rounded-2xl border border-border bg-surface">
+      <div aria-hidden="true" className="bg-grid absolute inset-0 opacity-40" />
+      <div className="relative flex flex-col gap-4 px-6 py-6 md:px-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="eyebrow">{scope}</p>
+        </div>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex max-w-3xl min-w-0 flex-col gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-balance text-text md:text-3xl">
+              {title}
+            </h1>
+            <p className="text-[15px] leading-relaxed text-text-2">{answer}</p>
+          </div>
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        </div>
+        <ul className="grid gap-2 md:grid-cols-3">
+          {tips.map((tip, i) => (
+            <li
+              key={i}
+              className="flex gap-2.5 rounded-lg border border-border bg-surface-2/70 px-3 py-2.5 text-[13px] leading-snug text-text-2"
+            >
+              <span
+                aria-hidden="true"
+                className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border-strong text-[11px] font-semibold text-text"
+              >
+                {i + 1}
+              </span>
+              <span>{tip}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </header>
+  );
+}

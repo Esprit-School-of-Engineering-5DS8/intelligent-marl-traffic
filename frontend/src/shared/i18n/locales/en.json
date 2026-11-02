@@ -225,7 +225,9 @@
     "grid4x4": "4x4 grid",
     "grid8x8": "8x8 grid",
     "real_district": "Real district (OSM)",
-    "real_district_ped": "Real district with sidewalks"
+    "real_district_ped": "Real district with sidewalks",
+    "paris": "Paris (OSM)",
+    "barcelona": "Barcelona (OSM)"
   },
   "filters": {
     "network": "Network",
@@ -450,7 +452,7 @@
     "openMap": "Map",
     "open3d": "3D",
     "new": "New scenario",
-    "newText": "Runs a simulation on the backend and records a side-by-side replay.",
+    "newText": "Pick the city, what happens in it and two controllers: the backend plays the same episode for both and records it as a replay, to watch in 2D and 3D.",
     "events": "Events",
     "seed": "Seed",
     "left": "Left controller",
@@ -472,7 +474,36 @@
     "confirm": "Run",
     "cancel": "Cancel",
     "exportCell": "Export the scenario's results",
-    "window": "{{minutes}} min recorded"
+    "window": "{{minutes}} min recorded",
+    "stepCity": "1. The city",
+    "stepEvents": "2. What happens",
+    "stepControllers": "3. Who controls the lights",
+    "netInfo": {
+      "grid4x4": "The grid the agents were trained on.",
+      "grid8x8": "A grid four times larger, never seen in training.",
+      "real_district": "A district of Tunis imported from OpenStreetMap.",
+      "real_district_ped": "The same district with sidewalks and crossings.",
+      "paris": "A district of Paris imported from OpenStreetMap (exploratory).",
+      "barcelona": "Barcelona's Eixample (exploratory: saturated network)."
+    },
+    "tagPedestrians": "pedestrians",
+    "tagScale": "demand ×{{scale}}",
+    "bigCityNote": "Large city, exploratory: demand is reduced to ×{{scale}} (what the network carries), and the lights the models cannot read keep their SUMO program. This is not a result of the study.",
+    "eventOff": {
+      "pedestrians": "No pedestrians here: this network has no sidewalks (pick a grid or the district with sidewalks).",
+      "other": "Event not set up on this network."
+    },
+    "presets": {
+      "vsMp": "Candidate vs Max-Pressure",
+      "vsFt": "Candidate vs fixed time",
+      "vsLlm": "Candidate vs Candidate + LLM"
+    },
+    "candidateNote": "Our candidate: the COOP-FULL agent guided by Max-Pressure, ambulances first, the safety shield.",
+    "llmNote": "Candidate + LLM: the local model (Ollama) chooses the network's strategy at regular intervals; each decision and its reason are shown during the replay. Ollama must run on the backend.",
+    "confirmTextBig": "Two full episodes will run on the backend; on a large city, expect several tens of minutes. The result will appear in the replays.",
+    "tagCandidate": "our candidate",
+    "tagLlm": "LLM in the loop",
+    "tagBig": "large city ×{{scale}}"
   },
   "scenarios": {
     "normal": "Normal traffic",

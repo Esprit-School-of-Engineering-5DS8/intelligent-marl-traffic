@@ -35,7 +35,13 @@ FIGURES_DIR = REPO_ROOT / "figures"
 DOCS_DIR = REPO_ROOT / "docs"
 
 # networks without their own trained agents run the agents of the network they derive from
-TRAINED_ON = {"real_district_ped": "real_district", "grid8x8": "grid4x4"}
+# networks never trained on: driven by the models of the network they share the format of
+TRAINED_ON = {
+    "real_district_ped": "real_district",
+    "grid8x8": "grid4x4",
+    "paris": "real_district",
+    "barcelona": "real_district",
+}
 
 
 def default_checkpoint(agent: str, network: str) -> Path:

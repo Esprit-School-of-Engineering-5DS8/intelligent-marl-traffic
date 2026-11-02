@@ -71,6 +71,14 @@ One JSON object per SSE `data:` line:
 
 A run executes `scripts/record_replay.py` with the requested options (two full
 evaluation episodes, a few minutes), then `scripts/export_dashboard_data.py
---skip-networks` so that the replay appears. One run at a time; runs live in memory.
+--skip-networks` so that the replay appears. What a request may ask for comes from
+`src/cotraffic/scenario_catalog.py`, exported in `meta.json` as `creation`: the networks
+(`grid4x4`, `grid8x8`, `real_district`, `real_district_ped`, `paris`, `barcelona`), the
+events each one can generate (from `unsupported_scenarios` in its config) and the
+controllers with a trained model on disk, our candidate (`hybrid_h2`) and its LLM version
+(`hybrid_h2_llmstrat`) included. Anything else is refused with 422; the LLM version is
+refused with 503 when the local Ollama server does not answer. Paris and Barcelona are
+played at the reduced demand of the exploratory demonstration (`scale` in the catalog),
+the LLM version's calls (time, mode, reason) are stored in the replay (`strategy`). One run at a time; runs live in memory.
 Status: `queued`, `running`, `done` (with `replayId`), `failed` (with `error`); the last
 50 log lines are kept.

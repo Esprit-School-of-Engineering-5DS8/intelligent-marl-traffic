@@ -133,6 +133,16 @@ m/s).
 - **Temps réel ?** En mode backend, l'état du serveur et des simulations arrive par
   WebSocket (reconnexion automatique) ; une simulation lancée depuis Scénarios apparaît
   dans les replays une fois terminée (quelques minutes).
+- **Peut-on créer un scénario ?** Oui, page Scénarios (backend en direct) : la ville
+  (grilles 4x4 et 8x8, quartier de Tunis avec ou sans trottoirs, Paris, Barcelone), les
+  événements (ambulances, piétons, incident, bus) et deux contrôleurs, dont notre candidat
+  et sa version avec le LLM stratège. Le formulaire ne propose que ce que le réseau sait
+  générer (pas de piétons sans trottoirs) ; les grandes villes sont jouées à demande
+  réduite, comme dans la démonstration exploratoire. Une grille 4x4 prend quelques
+  minutes, une grande ville ou la 8x8 davantage ; le LLM demande Ollama sur le backend.
+- **Où voir le LLM décider ?** Dans un replay « LLM dans la boucle » (par exemple Paris,
+  ou la grille 4x4 avec piétons, candidat contre candidat + LLM) : la carte et la 3D
+  affichent le mode choisi à chaque instant, sa raison et toutes ses décisions.
 
 ## Plan B
 

@@ -23,7 +23,7 @@ import type { Comparison, DistributionCell, Meta } from "@/shared/schemas";
 import { useFilters } from "@/shared/state/filters";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 export default function AnalyticsPage() {
   const { t } = useTranslation();
@@ -32,10 +32,7 @@ export default function AnalyticsPage() {
   const comparisons = useComparisons();
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("pages.analytics.title")}
-        description={t("pages.analytics.description")}
-      />
+      <ExploreHeader page="analytics" scope="study" />
       <QueryState query={meta} height={80}>
         {(m) => (
           <QueryState query={comparisons} height={420}>

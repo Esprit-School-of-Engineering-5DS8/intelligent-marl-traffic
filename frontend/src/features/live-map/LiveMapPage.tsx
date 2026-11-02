@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { ReplayControls, ReplayPicker } from "@/features/replay/ReplayControls";
 import { ReplayStats } from "@/features/replay/ReplayStats";
+import { StrategyPanel } from "@/features/replay/StrategyPanel";
 import { sceneAt, type Side } from "@/features/replay/scene";
 import { usePlayback, usePlaybackClock } from "@/features/replay/store";
 import { useMeta, useNetwork, useReplay } from "@/shared/api/queries";
@@ -15,7 +16,7 @@ import type { NetworkGeometry, Replay } from "@/shared/schemas";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 import { Events } from "./Events";
 import { JunctionPanel } from "./JunctionPanel";
@@ -34,7 +35,7 @@ export default function LiveMapPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t("pages.liveMap.title")} description={t("pages.liveMap.description")} />
+      <ExploreHeader page="liveMap" scope="replay" />
       <QueryState query={meta} height={60}>
         {(m) =>
           m.replays.length ? (
@@ -133,6 +134,7 @@ function MapArea({ net, replay }: { net: NetworkGeometry; replay: Replay }) {
         <ReplayStats replay={replay} sides={[...sides]} />
       </div>
       <aside aria-label={t("replay.legend")} className="flex flex-col gap-4">
+        <StrategyPanel replay={replay} sides={[...sides]} className="!grid-cols-1" />
         <JunctionPanel net={net} replay={replay} sides={[...sides]} />
         <Events replay={replay} />
         <Legend />

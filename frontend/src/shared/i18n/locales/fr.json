@@ -225,7 +225,9 @@
     "grid4x4": "Grille 4x4",
     "grid8x8": "Grille 8x8",
     "real_district": "Quartier réel (OSM)",
-    "real_district_ped": "Quartier réel avec trottoirs"
+    "real_district_ped": "Quartier réel avec trottoirs",
+    "paris": "Paris (OSM)",
+    "barcelona": "Barcelone (OSM)"
   },
   "filters": {
     "network": "Réseau",
@@ -450,7 +452,7 @@
     "openMap": "Carte",
     "open3d": "3D",
     "new": "Nouveau scénario",
-    "newText": "Lance une simulation sur le backend et enregistre un replay côte à côte.",
+    "newText": "Choisissez la ville, ce qui s'y passe et deux contrôleurs : le backend joue le même épisode pour les deux et l'enregistre en replay, à voir en 2D et en 3D.",
     "events": "Événements",
     "seed": "Graine",
     "left": "Contrôleur de gauche",
@@ -472,7 +474,36 @@
     "confirm": "Lancer",
     "cancel": "Annuler",
     "exportCell": "Exporter les résultats du scénario",
-    "window": "{{minutes}} min enregistrées"
+    "window": "{{minutes}} min enregistrées",
+    "stepCity": "1. La ville",
+    "stepEvents": "2. Ce qui s'y passe",
+    "stepControllers": "3. Qui contrôle les feux",
+    "netInfo": {
+      "grid4x4": "La grille d'entraînement des agents.",
+      "grid8x8": "Une grille quatre fois plus grande, jamais vue à l'entraînement.",
+      "real_district": "Un quartier de Tunis importé d'OpenStreetMap.",
+      "real_district_ped": "Le même quartier avec trottoirs et passages piétons.",
+      "paris": "Un quartier de Paris importé d'OpenStreetMap (exploratoire).",
+      "barcelona": "L'Eixample de Barcelone (exploratoire : réseau saturé)."
+    },
+    "tagPedestrians": "piétons",
+    "tagScale": "demande ×{{scale}}",
+    "bigCityNote": "Grande ville, exploratoire : la demande est réduite à ×{{scale}} (ce que le réseau supporte), et les feux que les modèles ne savent pas lire gardent leur programme SUMO. Ce n'est pas un résultat de l'étude.",
+    "eventOff": {
+      "pedestrians": "Pas de piétons ici : ce réseau n'a pas de trottoirs (choisissez une grille ou le quartier avec trottoirs).",
+      "other": "Événement non configuré sur ce réseau."
+    },
+    "presets": {
+      "vsMp": "Candidat contre Max-Pressure",
+      "vsFt": "Candidat contre temps fixe",
+      "vsLlm": "Candidat contre Candidat + LLM"
+    },
+    "candidateNote": "Notre candidat : l'agent COOP-FULL guidé par Max-Pressure, l'ambulance prioritaire, le bouclier de sécurité.",
+    "llmNote": "Candidat + LLM : le modèle local (Ollama) choisit la stratégie du réseau à intervalles réguliers ; chaque décision et sa raison s'affichent pendant le replay. Il faut qu'Ollama tourne sur le backend.",
+    "confirmTextBig": "Deux épisodes complets vont tourner sur le backend ; sur une grande ville, comptez plusieurs dizaines de minutes. Le résultat apparaîtra dans les replays.",
+    "tagCandidate": "notre candidat",
+    "tagLlm": "LLM dans la boucle",
+    "tagBig": "grande ville ×{{scale}}"
   },
   "scenarios": {
     "normal": "Trafic normal",

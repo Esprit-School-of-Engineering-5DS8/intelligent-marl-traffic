@@ -16,7 +16,7 @@ import type { Decisions, Meta, SummaryRow, Training } from "@/shared/schemas";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 import { DecisionTimeline } from "./DecisionTimeline";
 
@@ -38,7 +38,14 @@ export default function AgentsPage() {
   const meta = useMeta();
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t("pages.agents.title")} description={t("pages.agents.description")} />
+      <ExploreHeader
+        page="agents"
+        scope="study"
+        links={[
+          { to: "/how-it-works", label: t("nav.howItWorks") },
+          { to: "/final-controller", label: t("explore.toFinal") },
+        ]}
+      />
       <QueryState query={meta} height={80}>
         {(m) => (
           <>

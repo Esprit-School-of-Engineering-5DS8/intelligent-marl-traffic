@@ -8,6 +8,7 @@ import { cn } from "@/shared/lib/cn";
 import type { Meta, Replay } from "@/shared/schemas";
 import { Button } from "@/shared/ui/button";
 
+import { orderReplays } from "./catalog";
 import { duration } from "./scene";
 import { replayTitle } from "./title";
 import { usePlayback } from "./store";
@@ -21,10 +22,11 @@ export function ReplayPicker({ meta }: { meta: Meta }) {
   const id = useId();
   const replayId = usePlayback((s) => s.replayId);
   const setReplay = usePlayback((s) => s.setReplay);
+  const replays = orderReplays(meta.replays);
+  const first = replays[0]?.id ?? null;
   useEffect(() => {
-    if (!replayId || !meta.replays.some((r) => r.id === replayId))
-      setReplay(meta.replays[0]?.id ?? null);
-  }, [meta.replays, replayId, setReplay]);
+    if (!replayId || !meta.replays.some((r) => r.id === replayId)) setReplay(first);
+  }, [meta.replays, replayId, setReplay, first]);
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <label htmlFor={id} className="text-xs font-medium text-text-2">
@@ -36,7 +38,7 @@ export function ReplayPicker({ meta }: { meta: Meta }) {
         onChange={(e) => setReplay(e.target.value)}
         className="h-9 min-w-0 rounded-md border border-border-strong bg-surface-2 px-2 text-sm text-text"
       >
-        {meta.replays.map((r) => (
+        {replays.map((r) => (
           <option key={r.id} value={r.id}>
             {replayTitle(r.id, f)} · {f.methodName(r.left)} / {f.methodName(r.right)}
           </option>

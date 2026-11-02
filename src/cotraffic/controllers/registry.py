@@ -15,6 +15,10 @@ TEAM = ("team_rules", "team_qwen")
 # 2c0dd1d): COOP-FULL with a bias of 4 towards Max-Pressure and EV-RULE pre-emption, built as
 # scripts/combined_eval.py builds it (method hybrid_h2, beta 4)
 CANDIDATE = "hybrid_h2"
+# the candidate with the LLM strategist on top (llm/strategist.py, exploratory)
+LLM_CANDIDATE = "hybrid_h2_llmstrat"
+# built on a COOP-FULL model: their checkpoint is the one of coop_full
+ON_COOP_FULL = (CANDIDATE, LLM_CANDIDATE)
 
 # "<method>_guard": the same controller behind the shield with the spillback guard and
 # detector recall (FAILURES F-012, F-014), evaluated as a family of its own.
@@ -75,6 +79,17 @@ def make_controller(method: str, checkpoint: Path | None = None, **kwargs) -> Co
         base = make_controller("coop_full", checkpoint)
         beta = float(kwargs.get("beta", 4.0))
         return HybridPolicy(base, mp_beta=beta, ev_guide=EvRuleGuide(), name=CANDIDATE)
+    if method == LLM_CANDIDATE:
+        from cotraffic.llm.client import Ollama
+        from cotraffic.llm.settings import load_settings
+        from cotraffic.llm.strategist import LlmStrategist, LlmStrategyPolicy, StrategistPrompt
+
+        if checkpoint is None:
+            raise ValueError(f"method {method!r} needs a COOP-FULL checkpoint")
+        cfg = load_settings()
+        strategist = LlmStrategist(Ollama(cfg.model, cfg.options), StrategistPrompt.load())
+        beta = float(kwargs.get("beta", 4.0))
+        return LlmStrategyPolicy(make_controller("coop_full", checkpoint), strategist, beta, method)
     if method in LEARNED or checkpoint is not None:
         from cotraffic.controllers.rl_policy import LearnedPolicy
 

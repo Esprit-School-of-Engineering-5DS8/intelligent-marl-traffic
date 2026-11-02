@@ -29,16 +29,16 @@ from pydantic import BaseModel, Field, field_validator
 
 from api.llm_remote import make_llm
 from api.runs import RunQueue
+from cotraffic import scenario_catalog as catalog
 from cotraffic.assistant.ask import ask
 from cotraffic.assistant.llm import LLMUnavailableError
 from cotraffic.assistant.scenario import plan_demo
-from cotraffic.controllers.registry import LEARNED
-from cotraffic.paths import default_checkpoint
+from cotraffic.controllers.registry import LLM_CANDIDATE
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "frontend" / "public" / "data"
-NETWORKS = ("grid4x4", "real_district")
-EVENTS = ("emergency", "pedestrians", "incident", "buses")
+NETWORKS = catalog.NETWORKS
+EVENTS = catalog.EVENTS
 RUN_WORDS = re.compile(r"\b(lance|lancer|simule|simuler|run|démarre|demarre)\b", re.IGNORECASE)
 
 app = FastAPI(title="CoTraffic API", version="1.0")
@@ -93,7 +93,7 @@ def proposed_run(question: str, llm) -> dict[str, Any] | None:
     """A run the user may confirm, read from a demonstration request; never started here."""
     plan = plan_demo(question, llm)
     spec = plan.spec
-    network = "real_district" if spec.network.startswith("real_district") else "grid4x4"
+    network = spec.network if spec.network in NETWORKS else "grid4x4"
     demand = spec.demand if spec.demand in ("low", "medium", "peak") else "peak"
     return {
         "name": "runScenario",
@@ -162,7 +162,9 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 
 
 class ScenarioRequest(BaseModel):
-    network: Literal["grid4x4", "real_district"]
+    network: Literal[
+        "grid4x4", "grid8x8", "real_district", "real_district_ped", "paris", "barcelona"
+    ]
     demand: Literal["low", "medium", "peak"]
     events: list[Literal["emergency", "pedestrians", "incident", "buses"]] = Field(
         default_factory=list
@@ -186,13 +188,31 @@ def list_runs() -> list[dict[str, Any]]:
 
 @app.post("/api/runs", status_code=201)
 def create_run(req: ScenarioRequest) -> dict[str, Any]:
-    methods = known_methods()
+    offered = catalog.methods(req.network, sorted(known_methods()))
     for method in (req.left, req.right):
-        if methods and method not in methods:
-            raise HTTPException(422, f"unknown controller {method}")
-        if method in LEARNED and not default_checkpoint(method, req.network).exists():
+        if method not in offered:
+            raise HTTPException(422, f"{method} is not offered on {req.network}")
+        if not catalog.available(method, req.network):
             raise HTTPException(422, f"no trained {method} model for {req.network}")
+    refused = sorted(set(req.events) - set(catalog.events(req.network)))
+    if refused:
+        raise HTTPException(422, f"{req.network} cannot generate: {', '.join(refused)}")
+    if LLM_CANDIDATE in (req.left, req.right) and not ollama_up():
+        raise HTTPException(503, "the LLM strategist needs the local Ollama server (ollama serve)")
     return runs.submit(req.model_dump())
+
+
+def ollama_up() -> bool:
+    """Whether the local model of the LLM strategist answers (configs/llm.yaml)."""
+    import urllib.request
+
+    from cotraffic.llm.client import DEFAULT_URL
+
+    try:
+        with urllib.request.urlopen(f"{DEFAULT_URL}/api/tags", timeout=2) as r:
+            return r.status == 200
+    except OSError:
+        return False
 
 
 # --- live status ----------------------------------------------------------------------------------

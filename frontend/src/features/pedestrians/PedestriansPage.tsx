@@ -14,7 +14,7 @@ import { methodColor, sortMethods } from "@/shared/domain/methods";
 import { usePageTitle } from "@/shared/lib/use-page-title";
 import { useRtl } from "@/shared/lib/use-rtl";
 import type { Cell, PedestrianGreens } from "@/shared/schemas";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 export default function PedestriansPage() {
   const { t } = useTranslation();
@@ -47,9 +47,13 @@ export default function PedestriansPage() {
   };
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("pages.pedestrians.title")}
-        description={t("pages.pedestrians.description")}
+      <ExploreHeader
+        page="pedestrians"
+        scope="study"
+        links={[
+          { to: "/simulation-3d", label: t("explore.toReplay"), event: "pedestrians" },
+          { to: "/final-controller", label: t("explore.toFinal") },
+        ]}
       />
       <ScenarioFocus config={config}>{(cell) => <Greens cell={cell} />}</ScenarioFocus>
     </div>

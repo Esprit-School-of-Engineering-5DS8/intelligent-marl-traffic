@@ -2,6 +2,7 @@ import { Box, Download, Map as MapIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
+import { orderReplays, withCandidate } from "@/features/replay/catalog";
 import { replayTitle } from "@/features/replay/title";
 import { usePlayback } from "@/features/replay/store";
 import { useMeta, useSummary } from "@/shared/api/queries";
@@ -16,7 +17,7 @@ import type { Meta, SummaryRow } from "@/shared/schemas";
 import { useFilters } from "@/shared/state/filters";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 import { NewScenario } from "./NewScenario";
 import { Runs } from "./Runs";
@@ -27,18 +28,22 @@ export default function ScenariosPage() {
   const meta = useMeta();
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("pages.scenarios.title")}
-        description={t("pages.scenarios.description")}
+      <ExploreHeader
+        page="scenarios"
+        scope="replay"
+        links={[
+          { to: "/live-map", label: t("nav.liveMap") },
+          { to: "/simulation-3d", label: t("nav.simulation3d") },
+        ]}
       />
       <QueryState query={meta} height={200}>
         {(m) => (
           <>
-            <Replays meta={m} />
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
               <NewScenario meta={m} />
               <Runs />
             </div>
+            <Replays meta={m} />
             <ExportCell meta={m} />
           </>
         )}
@@ -65,10 +70,17 @@ function Replays({ meta }: { meta: Meta }) {
         <p className="text-xs text-text-2">{t("scenarioPage.replaysText")}</p>
       </div>
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {meta.replays.map((r) => (
+        {orderReplays(meta.replays).map((r) => (
           <li key={r.id}>
             <Card className="flex h-full flex-col">
               <CardHeader>
+                <div className="flex flex-wrap gap-1">
+                  {r.llm ? <Badge strong>{t("scenarioPage.tagLlm")}</Badge> : null}
+                  {withCandidate(r) ? <Badge strong>{t("scenarioPage.tagCandidate")}</Badge> : null}
+                  {r.scale !== undefined && r.scale !== 1 ? (
+                    <Badge>{t("scenarioPage.tagBig", { scale: f.number(r.scale) })}</Badge>
+                  ) : null}
+                </div>
                 <CardTitle className="text-[13px]">{replayTitle(r.id, f)}</CardTitle>
                 <CardDescription className="flex flex-wrap items-center gap-1.5">
                   <span
@@ -104,6 +116,20 @@ function Replays({ meta }: { meta: Meta }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+function Badge({ children, strong }: { children: string; strong?: boolean }) {
+  return (
+    <span
+      className={
+        strong
+          ? "rounded-full bg-text px-2 py-0.5 text-[10.5px] font-semibold text-bg"
+          : "rounded-full border border-border-strong px-2 py-0.5 text-[10.5px] font-medium text-text-2"
+      }
+    >
+      {children}
+    </span>
   );
 }
 

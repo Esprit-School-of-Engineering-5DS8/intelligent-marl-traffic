@@ -39,6 +39,17 @@ test.describe("pages", () => {
     ).toContainText(`${fr(wait)} s`);
   });
 
+  test("live map: the LLM strategist's decisions beside the replay", async ({ page }) => {
+    const replay = meta.replays.find((r) => r.llm);
+    test.skip(!replay, "no replay with the LLM strategist");
+    await open(page, "/live-map", "Carte en direct");
+    await main(page).getByLabel("Replay").selectOption(replay!.id);
+    const panel = main(page).getByRole("region", { name: /^Le LLM stratège · / });
+    await expect(panel).toBeVisible({ timeout: 20_000 });
+    await expect(panel.getByText("Mode en cours")).toBeVisible();
+    await expect(panel.getByText(/Équilibre|Fluidité|Agent seul/).first()).toBeVisible();
+  });
+
   test("live map: side-by-side replay plays", async ({ page }) => {
     test.skip(meta.replays.length === 0, "no replay recorded (scripts/record_replay.py)");
     await open(page, "/live-map", "Carte en direct");
@@ -115,6 +126,13 @@ test.describe("pages", () => {
       meta.replays.length,
     );
     await expect(main(page).getByRole("button", { name: "Lancer la simulation" })).toBeDisabled();
+    // every network of the exported catalog, the large cities and the 8x8 grid included
+    const radios = main(page).getByRole("radio");
+    await expect(radios).toHaveCount(meta.creation.networks.length);
+    for (const name of ["Grille 8x8", "Paris (OSM)", "Barcelone (OSM)"])
+      await expect(main(page).getByRole("radio").filter({ hasText: name })).toBeVisible();
+    // our candidate is the default right-hand controller
+    await expect(main(page).locator("#sc-right")).toHaveValue(meta.creation.candidate);
     await expect(
       main(page).getByText("Disponible avec la source « Backend en direct »").first(),
     ).toBeVisible();

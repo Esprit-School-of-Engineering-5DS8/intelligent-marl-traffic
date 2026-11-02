@@ -18,7 +18,7 @@ import { useRtl } from "@/shared/lib/use-rtl";
 import type { Comparison, Meta, SummaryRow, TimeseriesCell } from "@/shared/schemas";
 import { useFilters } from "@/shared/state/filters";
 import { Card, CardContent } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 import { Provenance } from "./Provenance";
 
@@ -46,7 +46,7 @@ export default function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t("pages.overview.title")} description={t("pages.overview.description")} />
+      <ExploreHeader page="overview" scope="study" />
       <QueryState query={meta} height={80}>
         {(m) => (
           <QueryState query={summary} height={400}>

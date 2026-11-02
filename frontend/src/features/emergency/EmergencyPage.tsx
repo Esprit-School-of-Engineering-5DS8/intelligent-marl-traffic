@@ -8,7 +8,7 @@ import { useFormat } from "@/shared/domain/format";
 import { methodColor } from "@/shared/domain/methods";
 import { usePageTitle } from "@/shared/lib/use-page-title";
 import type { Cell, EmergencyLog } from "@/shared/schemas";
-import { PageHeader } from "@/shared/ui/page-header";
+import { ExploreHeader } from "@/shared/components/explore";
 
 export default function EmergencyPage() {
   const { t } = useTranslation();
@@ -41,9 +41,13 @@ export default function EmergencyPage() {
   };
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("pages.emergency.title")}
-        description={t("pages.emergency.description")}
+      <ExploreHeader
+        page="emergency"
+        scope="study"
+        links={[
+          { to: "/final-controller", label: t("explore.toFinal") },
+          { to: "/live-map", label: t("explore.toReplay"), event: "emergency" },
+        ]}
       />
       <ScenarioFocus config={config}>{(cell) => <Log cell={cell} />}</ScenarioFocus>
     </div>
