@@ -1,10 +1,10 @@
 import { ArrowRight, Bus, Cpu, Network, RadioTower, type LucideIcon } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { findTest } from "@/features/combined/claims";
-import { useBigCity, useCells, useStudy, useTests } from "@/shared/api/queries";
+import { useCells, useStudy, useTests } from "@/shared/api/queries";
 import { EChart } from "@/shared/charts/EChart";
 import { baseAxes, escapeHtml, tooltipRow } from "@/shared/charts/style";
 import type { ChartTokens } from "@/shared/charts/tokens";
@@ -16,11 +16,12 @@ import {
   VerdictBadge,
 } from "@/shared/components/evidence";
 import { QueriesState } from "@/shared/components/QueriesState";
-import { Panel, Section } from "@/shared/components/section";
+import { Details } from "@/shared/components/page";
+import { Section } from "@/shared/components/section";
 import { useFormat, useTx } from "@/shared/domain/format";
 import { methodColor, methodLabel } from "@/shared/domain/methods";
 import { usePageTitle } from "@/shared/lib/use-page-title";
-import type { BigCity, Cells, Study, TestRow } from "@/shared/schemas/combined";
+import type { Cells, Study, TestRow } from "@/shared/schemas/combined";
 
 interface Situation {
   key: "sensors" | "dropout" | "buses" | "generalisation";
@@ -48,7 +49,7 @@ const SHOWN = ["hybrid_h2", "mp", "coop_full", "ev_rule_mp", "team_rules"];
 export default function RobustnessPage() {
   const { t } = useTranslation();
   usePageTitle(t("pages.robustness.title"));
-  const queries = { study: useStudy(), cells: useCells(), tests: useTests(), city: useBigCity() };
+  const queries = { study: useStudy(), cells: useCells(), tests: useTests() };
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8">
       <header className="flex flex-col gap-3">
@@ -66,7 +67,7 @@ export default function RobustnessPage() {
         </Link>
       </header>
       <QueriesState queries={queries} height={480}>
-        {({ study, cells, tests, city }) => (
+        {({ study, cells, tests }) => (
           <>
             <div className="grid gap-6 xl:grid-cols-2">
               {SITUATIONS.map((s) => (
@@ -84,7 +85,6 @@ export default function RobustnessPage() {
               source={`${cells.source} · combined/tests.json`}
               extra={t("final.prereg", { commit: study.prereg })}
             />
-            <BigCityCard city={city} />
           </>
         )}
       </QueriesState>
@@ -169,11 +169,13 @@ function SituationCard({
           );
         })}
       </ul>
-      <div className="grid gap-3">
-        {(["travel", "waiting"] as const).map((m) => (
-          <MeansChart key={m} controllers={played} metric={m} title={tx(`final.criteria.${m}`)} />
-        ))}
-      </div>
+      <Details title={t("robustness.means")} hint={t("robustness.meansHint")}>
+        <div className="grid gap-3">
+          {(["travel", "waiting"] as const).map((m) => (
+            <MeansChart key={m} controllers={played} metric={m} title={tx(`final.criteria.${m}`)} />
+          ))}
+        </div>
+      </Details>
       {same.length ? (
         <p className="text-xs text-muted">
           {t("robustness.same", {
@@ -317,127 +319,6 @@ function Summary({ study, tests }: { study: Study; tests: TestRow[] }) {
       badges={<EvidenceBadge kind="prereg" />}
     >
       <ClaimsBlock can={proven.map(line)} cannot={not.map(line)} />
-    </Section>
-  );
-}
-
-/** F-016: the large-city attempts, stopped before any test seed. */
-function BigCityCard({ city }: { city: BigCity }) {
-  const { t } = useTranslation();
-  const tx = useTx();
-  const f = useFormat();
-  const sweep = city.parisSweep;
-  const controllers = useMemo(() => [...new Set(sweep.map((r) => r.controller))], [sweep]);
-  const demands = useMemo(
-    () => [...new Set(sweep.map((r) => r.vehPerH))].sort((a, b) => a - b),
-    [sweep],
-  );
-  const build = useCallback(
-    (tk: ChartTokens) => {
-      const { axis, tooltip, legend } = baseAxes(tk);
-      return {
-        legend: { ...legend, top: 0, right: 0 },
-        grid: { left: 8, right: 64, top: 44, bottom: 36, containLabel: true },
-        tooltip: { ...tooltip, trigger: "axis" },
-        xAxis: {
-          type: "category",
-          data: demands.map((d) => f.number(d, 0)),
-          name: t("robustness.city.axisX"),
-          nameLocation: "middle",
-          nameGap: 26,
-          ...axis,
-        },
-        yAxis: {
-          type: "value",
-          min: 0,
-          name: t("robustness.city.axisY"),
-          ...axis,
-          nameTextStyle: { ...axis.nameTextStyle, align: "left" },
-          axisLabel: { ...axis.axisLabel, formatter: (v: number) => f.number(v, 0) },
-        },
-        series: controllers.map((c) => ({
-          name: methodLabel(c),
-          type: "line",
-          symbol: "circle",
-          symbolSize: 8,
-          lineStyle: { width: 2, color: methodColor(c) },
-          itemStyle: { color: methodColor(c), borderColor: tk.surface, borderWidth: 2 },
-          data: demands.map(
-            (d) => sweep.find((r) => r.controller === c && r.vehPerH === d)?.waiting ?? null,
-          ),
-          endLabel: {
-            show: true,
-            formatter: methodLabel(c),
-            color: tk.text2,
-            fontSize: 11,
-          },
-        })),
-      };
-    },
-    [sweep, controllers, demands, f, t],
-  );
-  return (
-    <Section
-      id="big-city"
-      title={t("robustness.city.title")}
-      description={t("robustness.city.text", { seed: city.seed })}
-      badges={
-        <>
-          <EvidenceBadge kind="stopped" />
-          <EvidenceBadge kind="validation" />
-        </>
-      }
-      className="rounded-2xl border border-dashed border-border-strong bg-surface p-5 md:p-6"
-    >
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
-        <ul className="flex flex-col gap-3">
-          {city.cities.map((c) => (
-            <li key={c.network} className="rounded-lg border border-border bg-surface-2 p-4">
-              <p className="text-sm font-semibold text-text">
-                {tx(`robustness.city.names.${c.network}`)}
-              </p>
-              <p className="mt-1 text-sm text-text-2">
-                {t("robustness.city.lights", {
-                  lights: c.lights,
-                  driven: c.driven,
-                  pctLights: f.number(c.drivenLightsPct, 0),
-                  pctLanes: f.number(c.drivenLanesPct, 0),
-                })}
-              </p>
-              <p className="mt-2 text-sm text-text-2">
-                {tx(`robustness.city.verdicts.${c.network}`)}
-              </p>
-            </li>
-          ))}
-        </ul>
-        <Panel>
-          <EChart
-            build={build}
-            height={280}
-            label={t("robustness.city.alt", {
-              items: controllers
-                .map(
-                  (c) =>
-                    `${methodLabel(c)} : ${sweep
-                      .filter((r) => r.controller === c)
-                      .map((r) => `${f.number(r.waiting, 0)} s`)
-                      .join(", ")}`,
-                )
-                .join(" ; "),
-            })}
-          />
-          <p className="mt-2 text-xs text-muted">{t("robustness.city.chartNote")}</p>
-        </Panel>
-      </div>
-      <ClaimsBlock
-        can={[t("robustness.city.can")]}
-        cannot={[t("robustness.city.cannot.result"), t("robustness.city.cannot.why")]}
-      />
-      <p className="text-sm text-text-2">
-        {t("robustness.city.more")} <code className="font-mono text-xs">docs/FAILURES.md</code>{" "}
-        (F-016).
-      </p>
-      <SourceNote source={city.source} />
     </Section>
   );
 }

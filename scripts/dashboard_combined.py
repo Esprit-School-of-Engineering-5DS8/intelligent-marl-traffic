@@ -341,6 +341,180 @@ def bigcity() -> dict:
     }  # fmt: skip
 
 
+# ---------------------------------------------------------------- the LLM in the loop
+LLM_LOOP = RESULTS_DIR / "llm_loop"
+LLM_METRICS = {"mean_travel_time": "travel", "mean_waiting_time": "waiting",
+               "ev_delay": "ambulances"}  # fmt: skip
+
+
+def _rows(folder: Path, pattern: str = "*.csv") -> pd.DataFrame:
+    files = sorted(folder.glob(pattern))
+    if not files:
+        return pd.DataFrame()
+    return pd.DataFrame([pd.read_csv(f).iloc[0].to_dict() for f in files])
+
+
+def _paired(llm: pd.DataFrame, cand: pd.DataFrame, metric: str, rng) -> dict | None:
+    """Gain of the LLM version over the candidate (percent, positive = better), paired on the
+    same cell and seed, with a bootstrap interval over the pairs."""
+    keys = ["network", "scenario", "demand", "seed"]
+    m = llm[keys + [metric]].merge(cand[keys + [metric]], on=keys, suffixes=("_llm", "_cand"))
+    m = m.dropna()
+    if m.empty:
+        return None
+    a, b = m[f"{metric}_llm"].to_numpy(float), m[f"{metric}_cand"].to_numpy(float)
+    draws = rng.integers(0, len(a), size=(ca.N_BOOT, len(a)))
+    boot = 100 * (b[draws].mean(1) - a[draws].mean(1)) / b[draws].mean(1)
+    lo, hi = np.percentile(boot, [2.5, 97.5])
+    return {"gain": r(100 * (b.mean() - a.mean()) / b.mean()), "low": r(lo), "high": r(hi),
+            "pairs": int(len(a))}  # fmt: skip
+
+
+def llm_loop() -> dict | None:
+    """The candidate with the LLM strategist (scripts/llm_loop.py), exploratory: against the
+    candidate's own episodes (model t1), the strategy oracle and its placebo (validation)."""
+    llm = _rows(LLM_LOOP / "raw")
+    if llm.empty:
+        return None
+    rng = np.random.default_rng(0)
+    explo = ca.load(VALIDATION / "raw")
+    final = ca.load(FINAL / "raw")
+    cand_v = explo[(explo.method == "hybrid_h2") & (explo.param == 4.0) & (explo.run == 1)]
+    cand_t = final[(final.method == "hybrid_h2") & (final.param == 4.0) & (final.run == 1)]
+    oracle = explo[explo.method == "strategy_oracle"]
+    placebo = explo[explo.method == "strategy_placebo"]
+    out: dict = {
+        "source": "results/llm_loop/raw, calls (scripts/llm_loop.py); candidate t1: "
+        "results/exploration/combined/raw (seed 1000), results/combined/raw (seeds 0-4); "
+        "oracle and placebo: results/exploration/combined/raw (phase B)",
+        "model": str(llm.llm_model.iloc[0]),
+        "prompt": str(llm.prompt.iloc[0]),
+        "windowS": float(llm.window_s.iloc[0]),
+        "beta": float(llm.beta.iloc[0]),
+        "episodes": int(len(llm)),
+        "calls": int(llm.llm_calls.sum()),
+        "validRate": r(float((llm.llm_valid_rate * llm.llm_calls).sum() / llm.llm_calls.sum()), 4),
+        "latencyP50S": r(float(llm.llm_latency_p50_s.median())),
+        "shares": {m: r(float(llm[f"llm_share_{m}"].mean()), 4)
+                   for m in ("equilibre", "fluidite", "agent")},
+        "validation": [],
+        "test": [],
+    }  # fmt: skip
+    parts = (("validation", llm.seed >= 1000, cand_v), ("test", llm.seed < 1000, cand_t))
+    for kind, sel, cand in parts:
+        part = llm[sel]
+        for (net, scen, dem), cell in part.groupby(["network", "scenario", "demand"]):
+            c = cand[(cand.network == net) & (cand.scenario == scen) & (cand.demand == dem)]
+            seeds = sorted(set(cell.seed) & set(c.seed))
+            if not seeds:
+                continue
+            line = {**split(f"{net} {scen} {dem}"), "seeds": len(seeds),
+                    "switches": r(float(cell.llm_mode_switches.mean()), 1),
+                    "shares": {m: r(float(cell[f"llm_share_{m}"].mean()), 4)
+                               for m in ("equilibre", "fluidite", "agent")}}  # fmt: skip
+            for metric, name in LLM_METRICS.items():
+                a = cell[cell.seed.isin(seeds)][metric].astype(float)
+                b = c[c.seed.isin(seeds)][metric].astype(float)
+                if a.isna().all():
+                    continue
+                entry = {"llm": r(a.mean()), "candidate": r(b.mean()),
+                         "gain": r(100 * (b.mean() - a.mean()) / b.mean())}  # fmt: skip
+                if kind == "validation":
+                    o = oracle[(oracle.network == net) & (oracle.scenario == scen)
+                               & (oracle.demand == dem)][metric]  # fmt: skip
+                    pl = placebo[(placebo.network == net) & (placebo.scenario == scen)
+                                 & (placebo.demand == dem)][metric]  # fmt: skip
+                    entry["oracle"] = r(float(o.iloc[0])) if len(o) else None
+                    entry["placeboBest"] = r(float(pl.min())) if len(pl) else None
+                line[name] = entry
+            out[kind].append(line)
+    test = llm[llm.seed < 1000]
+    out["testOverall"] = {name: _paired(test, cand_t, metric, rng)
+                          for metric, name in LLM_METRICS.items()} if len(test) else {}  # fmt: skip
+    # the episode where the model changed its mind most: its calls, one by one
+    best = llm.sort_values(["llm_mode_switches", "seed"], ascending=[False, True]).iloc[0]
+    calls = []
+    log = LLM_LOOP / "calls" / f"{best.run_id}.jsonl"
+    if log.is_file():
+        for line in log.read_text(encoding="utf-8").splitlines():
+            c = json.loads(line)
+            halted = re.search(r"(\d+) halted", c["state"])
+            backlog = re.search(r"enter the network: (\d+)", c["state"])
+            calls.append({"time": c["time"], "appliesAt": r(c["applies_at"], 1),
+                          "mode": c["mode"], "valid": bool(c["valid"]), "reason": c["reason"],
+                          "latency": r(c["latency_s"], 1),
+                          "halted": int(halted.group(1)) if halted else None,
+                          "backlog": int(backlog.group(1)) if backlog else None})  # fmt: skip
+    proto = config.load_protocol()["validation" if best.seed >= 1000 else "evaluation"]
+    end = sum(float(proto[k]) for k in ("warmup_s", "measure_s", "cooldown_s"))
+    out["timeline"] = {**split(f"{best.network} {best.scenario} {best.demand}"),
+                       "seed": int(best.seed), "end": end, "calls": calls}  # fmt: skip
+    # the earlier advisor (phase-level LLM bias), measured in the final evaluation
+    adv = final[final.method == "hybrid_h2_llm"]
+    if len(adv):
+        base = cand_t[(cand_t.network == "grid4x4") & (cand_t.scenario == "emergency")
+                      & (cand_t.demand == "peak")]  # fmt: skip
+        out["advisor"] = {name: _paired(adv, base, metric, rng)
+                          for metric, name in LLM_METRICS.items()}  # fmt: skip
+    return out
+
+
+# ---------------------------------------------------------------- large cities (demo)
+CITY_METRICS = {"mean_travel_time": "travel", "mean_waiting_time": "waiting",
+                "teleports_total": "teleports", "unfinished": "unfinished",
+                "ev_delay": "ambulances"}  # fmt: skip
+
+
+def city_map(network: str) -> dict:
+    """The street network as polylines (metres, rounded) and its lights, for a small map."""
+    import sumolib
+
+    net = sumolib.net.readNet(str(REPO_ROOT / "sumo_files" / network / f"{network}.net.xml"))
+    xmin, ymin, xmax, ymax = net.getBoundary()
+    edges = [[round(c, 0) for xy in e.getShape() for c in (xy[0] - xmin, xy[1] - ymin)]
+             for e in net.getEdges() if not e.isSpecial()]  # fmt: skip
+    table = pd.read_csv(BIGCITY / f"{network}_lights.csv")
+    driven = dict(zip(table.light.astype(str), table.driven, strict=True))
+    lights = []
+    for tls in net.getTrafficLights():
+        ends = [c[0].getEdge().getToNode().getCoord() for c in tls.getConnections()]
+        if ends:
+            x = sum(e[0] for e in ends) / len(ends) - xmin
+            y = sum(e[1] for e in ends) / len(ends) - ymin
+            lights.append({"x": round(x), "y": round(y),
+                           "driven": bool(driven.get(tls.getID(), False))})  # fmt: skip
+    return {"width": round(xmax - xmin), "height": round(ymax - ymin), "edges": edges,
+            "lights": lights}  # fmt: skip
+
+
+def cities() -> dict | None:
+    """Every controller on Paris and Barcelona at a demand the networks can carry
+    (scripts/bigcity.py demo): exploratory, never part of the preregistered results."""
+    rows = _rows(BIGCITY / "demo" / "raw")
+    if rows.empty:
+        return None
+    lights = {c["network"]: c for c in bigcity()["cities"]}
+    out = []
+    for network, part in rows.groupby("network"):
+        results = []
+        for (method, scenario), cell in part.groupby(["method", "scenario"]):
+            line = {"controller": method, "scenario": scenario, "n": int(len(cell))}
+            for metric, name in CITY_METRICS.items():
+                v = cell[metric].astype(float) if metric in cell else pd.Series(dtype=float)
+                line[name] = r(float(v.mean())) if v.notna().any() else None
+            results.append(line)
+        llm = part[part.method == "hybrid_h2_llmstrat"]
+        shares = ({m: r(float(llm[f"llm_share_{m}"].mean()), 4)
+                   for m in ("equilibre", "fluidite", "agent")} if len(llm) else None)  # fmt: skip
+        out.append({**lights[network], "scale": float(part.demand_scale.iloc[0]),
+                    "seeds": sorted(int(x) for x in part.seed.unique()),
+                    "vehPerH": r(float(part.vehicles.mean() / 1.0), 0),
+                    "results": results, "llmShares": shares, "map": city_map(network)})  # fmt: skip
+    return {"source": "results/bigcity/demo/raw (scripts/bigcity.py demo), "
+            "sumo_files/<city>/<city>.net.xml, results/bigcity/*_lights.csv",
+            "cities": out}  # fmt: skip
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     warnings.filterwarnings("ignore", category=RuntimeWarning)  # means of empty tables
@@ -356,6 +530,12 @@ def main() -> None:
     write("validation", validation())
     write("bilan", bilan())
     write("bigcity", bigcity())
+    loop = llm_loop()
+    if loop is not None:
+        write("llm_loop", loop)
+    big = cities()
+    if big is not None:
+        write("cities", big)
 
 
 if __name__ == "__main__":

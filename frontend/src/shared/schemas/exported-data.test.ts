@@ -20,7 +20,17 @@ import {
   TimeseriesCell,
   Training,
 } from "./index";
-import { BigCity, Bilan, Cells, Layers, Study, Tests, Validation } from "./combined";
+import {
+  BigCity,
+  Bilan,
+  Cells,
+  Cities,
+  Layers,
+  LlmLoop,
+  Study,
+  Tests,
+  Validation,
+} from "./combined";
 
 const DATA = join(process.cwd(), "public", "data");
 
@@ -38,6 +48,8 @@ const SCHEMAS: [RegExp, ZodType][] = [
   [/^combined\/validation$/, Validation],
   [/^combined\/bilan$/, Bilan],
   [/^combined\/bigcity$/, BigCity],
+  [/^combined\/llm_loop$/, LlmLoop],
+  [/^combined\/cities$/, Cities],
   [/^timeseries\//, TimeseriesCell],
   [/^distributions\//, DistributionCell],
   [/^decisions\//, Decisions],

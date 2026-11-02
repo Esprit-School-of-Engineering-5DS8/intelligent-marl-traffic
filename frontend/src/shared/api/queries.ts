@@ -19,7 +19,17 @@ import {
   type Cell,
 } from "@/shared/schemas";
 
-import { BigCity, Bilan, Cells, Layers, Study, Tests, Validation } from "@/shared/schemas/combined";
+import {
+  BigCity,
+  Bilan,
+  Cells,
+  Cities,
+  Layers,
+  LlmLoop,
+  Study,
+  Tests,
+  Validation,
+} from "@/shared/schemas/combined";
 
 import { fetchData } from "./source";
 
@@ -49,6 +59,8 @@ export const useLayers = () => useData("combined/layers", Layers, true);
 export const useValidation = () => useData("combined/validation", Validation, true);
 export const useBilan = () => useData("combined/bilan", Bilan, true);
 export const useBigCity = () => useData("combined/bigcity", BigCity, true);
+export const useLlmLoop = () => useData("combined/llm_loop", LlmLoop, true);
+export const useCities = () => useData("combined/cities", Cities, true);
 
 export const useTimeseries = (cell: Cell | null) =>
   useData(cell ? `timeseries/${cellKey(cell)}` : null, TimeseriesCell, true);

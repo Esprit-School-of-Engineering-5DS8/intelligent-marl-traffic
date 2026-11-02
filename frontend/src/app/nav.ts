@@ -1,6 +1,7 @@
 import {
   Bot,
   BrainCircuit,
+  Building2,
   ChartColumn,
   Cuboid,
   FlaskConical,
@@ -8,17 +9,22 @@ import {
   House,
   LayoutDashboard,
   MapPinned,
+  MessagesSquare,
   Scale,
   Settings,
   ShieldHalf,
   Siren,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
 export type PageKey =
   | "home"
+  | "howItWorks"
   | "finalController"
+  | "llm"
   | "robustness"
+  | "cities"
   | "overview"
   | "analytics"
   | "liveMap"
@@ -37,36 +43,34 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  key: "synthesis" | "results" | "demo" | "operations" | "tools";
+  key: "presentation" | "exploration" | "tools";
   items: NavItem[];
 }
 
-/** One entry per page; the router, the sidebar and the command palette all read this list. */
+/**
+ * One entry per page; the router, the sidebar and the command palette all read this list.
+ * "Présentation" is the defence, in the order of the talk: one page per question.
+ */
 export const NAV: NavGroup[] = [
   {
-    key: "synthesis",
-    items: [{ key: "home", path: "/", icon: House }],
-  },
-  {
-    key: "results",
+    key: "presentation",
     items: [
+      { key: "home", path: "/", icon: House },
+      { key: "howItWorks", path: "/how-it-works", icon: Workflow },
       { key: "finalController", path: "/final-controller", icon: Scale },
+      { key: "llm", path: "/llm", icon: MessagesSquare },
       { key: "robustness", path: "/robustness", icon: ShieldHalf },
-      { key: "overview", path: "/overview", icon: LayoutDashboard },
-      { key: "analytics", path: "/analytics", icon: ChartColumn },
+      { key: "cities", path: "/cities", icon: Building2 },
     ],
   },
   {
-    key: "demo",
+    key: "exploration",
     items: [
+      { key: "overview", path: "/overview", icon: LayoutDashboard },
+      { key: "analytics", path: "/analytics", icon: ChartColumn },
       { key: "liveMap", path: "/live-map", icon: MapPinned },
       { key: "simulation3d", path: "/simulation-3d", icon: Cuboid },
       { key: "scenarios", path: "/scenarios", icon: FlaskConical },
-    ],
-  },
-  {
-    key: "operations",
-    items: [
       { key: "emergency", path: "/emergency", icon: Siren },
       { key: "pedestrians", path: "/pedestrians", icon: Footprints },
       { key: "agents", path: "/agents", icon: BrainCircuit },

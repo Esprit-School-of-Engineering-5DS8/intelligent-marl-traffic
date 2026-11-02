@@ -9,6 +9,9 @@ import { NotFound } from "./NotFound";
 // one chunk per page: the first screen only downloads the shell and the page it shows
 const PAGES: Record<PageKey, LazyExoticComponent<ComponentType>> = {
   home: lazy(() => import("@/features/home/HomePage")),
+  howItWorks: lazy(() => import("@/features/how-it-works/HowItWorksPage")),
+  llm: lazy(() => import("@/features/llm/LlmPage")),
+  cities: lazy(() => import("@/features/cities/CitiesPage")),
   robustness: lazy(() => import("@/features/robustness/RobustnessPage")),
   overview: lazy(() => import("@/features/overview/OverviewPage")),
   liveMap: lazy(() => import("@/features/live-map/LiveMapPage")),

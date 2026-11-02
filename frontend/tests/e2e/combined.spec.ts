@@ -50,7 +50,7 @@ async function open(page: Page, path: string) {
 }
 
 test.describe("combined study", () => {
-  test("home: the three key numbers, the rigour banner and the four layers", async ({ page }) => {
+  test("home: the three key numbers, the rigour banner and the journey", async ({ page }) => {
     await open(page, "/");
     const numbers = main(page).getByRole("region", { name: "Trois chiffres à retenir" });
     const worst = numbers.getByRole("region", { name: /Pire écart au meilleur contrôleur/ });
@@ -73,17 +73,22 @@ test.describe("combined study", () => {
     await expect(rigour).toContainText(new Intl.NumberFormat("fr").format(study.episodes));
     await expect(rigour).toContainText(`${study.variantsTried} variantes`);
 
-    const layers = main(page).getByRole("region", { name: /Comment décide la candidate/ });
-    await expect(layers.getByRole("listitem")).toHaveCount(4);
-    await expect(
-      main(page).getByRole("region", { name: "Ce qu'on ne peut pas affirmer" }),
-    ).toBeVisible();
+    const journey = main(page).getByRole("region", { name: "Le parcours de la présentation" });
+    await expect(journey.getByRole("link")).toHaveCount(5);
+    await journey.getByRole("link", { name: /Le LLM dans la boucle/ }).click();
+    await expect(page).toHaveURL(/\/llm$/);
   });
 
   test("final controller: the forest plot and the final table follow the filters", async ({
     page,
   }) => {
     await open(page, "/final-controller");
+    await main(page)
+      .getByRole("button", { name: /^Les 36 tests de non-infériorité/ })
+      .click();
+    await main(page)
+      .getByRole("button", { name: /^Tableau final/ })
+      .click();
     const table = main(page).getByRole("region", {
       name: "Tests de non-infériorité de la candidate contre la meilleure référence.",
     });
@@ -125,9 +130,7 @@ test.describe("combined study", () => {
     await expect(ranking.getByRole("row")).toHaveCount(study.variantsTried + 1);
   });
 
-  test("robustness: each situation's preregistered tests, and the stopped big city", async ({
-    page,
-  }) => {
+  test("robustness: each situation's preregistered tests", async ({ page }) => {
     await open(page, "/robustness");
     const cases: [string, string, string, string][] = [
       ["Capteurs bruités", "grid4x4", "sensor_noise", "peak"],
@@ -150,9 +153,11 @@ test.describe("combined study", () => {
         .getByText("Vraie perte")
         .first(),
     ).toBeVisible();
-    const city = main(page).getByRole("region", { name: /Une grande ville : tentative arrêtée/ });
-    await expect(city.getByText("Arrêté", { exact: true })).toBeVisible();
-    await expect(city).toContainText("ne sont pas des résultats d'évaluation");
+    await expect(
+      main(page)
+        .getByRole("button", { name: /^Voir les moyennes/ })
+        .first(),
+    ).toBeVisible();
   });
 
   test("command palette: Ctrl+K, search without accents, arrows and Enter", async ({ page }) => {

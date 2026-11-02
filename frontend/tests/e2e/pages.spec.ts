@@ -152,17 +152,32 @@ test.describe("pages", () => {
       worstGap: { candidate: number };
       ambulances: { peak: { faster: number; total: number } };
     }>("final_controller.json");
-    await open(page, "/final-controller", "Contrôleur final");
+    await open(page, "/final-controller", "Notre contrôleur est-il meilleur que les autres ?");
     const messages = main(page).getByRole("region", { name: "Messages clés" });
     const worst = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
     await expect(messages).toContainText(`${worst.format(final.worstGap.candidate)} %`, {
       timeout: 20_000,
     });
     const peak = final.ambulances.peak;
-    await expect(messages).toContainText(`${peak.faster} / ${peak.total}`);
+    await expect(messages).toContainText(
+      new RegExp(`${peak.faster} trajets d.ambulance sur ${peak.total}`),
+    );
     const shown = final.tests.best + final.tests.noninf;
-    await expect(messages).toContainText(`${shown} / ${final.tests.total}`);
+    await expect(messages).toContainText(`${shown} prouvés sur ${final.tests.total}`);
+    // the details are folded: open them
     // one forest chart per group of situations, the compromise as a table, the ambulances
+    await main(page)
+      .getByRole("button", { name: /^Les 36 tests de non-infériorité/ })
+      .click();
+    await main(page)
+      .getByRole("button", { name: /^Aucun contrôleur n'est le meilleur partout/ })
+      .click();
+    await main(page)
+      .getByRole("button", { name: /^Retard des ambulances \(grille, urgences\)/ })
+      .click();
+    await main(page)
+      .getByRole("button", { name: /^La démo : une ambulance/ })
+      .click();
     await expect(
       main(page).getByRole("group", { name: /^Forest plot des 36 tests/ }),
     ).toBeVisible();

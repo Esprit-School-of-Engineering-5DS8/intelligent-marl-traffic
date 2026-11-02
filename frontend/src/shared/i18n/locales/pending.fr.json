@@ -44,7 +44,7 @@
     "tableOf": "Tableau : {{title}}"
   },
   "home": {
-    "eyebrow": "CoTraffic · étude combinée · évaluation finale unique",
+    "eyebrow": "Présentation · étape 1 · CoTraffic, étude combinée",
     "title": "Le meilleur compromis, pas le meilleur partout.",
     "lead": "Un contrôleur de feux qui réunit un agent PPO coopératif, Max-Pressure (β = {{beta}}) et la priorité aux ambulances, sous un bouclier de sécurité. Évalué une seule fois, sur des graines de test jamais utilisées pour le régler.",
     "cta": {
@@ -133,10 +133,34 @@
         "title": "Démo et replays",
         "text": "Rejouer un épisode côte à côte, sur la carte ou en 3D."
       }
+    },
+    "journey": {
+      "title": "Le parcours de la présentation",
+      "text": "Une page par question, dans l'ordre où les poser.",
+      "how": {
+        "title": "Comment ça marche",
+        "question": "Comment notre contrôleur décide-t-il, et où intervient le LLM ?"
+      },
+      "results": {
+        "title": "Les résultats",
+        "question": "Est-il meilleur que les autres ? Où gagne-t-il, où perd-il ?"
+      },
+      "llm": {
+        "title": "Le LLM dans la boucle",
+        "question": "Que décide le LLM, pourquoi, et qu'est-ce que ça change ?"
+      },
+      "robustness": {
+        "title": "Robustesse",
+        "question": "Tient-il quand les capteurs, les messages ou le réseau changent ?"
+      },
+      "cities": {
+        "title": "Grandes villes",
+        "question": "Que se passe-t-il à Paris et à Barcelone ?"
+      }
     }
   },
   "final": {
-    "eyebrow": "Résultats · évaluation finale unique",
+    "eyebrow": "Présentation · étape 3 · évaluation finale unique",
     "lead": "La candidate contre la meilleure référence de chaque situation, sur les graines de test : chaque test pré-enregistré, le compromis entre critères, les ambulances, et ce que chaque couche apporte.",
     "prereg": "pré-enregistrement {{commit}}",
     "tabs": {
@@ -331,7 +355,7 @@
     }
   },
   "robustness": {
-    "eyebrow": "Résultats · robustesse et généralisation",
+    "eyebrow": "Présentation · étape 5 · robustesse et généralisation",
     "lead": "La candidate quand les conditions se dégradent (capteurs, communication), avec des bus, et sur un réseau plus grand que celui de l'entraînement. Mêmes tests pré-enregistrés que les cas principaux, mêmes graines de test.",
     "interval": "IC à 95 % : [{{low}} ; {{high}}]",
     "same": "{{list}} : identiques à {{as}} dans cette situation, par construction (mêmes épisodes).",
@@ -385,6 +409,202 @@
       },
       "more": "Le détail des tentatives est dans"
     },
-    "allTests": "Voir tous les tests, situation par situation, dans Contrôleur final"
+    "allTests": "Voir tous les tests, situation par situation, dans Contrôleur final",
+    "means": "Voir les moyennes par contrôleur",
+    "meansHint": "Temps de trajet et attente moyens, barres depuis zéro : un petit écart reste petit."
+  },
+  "how": {
+    "eyebrow": "Présentation · étape 2",
+    "title": "Comment décide notre contrôleur ?",
+    "answer": "Cinq couches, de la plus lente à la plus sûre : le LLM choisit la stratégie du réseau, l'agent appris propose une phase, Max-Pressure la corrige, l'ambulance passe avant tout, et le bouclier de sécurité a le dernier mot. Une décision toutes les {{every}} secondes, à chaque feu.",
+    "rhythm": {
+      "slow": "toutes les {{window}} min",
+      "fast": "toutes les {{every}} s"
+    },
+    "modes": {
+      "equilibre": "Équilibre",
+      "fluidite": "Fluidité",
+      "agent": "Agent seul"
+    },
+    "pipeline": {
+      "title": "Les cinq couches d'une décision",
+      "text": "Le point bleu suit une décision, de la stratégie jusqu’au feu. Les quatre couches du bas forment la candidate pré-enregistrée ; la couche du LLM a été ajoutée ensuite (exploratoire). La sécurité ne dépend jamais du LLM ni de l’agent appris.",
+      "step": "couche {{n}}",
+      "plain": "Le LLM règle la stratégie, l'agent propose, une règle éprouvée le corrige, l'ambulance est prioritaire, et l'arbitre garantit la sécurité."
+    },
+    "layers": {
+      "llm": {
+        "title": "Le LLM choisit la stratégie",
+        "text": "Il lit un résumé du réseau (véhicules arrêtés, file à l'entrée, piétons, événements) et choisit le mode des minutes suivantes : équilibre (la candidate), fluidité (Max-Pressure partout) ou agent seul. Il explique son choix en une phrase."
+      },
+      "policy": {
+        "title": "L'agent COOP-FULL propose",
+        "text": "Un réseau de neurones entraîné par PPO note chaque phase à partir des files, des attentes et des messages des feux voisins."
+      },
+      "bias": {
+        "title": "Max-Pressure corrige (β = {{beta}})",
+        "text": "On ajoute {{beta}} à la note de la phase que choisirait Max-Pressure : l'agent ne garde la main que s'il est presque sûr de lui (le démonstrateur ci-dessous le calcule)."
+      },
+      "ambulance": {
+        "title": "L'ambulance passe avant tout",
+        "text": "Une ambulance à moins de {{range}} m d'un feu obtient le vert sur son approche, quel que soit le mode choisi."
+      },
+      "shield": {
+        "title": "Le bouclier a le dernier mot",
+        "text": "Vert minimal de {{minGreen}} s, jamais plus de {{maxRed}} s de rouge pour une file qui attend, jaune toujours inséré : aucune décision ne peut produire un feu dangereux."
+      }
+    },
+    "who": {
+      "title": "Qui décide : l'agent ou Max-Pressure ?",
+      "text": "Bougez le curseur : c'est la confiance de l'agent dans sa phase préférée. Les barres montrent le calcul exact du contrôleur (notes = logarithmes des probabilités, sur un carrefour à deux phases).",
+      "mode": "Mode choisi par le LLM",
+      "slider": "Confiance de l'agent dans sa phase :",
+      "threshold": "En mode équilibre, le bonus de {{beta}} multiplie par {{factor}} la probabilité de la phase de Max-Pressure : l'agent ne garde sa phase que s'il en est sûr à plus de {{threshold}} %.",
+      "modeText": {
+        "fluidite": "En mode fluidité, Max-Pressure décide à chaque feu, quelle que soit la confiance de l'agent.",
+        "agent": "En mode agent seul, il n'y a pas de bonus : l'agent garde sa phase dès qu'il la préfère (plus de 50 %)."
+      },
+      "agentPhase": "Phase préférée de l'agent",
+      "mpPhase": "Phase de Max-Pressure",
+      "chosen": "choisie",
+      "agentDecides": "Résultat : la phase de l'agent est appliquée.",
+      "mpDecides": "Résultat : la phase de Max-Pressure est appliquée."
+    },
+    "keyTitle": "À retenir",
+    "key": {
+      "one": "Le LLM est dans la boucle de décision, au niveau où il est utile : la stratégie, toutes les quelques minutes, pas la phase toutes les 5 s (il met plusieurs secondes à répondre).",
+      "two": "L'agent appris et la règle Max-Pressure se complètent : la règle décide par défaut, l'agent garde la main quand il est presque certain.",
+      "three": "La sécurité ne dépend d'aucune couche apprise : la règle ambulance et le bouclier s'appliquent dans tous les modes."
+    }
+  },
+  "results": {
+    "waffleAlt": "Les {{total}} tests pré-enregistrés, un carré par test : {{detail}}.",
+    "title": "Notre contrôleur est-il meilleur que les autres ?",
+    "answer": "Pas partout, et c’est voulu : c’est le meilleur compromis. Son pire écart au meilleur contrôleur est de {{worst}}, contre {{min}} à {{max}} pour les autres.",
+    "details": "Pour aller plus loin (le détail, pour les experts)",
+    "compromise": {
+      "title": "Le compromis",
+      "message": "Aucun contrôleur n’est le meilleur partout. Le nôtre n’a pas de point faible : {{worst}} au pire, contre {{min}} à {{max}}.",
+      "footer": "Pour chaque contrôleur : sa plus grande distance au meilleur, sur cinq critères (trajet, attente, ambulances, piétons, capteurs bruités). Plus court = mieux."
+    },
+    "tests": {
+      "title": "Les {{total}} tests pré-enregistrés",
+      "message": "{{holds}} prouvés sur {{total}}, dont {{best}} où il est meilleur ; {{loss}} petites pertes ; {{wide}} trop incertains pour conclure.",
+      "footer": "Un carré par test (survolez-le pour la situation). Prouvé = non inférieur à la meilleure référence à {{margin}} % près, avec la correction de Holm."
+    },
+    "ambulances": {
+      "title": "Les ambulances",
+      "message": "{{faster}} trajets d’ambulance sur {{total}} plus rapides qu’avec Max-Pressure.",
+      "footer": "Retard moyen à l’heure de pointe : {{candidate}} s contre {{mp}} s avec Max-Pressure ({{ev}} s pour {{evName}}, la règle dédiée). Un carré par trajet : plein = plus rapide.",
+      "hint": "Moyenne des épisodes et intervalle à 95 %, en demande moyenne et à l’heure de pointe."
+    }
+  },
+  "llm": {
+    "eyebrow": "Présentation · étape 4",
+    "title": "Le LLM dans la boucle de décision",
+    "answer": "Toutes les {{minutes}} minutes, le LLM local ({{model}}) lit l'état du réseau et choisit sa stratégie : équilibre, fluidité ou agent seul. Il justifie chaque choix en une phrase ; les couches de sécurité exécutent.",
+    "guard": {
+      "title": "Pourquoi il ne peut pas faire de dégât",
+      "modes": "Il choisit seulement parmi trois modes déjà validés ; il ne commande jamais un feu directement.",
+      "format": "Sa réponse doit respecter un format JSON imposé ; sinon, le mode actuel est gardé. Réponses valides : {{valid}} %.",
+      "latency": "Sa décision ne s'applique qu'après son vrai temps de réponse (médiane {{latency}} s) : pas de triche sur la vitesse.",
+      "safety": "La priorité ambulance et le bouclier de sécurité restent actifs dans tous les modes."
+    },
+    "timeline": {
+      "title": "Un épisode vu par le LLM",
+      "message": "{{situation}} : {{n}} décisions du LLM, et les moments où il change de stratégie.",
+      "footer": "Chaque couleur est le mode en vigueur ; chaque trait blanc, un appel au LLM. Ses raisons sont écrites juste en dessous.",
+      "alt": "Modes choisis par le LLM au fil de l'épisode : {{detail}}.",
+      "ticks": "temps simulé"
+    },
+    "decisions": {
+      "title": "Ses décisions, une par une",
+      "hint": "Ce qu'il a lu, ce qu'il a choisi, et sa propre justification.",
+      "switch": "changement",
+      "state": "({{halted}} véhicules arrêtés, {{backlog}} en attente d'entrer ; réponse en {{latency}} s)"
+    },
+    "effect": {
+      "title": "Ce que ça change",
+      "message": "Par rapport à la candidate seule, sur les mêmes graines de test : trajet {{travel}}, attente {{waiting}} ({{pairs}} épisodes appariés).",
+      "pending": "Les épisodes sur les graines de test sont en cours : les gains s'afficheront ici dès qu'ils seront calculés.",
+      "footer": "Le LLM a choisi un autre mode que l'équilibre {{share}} % du temps. Intervalles à 95 % (bootstrap sur les épisodes appariés).",
+      "worse": "← moins bien que la candidate",
+      "better": "mieux que la candidate →"
+    },
+    "claims": {
+      "can": {
+        "loop": "Le LLM est réellement dans la boucle de décision : toutes les {{minutes}} minutes, son choix fixe la stratégie de tout le réseau.",
+        "valid": "Il est fiable techniquement : {{calls}} appels, {{valid}} % de réponses valides, {{latency}} s de réponse en médiane.",
+        "safe": "Il ne peut pas rendre le carrefour dangereux : l'ambulance et le bouclier ont toujours le dernier mot."
+      },
+      "cannot": {
+        "prereg": "Ce résultat est exploratoire : le LLM a été ajouté après l'évaluation pré-enregistrée (commit {{commit}}), qui reste la référence.",
+        "ceiling": "Il ne peut pas gagner beaucoup : l'oracle a montré qu'un choix parfait de stratégie rapporte au plus quelques pour cent.",
+        "small": "Avec un seul modèle PPO et peu de graines, de petits écarts ne sont pas démontrés.",
+        "reasons": "Ses justifications ne sont pas toujours exactes (il écrit parfois « peu de véhicules arrêtés » alors qu’il y en a beaucoup) : c’est un petit modèle de 3 milliards de paramètres. C’est pour cela qu’il ne choisit qu’entre des modes validés et que la sécurité reste hors de son contrôle."
+      }
+    },
+    "oracle": {
+      "title": "Le LLM face à l'oracle et au hasard (graine de validation)",
+      "hint": "Temps de trajet moyen : la candidate seule, le LLM, l'oracle qui connaît le futur, et le meilleur de trois choix au hasard.",
+      "caption": "Temps de trajet moyen de la candidate, du LLM stratège, de l'oracle et du meilleur placebo, par situation.",
+      "columns": {
+        "situation": "Situation",
+        "candidate": "Candidate seule",
+        "llm": "Avec le LLM",
+        "oracle": "Oracle (plafond)",
+        "placebo": "Meilleur hasard"
+      },
+      "note": "L'oracle rejoue chaque fenêtre avec chacun des trois modes et garde le meilleur : c'est le plafond de ce rôle. Le hasard (placebo) tire les modes au sort."
+    },
+    "cells": {
+      "title": "Situation par situation (graines de test)",
+      "hint": "Gain du LLM sur la candidate seule, et les modes qu'il a choisis.",
+      "modes": "Modes choisis",
+      "seeds": "Graines"
+    },
+    "advisor": {
+      "title": "Le premier essai : le LLM conseiller de phases",
+      "hint": "Mesuré pendant l'évaluation finale, sur une situation.",
+      "text": "Avant le rôle de stratège, le LLM conseillait directement des phases (un biais sur les notes de l'agent). Sur la grille, urgences, pointe : trajet {{travel}}, attente {{waiting}}, ambulances {{ambulances}} par rapport à la candidate. C'est pour cela qu'on l'a placé au niveau de la stratégie, plus lent et mieux encadré."
+    },
+    "keyTitle": "À retenir",
+    "key": {
+      "one": "Le LLM décide la stratégie toutes les {{minutes}} minutes : c'est le bon niveau pour un modèle qui met quelques secondes à répondre.",
+      "two": "Il explique chacun de ses choix : on peut lire pourquoi le réseau a changé de mode.",
+      "three": "La sécurité ne dépend jamais de lui : il choisit entre des modes validés, et l'ambulance et le bouclier restent prioritaires."
+    }
+  },
+  "cities": {
+    "eyebrow": "Présentation · étape 6",
+    "title": "Et dans une vraie grande ville ?",
+    "answer": "Paris et Barcelone, importées d’OpenStreetMap avec leurs vrais feux, sans aucun réentraînement : les modèles appris sur le quartier de Tunis y pilotent des dizaines de carrefours, avec et sans le LLM.",
+    "facts": "{{lights}} feux, dont {{driven}} pilotés par nos agents ({{pct}} %) ; environ {{veh}} véhicules par heure ({{scale}} % de la demande prévue, au-delà même le temps fixe se bloque) ; {{seeds}} graines.",
+    "legend": {
+      "driven": "feu piloté par nos agents",
+      "kept": "feu gardant son programme SUMO"
+    },
+    "mapAlt": "Plan du réseau : {{lights}} feux, dont {{driven}} pilotés par nos agents.",
+    "verdict": "Meilleur ici : {{best}}. La candidate attend {{cand}} s en moyenne, avec le LLM {{llm}} s, contre {{mp}} s pour Max-Pressure et {{ft}} s pour le temps fixe.",
+    "pending": "Les épisodes de cette ville sont en cours de calcul.",
+    "barsAlt": "Attente moyenne par contrôleur, trafic normal.",
+    "teleports": "{{n}} téléport. (bouchons)",
+    "barsNote": "Attente moyenne en trafic normal, barres depuis zéro. Une téléportation est un véhicule retiré par SUMO après un blocage : plus il y en a, plus le réseau sature.",
+    "llm": "Le LLM a choisi l’équilibre {{equilibre}} % du temps, la fluidité {{fluidite}} %, l’agent seul {{agent}} %.",
+    "claims": {
+      "can": {
+        "transfer": "Sans réentraînement, nos contrôleurs appris fonctionnent dans une vraie ville importée, et font bien mieux que Max-Pressure là où celui-ci s’effondre.",
+        "protocol": "Le même protocole s’applique à une nouvelle ville : mêmes contrôleurs, même bouclier, mêmes mesures."
+      },
+      "cannot": {
+        "prereg": "Exploratoire : ces villes ne font pas partie de l’évaluation pré-enregistrée, et la demande a été réduite pour que le réseau tienne.",
+        "ft": "Le temps fixe (Webster, réglé pour la demande jouée) reste meilleur à Paris : un réseau importé tel quel favorise les plans fixes.",
+        "network": "Un vrai test demanderait un réseau nettoyé, une demande réelle et probablement un réentraînement par ville (F-016)."
+      }
+    },
+    "history": {
+      "title": "Pourquoi l’étude avait été arrêtée (F-016)",
+      "hint": "Le calibrage à la demande prévue : le réseau se bloque, Max-Pressure s’effondre."
+    }
   }
 }

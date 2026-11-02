@@ -185,3 +185,105 @@ export type Validation = z.infer<typeof Validation>;
 export type Bilan = z.infer<typeof Bilan>;
 export type BilanVerdict = z.infer<typeof BilanVerdict>;
 export type BigCity = z.infer<typeof BigCity>;
+
+/** The candidate with the LLM strategist (scripts/llm_loop.py, exploratory). */
+export const StrategyMode = z.enum(["equilibre", "fluidite", "agent"]);
+const LlmMetric = z.object({
+  llm: maybe,
+  candidate: maybe,
+  gain: maybe,
+  oracle: maybe.optional(),
+  placeboBest: maybe.optional(),
+});
+const LlmCell = Situation.extend({
+  seeds: num,
+  switches: num,
+  shares: z.record(StrategyMode, num),
+  travel: LlmMetric.optional(),
+  waiting: LlmMetric.optional(),
+  ambulances: LlmMetric.optional(),
+});
+const Paired = z.object({ gain: num, low: num, high: num, pairs: num }).nullable();
+export const LlmLoop = z.object({
+  source: z.string(),
+  model: z.string(),
+  prompt: z.string(),
+  windowS: num,
+  beta: num,
+  episodes: num,
+  calls: num,
+  validRate: num,
+  latencyP50S: num,
+  shares: z.record(StrategyMode, num),
+  validation: z.array(LlmCell),
+  test: z.array(LlmCell),
+  testOverall: z.object({
+    travel: Paired.optional(),
+    waiting: Paired.optional(),
+    ambulances: Paired.optional(),
+  }),
+  timeline: Situation.extend({
+    seed: num,
+    end: num,
+    calls: z.array(
+      z.object({
+        time: num,
+        appliesAt: num,
+        mode: StrategyMode,
+        valid: z.boolean(),
+        reason: z.string(),
+        latency: num,
+        halted: maybe,
+        backlog: maybe,
+      }),
+    ),
+  }),
+  advisor: z
+    .object({
+      travel: Paired.optional(),
+      waiting: Paired.optional(),
+      ambulances: Paired.optional(),
+    })
+    .optional(),
+});
+
+export type StrategyMode = z.infer<typeof StrategyMode>;
+export type LlmLoop = z.infer<typeof LlmLoop>;
+
+/** Paris and Barcelona with every controller (scripts/bigcity.py demo, exploratory). */
+export const Cities = z.object({
+  source: z.string(),
+  cities: z.array(
+    z.object({
+      network: z.string(),
+      lights: num,
+      driven: num,
+      drivenLightsPct: num,
+      drivenLanesPct: num,
+      wideLights: num,
+      scale: num,
+      seeds: z.array(num),
+      vehPerH: maybe,
+      results: z.array(
+        z.object({
+          controller: z.string(),
+          scenario: z.string(),
+          n: num,
+          travel: maybe,
+          waiting: maybe,
+          teleports: maybe,
+          unfinished: maybe,
+          ambulances: maybe,
+        }),
+      ),
+      llmShares: z.record(StrategyMode, num).nullable(),
+      map: z.object({
+        width: num,
+        height: num,
+        edges: z.array(z.array(num)),
+        lights: z.array(z.object({ x: num, y: num, driven: z.boolean() })),
+      }),
+    }),
+  ),
+});
+export type Cities = z.infer<typeof Cities>;
