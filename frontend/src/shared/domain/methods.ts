@@ -22,7 +22,8 @@ export const METHOD_LABELS: Record<string, string> = {
   coop_full_evrule_switch: "V1 : COOP-FULL + EV-RULE",
   coop_full_pedrule_switch: "COOP-FULL + EV-RULE + PED-RULE",
   coop_full_teamped_switch: "COOP-FULL + EV-RULE + règles piétons du coéquipier",
-  hybrid_h2_llm: "Candidate + LLM",
+  hybrid_h2_llm: "Candidate + LLM conseiller",
+  hybrid_h2_llmstrat: "Candidate + LLM stratège",
   oracle: "Oracle",
   placebo: "Placebo",
 };
@@ -39,6 +40,7 @@ const FIXED: Record<string, string> = {
   ev_rule_mp: "--ctl-ev-rule-mp",
   team_rules: "--ctl-team",
   hybrid_h2_llm: "--ctl-llm",
+  hybrid_h2_llmstrat: "--ctl-llm",
   ft: "--ctl-neutral",
   placebo: "--ctl-placebo",
   oracle: "--ctl-oracle",

@@ -86,8 +86,9 @@ function CityMap({ city }: { city: City }) {
             key={i}
             points={points(e)}
             fill="none"
-            stroke="var(--border-strong)"
-            strokeWidth={6}
+            stroke="var(--text-2)"
+            strokeOpacity={0.55}
+            strokeWidth={12}
             strokeLinecap="round"
           />
         ))}

@@ -46,7 +46,7 @@
   "home": {
     "eyebrow": "Présentation · étape 1 · CoTraffic, étude combinée",
     "title": "Le meilleur compromis, pas le meilleur partout.",
-    "lead": "Un contrôleur de feux qui réunit un agent PPO coopératif, Max-Pressure (β = {{beta}}) et la priorité aux ambulances, sous un bouclier de sécurité. Évalué une seule fois, sur des graines de test jamais utilisées pour le régler.",
+    "lead": "Un contrôleur de feux qui réunit un agent PPO coopératif, Max-Pressure (β = {{beta}}) et la priorité aux ambulances, sous un bouclier de sécurité. Évalué une seule fois, sur des graines de test jamais utilisées pour le régler. Un LLM local choisit en plus la stratégie du réseau (ajouté ensuite, exploratoire).",
     "cta": {
       "results": "Voir les résultats",
       "robustness": "Robustesse et généralisation",
@@ -513,7 +513,7 @@
     "timeline": {
       "title": "Un épisode vu par le LLM",
       "message": "{{situation}} : {{n}} décisions du LLM, et les moments où il change de stratégie.",
-      "footer": "Chaque couleur est le mode en vigueur ; chaque trait blanc, un appel au LLM. Ses raisons sont écrites juste en dessous.",
+      "footer": "L’épisode où le LLM a le plus souvent changé de stratégie (critère fixé, pas le meilleur résultat). Chaque couleur est le mode en vigueur ; chaque trait blanc, un appel au LLM. Ses raisons sont écrites juste en dessous.",
       "alt": "Modes choisis par le LLM au fil de l'épisode : {{detail}}.",
       "ticks": "temps simulé"
     },
@@ -540,7 +540,7 @@
       "cannot": {
         "prereg": "Ce résultat est exploratoire : le LLM a été ajouté après l'évaluation pré-enregistrée (commit {{commit}}), qui reste la référence.",
         "ceiling": "Il ne peut pas gagner beaucoup : l'oracle a montré qu'un choix parfait de stratégie rapporte au plus quelques pour cent.",
-        "small": "Avec un seul modèle PPO et peu de graines, de petits écarts ne sont pas démontrés.",
+        "small": "Sur les graines de test, l’effet moyen est faible et non démontré : les intervalles à 95 % contiennent 0. Il gagne dans certaines situations (piétons en pointe) et perd dans d’autres (capteurs bruités, où il choisit Max-Pressure à tort).",
         "reasons": "Ses justifications ne sont pas toujours exactes (il écrit parfois « peu de véhicules arrêtés » alors qu’il y en a beaucoup) : c’est un petit modèle de 3 milliards de paramètres. C’est pour cela qu’il ne choisit qu’entre des modes validés et que la sécurité reste hors de son contrôle."
       }
     },
