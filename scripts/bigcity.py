@@ -3,11 +3,15 @@
     python scripts/bigcity.py lights                       # the lights and what the agents drive
     python scripts/bigcity.py calibrate [--scales ...]     # demand with FT and MP, seed 1000
     python scripts/bigcity.py check                        # compatibility, seed 1000
+    python scripts/bigcity.py demo --scale 0.5 --seeds 0 1 2   # every controller, LLM included
 
 Stopped by the team on 2026-10-31 before any test seed (docs/FAILURES.md, F-016): the
 Barcelona import blocks under every controller, fixed time included, and on Paris
 Max-Pressure collapses while fixed time works. Kept as documented attempts; nothing here is
-an evaluation result. Network: BIGCITY_NETWORK (barcelona, or paris), never trained on,
+an evaluation result. Resumed on 2026-11-02 at the team's request as an exploratory
+demonstration (``demo``): reduced demand (the planned demand blocks even fixed time), every
+controller including the candidate with the LLM strategist, never part of the
+preregistered results. Network: BIGCITY_NETWORK (barcelona, or paris), never trained on,
 driven by the COOP-FULL models of real_district (same observation format). Everything goes
 to results/bigcity/.
 
@@ -44,6 +48,7 @@ MODELS_FROM = "real_district"  # the trained network whose observation format it
 OUT = RESULTS_DIR / "bigcity"
 NET_FILE = REPO_ROOT / "sumo_files" / NETWORK / f"{NETWORK}.net.xml"
 SCENARIOS = ["normal", "emergency"]
+LLM_METHOD = "hybrid_h2_llmstrat"
 
 
 # ---------------------------------------------------------------- the lights
@@ -115,12 +120,22 @@ def cmd_lights(_args) -> None:
 
 
 # ---------------------------------------------------------------- episodes
-def controller(method: str, run: int):
+def controller(method: str, run: int, scale: float = 1.0):
     from cotraffic.controllers.registry import make_controller
 
-    if method in ("ft", "mp", "ev_rule_mp"):
+    if method == "ft":  # Webster plan computed for the demand actually played
+        return make_controller("ft", scale=scale), None
+    if method in ("mp", "ev_rule_mp"):
         return make_controller(method), None
     ckpt = CHECKPOINTS_DIR / "coop_full" / MODELS_FROM / f"seed{run}.zip"
+    if method == LLM_METHOD:  # the candidate with the LLM strategist (llm/strategist.py)
+        from cotraffic.llm.client import Ollama
+        from cotraffic.llm.settings import load_settings
+        from cotraffic.llm.strategist import LlmStrategist, LlmStrategyPolicy, StrategistPrompt
+
+        cfg = load_settings()
+        strategist = LlmStrategist(Ollama(cfg.model, cfg.options), StrategistPrompt.load())
+        return LlmStrategyPolicy(make_controller("coop_full", ckpt), strategist, 4.0, method), ckpt
     return make_controller(method, ckpt), ckpt
 
 
@@ -150,7 +165,7 @@ def episode(task: tuple) -> dict:
     from cotraffic.evaluation.runner import run_episode
 
     method, scenario, seed, run, scale, mode, folder = task
-    ctrl, ckpt = controller(method, run)
+    ctrl, ckpt = controller(method, run, scale)
     probe = LightProbe()
     hooks = ctrl.step_hooks()
     ctrl.step_hooks = lambda: [*hooks, probe]  # this episode's controller only
@@ -160,6 +175,14 @@ def episode(task: tuple) -> dict:
                       controller=ctrl, scale=scale, mode=mode)  # fmt: skip
     row.update({"train_run": run, "models_from": MODELS_FROM, "agents": len(DRIVEN),
                 "sumo_backend": "libsumo"})  # fmt: skip
+    if hasattr(ctrl, "summary"):
+        row.update(ctrl.summary())
+    if hasattr(ctrl, "call_log"):  # every call of the LLM strategist
+        calls = OUT / folder / "calls"
+        calls.mkdir(parents=True, exist_ok=True)
+        with (calls / f"{row['run_id']}.jsonl").open("w", encoding="utf-8") as f:
+            for c in ctrl.call_log():
+                f.write(json.dumps(c, ensure_ascii=False) + "\n")
     per_light = pd.DataFrame(
         {"light": sorted(probe.halting),
          "mean_halting": [probe.halting[t] / max(1, probe.samples) for t in sorted(probe.halting)],
@@ -211,6 +234,31 @@ def cmd_check(args) -> None:
     print(table.drop(columns="ev_delays").round(1).to_string(index=False))
 
 
+DEMO_METHODS = [("ft", 0), ("mp", 0), ("ev_rule_mp", 0), ("coop_full", 1), ("hybrid_h2", 1),
+                (LLM_METHOD, 1)]  # fmt: skip
+
+
+def cmd_demo(args) -> None:
+    """Every controller at a demand the network can carry (exploratory demonstration)."""
+    tasks = [(m, s, seed, k, args.scale, "evaluation", "demo") for seed in args.seeds
+             for s in SCENARIOS for m, k in DEMO_METHODS
+             if not (m == "ev_rule_mp" and s == "normal")]  # fmt: skip
+    # the LLM episodes first: the slowest, so that the pool ends together
+    tasks.sort(key=lambda t: t[0] != LLM_METHOD)
+    done = {p.stem for p in (OUT / "demo" / "raw").glob("*.csv")}
+    rows = run_all([t for t in tasks if demo_id(t) not in done], args.jobs)
+    print(pd.DataFrame(rows)[[c for c in COLUMNS if c != "ev_delays"]].round(1).to_string())
+
+
+def demo_id(task: tuple) -> str:
+    from cotraffic.evaluation.runner import run_id
+
+    method, scenario, seed, run, scale, _, _ = task
+    ckpt = method not in ("ft", "mp", "ev_rule_mp")
+    tag = "-".join(x for x in (f"t{run}" if ckpt else "", f"x{scale:g}" if scale != 1 else "") if x)
+    return run_id(method, NETWORK, [s for s in [scenario] if s != "normal"], "peak", seed, tag)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -223,6 +271,11 @@ def main() -> None:
     p = sub.add_parser("check")
     p.add_argument("--jobs", type=int, default=4)
     p.set_defaults(func=cmd_check)
+    p = sub.add_parser("demo")
+    p.add_argument("--scale", type=float, default=0.5)
+    p.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
+    p.add_argument("--jobs", type=int, default=2)
+    p.set_defaults(func=cmd_demo)
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     args.func(args)
