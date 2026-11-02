@@ -12,7 +12,7 @@ single store and controller — the same role a Zustand store would play.
 ```
 modes/
   data.js    deterministic mock provider (recommendations, signal timing,
-             forecast, roam stats, congestion geometry) behind one adapter
+             forecast, roam stats) behind one adapter
   index.js   store, map layers, panels, dock/timeline overrides, keyboard,
              presets, collapse, persistence
 ```
@@ -26,11 +26,16 @@ The operator has a congested corridor and a handful of levers. The panel ranks
 recommendations by delay saved, so the list is ordered by impact, not by road.
 Each row carries the mechanism (signal phase, reroute, ramp meter, transit
 priority), the projected gain and a confidence figure. *Preview* is the
-low-risk path: it ghosts the change on the map (animated dashed reroute,
-red→green congestion line), shows the before/after delta chips, and animates
-both gauges to projected values with a faint ghost arc at the live value.
+low-risk path: it ghosts the change on the map (the junction's real approach
+lanes, its per-lane signal lamps and the dashed alternative route), shows the
+before/after delta chips, and animates both gauges to projected values with a
+faint ghost arc at the live value.
 *Apply* is optimistic: the row becomes Applied immediately; *Dismiss* is
-undoable through the toast. The scrubber gains a two-line comparison band and
+undoable through the toast. The preview also draws the road it is changing: the
+junction's inbound approaches in amber, a lamp for every controlled lane in the
+phase colour the run is showing, and the alternative route that reaches the same
+downstream point from the upstream intersection without those approaches (the
+strip lists the street names and the extra distance). The scrubber gains a two-line comparison band and
 Control Actions is replaced by a signal-timing editor, because in this mode the
 operator is editing phases, not issuing corridor actions.
 
@@ -42,7 +47,10 @@ roadworks) re-run the scenario and move the numbers; "Compare with typical day"
 toggles the baseline. The scrubber grows a hatched future zone from *now* to the
 end of the day whose confidence band widens as uncertainty grows, plus a
 draggable forecast handle. Gauges show predicted values and keep the live value
-as a ghost outline.
+as a ghost outline. A live run also offers a trip estimator: *Pick A* / *Pick B*
+place two pins on the network, the lanes between them are routed on the run's own
+geometry, and the card reports distance, signalised crossings and arrival time at
+the measured corridor speed.
 
 **Roam — "let me look at the network."**
 Map-first. Panels collapse, the dock hides, the camera is free, and only a stats

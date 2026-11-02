@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { mountBenchmarkView, setBenchmarkTab } from './benchmark-mount.jsx';
 import { mountGauges } from './gauge.js';
-import { initModes } from './modes/index.js';
+import { initModes, refreshLiveGauges } from './modes/index.js';
+import { setLiveState } from './modes/live.js';
 
 const $ = (id) => document.getElementById(id);
 // Declared up here because applyScenarioChrome() runs during module evaluation and
@@ -119,6 +120,11 @@ try {
 
 function getScenario() {
   return SCENARIOS[activeScenario] || SCENARIOS['grid-2x2'];
+}
+
+/** The scenario id sent to the backend. Never silently fall back to an SF grid. */
+function simulationScenarioId() {
+  return SCENARIOS[activeScenario] ? activeScenario : 'grid-2x2';
 }
 
 let map = null;
@@ -239,14 +245,22 @@ function scenarioOptionMarkup(key, scenario) {
 function renderScenarioMenus() {
   scenarioMenus.forEach((menu) => {
     const all = Object.entries(SCENARIOS);
-    const places = [];
-    const grids = all;
+    // Real-city networks and the synthetic SF grids are grouped apart: the grids
+    // draw the TraCI network on the canvas scene, the city nets use map layers.
+    const isGrid = ([key]) => key.startsWith('grid-');
+    const places = all.filter((entry) => !isGrid(entry));
+    const grids = all.filter(isGrid);
     menu.innerHTML = `
       <div class="scenario-menu-head" role="presentation">
         <span>Simulation scenario</span>
       <small>${all.length} available</small>
       </div>
-      ${places.map(([key, scenario]) => scenarioOptionMarkup(key, scenario)).join('')}
+      ${
+        places.length
+          ? `<div class="scenario-menu-group" role="presentation"><span>City networks</span><small>OSM · MoST</small></div>
+      ${places.map(([key, scenario]) => scenarioOptionMarkup(key, scenario)).join('')}`
+          : ''
+      }
       ${
         grids.length
           ? `<div class="scenario-menu-group" role="presentation"><span>San Francisco grids</span><small>Live TraCI · OSM</small></div>
@@ -287,19 +301,8 @@ function toggleScenarioMenu(trigger) {
   setScenarioMenuOpen(menu, willOpen);
 }
 
-/* Mapbox layers are available for every scenario, including the SF SUMO grids. */
-function syncLayerMenuAvailability() {
-  document.querySelectorAll('[data-map-layer="basemap"]').forEach((option) => {
-    option.disabled = false;
-    option.classList.remove('is-disabled');
-    option.removeAttribute('aria-disabled');
-    option.title = '';
-  });
-}
-
 function applyScenarioChrome() {
   const scenario = getScenario();
-  syncLayerMenuAvailability();
   const siteTitle = $('siteTitle');
   if (siteTitle) siteTitle.textContent = scenario.title;
   const liveScenarioName = $('liveScenarioName');
@@ -320,8 +323,8 @@ function applyScenarioChrome() {
       'grid-2x2': '2×2',
       'grid-3x3': '3×3'
     };
-    const gridLabel = labels[activeScenario] || '2×2';
-    simStart.innerHTML = `<svg class="ico"><use href="#i-refresh"/></svg>Start ${gridLabel}`;
+    const startLabel = labels[activeScenario] || scenario.label;
+    simStart.innerHTML = `<svg class="ico"><use href="#i-refresh"/></svg>Start ${startLabel}`;
   }
   document.querySelectorAll('[data-scenario-option]').forEach((option) => {
     const selected = option.dataset.scenarioOption === activeScenario;
@@ -379,16 +382,25 @@ async function loadLiveWeather() {
 
 /* Moving between the two grids must not leave the previous run's vehicles on
    the new network: if something is already live, restart it on this grid. */
-function retargetSimulation(name) {
-  const grid = ['grid-2x2', 'grid-3x3'].includes(name) ? name : null;
-  const live = latestSimulationState;
-  if (!grid || !live) return;
-  if (!['running', 'paused', 'starting'].includes(live.status)) return;
-  if (live.scenario === grid) return;
+/* A new scenario takes over the live run: the backend maps every scenario id to its
+   own network (monaco, tunis included), so the picker restarts the run on it. A page
+   that has not received a socket frame yet asks the service for the current run. */
+async function retargetSimulation(name) {
+  if (!SCENARIOS[name]) return;
+  const live = latestSimulationState
+    || await simulationFetch('/api/simulation/state')
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null);
+  if (!live) return;
+  const active = ['running', 'paused', 'starting'].includes(live.status);
+  // The selected scenario owns the live run. Bailing out when the run was idle
+  // left the map on the old scenario's last snapshot, so its vehicles and lights
+  // vanished; starting here keeps the picker and the map in agreement.
+  if (active && live.scenario === name) return;
   simulationFetch('/api/simulation/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scenario: grid, speed: simulationSpeed })
+    body: JSON.stringify({ scenario: name, speed: simulationSpeed })
   })
     .then((response) => (response.ok ? response.json() : null))
     .then((state) => state && updateSimulationState(state))
@@ -691,7 +703,6 @@ const ROUTE_BASES = {
   Benchmark: '/benchmark',
   Dashboard: '/',
   Message: '/messages',
-  'Rules Engine': '/rules',
   Settings: '/settings',
   'Activity log': '/activity-log',
 };
@@ -727,7 +738,6 @@ function routeFromLocation() {
   if (section === 'live-map') return { view: 'Live Map', subtab: LIVE_TABS.includes(subtab) ? subtab : 'events' };
   if (section === 'access') return { view: 'Roles & Permissions', subtab: ACCESS_TABS.includes(subtab) ? subtab : 'roles' };
   if (section === 'messages') return { view: 'Message', subtab: null };
-  if (section === 'rules') return { view: 'Rules Engine', subtab: null };
   if (section === 'settings') return { view: 'Settings', subtab: SETTINGS_TABS.includes(subtab) ? subtab : 'general' };
   if (section === 'activity-log') return { view: 'Activity log', subtab: null };
   if (section === 'dashboard' || parts.length === 0) return { view: 'Dashboard', subtab: null };
@@ -879,7 +889,7 @@ function startLiveMapSimulationPolling() {
         const state = await res.json();
         if (state && state.status === 'idle') {
           // If simulation is not running yet, automatically start it on the active scenario
-          const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+          const scenario = simulationScenarioId();
           await simulationFetch('/api/simulation/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -904,6 +914,7 @@ function stopLiveMapSimulationPolling() {
 
 function ensureLiveMap() {
   startLiveMapSimulationPolling();
+
   if (liveMap) {
     liveMap.resize();
     return;
@@ -1309,22 +1320,45 @@ const simulationPlayButton = $('simulationPlay');
 /* Shape of a normal weekday in the corridor: a morning ramp, a midday dip and
    an evening peak. Drawn behind the scrub track so the day's rhythm is visible
    while dragging the playhead. */
+/* The corridor's demand across the operating day, which starts at 08:00: the
+   school/work ramp, the midday plateau, the evening peak and the overnight trough.
+   One bar per clock hour, from 08:00 back round to 08:00. */
 const SIMULATION_DAY_PROFILE = [
-  14, 10, 8, 9, 18, 34, 58, 82, 96, 72, 54, 49,
-  52, 50, 47, 55, 74, 92, 100, 84, 62, 46, 32, 21
+  62, 78, 86, 90, 94, 92, 88, 86, 90, 96, 100, 96,
+  84, 70, 56, 44, 32, 24, 18, 14, 12, 16, 30, 46
 ];
+const DAY_START_SECONDS = 8 * 3600;
 
+/* The hourly samples are smoothed into one continuous silhouette: a soft filled
+   area with a hairline top, so the peaks read as demand rather than as a row of
+   blocks sitting inside the scrub track. */
 function buildSimulationProfile() {
   if (!simulationProfile || simulationProfile.childElementCount) return;
-  SIMULATION_DAY_PROFILE.forEach((height) => {
-    const bar = document.createElement('i');
-    bar.style.setProperty('--h', `${height}%`);
-    simulationProfile.append(bar);
-  });
+  const points = SIMULATION_DAY_PROFILE;
+  const step = 100 / (points.length - 1);
+  const coords = points.map((height, index) => [index * step, 100 - height]);
+  let path = `M 0 100 L ${coords[0][0].toFixed(2)} ${coords[0][1].toFixed(2)}`;
+  for (let index = 0; index < coords.length - 1; index += 1) {
+    const p0 = coords[index - 1] || coords[index];
+    const p1 = coords[index];
+    const p2 = coords[index + 1];
+    const p3 = coords[index + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    path += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+  }
+  simulationProfile.innerHTML = `
+    <svg class="sim-profile-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="sim-profile-area" d="${path} L 100 100 Z" />
+      <path class="sim-profile-line" d="${path}" />
+    </svg>`;
 }
 
 function formatSimulationTime(seconds) {
-  const value = Math.max(0, Math.min(86400, Number(seconds) || 0));
+  // The track is one operating day: 0 s is 08:00, 24 h later is 08:00 again.
+  const value = ((Math.max(0, Math.min(86400, Number(seconds) || 0)) + DAY_START_SECONDS) % 86400);
   const hours = String(Math.floor(value / 3600)).padStart(2, '0');
   const minutes = String(Math.floor((value % 3600) / 60)).padStart(2, '0');
   return `${hours}:${minutes}`;
@@ -1368,12 +1402,18 @@ simulationTrack?.addEventListener('pointerdown', () => simulationTrack.classList
 
 let simulationSocket = null;
 let simulationSpeed = 1;
+let simulationScrubUntil = 0;
 let latestSimulationState = null;
 let previousVehicleFrame = null;
 let currentVehicleFrame = null;
 let vehicleFrameTime = 0;
+// Measured gap between two *distinct* simulation steps, not an assumed 1 s.
+let vehicleFrameInterval = 1000;
+let currentFrameKey = '';
 let vehicleAnimationFrame = 0;
 let simulationSignalFeatures = [];
+// Lane id → lane polyline for the running network, used to keep moving bodies on the road.
+let simulationLaneShapes = new Map();
 const simulationSignalMarkers = new Map();
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
 const SIMULATION_BOUNDS = {
@@ -1385,8 +1425,13 @@ function simulationFetch(path, options) {
   return fetch(`${API_BASE}${path}`, options);
 }
 
+/* SUMO x/y → lng/lat, only for the networks whose net-local extent we know. The
+   backend sends lng/lat for every vehicle and signal lane; this fallback used to
+   land anything missing them in San Francisco on *every other* network. Returning
+   null lets the caller skip the object instead of drawing it in the wrong city. */
 function simulationPoint(scenario, x, y) {
-  const bounds = SIMULATION_BOUNDS[scenario] || SIMULATION_BOUNDS['grid-2x2'];
+  const bounds = SIMULATION_BOUNDS[scenario];
+  if (!bounds) return null;
   return [
     bounds.west + (Number(x) / bounds.width) * (bounds.east - bounds.west),
     bounds.south + (Number(y) / bounds.height) * (bounds.north - bounds.south)
@@ -1395,6 +1440,9 @@ function simulationPoint(scenario, x, y) {
 
 function refreshSimulationSignals(state) {
   if (!liveMap) return;
+  // Frames from the previous run keep arriving for a moment after a switch; their
+  // signal ids belong to another network, so they must not repaint these markers.
+  if (state?.scenario && state.scenario !== activeScenario) return;
   const active = new Map((state?.signals || []).map((signal) => [signal.id, signal.state || '']));
   simulationSignalFeatures.forEach((signal) => {
     const stateString = active.get(signal.signalId) || '';
@@ -1437,13 +1485,15 @@ function setSimulationSignalMarkers(signals) {
 }
 
 const VEHICLE_RENDER = {
-  passenger: { label: 'Car', color: '#4f9fd8', length: 4.5, width: 1.9, height: 1.55 },
-  taxi: { label: 'Taxi', color: '#e9b83f', length: 4.5, width: 1.9, height: 1.6 },
-  bus: { label: 'Bus', color: '#35a77a', length: 11.5, width: 2.5, height: 3.25 },
-  truck: { label: 'Truck', color: '#9babb7', length: 7.2, width: 2.45, height: 3.0 },
-  emergency: { label: 'Emergency', color: '#f2f1ec', length: 5.4, width: 2.1, height: 2.15 },
+  passenger: { label: 'Car', color: '#5b8fb0', length: 4.5, width: 1.9, height: 1.55 },
+  taxi: { label: 'Taxi', color: '#d9a12b', length: 4.5, width: 1.9, height: 1.6 },
+  // Buses are the long yellow bars: ~2.5 car lengths, full height.
+  bus: { label: 'Bus', color: '#f2c200', length: 12.0, width: 2.55, height: 3.25 },
+  truck: { label: 'Truck', color: '#8b9299', length: 7.2, width: 2.45, height: 3.0 },
+  // Base colour only; the layer paints ambulances red/blue alternately.
+  emergency: { label: 'Ambulance', color: '#ed2939', length: 5.4, width: 2.1, height: 2.15 },
   bicycle: { label: 'Bicycle', color: '#ee9f37', length: 1.9, width: 0.65, height: 1.25 },
-  motorcycle: { label: 'Motorcycle', color: '#555d68', length: 2.2, width: 0.8, height: 1.35 },
+  motorcycle: { label: 'Motorcycle', color: '#525963', length: 2.2, width: 0.8, height: 1.35 },
   pedestrian: { label: 'Pedestrian', color: '#8464d8', length: 0.65, width: 0.65, height: 1.7 },
 };
 
@@ -1456,6 +1506,63 @@ function vehicleRenderClass(vehicle) {
   if (/bicycle|bike/.test(source)) return 'bicycle';
   if (/motorcycle|moped/.test(source)) return 'motorcycle';
   return 'passenger';
+}
+
+// Bodies are drawn at close to their real footprint. They used to be scaled 1.9× so a
+// 4.5 m car stayed readable, but a queued car then covered 8.5 m — twice the gap between
+// stopped vehicles — and a line of them fused into one long rectangle that read as a bus.
+// Slightly over life keeps them legible while leaving daylight between queued cars.
+const VEHICLE_DRAW_SCALE = 1.18;
+
+/* TraCI reports a vehicle's position at its front bumper, so a body drawn around that
+   point sits half a length ahead of the vehicle. In a queue that pushes every car over
+   the one in front — the line reads as one long rectangle — and a bus swings its tail
+   through a corner. Place the body at the centre of the vehicle instead. */
+function nearestOnPolyline(point, coords) {
+  const lat = point[1] * (Math.PI / 180);
+  const scaleX = 111320 * Math.max(Math.cos(lat), 0.01);
+  let best = null;
+  for (let index = 0; index < coords.length - 1; index += 1) {
+    const ax = (coords[index][0] - point[0]) * scaleX;
+    const ay = (coords[index][1] - point[1]) * 111320;
+    const bx = (coords[index + 1][0] - point[0]) * scaleX;
+    const by = (coords[index + 1][1] - point[1]) * 111320;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const span = dx * dx + dy * dy;
+    const t = span > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / span)) : 0;
+    const px = ax + dx * t;
+    const py = ay + dy * t;
+    const distance = Math.hypot(px, py);
+    if (!best || distance < best.distance) {
+      best = { distance, point: [point[0] + px / scaleX, point[1] + py / 111320] };
+    }
+  }
+  return best;
+}
+
+/* The lane shapes are the path SUMO drives. Interpolating between two snapshots moves
+   a body along a straight chord, which cuts the corner off a left or right turn;
+   snapping the interpolated point onto the vehicle's own lane follows the SUMO turn
+   instead. A point far from that lane is left alone, so nothing is yanked sideways. */
+function snapToLane(point, laneId) {
+  if (!point || !laneId) return point;
+  const shape = simulationLaneShapes.get(laneId);
+  if (!shape || shape.length < 2) return point;
+  const hit = nearestOnPolyline(point, shape);
+  return hit && hit.distance <= 25 ? hit.point : point;
+}
+
+function vehicleBodyCenter(front, angle, length) {
+  if (!front) return front;
+  const radians = (Number(angle) || 0) * (Math.PI / 180);
+  const lat = Number(front[1]) || 0;
+  const back = (Number(length) || 4.5) / 2;
+  const scaleX = 111320 * Math.max(Math.cos(lat * (Math.PI / 180)), 0.01);
+  return [
+    front[0] - (Math.sin(radians) * back) / scaleX,
+    front[1] - (Math.cos(radians) * back) / 111320
+  ];
 }
 
 function vehicleFootprint(center, angle, length, width) {
@@ -1475,6 +1582,16 @@ function vehicleFootprint(center, angle, length, width) {
 
 const vehicleClassVisibility = new Map(Object.keys(VEHICLE_RENDER).map((kind) => [kind, true]));
 const vehicleInstances = new Map();
+// Follow target marker. Shared material: the layer rebuilds meshes every frame
+// and disposes their geometries, so the ring gets a fresh geometry but not a
+// fresh material.
+const FOLLOW_RING_MATERIAL = new THREE.MeshBasicMaterial({
+  color: 0x35c05a,
+  transparent: true,
+  opacity: 0.9,
+  side: THREE.DoubleSide,
+  depthWrite: false
+});
 let selectedVehicleId = null;
 
 // Three.js 3D Vehicle Renderer on Mapbox
@@ -1553,7 +1670,11 @@ const customThreeVehicleLayer = {
       for (const vehicle of vehicleInstances.values()) {
         if (!vehicle.position || !vehicleClassVisibility.get(vehicle.renderClass)) continue;
 
-        const coords = vehicle.position;
+        const coords = vehicleBodyCenter(
+          vehicle.position,
+          vehicle.angle,
+          (vehicle.length || 4.5) * VEHICLE_DRAW_SCALE
+        );
         const modelAsMercator = mapboxgl.MercatorCoordinate.fromLngLat(
           { lng: coords[0], lat: coords[1] },
           0
@@ -1572,6 +1693,20 @@ const customThreeVehicleLayer = {
         vMesh.rotation.z = rad;
 
         threeVehicleGroup.add(vMesh);
+
+        if (vehicle.selected) {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(3.4, 4.6, 32),
+            FOLLOW_RING_MATERIAL
+          );
+          ring.position.set(
+            modelAsMercator.x,
+            modelAsMercator.y,
+            modelAsMercator.z + meterScale * 0.4
+          );
+          ring.scale.setScalar(meterScale);
+          threeVehicleGroup.add(ring);
+        }
       }
     }
 
@@ -1583,28 +1718,89 @@ const customThreeVehicleLayer = {
   }
 };
 
+/* Display headings are eased toward the telemetry heading. SUMO reports a new
+   angle at every step, so a 90° turn at a junction used to snap the whole body
+   round in one frame; this sweeps it over a few frames instead. */
+const vehicleDisplayHeadings = new Map();
+let lastHeadingFrameAt = 0;
+
+function smoothVehicleHeading(id, target, elapsed) {
+  const previous = vehicleDisplayHeadings.get(id);
+  if (previous === undefined) {
+    vehicleDisplayHeadings.set(id, target);
+    return target;
+  }
+  const delta = ((target - previous + 540) % 360) - 180;
+  // More than a junction turn is not a turn (lane change, spawn, run restart): snap
+  // rather than spinning the body the long way round.
+  if (Math.abs(delta) > 140) {
+    vehicleDisplayHeadings.set(id, target);
+    return target;
+  }
+  // Sweep at a capped angular speed (90° in ~0.19 s). The elapsed time comes from the
+  // frame, not from this call: timing each vehicle separately gave almost no budget and
+  // made every turn creep round.
+  const maxStep = 480 * elapsed;
+  const next = (previous + Math.max(-maxStep, Math.min(maxStep, delta)) + 360) % 360;
+  vehicleDisplayHeadings.set(id, next);
+  return next;
+}
+
+/* Headings belong to a run: a restarted run reuses ids like bus_0, and a stale
+   heading would spin a brand-new vehicle to the old run's direction. */
+function resetVehicleHeadings() {
+  vehicleDisplayHeadings.clear();
+  lastHeadingFrameAt = 0;
+}
+
+let lastVehicleRunId = null;
+
 function refreshSimulationVehicles(state) {
   if (!liveMap || !state?.scenario) return;
   const source = liveMap.getSource('live-vehicles');
+  // While a scenario switch retargets the run, snapshots still describe the old
+  // network. Drawing them here put SF bodies (or none) on Monaco/Tunis. Clear and
+  // wait for the retargeted run instead.
+  if (state.scenario !== activeScenario) {
+    vehicleInstances.clear();
+    source?.setData({ type: 'FeatureCollection', features: [] });
+    return;
+  }
+  // A new run reuses ids (car_0, bus_0), and a stale heading would spin a fresh
+  // vehicle toward the previous run's direction before it has driven anywhere.
+  if (state.runId !== lastVehicleRunId) {
+    lastVehicleRunId = state.runId;
+    resetVehicleHeadings();
+  }
   vehicleInstances.clear();
+  // The crash is whichever vehicle the operator's incident stopped.
+  const incidentVehicleId = state.incident?.active
+    ? String(state.incident.vehicleId || '')
+    : '';
   const timestamp = Number(state.simulationTime || 0);
+  const headingNow = performance.now();
+  const headingElapsed = Math.min(0.25, Math.max(0.004, (headingNow - lastHeadingFrameAt) / 1000));
+  lastHeadingFrameAt = headingNow;
 
   const addVehicle = (object, pedestrian = false) => {
     const renderClass = pedestrian ? 'pedestrian' : vehicleRenderClass(object);
     if (!vehicleClassVisibility.get(renderClass)) return;
-    const style = VEHICLE_RENDER[renderClass];
-    const center = Number.isFinite(Number(object.lng)) && Number.isFinite(Number(object.lat))
+    const style = VEHICLE_RENDER[renderClass];    const center = Number.isFinite(Number(object.lng)) && Number.isFinite(Number(object.lat))
       ? [Number(object.lng), Number(object.lat)]
       : simulationPoint(state.scenario, object.x, object.y);
+    if (!center) return;
     const angle = Number(object.angle || 0);
     const id = String(object.id || renderClass + "-" + vehicleInstances.size);
+    const displayAngle = smoothVehicleHeading(id, angle, headingElapsed);
     const waiting = Boolean(object.waiting);
     const data = {
       id, vehicleClass: renderClass, classLabel: style.label, speed: Number(object.speed || 0),
-      waiting, emergency: renderClass === 'emergency', color: waiting ? '#d45c52' : style.color,
-      height: style.height, simulationTime: timestamp,
+      waiting, emergency: renderClass === 'emergency', incident: id === incidentVehicleId,
+      color: waiting ? '#d45c52' : style.color,
+      height: style.height * VEHICLE_DRAW_SCALE, simulationTime: timestamp,
+      pedestrian: pedestrian || renderClass === 'pedestrian',
     };
-    vehicleInstances.set(id, { ...data, position: center, angle, renderClass, length: style.length, width: style.width, height: style.height, selected: id === selectedVehicleId });
+    vehicleInstances.set(id, { ...data, position: center, angle: displayAngle, renderClass, length: style.length, width: style.width, height: style.height, selected: id === selectedVehicleId });
   };
 
   (state.vehicles || []).slice(0, 5000).forEach((vehicle) => addVehicle(vehicle));
@@ -1623,7 +1819,16 @@ function refreshSimulationVehicles(state) {
       },
       geometry: {
         type: 'Polygon',
-        coordinates: vehicleFootprint(vehicle.position, vehicle.angle, vehicle.length || 4.5, vehicle.width || 1.9)
+        coordinates: vehicleFootprint(
+          vehicleBodyCenter(
+            vehicle.position,
+            vehicle.angle,
+            (vehicle.length || 4.5) * VEHICLE_DRAW_SCALE
+          ),
+          vehicle.angle,
+          (vehicle.length || 4.5) * VEHICLE_DRAW_SCALE,
+          (vehicle.width || 1.9) * VEHICLE_DRAW_SCALE
+        )
       }
     }));
     source.setData({ type: 'FeatureCollection', features });
@@ -1635,9 +1840,18 @@ function refreshSimulationVehicles(state) {
 }
 
 function interpolateVehicleFrame(now) {
-  if (!currentVehicleFrame || !liveMap) return;
+  if (!currentVehicleFrame || !liveMap) {
+    // The poll can publish a frame before the map exists. Clear the handle so the
+    // next updateSimulationState restarts the loop, instead of it dying silently.
+    vehicleAnimationFrame = 0;
+    return;
+  }
+  try {
   const elapsed = Math.max(0, now - vehicleFrameTime);
-  const alpha = Math.min(1, elapsed / Math.max(100, 1000 / Math.max(simulationSpeed, 0.25)));
+  // Sweep over the interval the run is actually publishing at. The stream pushes at
+  // ~4 Hz while the run steps once per decision, so a fixed divisor restarted the
+  // sweep mid-step and the cars crept, then snapped forward — the bounce you saw.
+  const alpha = Math.min(1, elapsed / Math.max(80, vehicleFrameInterval));
   if (previousVehicleFrame && alpha < 1) {
     const priorVehicles = new Map((previousVehicleFrame.vehicles || []).map((vehicle) => [String(vehicle.id), vehicle]));
     const priorPeople = new Map((previousVehicleFrame.pedestrians || []).map((person) => [String(person.id), person]));
@@ -1645,21 +1859,187 @@ function interpolateVehicleFrame(now) {
       const old = oldItems.get(String(item.id));
       if (!old) return item;
       const delta = ((Number(item.angle || 0) - Number(old.angle || 0) + 540) % 360) - 180;
+      const lng = Number.isFinite(Number(old.lng)) && Number.isFinite(Number(item.lng))
+        ? Number(old.lng) + (Number(item.lng) - Number(old.lng)) * alpha
+        : item.lng;
+      const lat = Number.isFinite(Number(old.lat)) && Number.isFinite(Number(item.lat))
+        ? Number(old.lat) + (Number(item.lat) - Number(old.lat)) * alpha
+        : item.lat;
+      // Follow the lane through the junction rather than the straight chord.
+      const [laneLng, laneLat] = snapToLane([Number(lng), Number(lat)], item.lane);
       return { ...item,
         x: Number(old.x) + (Number(item.x) - Number(old.x)) * alpha,
         y: Number(old.y) + (Number(item.y) - Number(old.y)) * alpha,
-        lng: Number.isFinite(Number(old.lng)) && Number.isFinite(Number(item.lng)) ? Number(old.lng) + (Number(item.lng) - Number(old.lng)) * alpha : item.lng,
-        lat: Number.isFinite(Number(old.lat)) && Number.isFinite(Number(item.lat)) ? Number(old.lat) + (Number(item.lat) - Number(old.lat)) * alpha : item.lat,
+        lng: Number.isFinite(laneLng) ? laneLng : lng,
+        lat: Number.isFinite(laneLat) ? laneLat : lat,
         angle: Number(old.angle || 0) + delta * alpha,
       };
     });
     refreshSimulationVehicles({ ...currentVehicleFrame, vehicles: blend(currentVehicleFrame.vehicles, priorVehicles), pedestrians: blend(currentVehicleFrame.pedestrians, priorPeople) });
   } else {
     refreshSimulationVehicles(currentVehicleFrame);
-    previousVehicleFrame = currentVehicleFrame;
   }
-  vehicleAnimationFrame = window.requestAnimationFrame(interpolateVehicleFrame);
+  } finally {
+    // Always keep the loop alive: one bad frame must not freeze every vehicle.
+    vehicleAnimationFrame = window.requestAnimationFrame(interpolateVehicleFrame);
+  }
 }
+/* Accept only frames that actually advanced the simulation. The websocket repeats the
+   same snapshot four times a second, and treating each repeat as a new frame kept
+   resetting the interpolation clock (the source of the stutter and the snap). */
+function queueVehicleFrame(state) {
+  const simTime = Number(state.simulationTime) || 0;
+  const key = `${state.runId || ''}:${simTime}`;
+  if (currentVehicleFrame && key === currentFrameKey) return;
+
+  const now = performance.now();
+  if (currentVehicleFrame && state.runId === currentVehicleFrame.runId) {
+    const gap = now - vehicleFrameTime;
+    // Ignore pauses (resume, tab wake) when learning the cadence.
+    if (gap > 30 && gap < 6000) {
+      vehicleFrameInterval = vehicleFrameInterval * 0.6 + gap * 0.4;
+    }
+    previousVehicleFrame = currentVehicleFrame;
+  } else {
+    // First frame of a run: nothing to move from, so draw it where it is.
+    previousVehicleFrame = null;
+    vehicleFrameInterval = 1000;
+  }
+
+  currentVehicleFrame = state;
+  currentFrameKey = key;
+  vehicleFrameTime = now;
+  if (!vehicleAnimationFrame) {
+    vehicleAnimationFrame = window.requestAnimationFrame(interpolateVehicleFrame);
+  }
+}
+
+/* Roam follow camera. The Roam pills choose a vehicle; this keeps the Mapbox
+   camera on it as the 4 Hz snapshots arrive. `pov` puts the camera inside the
+   car looking down its heading, `follow` keeps a chase view above it. */
+let roamFollow = null;
+let roamTarget = null;
+let roamSmooth = null;
+let roamCameraFrame = 0;
+let roamCameraAt = 0;
+
+document.addEventListener('sumo:roamfollow', (event) => {
+  const detail = event.detail;
+  const next = detail && detail.id && detail.view
+    ? { id: String(detail.id), view: String(detail.view) }
+    : null;
+  if (!next) {
+    roamFollow = null;
+    roamTarget = null;
+    roamSmooth = null;
+    selectedVehicleId = null;
+    if (currentVehicleFrame) refreshSimulationVehicles(currentVehicleFrame);
+    return;
+  }
+  // A new target should not glide the camera all the way across the network.
+  if (!roamFollow || roamFollow.id !== next.id) roamSmooth = null;
+  roamFollow = next;
+  // The followed body carries the map's selection ring.
+  selectedVehicleId = next.id;
+  if (currentVehicleFrame) refreshSimulationVehicles(currentVehicleFrame);
+  if (next.view === 'pov') liveMap?.setMaxPitch?.(85);
+  requestRoamCameraFrame();
+});
+
+function requestRoamCameraFrame() {
+  if (!roamCameraFrame) roamCameraFrame = window.requestAnimationFrame(stepRoamCamera);
+}
+
+/** Move a lng/lat by `meters` along a compass `bearing` (degrees from north). */
+function offsetLngLat(lng, lat, meters, bearing) {
+  const radians = (Number(bearing) || 0) * Math.PI / 180;
+  const north = Math.cos(radians) * meters;
+  const east = Math.sin(radians) * meters;
+  return [
+    lng + east / (111320 * Math.cos(lat * Math.PI / 180)),
+    lat + north / 111320
+  ];
+}
+
+/** Roam click: the nearest rendered vehicle within 24 screen pixels wins. */
+function handleRoamVehicleClick(event) {
+  const view = document.getElementById('liveMapView');
+  if (!liveMap || view?.dataset.mode !== 'roam') return;
+  let best = null;
+  let bestDistance = 24;
+  vehicleInstances.forEach((vehicle) => {
+    if (vehicle.pedestrian || !vehicle.position) return;
+    const projected = liveMap.project(vehicle.position);
+    const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
+    if (distance < bestDistance) {
+      best = vehicle;
+      bestDistance = distance;
+    }
+  });
+  if (!best) return;
+  document.dispatchEvent(
+    new CustomEvent('sumo:roamvehiclepick', { detail: { id: best.id } })
+  );
+}
+
+function stepRoamCamera(now) {
+  roamCameraFrame = 0;
+  if (!roamFollow || !roamTarget || !liveMap) return;
+  const elapsed = roamCameraAt
+    ? Math.min(0.1, Math.max(0.001, (now - roamCameraAt) / 1000))
+    : 0.016;
+  roamCameraAt = now;
+  if (!roamSmooth) {
+    roamSmooth = {
+      lng: roamTarget.lng,
+      lat: roamTarget.lat,
+      bearing: roamTarget.bearing
+    };
+  }
+  // Frame-rate independent smoothing. The camera keeps moving between the 4 Hz
+  // snapshots instead of restarting an easeTo on every publish, which was the
+  // pulse that made follow look jittery at the snapshot cadence.
+  const tau = roamTarget.view === 'pov' ? 0.07 : 0.16;
+  const alpha = 1 - Math.exp(-elapsed / tau);
+  roamSmooth.lng += (roamTarget.lng - roamSmooth.lng) * alpha;
+  roamSmooth.lat += (roamTarget.lat - roamSmooth.lat) * alpha;
+  const delta = ((roamTarget.bearing - roamSmooth.bearing + 540) % 360) - 180;
+  roamSmooth.bearing = (roamSmooth.bearing + delta * alpha + 360) % 360;
+  liveMap.jumpTo({
+    center: [roamSmooth.lng, roamSmooth.lat],
+    bearing: roamSmooth.bearing,
+    pitch: roamTarget.view === 'pov' ? 82 : 58,
+    zoom: roamTarget.view === 'pov' ? 19.2 : 17.4
+  });
+  if (roamFollow && roamTarget) requestRoamCameraFrame();
+}
+
+function syncRoamCamera(state) {
+  if (!roamFollow || !liveMap) return;
+  const vehicle = (state?.vehicles || []).find((item) => String(item.id) === roamFollow.id);
+  const lng = Number(vehicle?.lng);
+  const lat = Number(vehicle?.lat);
+  if (!vehicle || !Number.isFinite(lng) || !Number.isFinite(lat)) {
+    roamFollow = null;
+    roamTarget = null;
+    roamSmooth = null;
+    selectedVehicleId = null;
+    if (currentVehicleFrame) refreshSimulationVehicles(currentVehicleFrame);
+    document.dispatchEvent(new CustomEvent('sumo:roamfollowlost'));
+    return;
+  }
+  const bearing = Number(vehicle.angle) || 0;
+  const view = roamFollow.view;
+  if (view === 'pov') liveMap.setMaxPitch?.(85);
+  // POV looks 9 m ahead of the car so the vehicle sits low in frame; the chase
+  // view centres the vehicle itself.
+  const [targetLng, targetLat] = view === 'pov'
+    ? offsetLngLat(lng, lat, 9, bearing)
+    : [lng, lat];
+  roamTarget = { lng: targetLng, lat: targetLat, bearing, view };
+  requestRoamCameraFrame();
+}
+
 function install3dVehicleLayer() {
   if (!liveMap || threeLayerInstalled) return;
   if (!liveMap.getLayer('three-3d-vehicles')) {
@@ -1672,28 +2052,65 @@ function install3dVehicleLayer() {
   }
 }
 
+/* The snapshot ships a 60-sample trend; the whole run history is fetched once per run
+   so the mode panels see the episode, not only the last minute. */
+let loadedHistoryRunId = null;
+function loadRunHistory(runId) {
+  if (!runId || runId === loadedHistoryRunId) return;
+  loadedHistoryRunId = runId;
+  simulationFetch('/api/simulation/history')
+    .then((response) => (response.ok ? response.json() : null))
+    .then((body) => {
+      if (!body || !Array.isArray(body.samples) || !latestSimulationState) return;
+      if (body.runId && body.runId !== runId) return;
+      setLiveState(latestSimulationState, body.samples);
+    })
+    .catch(() => {});
+}
+
 function updateSimulationState(state) {
   if (!state) return;
   latestSimulationState = state;
-  if (simulationClock) simulationClock.textContent = state.clock || '00:00:00';
+  // The Optimize / Predict / Roam panels read the same snapshot as the map.
+  setLiveState(state, state.trend);
+  loadRunHistory(state.runId);
+  refreshLiveGauges();
+  renderLiveOps(state);
+  syncRunControls(state);
+  // A chart-bar scrub holds the timeline for a few seconds; otherwise the 4 Hz
+  // stream would snap the playhead back to the live time immediately.
+  const followingLive = performance.now() >= simulationScrubUntil;
+  if (simulationClock && followingLive) {
+    simulationClock.textContent = formatSimulationClock(state.simulationTime || 0);
+  }
   setSimulationStatus(state.status);
   if (simulationMetrics) simulationMetrics.textContent = `${state.metrics?.vehicles || 0} vehicles · ${state.metrics?.pedestrians || 0} pedestrians`;
-  if (simulationTime && Number.isFinite(Number(state.simulationTime))) simulationTime.value = state.simulationTime;
+  renderLiveEvents(state.events);
+  renderOverview(state);
+  if (followingLive && simulationTime && Number.isFinite(Number(state.simulationTime))) simulationTime.value = state.simulationTime;
   paintSimulationTimeline(simulationTime?.value || 0);
-  previousVehicleFrame = currentVehicleFrame;
-  currentVehicleFrame = state;
-  vehicleFrameTime = performance.now();
-  if (!vehicleAnimationFrame) vehicleAnimationFrame = window.requestAnimationFrame(interpolateVehicleFrame);
+  queueVehicleFrame(state);
+  syncRoamCamera(state);
   refreshSimulationSignals(state);
 }
 
 function formatSimulationClock(seconds) {
-  const value = Math.max(0, Number(seconds) || 0);
+  const value = ((Math.max(0, Number(seconds) || 0) + DAY_START_SECONDS) % 86400);
   return `${String(Math.floor(value / 3600)).padStart(2, '0')}:${String(Math.floor(value % 3600 / 60)).padStart(2, '0')}:${String(Math.floor(value % 60)).padStart(2, '0')}`;
+}
+
+function scrubSimulationTimeline(seconds) {
+  const value = Math.max(0, Math.min(86400, Number(seconds) || 0));
+  simulationScrubUntil = performance.now() + 6000;
+  if (simulationTime) simulationTime.value = String(value);
+  if (simulationClock) simulationClock.textContent = formatSimulationClock(value);
+  paintSimulationTimeline(value);
+  if (simulationBubble) simulationBubble.textContent = formatSimulationTime(value);
 }
 
 simulationTime?.addEventListener('input', () => {
   const seconds = Number(simulationTime.value);
+  simulationScrubUntil = performance.now() + 6000;
   paintSimulationTimeline(seconds);
   if (simulationClock) simulationClock.textContent = formatSimulationClock(seconds);
 });
@@ -1706,7 +2123,7 @@ document.getElementById('simulationPlay')?.addEventListener('click', async (even
   let options = { method: 'POST' };
   if (!status || status === 'idle' || status === 'error') {
     connectSimulationSocket();
-    const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+    const scenario = simulationScenarioId();
     endpoint = 'start';
     options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) };
   } else if (status === 'running' || status === 'starting') {
@@ -1732,7 +2149,7 @@ function connectSimulationSocket() {
 
 document.getElementById('simulationStart')?.addEventListener('click', async () => {
   connectSimulationSocket();
-  const scenario = activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2';
+  const scenario = simulationScenarioId();
   try {
     const response = await simulationFetch('/api/simulation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) });
     updateSimulationState(await response.json());
@@ -1749,11 +2166,32 @@ document.getElementById('simulationPause')?.addEventListener('click', async () =
     showToast('Simulation service is offline.');
   }
 });
+document.getElementById('liveSimulateIncident')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    const response = await simulationFetch('/api/simulation/incident', { method: 'POST' });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      showToast(detail.detail || 'Start the live run before injecting an accident.');
+      return;
+    }
+    // A new incident must reopen the backlog card even if the last one was closed.
+    queueShownFor = null;
+    updateSimulationState(await response.json());
+    showToast('Accident injected — queue backlog estimate opened.');
+  } catch {
+    showToast('Simulation service is offline.');
+  } finally {
+    button.disabled = false;
+  }
+});
+
 document.getElementById('simulationSpeed')?.addEventListener('click', async (event) => {
   simulationSpeed = simulationSpeed === 1 ? 5 : simulationSpeed === 5 ? 20 : 1;
   event.currentTarget.textContent = `${simulationSpeed}×`;
   try {
-    const response = await simulationFetch('/api/simulation/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: activeScenario === 'grid-3x3' ? 'grid-3x3' : 'grid-2x2', speed: simulationSpeed }) });
+    const response = await simulationFetch('/api/simulation/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: simulationScenarioId(), speed: simulationSpeed }) });
     updateSimulationState(await response.json());
   } catch {
     showToast('Simulation service is offline.');
@@ -1940,13 +2378,8 @@ function buildLiveMapScene() {
   }
 
   try {
-    liveMap.setFog({
-      color: '#eef0eb',
-      'high-color': '#e5e9e2',
-      'horizon-blend': 0.22,
-      'space-color': '#f5f6f2',
-      'star-intensity': 0
-    });
+    // No fog: its near-white haze washed the edges of the view out into a vignette.
+    liveMap.setFog(null);
     liveMap.setLight({ anchor: 'viewport', color: '#fffdf8', intensity: 0.62, position: [1.3, 212, 34] });
   } catch {
     // Older styles may not expose fog or light configuration.
@@ -2023,20 +2456,61 @@ function buildLiveMapScene() {
   if (!liveMap.getSource('live-vehicles')) {
     liveMap.addSource('live-vehicles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   }
-  install3dVehicleLayer();
+  // The Three.js vehicle group is left unmounted: the flat extrusion below is the only
+  // vehicle body, so nothing can overlap it or cast shading over it.
   if (!liveMap.getLayer('live-vehicles-extrusion')) {
     liveMap.addLayer({
       id: 'live-vehicles-extrusion',
+      // Mapbox Standard draws its basemap buildings in the middle slot; vehicles must sit
+      // above them or they are hidden as soon as the camera pitches over the buildings.
+      slot: 'top',
       type: 'fill-extrusion',
       source: 'live-vehicles',
       paint: {
-        'fill-extrusion-color': ['coalesce', ['get', 'color'], '#4f9fd8'],
+        // Class colour carried by the feature; ambulances alternate red/blue on every
+        // state refresh so they read as a flashing emergency vehicle.
+        'fill-extrusion-color': [
+          // The crashed vehicle twitches orange/blue so a stopped body reads as an
+          // incident, not as traffic waiting at a light.
+          'case', ['get', 'incident'],
+          ['case',
+            ['==', ['%', ['floor', ['*', ['to-number', ['get', 'simulationTime']], 3]], 2], 0],
+            '#f2913a', '#1769ff'],
+          ['case', ['get', 'emergency'],
+            ['case',
+              ['==', ['%', ['floor', ['*', ['to-number', ['get', 'simulationTime']], 2]], 2], 0],
+              '#ed2939', '#1769ff'],
+          ['coalesce', ['get', 'color'], '#5b8fb0']]
+        ],
         'fill-extrusion-height': ['coalesce', ['get', 'height'], 1.6],
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.95,
-        'fill-extrusion-vertical-gradient': true
+        'fill-extrusion-opacity': 1
       }
     });
+  }
+  // A flat footprint of the same body, so vehicles stay visible when the camera is
+  // straight above: a fill-extrusion has no on-screen height at pitch 0.
+  if (!liveMap.getLayer('live-vehicles-flat')) {
+    liveMap.addLayer({
+      id: 'live-vehicles-flat',
+      type: 'fill',
+      source: 'live-vehicles',
+      paint: {
+        'fill-color': [
+          // Same twitch as the 3D body, for the flat 2D footprint.
+          'case', ['get', 'incident'],
+          ['case',
+            ['==', ['%', ['floor', ['*', ['to-number', ['get', 'simulationTime']], 3]], 2], 0],
+            '#f2913a', '#1769ff'],
+          ['case', ['get', 'emergency'],
+            ['case',
+              ['==', ['%', ['floor', ['*', ['to-number', ['get', 'simulationTime']], 2]], 2], 0],
+              '#ed2939', '#1769ff'],
+          ['coalesce', ['get', 'color'], '#5b8fb0']]
+        ],
+        'fill-opacity': 0.95
+      }
+    }, liveMap.getLayer('live-vehicles-extrusion') ? 'live-vehicles-extrusion' : undefined);
   }
   const ensureMapIcon = (name, width, height, draw) => {
     if (liveMap.hasImage(name)) return;
@@ -2106,7 +2580,10 @@ function buildLiveMapScene() {
       layout: {
         'icon-image': ['match', ['get', 'vehicleClass'], 'bus', 'bus-rectangle', 'emergency', 'emergency-rectangle', 'bicycle', 'bicycle-rectangle', 'vehicle-rectangle'],
         'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.78, 17, 1.12],
-        'icon-rotate': ['get', 'angle'],
+        // The sprites are drawn nose-right (east), while SUMO's angle is clockwise from
+        // north: subtracting 90 puts every body on its real heading instead of a
+        // quarter-turn off, which is what made corners look like the whole fleet spun.
+        'icon-rotate': ['-', ['get', 'angle'], 90],
         'icon-rotation-alignment': 'map',
         'icon-allow-overlap': true,
         'icon-ignore-placement': true
@@ -2139,14 +2616,15 @@ function buildLiveMapScene() {
       }
     });
   }
-  // The symbol layers above are kept only as a compatibility scaffold for
-  // old styles; the visible vehicle representation is the 3D extrusion.
+  // One representation only: the flat 3D extrusion. The sprite icons drawn above are
+  // dropped so a vehicle never shows as two overlapping shapes (sprite + body).
   ['live-vehicles', 'live-pedestrians'].forEach((id) => {
     if (liveMap.getLayer(id)) liveMap.removeLayer(id);
   });
   loadSimulationNetwork(activeScenario);
   refreshSimulationVehicles(latestSimulationState);
   refreshSimulationSignals(latestSimulationState);
+  syncVehicleFlatLayer(liveMap);
 
   if (!liveMap.getSource('live-fog')) {
     liveMap.addSource('live-fog', {
@@ -2224,18 +2702,29 @@ function buildLiveMapScene() {
   addLiveSceneMarkers(scene);
 }
 
-async function loadSimulationNetwork(scenario) {
-  if (!liveMap) return;
-  try {
-    const response = await simulationFetch(`/api/simulation/network/${scenario}`);
-    if (!response.ok) return;
-    const data = await response.json();
+const simulationNetworkCache = new Map();
+
+/* Draw one scenario's network: the lane shapes vehicles snap to, and a lamp for
+   every signalised lane. */
+function applySimulationNetwork(scenario, data) {
+  // Keep the lane polylines: they are the path the run drives, and the map snaps
+  // moving bodies onto them so a turning vehicle follows the corner.
+  simulationLaneShapes = new Map();
+    (data.features || []).forEach((feature) => {
+      const coords = feature?.geometry?.coordinates;
+      const id = feature?.properties?.id;
+      if (id && Array.isArray(coords) && coords.length >= 2) {
+        simulationLaneShapes.set(id, coords);
+      }
+    });
     const signalLaneByKey = new Map();
     (data.signals || []).forEach((signal) => {
       (signal.lanes || []).forEach((lane) => {
         const coordinates = Number.isFinite(Number(lane.lng)) && Number.isFinite(Number(lane.lat))
           ? [Number(lane.lng), Number(lane.lat)]
           : simulationPoint(scenario, lane.x, lane.y);
+        // Unknown projection: skip the lamp rather than place it in another city.
+        if (!coordinates) return;
         const key = `${signal.id}:${lane.lane}`;
         const existing = signalLaneByKey.get(key);
         const linkIndices = Array.isArray(lane.linkIndices)
@@ -2250,9 +2739,31 @@ async function loadSimulationNetwork(scenario) {
         });
       });
     });
-    setSimulationSignalMarkers([...signalLaneByKey.values()]);
-    liveMap.getSource('live-net-bounds')?.setData(networkBoundsFeature(scenario, data));
-    syncNetworkBoundsVisibility();
+  setSimulationSignalMarkers([...signalLaneByKey.values()]);
+  liveMap.getSource('live-net-bounds')?.setData(networkBoundsFeature(scenario, data));
+  syncNetworkBoundsVisibility();
+}
+
+async function loadSimulationNetwork(scenario) {
+  if (!liveMap) return;
+  // Drop the previous network's lights and lane shapes before the new ones land,
+  // otherwise the old scenario's markers sit over the new streets.
+  setSimulationSignalMarkers([]);
+  simulationLaneShapes = new Map();
+  // One payload per scenario: switching back is instant, and a slow response for a
+  // scenario the operator already left can never overwrite the current one.
+  const cached = simulationNetworkCache.get(scenario);
+  if (cached) {
+    applySimulationNetwork(scenario, cached);
+    return;
+  }
+  try {
+    const response = await simulationFetch(`/api/simulation/network/${scenario}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    simulationNetworkCache.set(scenario, data);
+    if (scenario !== activeScenario) return;
+    applySimulationNetwork(scenario, data);
   } catch {
     // The map remains usable when the SUMO service is offline.
   }
@@ -2306,15 +2817,13 @@ function networkBoundsFeature(scenario, data) {
   };
 }
 
-/* Borders live in the sumo-road layer group: they show only for the SF grids
-   while the operator keeps the road-layout toggle enabled. */
+/* The corridor boundary belongs to the road layout, which is always drawn. */
 function syncNetworkBoundsVisibility() {
   if (!liveMap || !liveMap.getLayer('live-net-bounds')) return;
-  const enabled = document.querySelector('[data-map-layer="sumo-road"]')?.getAttribute('aria-checked') !== 'false';
   liveMap.setLayoutProperty(
     'live-net-bounds',
     'visibility',
-    enabled && activeScenario.startsWith('grid-') ? 'visible' : 'none'
+    activeScenario.startsWith('grid-') ? 'visible' : 'none'
   );
 }
 
@@ -2323,8 +2832,6 @@ function initLiveMap() {
   if (!container) return;
   container.hidden = false;
   container.style.display = '';
-  const vignette = document.querySelector('.live-map-vignette');
-  if (vignette) vignette.style.display = '';
   if (liveMap) {
     liveMap.getContainer().style.display = '';
     liveMap.resize();
@@ -2355,11 +2862,13 @@ function initLiveMap() {
 
   // The modes layer falls back to this global when no getter is injected.
   window.sumoLiveMap = liveMap;
+  liveMap.on('click', handleRoamVehicleClick);
+  // The flat vehicle footprint only stands in when the camera cannot show height.
+  liveMap.on('pitch', () => syncVehicleFlatLayer(liveMap));
 
   liveMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
   liveMap.on('load', () => {
     hideLiveMapFallback();
-    syncLayerMenuAvailability();
     buildLiveMapScene();
     document.dispatchEvent(new CustomEvent('sumo:livemapready'));
   });
@@ -2384,7 +2893,11 @@ function initLiveMap() {
 
 function applyLiveMapStyle(styleName) {
   const style = MAP_STYLES[styleName];
-  if (!style || !liveMap || styleName === activeMapStyle) return;
+  if (!style) return;
+  // The operator panels follow the map scene: Day and Dawn are light scenes, so the
+  // panels are light; Night and Dusk are dark scenes, so the panels are dark.
+  setPanelTheme(styleName === 'light' || styleName === 'dawn');
+  if (!liveMap || styleName === activeMapStyle) return;
   activeMapStyle = styleName;
   liveMap.setConfigProperty('basemap', 'lightPreset', style.preset);
   liveMap.setConfigProperty('basemap', 'showPedestrianRoads', false);
@@ -2437,17 +2950,9 @@ mountGauges();
    bands. It reads the same scrubber and mode tabs as the rest of the map. */
 initModes({
   getMap: () => liveMap,
-  showToast: (message, options) => showToast(message, options)
+  showToast: (message, options) => showToast(message, options),
+  getScenario: () => getScenario()
 });
-
-const LIVE_ACTION_MESSAGES = {
-  accelerate: 'Acceleration plan applied to the active corridor.',
-  reroute: 'Reroute advisory published to connected vehicles.',
-  restrict: 'Lane restriction staged for operator approval.',
-  deviation: 'Deviation monitoring enabled for this sector.',
-  monitor: 'Live monitoring focused on the active sector.',
-  deactivate: 'Adaptive control actions paused.'
-};
 
 document.querySelectorAll('[data-live-action]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -2508,13 +3013,91 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
       return;
     }
 
-    if (button.classList.contains('live-action')) {
-      document.querySelectorAll('.live-action').forEach((tile) => tile.classList.remove('is-active'));
-      if (action !== 'deactivate') button.classList.add('is-active');
-      showToast(LIVE_ACTION_MESSAGES[action] || 'Corridor action applied.');
-    }
   });
 });
+
+/* ---------------- Live run controls (dock) ----------------
+   The Control Actions card used to toggle decorative tiles and toast a message. These
+   buttons drive the real session endpoints — pause/resume, one-decision step, speed,
+   restart, incident, stop — and show the status the backend publishes. */
+
+const RUN_COMMAND_TOASTS = {
+  pause: (state) => (state?.status === 'paused' ? 'Run paused.' : 'Run resumed.'),
+  step: () => 'Advanced one decision.',
+  stop: () => 'Run stopped.',
+  incident: () => 'Incident injected into the live run.',
+  restart: () => 'Scenario restarted with the active controller.',
+  speed: () => `Speed set to ${simulationSpeed}×.`
+};
+
+async function runSimulationCommand(command) {
+  const current = latestSimulationState || {};
+  let path = null;
+  let body = null;
+  if (command === 'pause') {
+    path = current.status === 'paused' ? '/api/simulation/resume' : '/api/simulation/pause';
+  } else if (command === 'step') {
+    path = '/api/simulation/step';
+    body = { count: 1 };
+  } else if (command === 'stop') {
+    path = '/api/simulation/stop';
+  } else if (command === 'incident') {
+    path = '/api/simulation/incident';
+  } else if (command === 'restart') {
+    path = '/api/simulation/start';
+    body = { scenario: current.scenario || activeScenario || 'grid-2x2', speed: simulationSpeed };
+  } else if (command === 'speed') {
+    simulationSpeed = simulationSpeed === 1 ? 5 : simulationSpeed === 5 ? 20 : 1;
+    path = '/api/simulation/speed';
+    body = { speed: simulationSpeed };
+    const chip = document.getElementById('simulationSpeed');
+    if (chip) chip.textContent = `${simulationSpeed}×`;
+  }
+  if (!path) return;
+  const options = body
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    : { method: 'POST' };
+  try {
+    const response = await simulationFetch(path, options);
+    const state = await response.json().catch(() => null);
+    if (!response.ok) {
+      showToast(state?.detail || `Command failed (HTTP ${response.status}).`);
+      return;
+    }
+    if (state) updateSimulationState(state);
+    showToast(RUN_COMMAND_TOASTS[command]?.(state) || 'Command applied.');
+  } catch {
+    showToast('Simulation service is offline.');
+  }
+}
+
+document.querySelectorAll('[data-sim-control]').forEach((button) => {
+  button.addEventListener('click', () => runSimulationCommand(button.dataset.simControl));
+});
+
+function syncRunControls(state) {
+  const status = String(state?.status || 'idle');
+  const live = ['running', 'paused', 'starting'].includes(status);
+  const pause = document.querySelector('[data-sim-control="pause"]');
+  if (pause) {
+    const label = pause.querySelector('.action-label');
+    if (label) label.textContent = status === 'paused' ? 'Resume' : 'Pause';
+    pause.querySelector('[data-sim-icon]')?.setAttribute('href', status === 'paused' ? '#i-play' : '#i-pause');
+    pause.classList.toggle('is-active', status === 'paused');
+  }
+  const statusValue = document.querySelector('[data-sim-value="status"]');
+  if (statusValue) statusValue.textContent = status;
+  const scenarioValue = document.querySelector('[data-sim-value="scenario"]');
+  if (scenarioValue) {
+    scenarioValue.textContent = SCENARIOS[state?.scenario]?.label || state?.scenario || 'idle';
+  }
+  const speedValue = document.querySelector('[data-sim-value="speed"]');
+  if (speedValue) speedValue.textContent = `${simulationSpeed}×`;
+  document.querySelectorAll('[data-sim-control]').forEach((button) => {
+    // Restart is also how an idle session is started again.
+    button.disabled = button.dataset.simControl === 'restart' ? false : !live;
+  });
+}
 
 document.querySelectorAll('[data-map-style]').forEach((option) => {
   option.addEventListener('click', () => {
@@ -2538,6 +3121,13 @@ document.querySelectorAll('[data-vehicle-class]').forEach((option) => {
   });
 });
 
+/* Vehicles are a fill-extrusion in 3D and a flat fill in 2D; only one shows at a time. */
+function syncVehicleFlatLayer(mapbox) {
+  if (!mapbox?.getLayer?.('live-vehicles-flat')) return;
+  const flat = mapbox.getPitch() < 6;
+  mapbox.setLayoutProperty('live-vehicles-flat', 'visibility', flat ? 'visible' : 'none');
+}
+
 function setMapLayerVisibility(layerName, enabled) {
   if (!liveMap) return;
   if (layerName === 'vehicles') {
@@ -2545,20 +3135,13 @@ function setMapLayerVisibility(layerName, enabled) {
     if (liveMap.getLayer('live-vehicles-extrusion')) {
       liveMap.setLayoutProperty('live-vehicles-extrusion', 'visibility', enabled ? 'visible' : 'none');
     }
+    if (liveMap.getLayer('live-vehicles-flat')) {
+      liveMap.setLayoutProperty('live-vehicles-flat', 'visibility', enabled && liveMap.getPitch() < 6 ? 'visible' : 'none');
+    }
     document.querySelectorAll('[data-vehicle-class]').forEach((option) => { option.disabled = !enabled; });
     simulationSignalMarkers.forEach((marker) => marker.getElement().classList.toggle('is-hidden', !enabled));
     if (liveMap) liveMap.triggerRepaint();
     return;
-  }
-  if (layerName === 'basemap') {
-    liveMap.getStyle().layers.forEach((layer) => {
-      if (!layer.id.startsWith('live-')) liveMap.setLayoutProperty(layer.id, 'visibility', enabled ? 'visible' : 'none');
-    });
-  }
-  if (layerName === 'sumo-road') {
-    ['live-net-bounds', 'live-route-glow', 'live-cross-route', 'live-route-casing', 'live-route', 'live-sumo-road'].forEach((id) => {
-      if (liveMap.getLayer(id)) liveMap.setLayoutProperty(id, 'visibility', enabled ? 'visible' : 'none');
-    });
   }
   if (layerName === 'vehicles') {
     // Toggle vehicle / model layers produced by the SUMO live feed
@@ -2582,7 +3165,6 @@ document.querySelectorAll('[data-map-layer]').forEach((option) => {
     option.setAttribute('aria-checked', String(enabled));
     option.classList.toggle('is-selected', enabled);
     setMapLayerVisibility(option.dataset.mapLayer, enabled);
-    if (option.dataset.mapLayer === 'basemap') setPanelTheme(enabled);
   });
 });
 
@@ -2594,6 +3176,8 @@ function setPanelTheme(light) {
     button.classList.toggle('is-light', enabled);
     button.setAttribute('title', enabled ? 'Panels: Light' : 'Panels: Dark');
     button.setAttribute('aria-label', enabled ? 'Switch panels to dark mode' : 'Switch panels to light mode');
+    // The icon names the theme in use: sun for light panels, moon for dark ones.
+    button.querySelector('use')?.setAttribute('href', enabled ? '#i-sun' : '#i-moon');
   });
   return enabled;
 }
@@ -2913,6 +3497,640 @@ document.querySelectorAll('[data-settings-tab]').forEach((tab) => {
   tab.addEventListener('click', () => setSettingsTab(tab.dataset.settingsTab));
 });
 
+/* ---------------- Control model picker (Settings → Models) ----------------
+   The catalog lists the checkpoints the backend will accept (selected runs, raw
+   training runs, registry versions); choosing one pins it in the active policy so the
+   next run uses exactly those weights instead of whatever seed1.zip happens to be. */
+
+const modelList = document.getElementById('modelList');
+const modelStatus = document.getElementById('modelStatus');
+const modelNetwork = document.getElementById('modelNetwork');
+
+const escapeModelText = (value) => String(value ?? '').replace(
+  /[&<>"']/g,
+  (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]),
+);
+
+function describeActivePolicy(policy) {
+  if (!policy || !modelStatus) return;
+  const weights = policy.checkpoint ? String(policy.checkpoint).split(/[\\/]/).pop() : 'auto';
+  modelStatus.textContent = `Active: ${policy.label || policy.method} · ${policy.network} · ${weights}`;
+}
+
+async function refreshActivePolicy() {
+  try {
+    const response = await fetch('/api/policy');
+    if (response.ok) describeActivePolicy(await response.json());
+  } catch { /* the panel keeps the last known policy */ }
+}
+
+function renderModelCatalog(payload) {
+  if (!modelList) return;
+  const models = payload.models || [];
+  if (!models.length) {
+    modelList.innerHTML = '<p class="model-empty">No trained checkpoint for this network yet. Train one in Models &amp; Runs, then refresh.</p>';
+    return;
+  }
+  modelList.innerHTML = models.map((model) => {
+    const seed = model.seed == null ? '—' : model.seed;
+    const steps = model.timesteps ? ` · ${model.timesteps} steps` : '';
+    const reason = model.available ? '' : `<small class="model-reason">${escapeModelText(model.reason || 'unavailable')}</small>`;
+    return `
+      <article class="model-row${model.available ? '' : ' is-unavailable'}" role="listitem">
+        <div class="model-copy">
+          <strong>${escapeModelText(model.label)}</strong>
+          <small>${escapeModelText(model.agent)} · seed ${seed}${steps} · ${escapeModelText(model.source)}</small>
+          ${reason}
+        </div>
+        <button type="button" class="settings-btn" data-model-id="${escapeModelText(model.id)}"${model.available ? '' : ' disabled'}>Use for simulation</button>
+      </article>`;
+  }).join('');
+  modelList.querySelectorAll('[data-model-id]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const model = models.find((entry) => entry.id === button.dataset.modelId);
+      if (model) applyModelToPolicy(model, button);
+    });
+  });
+}
+
+async function applyModelToPolicy(model, button) {
+  if (modelStatus) modelStatus.textContent = `Applying ${model.label}…`;
+  try {
+    const response = await fetch('/api/policy', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        method: model.agent,
+        network: model.network,
+        checkpoint: model.checkpointPath,
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+    describeActivePolicy(body);
+    if (modelStatus) modelStatus.textContent += ' — restart the run to use it.';
+    if (button) { button.textContent = 'Active'; button.disabled = true; }
+  } catch (error) {
+    if (modelStatus) modelStatus.textContent = `Could not apply: ${error.message}`;
+  }
+}
+
+async function loadModelCatalog() {
+  if (!modelList) return;
+  const network = modelNetwork?.value || '';
+  if (modelStatus) modelStatus.textContent = 'Loading trained models…';
+  refreshActivePolicy();
+  try {
+    const query = network ? `?network=${encodeURIComponent(network)}` : '';
+    const response = await fetch(`/api/models/catalog${query}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    renderModelCatalog(await response.json());
+  } catch (error) {
+    if (modelStatus) modelStatus.textContent = `Model catalog unavailable: ${error.message}`;
+    if (modelList) modelList.innerHTML = '';
+  }
+}
+
+modelNetwork?.addEventListener('change', loadModelCatalog);
+document.getElementById('modelRefresh')?.addEventListener('click', loadModelCatalog);
+document.querySelector('[data-settings-tab="models"]')?.addEventListener('click', loadModelCatalog);
+
+/* ---------------- Live operation panels (Events tab) ----------------
+   Zone Monitoring and the dock's Event Log used to be demo copy. They now read
+   the same snapshot as the map, and show an explicit idle state before a run. */
+
+const liveZoneStatus = document.getElementById('liveZoneStatus');
+const liveZoneControl = document.getElementById('liveZoneControl');
+const liveZoneIncidents = document.getElementById('liveZoneIncidents');
+const liveZoneSpeed = document.getElementById('liveZoneSpeed');
+const liveQueueLen = document.getElementById('liveQueueLen');
+const liveDelay = document.getElementById('liveDelay');
+const liveQueueKpi = liveQueueLen?.closest('.zone-kpi');
+const liveDelayKpi = liveDelay?.closest('.zone-kpi');
+const liveZoneVolumeValue = document.getElementById('liveZoneVolumeValue');
+const liveZoneVolumeMeta = document.getElementById('liveZoneVolumeMeta');
+const liveZoneCapacity = document.getElementById('liveZoneCapacity');
+const liveZonePeak = document.getElementById('liveZonePeak');
+const liveZoneVolumeSpeed = document.getElementById('liveZoneVolumeSpeed');
+const liveZoneChartBars = document.getElementById('liveZoneChartBars');
+const liveZoneChartAxis = document.getElementById('liveZoneChartAxis');
+const liveZoneChartSelection = document.getElementById('liveZoneChartSelection');
+const liveZoneExpand = document.getElementById('liveZoneExpand');
+let zoneChartSignature = '';
+let zoneVolumeExpanded = false;
+
+const ZONE_CHART_SAMPLES = 12;
+const ZONE_BUSY_RATIO = 0.12;
+const ZONE_CONGESTED_RATIO = 0.4;
+
+function zoneCongestionState(ratio) {
+  if (ratio >= ZONE_CONGESTED_RATIO) return 'congested';
+  if (ratio >= ZONE_BUSY_RATIO) return 'busy';
+  return 'flowing';
+}
+
+function zoneSampleTip(sample) {
+  const clock = String(sample.clock || '--:--:--').slice(0, 5);
+  return `${clock} · ${Number(sample.vehicles) || 0} vehicles · ${Number(sample.queued) || 0} queued · ${Math.round(Number(sample.avgSpeedKmh) || 0)} km/h`;
+}
+
+function setZoneChartSelection(text) {
+  if (liveZoneChartSelection) liveZoneChartSelection.textContent = text;
+}
+
+/* Bars are red/orange/green by the measured queue share of that sample, and
+   rebuild only when a new history sample lands, so hover/selection survives. */
+function renderZoneChart(samples, live) {
+  if (!liveZoneChartBars) return;
+  const slice = live ? samples.slice(-ZONE_CHART_SAMPLES) : [];
+  const signature = slice.map((sample) => `${sample.t}:${sample.vehicles}:${sample.queued}`).join('|');
+  if (signature === zoneChartSignature) return;
+  zoneChartSignature = signature;
+  if (!slice.length) {
+    liveZoneChartBars.replaceChildren();
+    liveZoneChartAxis?.replaceChildren();
+    setZoneChartSelection('Waiting for the run.');
+    return;
+  }
+  const peak = Math.max(...slice.map((sample) => Number(sample.vehicles) || 0), 1);
+  liveZoneChartBars.replaceChildren(...slice.map((sample, index) => {
+    const vehicles = Number(sample.vehicles) || 0;
+    const ratio = vehicles ? (Number(sample.queued) || 0) / vehicles : 0;
+    const bar = document.createElement('i');
+    bar.className = `is-${zoneCongestionState(ratio)}${index === slice.length - 1 ? ' is-current' : ''}`;
+    bar.style.height = `${Math.max(10, Math.round((vehicles / peak) * 100))}%`;
+    bar.tabIndex = 0;
+    bar.dataset.t = String(Number(sample.t) || 0);
+    bar.dataset.tip = zoneSampleTip(sample);
+    bar.title = bar.dataset.tip;
+    bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label', bar.dataset.tip);
+    return bar;
+  }));
+  if (liveZoneChartAxis) {
+    const ticks = [slice[0], slice[Math.floor(slice.length / 2)], slice[slice.length - 1]];
+    liveZoneChartAxis.replaceChildren(...ticks.map((sample) => {
+      const tick = document.createElement('span');
+      tick.textContent = String(sample.clock || '').slice(0, 5) || '—';
+      return tick;
+    }));
+  }
+  setZoneChartSelection(zoneSampleTip(slice[slice.length - 1]));
+}
+
+if (liveZoneChartBars) {
+  const showTip = (event) => {
+    const bar = event.target.closest?.('i[data-tip]');
+    if (bar) setZoneChartSelection(bar.dataset.tip);
+  };
+  liveZoneChartBars.addEventListener('pointerover', showTip);
+  liveZoneChartBars.addEventListener('focusin', showTip);
+  liveZoneChartBars.addEventListener('click', (event) => {
+    const bar = event.target.closest?.('i[data-tip]');
+    if (!bar) return;
+    liveZoneChartBars.querySelectorAll('i.is-selected').forEach((node) => node.classList.remove('is-selected'));
+    bar.classList.add('is-selected');
+    setZoneChartSelection(bar.dataset.tip);
+    scrubSimulationTimeline(Number(bar.dataset.t));
+  });
+  liveZoneChartBars.addEventListener('pointerout', (event) => {
+    if (event.relatedTarget && liveZoneChartBars.contains(event.relatedTarget)) return;
+    const last = liveZoneChartBars.querySelector('i.is-current') || liveZoneChartBars.lastElementChild;
+    setZoneChartSelection(last?.dataset.tip || 'Waiting for the run.');
+  });
+}
+
+liveZoneExpand?.addEventListener('click', () => {
+  zoneVolumeExpanded = !zoneVolumeExpanded;
+  liveZoneExpand.closest('.zone-volume')?.classList.toggle('is-expanded', zoneVolumeExpanded);
+  liveZoneExpand.setAttribute('aria-expanded', String(zoneVolumeExpanded));
+});
+const liveDockEvents = document.getElementById('liveDockEvents');
+const liveActionsSub = document.querySelector('.live-actions-card .live-dock-sub');
+let latestLiveEvents = [];
+const queueBacklogPanel = document.getElementById('queueBacklogPanel');
+const queueLengthValue = document.getElementById('queueLengthValue');
+const queueLengthDelta = document.getElementById('queueLengthDelta');
+const queueDelayValue = document.getElementById('queueDelayValue');
+const queueDelayDelta = document.getElementById('queueDelayDelta');
+const queueBacklogNote = document.getElementById('queueBacklogNote');
+let queueShownFor = null;
+// The backlog card announces itself a beat after the incident instead of during it.
+const QUEUE_REVEAL_DELAY_MS = 2500;
+let queueRevealTimer = 0;
+
+/* Where the backlog card should point the camera: the incident itself when the run
+   published a position, else the busiest junction's stop lines, else the view centre. */
+function queueIncidentPoint() {
+  // The staged crash is the precise target; the event is only a fallback.
+  const active = latestSimulationState?.incident;
+  if (active?.active && Number.isFinite(Number(active.lng)) && Number.isFinite(Number(active.lat))) {
+    return [Number(active.lng), Number(active.lat)];
+  }
+  const incident = latestLiveEvents.find((event) => event.kind === 'incident');
+  const fromEvent = incident ? liveEventPoint(incident) : null;
+  if (fromEvent) return fromEvent;
+  const junctions = latestSimulationState?.metrics?.junctions || [];
+  const busiest = [...junctions].sort(
+    (a, b) => (Number(b.queue) || 0) - (Number(a.queue) || 0)
+  )[0];
+  const lanes = simulationSignalFeatures.filter((entry) => entry.signalId === busiest?.id);
+  if (lanes.length) {
+    const [lng, lat] = lanes.reduce(
+      (acc, entry) => [acc[0] + entry.coordinates[0], acc[1] + entry.coordinates[1]],
+      [0, 0]
+    );
+    return [lng / lanes.length, lat / lanes.length];
+  }
+  return getScenario()?.liveCenter || null;
+}
+
+function focusQueueLocation() {
+  const point = queueIncidentPoint();
+  if (!point || !liveMap) {
+    showToast('No incident location published yet.');
+    return;
+  }
+  flashLiveEventFocus(point);
+  liveMap.flyTo({
+    center: point,
+    zoom: Math.min(18.5, Math.max(Number(liveMap.getZoom()) || 0, 16.8)),
+    pitch: LIVE_VIEW.pitch,
+    bearing: liveMap.getBearing(),
+    duration: 900,
+    essential: true
+  });
+}
+
+document.getElementById('queueLocate')?.addEventListener('click', focusQueueLocation);
+
+/* Event Log rows are map shortcuts: the published event carries no coordinate,
+   so resolve one from the vehicle it names, or from the queue for congestion. */
+function liveEventPoint(event) {
+  const detail = event?.detail || {};
+  if (Number.isFinite(Number(detail.lng)) && Number.isFinite(Number(detail.lat))) {
+    return [Number(detail.lng), Number(detail.lat)];
+  }
+  const state = latestSimulationState;
+  if (!state) return null;
+  const mentioned = String(event?.message || '').match(/\(([A-Za-z]+_\d+)\)/);
+  const wanted = detail.vehicleId || mentioned?.[1];
+  const pool = [...(state.vehicles || []), ...(state.pedestrians || [])];
+  const vehicle = wanted
+    ? pool.find((item) => String(item.id) === String(wanted))
+    : ['congestion', 'queue'].includes(event?.kind)
+      ? pool.find((item) => item.waiting)
+      : null;
+  if (!vehicle) return null;
+  if (Number.isFinite(Number(vehicle.lng)) && Number.isFinite(Number(vehicle.lat))) {
+    return [Number(vehicle.lng), Number(vehicle.lat)];
+  }
+  return simulationPoint(state.scenario, vehicle.x, vehicle.y);
+}
+
+let liveEventFocusMarker = null;
+let liveEventFocusTimer = 0;
+
+/* A short-lived ring marks the event's spot, so the camera move has a target. */
+function flashLiveEventFocus(lngLat) {
+  if (!liveMap) return;
+  window.clearTimeout(liveEventFocusTimer);
+  liveEventFocusMarker?.remove();
+  const element = document.createElement('div');
+  element.className = 'live-map-marker is-event-focus';
+  element.innerHTML = '<span class="live-focus-ring"></span><span class="live-marker-core"></span>';
+  liveEventFocusMarker = new mapboxgl.Marker({ element, anchor: 'center' }).setLngLat(lngLat).addTo(liveMap);
+  liveEventFocusTimer = window.setTimeout(() => {
+    liveEventFocusMarker?.remove();
+    liveEventFocusMarker = null;
+  }, 2600);
+}
+
+function focusLiveEvent(event) {
+  if (!event || !liveMap) return;
+  const point = liveEventPoint(event);
+  if (!point) return;
+  flashLiveEventFocus(point);
+  liveMap.flyTo({
+    center: point,
+    zoom: Math.min(18.5, Math.max(Number(liveMap.getZoom()) || 0, 16.8)),
+    pitch: LIVE_VIEW.pitch,
+    bearing: liveMap.getBearing(),
+    duration: 900,
+    essential: true
+  });
+}
+
+function activateLiveEventRow(row) {
+  if (!row) return;
+  focusLiveEvent(latestLiveEvents.find((item) => String(item.id) === row.dataset.eventId));
+}
+
+liveDockEvents?.addEventListener('click', (event) => {
+  activateLiveEventRow(event.target.closest('.live-event-row'));
+});
+
+liveDockEvents?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('.live-event-row');
+  if (!row) return;
+  event.preventDefault();
+  activateLiveEventRow(row);
+});
+
+function renderLiveOps(state) {
+  const metrics = state.metrics || {};
+  // Signal transitions are counted in the KPIs, not shown as feed entries.
+  const events = (Array.isArray(state.events) ? state.events : []).filter((event) => event.kind !== 'signalChange');
+  latestLiveEvents = events;
+  const live = ['running', 'paused', 'starting'].includes(String(state.status));
+  const vehicles = Number(metrics.vehicles) || 0;
+  const queued = Number(metrics.queued) || 0;
+  const critical = events.filter((event) => event.severity === 'critical').length;
+
+  const queueRatio = vehicles ? queued / vehicles : 0;
+  const trendSamples = Array.isArray(state.trend) ? state.trend : [];
+  const congestionState = zoneCongestionState(queueRatio);
+  liveQueueKpi?.setAttribute('data-state', live ? congestionState : 'idle');
+  liveDelayKpi?.setAttribute('data-state', live ? congestionState : 'idle');
+  if (liveZoneStatus) {
+    const label = !live ? 'Idle' : zoneCongestionState(queueRatio) === 'congested' ? 'Congested' : zoneCongestionState(queueRatio) === 'busy' ? 'Busy' : 'Flowing';
+    liveZoneStatus.lastChild.nodeValue = label;
+    liveZoneStatus.dataset.state = label.toLowerCase();
+  }
+  if (liveZoneControl) liveZoneControl.textContent = state.policy?.label || state.method || '—';
+  if (liveActionsSub?.lastChild) {
+    liveActionsSub.lastChild.nodeValue = `Sector 6 · ${live ? (state.policy?.label || state.method || 'Auto') : 'Idle'}`;
+  }
+  if (liveZoneIncidents) liveZoneIncidents.textContent = live ? `${critical} active` : '—';
+  if (liveZoneSpeed) {
+    liveZoneSpeed.textContent = live ? `${Math.round(Number(metrics.avgSpeedKmh) || 0)} km/h` : '—';
+  }
+  if (liveQueueLen) {
+    // ~7 m of road per queued vehicle: an estimate from the measured queue count.
+    liveQueueLen.innerHTML = live
+      ? `${escapeModelText((queued * 0.007).toFixed(1))} <small>km</small>`
+      : '— <small>km</small>';
+  }
+  if (liveDelay) {
+    liveDelay.innerHTML = live
+      ? `${Math.round((Number(metrics.avgWaitingS) || 0) / 60)} <small>m</small>`
+      : '— <small>m</small>';
+  }
+
+  // Volume block: arrived vehicles, measured congestion, peak queue time and
+  // the run's average speed, all from the published snapshot/history.
+  if (liveZoneVolumeValue) {
+    const arrived = Number(metrics.arrivedTotal ?? metrics.arrived) || 0;
+    liveZoneVolumeValue.innerHTML = live
+      ? `${arrived >= 1000 ? (arrived / 1000).toFixed(1) : arrived}${arrived >= 1000 ? '<span>k</span>' : ''}`
+      : '—';
+  }
+  if (liveZoneVolumeMeta) liveZoneVolumeMeta.textContent = live ? 'Vehicles cleared this run' : 'Last 24h trends';
+  if (liveZoneCapacity) liveZoneCapacity.textContent = live ? `${Math.round(queueRatio * 100)}%` : '—';
+  const peakSample = trendSamples.reduce(
+    (best, sample) => ((Number(sample.queued) || 0) > (Number(best?.queued) || 0) ? sample : best),
+    null
+  );
+  if (liveZonePeak) liveZonePeak.textContent = live && peakSample?.clock ? String(peakSample.clock).slice(0, 5) : '—';
+  if (liveZoneVolumeSpeed) {
+    liveZoneVolumeSpeed.textContent = live ? `${Math.round(Number(metrics.avgSpeedKmh) || 0)} km/h` : '—';
+  }
+  renderZoneChart(trendSamples, live);
+  if (liveDockEvents) {
+    const recent = events.slice(-8).reverse();
+    liveDockEvents.innerHTML = recent.length
+      ? recent.map((event) => {
+          const severity = escapeModelText(event.severity || 'info');
+          return `
+        <li class="live-event-row is-${severity}" data-event-id="${escapeModelText(event.id || '')}" role="button" tabindex="0" aria-label="${escapeModelText(`${event.message || event.kind || 'Event'} at ${formatSimulationClock(event.t || 0)}`)}">
+          <span class="live-event-dot" aria-hidden="true"></span>
+          <span class="live-event-text" title="${escapeModelText(event.message || event.kind || '')}">${escapeModelText(event.message || event.kind || '')}</span>
+          <time class="live-event-time">${escapeModelText(formatSimulationClock(event.t || 0))}</time>
+        </li>`;
+        }).join('')
+      : '<li class="live-event-empty">Waiting for the run — events appear once the simulation publishes.</li>';
+  }
+
+  // Queue Backlog: starts hidden, pops up when an incident is published, and keeps
+  // the two metric slots on the run's measured queue/delay plus a clearance ETA.
+  const incident = [...events].reverse().find((event) => event.kind === 'incident');
+  const incidentAge = incident ? (Number(state.simulationTime) || 0) - (Number(incident.t) || 0) : Infinity;
+  if (queueBacklogPanel) {
+    if (live && incident && incidentAge <= 300 && queueShownFor !== incident.id) {
+      queueShownFor = incident.id;
+      window.clearTimeout(queueRevealTimer);
+      queueBacklogPanel.classList.remove('is-visible');
+      queueRevealTimer = window.setTimeout(() => {
+        // A later incident (or a closed card) owns the panel by now.
+        if (queueShownFor !== incident.id) return;
+        queueBacklogPanel.hidden = false;
+        queueBacklogPanel.classList.add('is-incident');
+        queueBacklogPanel.classList.remove('is-closing');
+        // Paint the faded state once, so the transition has somewhere to start.
+        requestAnimationFrame(() => queueBacklogPanel.classList.add('is-visible'));
+      }, QUEUE_REVEAL_DELAY_MS);
+    }
+    const queueKm = queued * 0.007;
+    const samples = Array.isArray(state.trend) ? state.trend : [];
+    const oldest = samples.length > 1 ? samples[0] : null;
+    const trendPct = oldest && Number(oldest.queued) > 0
+      ? Math.round(((queued - Number(oldest.queued)) / Number(oldest.queued)) * 100)
+      : null;
+    const throughput = Number(metrics.throughputPerMin) || 0;
+    const eta = throughput > 0 ? Math.max(1, Math.ceil(queued / throughput)) : null;
+    if (queueLengthValue) queueLengthValue.textContent = live ? queueKm.toFixed(1) : '—';
+    if (queueLengthDelta) {
+      queueLengthDelta.textContent = !live
+        ? '—'
+        : trendPct === null
+          ? `${queued} veh`
+          : `${trendPct >= 0 ? '+' : ''}${trendPct}% / min`;
+    }
+    if (queueDelayValue) {
+      queueDelayValue.textContent = live ? String(Math.round((Number(metrics.avgWaitingS) || 0) / 60)) : '—';
+    }
+    if (queueDelayDelta) queueDelayDelta.textContent = eta === null ? 'ETA —' : `ETA ${eta} min`;
+    if (queueBacklogNote) {
+      queueBacklogNote.textContent = live
+        ? `${queued} vehicles queued · ${throughput.toFixed(1)} veh/min clearing`
+        : 'Waiting for an incident.';
+    }
+  }
+}
+
+/* ---------------- Live events (Events tab) ----------------
+   The backend publishes rising-edge events with the simulation state; once a run has
+   any, they replace the static demo incident so the card reflects this run. */
+
+const liveEvents = document.getElementById('liveEvents');
+
+function renderLiveEvents(events) {
+  if (!liveEvents) return;
+  const list = (Array.isArray(events) ? events : []).filter((event) => event.kind !== 'signalChange');
+  if (!list.length) return;
+  const recent = list.slice(-6).reverse();
+  liveEvents.innerHTML = recent.map((event) => `
+    <li class="live-event is-${escapeModelText(event.severity || 'info')}">
+      <span class="live-event-time">${escapeModelText(event.clock || '')}</span>
+      <span class="live-event-copy">${escapeModelText(event.message || event.kind || '')}</span>
+    </li>`).join('');
+  liveEvents.hidden = false;
+  document.querySelectorAll('.events-card [data-overview-static]').forEach((node) => {
+    node.hidden = true;
+  });
+}
+
+/* ---------------- Overview dashboard (live) ----------------
+   Every panel on the Overview page reads the same `/api/simulation/state` snapshot as
+   the live map: measured metrics, the session's trend series and its rising-edge events.
+   A value the run cannot measure stays at "—"; nothing here is a demo constant. */
+
+const OVERVIEW_LIVE_STATUSES = new Set(['running', 'paused', 'starting']);
+
+function overviewSet(selector, value) {
+  document.querySelectorAll(selector).forEach((node) => {
+    node.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+  });
+}
+
+function overviewSeries(state, key) {
+  return (Array.isArray(state?.trend) ? state.trend : [])
+    .map((sample) => Number(sample[key]))
+    .filter((value) => Number.isFinite(value));
+}
+
+function overviewPoints(values, width = 400, height = 108, pad = 6) {
+  if (!values.length) return [];
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const span = high - low || Math.max(1, high * 0.1);
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  return values.map((value, index) => [
+    Number((index * step).toFixed(1)),
+    Number((pad + (1 - (value - low) / span) * (height - pad * 2)).toFixed(1))
+  ]);
+}
+
+function overviewLine(points) {
+  return points.map(([x, y], index) => `${index ? 'L' : 'M'}${x} ${y}`).join(' ');
+}
+
+function overviewArea(points, height = 108) {
+  if (!points.length) return '';
+  const [lastX] = points[points.length - 1];
+  const [firstX] = points[0];
+  return `${overviewLine(points)} L${lastX} ${height} L${firstX} ${height} Z`;
+}
+
+function overviewDrawChart(state, prefix, key, live) {
+  const line = document.querySelector(`[data-overview-chart="${prefix}-line"]`);
+  const area = document.querySelector(`[data-overview-chart="${prefix}-area"]`);
+  const average = document.querySelector(`[data-overview-chart="${prefix}-average"]`);
+  const axis = document.querySelector(`[data-overview-chart="${prefix}-axis"]`);
+  const values = live ? overviewSeries(state, key) : [];
+  const points = overviewPoints(values);
+  if (line) line.setAttribute('d', overviewLine(points));
+  if (area) area.setAttribute('d', overviewArea(points));
+  if (average) {
+    if (!values.length) average.setAttribute('d', '');
+    else {
+      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+      const [, y] = overviewPoints([mean, mean])[0] || [0, 54];
+      average.setAttribute('d', `M0 ${y} L400 ${y}`);
+    }
+  }
+  const samples = live && Array.isArray(state?.trend) ? state.trend : [];
+  [...(axis?.querySelectorAll('span') || [])].forEach((slot, index, slots) => {
+    if (!samples.length) {
+      slot.textContent = '—';
+      return;
+    }
+    const position = Math.round((index / Math.max(1, slots.length - 1)) * (samples.length - 1));
+    slot.textContent = String(samples[position]?.clock || '').slice(0, 5) || '—';
+  });
+}
+
+function renderOverview(state) {
+  const status = String(state?.status || 'idle').toLowerCase();
+  const live = OVERVIEW_LIVE_STATUSES.has(status);
+  const metrics = live ? (state?.metrics || {}) : {};
+  const policy = state?.policy || {};
+  const clock = live ? state?.clock || '—' : '—';
+  const scenario = SCENARIOS[state?.scenario];
+  const events = live && Array.isArray(state?.events)
+    ? state.events.filter((event) => event.kind !== 'signalChange')
+    : [];
+
+  overviewSet('[data-overview-updated]', clock);
+  overviewSet('[data-overview-clock]', clock);
+  overviewSet('[data-overview-scenario]', scenario?.label || state?.scenario);
+  overviewSet('[data-overview-value="vehicles"]', live ? metrics.vehicles : null);
+  overviewSet('[data-overview-value="speed"]', live ? metrics.avgSpeedKmh : null);
+  overviewSet('[data-overview-metric="vehicles"]', live ? metrics.vehicles : null);
+  overviewSet('[data-overview-metric="pedestrians"]', live ? metrics.pedestrians : null);
+  overviewSet('[data-overview-metric="queued"]', live ? metrics.queued : null);
+  overviewSet(
+    '[data-overview-metric="queueShare"]',
+    live && metrics.queueShare != null ? `${Math.round(metrics.queueShare * 100)}%` : null
+  );
+  overviewSet('[data-overview-metric="avgSpeedKmh"]', live ? metrics.avgSpeedKmh : null);
+  overviewSet('[data-overview-metric="throughputPerMin"]', live ? metrics.throughputPerMin : null);
+  overviewSet(
+    '[data-overview-metric="signalPhaseChanges"]',
+    live ? metrics.signalPhaseChanges : null
+  );
+  overviewSet('[data-overview-metric="controllerCalls"]', live ? metrics.controllerCalls : null);
+  overviewSet(
+    '[data-overview-decision]',
+    live && metrics.lastDecisionMs != null ? `${metrics.lastDecisionMs} ms` : null
+  );
+  overviewSet('[data-overview-controller]', live ? policy.label || policy.method : null);
+  overviewSet(
+    '[data-overview-weights]',
+    live ? String(policy.checkpoint || 'auto').split(/[\\/]/).pop() : null
+  );
+  overviewSet('[data-overview-event-id]', events.length ? events[events.length - 1].id : null);
+
+  const badge = document.querySelector('[data-overview-status]');
+  if (badge) {
+    badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    badge.className = status === 'running'
+      ? 'status dispatched'
+      : status === 'paused'
+        ? 'status progress'
+        : status === 'starting'
+          ? 'status progress'
+          : 'status notified';
+  }
+
+  overviewDrawChart(state, 'vehicles', 'vehicles', live);
+  overviewDrawChart(state, 'speed', 'avgSpeedKmh', live);
+
+  const staticEvent = document.querySelector('.events-card [data-overview-static]');
+  if (staticEvent) staticEvent.hidden = events.length > 0;
+  if (liveEvents && !events.length) {
+    liveEvents.innerHTML = '';
+    liveEvents.hidden = true;
+  }
+}
+
+/* The dashboard polls while it is the visible view; the live map pushes the same
+   snapshot over its socket, so both pages show the same numbers. */
+async function refreshOverview() {
+  if (!dashboardView || dashboardView.hidden) return;
+  try {
+    const response = await simulationFetch('/api/simulation/state');
+    if (!response.ok) return;
+    renderOverview(await response.json());
+  } catch {
+    // Backend offline: keep the last published values on screen.
+  }
+}
+
+refreshOverview();
+window.setInterval(refreshOverview, 2000);
+
 function applyLocationRoute({ replaceLegacy = false } = {}) {
   const legacy = new URLSearchParams(window.location.search);
   const legacyView = legacy.get('view');
@@ -3157,17 +4375,165 @@ document.querySelectorAll('.connected-remove').forEach((button) => {
 
 $('addAppBtn')?.addEventListener('click', () => showToast('App directory is ready to connect.'));
 
-document.querySelectorAll('[data-integration-connect]').forEach((button) => {
-  button.addEventListener('click', () => {
-    const next = button.getAttribute('aria-pressed') !== 'true';
-    button.setAttribute('aria-pressed', String(next));
-    button.querySelector('use')?.setAttribute('href', next ? '#i-check' : '#i-link');
-    const label = button.querySelector('span');
-    if (label) label.textContent = next ? 'Connected' : 'Connect';
-    button.closest('.integration-card')?.classList.toggle('is-connected', next);
-    showToast(`${button.dataset.label || 'Integration'} ${next ? 'connected' : 'disconnected'}.`);
+/* ---------------- Settings → Integrations ----------------
+   Every card mirrors a real backend credential instead of a toggle: the state comes
+   from GET /api/integrations, saving goes through PUT, and the Mapbox token is kept in
+   this browser too so the map picks it up without a reload. */
+
+const integrationCards = [...document.querySelectorAll('.integration-card[data-integration]')];
+
+function renderIntegration(entry) {
+  const card = document.querySelector(`.integration-card[data-integration="${entry.id}"]`);
+  if (!card) return;
+  let stored = null;
+  try {
+    stored = entry.id === 'mapbox' ? localStorage.getItem(TOKEN_KEY) : null;
+  } catch {
+    stored = null;
+  }
+  const connected = Boolean(entry.configured || stored);
+  const badge = card.querySelector('[data-integration-status]');
+  if (badge) {
+    badge.classList.toggle('is-connected', connected);
+    badge.querySelector('use')?.setAttribute('href', connected ? '#i-check' : '#i-link');
+    const label = badge.querySelector('span');
+    if (label) label.textContent = connected ? 'Connected' : 'Not configured';
+  }
+  card.classList.toggle('is-connected', connected);
+  const detail = card.querySelector('[data-integration-detail]');
+  if (detail) {
+    detail.classList.remove('is-error');
+    detail.textContent = entry.detail || (connected ? 'Configured.' : 'Not configured.');
+  }
+  const input = card.querySelector('input[name="value"]');
+  if (input && entry.placeholder) input.placeholder = entry.placeholder;
+  // A token saved in .env is handed to this browser once, then remembered locally.
+  if (entry.id === 'mapbox' && entry.token && !stored) {
+    try {
+      localStorage.setItem(TOKEN_KEY, entry.token);
+    } catch {
+      // Private mode: the map still opens for this page load.
+    }
+    if (!map) {
+      hideTokenPanel();
+      buildMap(entry.token);
+    }
+  }
+}
+
+async function loadIntegrations() {
+  if (!integrationCards.length) return;
+  try {
+    const response = await fetch('/api/integrations');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = await response.json();
+    (body.integrations || []).forEach(renderIntegration);
+  } catch {
+    integrationCards.forEach((card) => {
+      const detail = card.querySelector('[data-integration-detail]');
+      if (!detail) return;
+      detail.classList.add('is-error');
+      detail.textContent = 'Backend unreachable — start the API on :8000 to read live status.';
+    });
+  }
+}
+
+async function saveIntegration(id, value) {
+  const card = document.querySelector(`.integration-card[data-integration="${id}"]`);
+  const detail = card?.querySelector('[data-integration-detail]');
+  const submit = card?.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const response = await fetch('/api/integrations', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, value })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (detail) {
+        detail.classList.add('is-error');
+        detail.textContent = body.detail || `Could not save (HTTP ${response.status}).`;
+      }
+      return;
+    }
+    if (id === 'mapbox') {
+      try {
+        if (value) localStorage.setItem(TOKEN_KEY, value);
+        else localStorage.removeItem(TOKEN_KEY);
+      } catch {
+        // Private mode: the map still applies the token for this page load.
+      }
+      if (value) {
+        hideTokenPanel();
+        buildMap(value);
+      } else {
+        setOffline(true);
+        showTokenPanel('Mapbox access token required for the live map.');
+      }
+    }
+    (body.integrations || []).forEach(renderIntegration);
+    const input = card?.querySelector('input[name="value"]');
+    if (input) input.value = '';
+    const label = { groq: 'Groq', gemini: 'Gemini', mapbox: 'Mapbox' }[id] || id;
+    showToast(`${label} ${value ? 'saved' : 'cleared'}.`);
+  } catch {
+    if (detail) {
+      detail.classList.add('is-error');
+      detail.textContent = 'Backend unreachable — nothing was saved.';
+    }
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+async function testIntegration(id, button) {
+  const card = document.querySelector(`.integration-card[data-integration="${id}"]`);
+  const detail = card?.querySelector('[data-integration-detail]');
+  if (detail) {
+    detail.classList.remove('is-error');
+    detail.textContent = 'Testing the connection…';
+  }
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/integrations/${id}/test`, { method: 'POST' });
+    const body = await response.json().catch(() => ({}));
+    if (!detail) return;
+    if (!response.ok) {
+      detail.classList.add('is-error');
+      detail.textContent = body.detail || `Test failed (HTTP ${response.status}).`;
+      return;
+    }
+    detail.textContent = `${body.detail} · ${Math.round(body.latencyMs)} ms`;
+  } catch {
+    if (detail) {
+      detail.classList.add('is-error');
+      detail.textContent = 'Backend unreachable — the test did not run.';
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.querySelectorAll('[data-integration-test]').forEach((button) => {
+  button.addEventListener('click', () =>
+    testIntegration(button.dataset.integrationTest, button)
+  );
+});
+
+document.querySelectorAll('[data-integration-form]').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = form.querySelector('input[name="value"]');
+    saveIntegration(form.dataset.integrationForm, (input?.value || '').trim());
   });
 });
+
+document
+  .querySelectorAll('[data-settings-tab="integrations"]')
+  .forEach((tab) => tab.addEventListener('click', loadIntegrations));
+
+loadIntegrations();
 $('deleteAccountBtn')?.addEventListener('click', () => showToast('Account deletion requires administrator confirmation.'));
 $('inviteMemberBtn')?.addEventListener('click', () => showToast('Invite link copied to clipboard.'));
 

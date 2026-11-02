@@ -41,6 +41,15 @@ osm:
 
 pedestrians: true
 
+# One bus line through the corridor so the live map carries every vehicle class
+# (a long yellow bus), not only cars. Edge ids come from the built net.
+bus_lines:
+  - id: L1
+    from_edge: "-111547662#5"
+    to_edge: "-1495461165#1"
+    reverse_from_edge: "-1495461165#1"
+    reverse_to_edge: "-111547662#5"
+
 padding:
   lanes_per_side: 4
   max_phases: 8
@@ -53,6 +62,11 @@ neighbours:
 demand:
   # placeholder until `cotraffic calibrate-demand --net sf_mission_2x2` runs
   peak_vehicles_per_hour: 2600
+  # The live window keeps the medium rate (0.7 x peak): the 2x2 is four junctions
+  # and gridlocks if it is filled at the calibrated peak.
+  live_vehicles_per_hour: 1800
+  # Mission/Howard sidewalks: busy, but a four-junction corridor, not a city centre.
+  pedestrians_per_hour: 1100
   origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
   opposite_side_prob: 0.5
   route_random_factor: 1.2

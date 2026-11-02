@@ -1384,9 +1384,8 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .card {
   min-width: 0;
   border: 1px solid #ededed;
-  border-radius: 9px;
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.025);
 }
 
 .chart-grid,
@@ -1398,6 +1397,9 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .chart-grid { margin-bottom: 10px; }
 .detail-grid { margin-bottom: 13px; }
+/* The map column stretches to this column's height, so a trailing margin would
+   push the map's bottom edge past the last row of cards. */
+.insights-column > :last-child { margin-bottom: 0; }
 
 .chart-card { padding: 12px 13px 9px; }
 
@@ -1677,6 +1679,7 @@ html.is-sidebar-collapsed .sidebar-collapse {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  margin-bottom: 13px;
 }
 
 .metric-card {
@@ -1686,10 +1689,49 @@ html.is-sidebar-collapsed .sidebar-collapse {
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid #ededed;
-  border-radius: 8px;
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.025);
 }
+
+/* ---------------- Control model picker (Settings → Models) ---------------- */
+
+.model-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0; }
+
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #ededed;
+  background: #ffffff;
+}
+
+.model-row.is-unavailable { opacity: 0.62; }
+.model-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.model-copy strong { font-size: 12px; font-weight: 600; color: #262626; }
+.model-copy small { font-size: 10px; color: #8d8d8d; }
+.model-copy .model-reason { color: #b4552f; }
+.model-empty { margin: 10px 0 0; font-size: 11px; color: #8d8d8d; }
+
+/* ---------------- Live events (Events tab) ---------------- */
+
+.live-events { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+
+.live-event {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  border-left: 2px solid #c9c9c4;
+  background: #fafaf8;
+  font-size: 10px;
+  color: #4a4a46;
+}
+
+.live-event.is-warning { border-left-color: #e6b06a; }
+.live-event.is-critical { border-left-color: #d1503f; }
+.live-event-time { flex: none; font-variant-numeric: tabular-nums; color: #9a9a95; }
+.live-event-copy { min-width: 0; }
 
 .metric-ico {
   display: grid;
@@ -2744,6 +2786,33 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .brand-sumo { background: #eaf3e2; color: #5f982f; }
 .brand-ctecc { background: #fdf0e3; color: #b9762c; }
 .brand-v2x { background: #eaeefb; color: #5367ae; }
+.brand-groq { background: #f54f35; color: #fefbfb; }
+.brand-gemini { background: #f4f6fb; }
+.brand-mapbox { background: #edf0ff; color: #4264fb; }
+
+/* Brand tiles carry the vendor's own mark instead of a letter. */
+.brand-svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+.brand-img {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.integration-card .brand-mark .brand-svg {
+  width: 22px;
+  height: 22px;
+}
+
+.integration-card .brand-mark .brand-img {
+  width: 26px;
+  height: 26px;
+}
 
 .connected-remove {
   display: grid;
@@ -5112,6 +5181,172 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-panels-collapsed .live-bottom-dock > * { opacity: 0; pointer-events: none; translate: 0 160%; }
 .live-panels-collapsed .simulation-timeline { opacity: 1; pointer-events: auto; }
 .live-roam-tab { color: #5b7280; }
+
+/* Event log: one compact row per published event — severity dot, message, clock. */
+.live-event-list {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  margin: 7px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.live-event-list::-webkit-scrollbar { display: none; }
+
+.live-event-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 1px;
+  overflow: hidden;
+  border-top: 1px solid var(--dock-hair, rgba(20, 20, 20, 0.1));
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+/* The row is a button: it flies the live map to the event's position. */
+.live-event-row:hover { background: var(--dock-hover, rgba(20, 20, 20, 0.045)); }
+
+.live-event-row:focus-visible {
+  outline: 2px solid var(--dock-accent, #5f9c2b);
+  outline-offset: -2px;
+}
+
+.live-event-row:first-child { border-top: 0; padding-top: 2px; }
+
+.live-event-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: #8aa0b6;
+  box-shadow: 0 0 0 2px rgba(138, 160, 182, 0.18);
+}
+
+.live-event-row.is-warning .live-event-dot { background: #e0a233; box-shadow: 0 0 0 2px rgba(224, 162, 51, 0.18); }
+.live-event-row.is-critical .live-event-dot { background: #c74a4a; box-shadow: 0 0 0 2px rgba(199, 74, 74, 0.18); }
+
+.live-event-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dock-ink, #3d3b2d);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-event-time {
+  flex: none;
+  white-space: nowrap;
+  color: var(--dock-muted, #7b7a66);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.live-event-empty {
+  padding: 6px 1px;
+  color: var(--dock-muted, #7b7a66);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+/* Queue backlog is incident-driven: hidden until an incident event is published.
+   Needs the .live-map-view prefix to outrank the panel's own display: flex. */
+.live-map-view .queue-panel[hidden] { display: none; }
+.live-map-view .queue-panel.is-incident { border-color: rgba(199, 74, 74, 0.55); }
+
+.live-map-view .queue-panel .queue-note {
+  margin: 0;
+  padding: 0 14px 12px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 9.5px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+/* ------------------------------------------------------------------
+   Zone Monitoring — measured congestion tones and the live trend chart
+   ------------------------------------------------------------------ */
+.zone-status-value[data-state="flowing"] { --zone-tone: #2f9e57; --zone-tone-soft: rgba(47, 158, 87, 0.18); }
+.zone-status-value[data-state="busy"] { --zone-tone: #c97a16; --zone-tone-soft: rgba(201, 122, 22, 0.18); }
+.zone-status-value[data-state="congested"] { --zone-tone: #c0392b; --zone-tone-soft: rgba(192, 57, 43, 0.2); }
+.zone-status-value[data-state="idle"] { --zone-tone: #8a8574; --zone-tone-soft: rgba(138, 133, 116, 0.16); }
+
+/* Attribute in the selector keeps these tones above the themed base colours. */
+.live-map-view .zone-panel .zone-status-value[data-state],
+.live-map-view.live-panels-light .zone-panel .zone-status-value[data-state] {
+  color: var(--zone-tone, #2b2924);
+}
+
+.live-map-view .zone-panel .zone-status-value[data-state] i,
+.live-map-view.live-panels-light .zone-panel .zone-status-value[data-state] i {
+  background: var(--zone-tone, #33b864);
+  box-shadow: 0 0 0 4px var(--zone-tone-soft, rgba(51, 184, 100, 0.18));
+}
+
+.zone-chart-selection {
+  min-height: 10px;
+  margin: 6px 0 0;
+  color: #8b8470;
+  font-size: 7px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-map-view:not(.live-panels-light) .zone-panel .zone-chart-selection { color: #cdc7b8; }
+
+.zone-chart .spark-bars i {
+  cursor: pointer;
+  opacity: 0.9;
+  transition: height 320ms var(--ease-standard), opacity 160ms ease, box-shadow 160ms ease;
+}
+
+.zone-chart .spark-bars i:hover,
+.zone-chart .spark-bars i:focus-visible,
+.zone-chart .spark-bars i.is-selected {
+  opacity: 1;
+  box-shadow: 0 0 0 1px rgba(43, 41, 36, 0.28);
+}
+
+.live-map-view .zone-panel .zone-chart .spark-bars i.is-flowing { background: rgba(47, 158, 87, 0.62); }
+.live-map-view .zone-panel .zone-chart .spark-bars i.is-busy { background: rgba(201, 122, 22, 0.74); }
+.live-map-view .zone-panel .zone-chart .spark-bars i.is-congested { background: rgba(192, 57, 43, 0.82); }
+.live-map-view .zone-panel .zone-chart .spark-bars i.is-current { box-shadow: 0 0 0 1px rgba(43, 41, 36, 0.32); }
+
+.live-map-view.live-panels-light .zone-panel .zone-chart .spark-bars i.is-flowing { background: rgba(47, 158, 87, 0.72); }
+.live-map-view.live-panels-light .zone-panel .zone-chart .spark-bars i.is-busy { background: rgba(201, 122, 22, 0.82); }
+.live-map-view.live-panels-light .zone-panel .zone-chart .spark-bars i.is-congested { background: rgba(192, 57, 43, 0.88); }
+
+.live-map-view .zone-panel .zone-volume.is-expanded .zone-chart .spark-bars { height: 104px; }
+
+.live-map-view .zone-panel .zone-volume-value span:empty { display: none; }
+
+/* Operator incident control in the simulation chip row. */
+.live-map-view .sim-chip.sim-chip--alert {
+  color: #9a3a1d;
+  border-color: rgba(224, 106, 49, 0.42);
+  background: rgba(224, 106, 49, 0.12);
+}
+
+.live-map-view .sim-chip.sim-chip--alert:hover {
+  color: #7c2d12;
+  border-color: rgba(224, 106, 49, 0.62);
+  background: rgba(224, 106, 49, 0.2);
+}
+
+.live-map-view .sim-chip.sim-chip--alert:disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
 .live-roam-mode .live-roam-tab { background: #d6e6ec; color: #234858; }
 
 /* Roam mode keeps the simulation controls centered. Its glass follows the
@@ -5140,7 +5375,8 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-map-view.live-roam-mode.live-panels-light .sim-badge { background: rgba(38,49,55,.1); color: #3f4c53; }
 .live-map-view.live-roam-mode.live-panels-light .sim-badge[data-state="running"] { background: rgba(124,189,64,.22); color: #3f6b22; }
 .live-map-view.live-roam-mode.live-panels-light .sim-track { border-color: rgba(38,49,55,.14); background: rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
-.live-map-view.live-roam-mode.live-panels-light .sim-profile i { background: rgba(38,49,55,.18); }
+.live-map-view.live-roam-mode.live-panels-light .sim-profile-area { fill: rgba(38,49,55,.18); }
+.live-map-view.live-roam-mode.live-panels-light .sim-profile-line { stroke: rgba(38,49,55,.34); }
 
 /* Dark chrome for the roam timeline. Roam's top bar is the strongest glass in
    the mode (rgba(15,24,31,.68)), so the timeline uses the same recipe rather
@@ -5170,7 +5406,8 @@ html.is-sidebar-collapsed .sidebar-collapse {
   background: rgba(255,255,255,.1);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
 }
-.live-map-view.live-roam-mode:not(.live-panels-light) .sim-profile i { background: rgba(255,255,255,.22); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-profile-area { fill: rgba(255,255,255,.22); }
+.live-map-view.live-roam-mode:not(.live-panels-light) .sim-profile-line { stroke: rgba(255,255,255,.4); }
 .live-map-view.live-roam-mode .simulation-timeline .sim-bubble { background: var(--green); color: var(--lm-accent-ink); }
 .live-map-view.live-roam-mode .simulation-timeline .sim-bubble::after { border-top-color: var(--green); }
 .live-map-view.live-roam-mode .live-place-card,
@@ -5184,7 +5421,6 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-map-view.live-roam-mode .live-mode-tab,
 .live-map-view.live-roam-mode .live-tool { color: #f6fbff; }
 .live-map-view.live-roam-mode .live-mode-tab.is-active { color: #241f10; }
-.live-map-view.live-roam-mode .live-map-vignette,
 .live-map-view.live-roam-mode .live-map-tools,
 .live-map-view.live-roam-mode .mapboxgl-ctrl,
 .live-map-view.live-roam-mode .mapboxgl-ctrl-bottom-right { display: none !important; }
@@ -5349,16 +5585,6 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .live-map-view .mapboxgl-canvas {
   filter: saturate(0.72) contrast(0.94) brightness(1.045);
-}
-
-.live-map-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 58% 36%, rgba(255, 255, 255, 0) 0%, rgba(246, 248, 243, 0.12) 54%, rgba(237, 241, 233, 0.56) 100%),
-    linear-gradient(180deg, rgba(248, 249, 246, 0.34) 0%, rgba(248, 249, 246, 0) 18%, rgba(244, 246, 240, 0) 68%, rgba(236, 240, 232, 0.3) 100%);
 }
 
 .live-map-overlay {
@@ -6048,6 +6274,31 @@ html.is-sidebar-collapsed .sidebar-collapse {
   50% { opacity: 0.55; transform: scale(1.18); }
 }
 
+/* Event Log focus marker: a brand-green ring burst on the event's spot. */
+.live-map-marker.is-event-focus {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+}
+
+.live-focus-ring {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border: 2px solid rgba(95, 156, 43, 0.75);
+  border-radius: 50%;
+  animation: liveEventFocusPulse 1.1s ease-out 2 both;
+}
+
+.live-map-marker.is-event-focus .live-marker-core { background: var(--green-deep, #5f9c2b); }
+
+@keyframes liveEventFocusPulse {
+  0% { opacity: 0.9; transform: scale(0.45); }
+  70% { opacity: 0.3; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+
 .live-marker-label {
   position: absolute;
   top: 50%;
@@ -6324,26 +6575,6 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .live-event-more:hover { background: rgba(241, 236, 220, 0.8); color: #4a4738; }
 .live-event-more .ico { width: 11px; height: 11px; }
-
-.live-event-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.live-event-list li {
-  display: grid;
-  grid-template-columns: 28px 5px minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
-  min-height: 29px;
-  border-top: 1px solid rgba(87, 82, 62, 0.09);
-}
-
-.live-event-list time { color: #9b9789; font-size: 6.8px; }
 
 .event-dot {
   width: 5px;
@@ -7953,26 +8184,33 @@ html.is-sidebar-collapsed .sidebar-collapse {
   box-shadow: inset 0 1px 2px rgba(66, 62, 46, 0.06);
 }
 
-/* Traffic silhouette: one continuous hourly area, not a row of tiles. */
+/* Traffic silhouette: the day's demand as one smooth area behind the track. */
 .sim-profile {
   position: absolute;
   inset: 0;
   z-index: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 0;
-  padding: 0;
   overflow: hidden;
   pointer-events: none;
 }
 
-.sim-profile i {
-  flex: 1 1 0;
-  min-width: 0;
-  height: var(--h, 20%);
-  border-radius: 0;
-  background: rgba(112, 108, 88, 0.16);
-  transition: background 180ms ease;
+.sim-profile-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sim-profile-area {
+  fill: rgba(112, 108, 88, 0.17);
+  transition: fill 180ms ease;
+}
+
+.sim-profile-line {
+  fill: none;
+  stroke: rgba(112, 108, 88, 0.36);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 180ms ease;
 }
 
 /* elapsed time reads as a soft green wash behind the profile */
@@ -8181,6 +8419,68 @@ html.is-sidebar-collapsed .sidebar-collapse {
   transform: translateX(-50%) translateY(-10px) scale(0.97);
   transition: opacity 170ms ease, transform 170ms ease;
   pointer-events: none;
+}
+
+/* The card eases in a beat after the incident: it starts faded and slightly low, and
+   is-visible is added on the next frame so the transition has a start value. Uses the
+   individual translate/scale properties, leaving transform free for the centring. */
+.live-map-view .queue-panel.is-reveal {
+  opacity: 0;
+  translate: 0 14px;
+  scale: 0.96;
+  transition:
+    opacity 340ms cubic-bezier(0.2, 0, 0, 1),
+    translate 340ms cubic-bezier(0.2, 0, 0, 1),
+    scale 340ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.live-map-view .queue-panel.is-reveal.is-visible {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-map-view .queue-panel.is-reveal {
+    transition: none;
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+/* Shortcut to the incident: the card is an alert, so it carries its own way there. */
+.live-map-view .queue-panel .queue-locate {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 22px 18px;
+  padding: 8px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.live-map-view .queue-panel .queue-locate:hover {
+  background: rgba(255, 255, 255, 0.42);
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+.live-map-view .queue-panel .queue-locate:active {
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.live-map-view .queue-panel .queue-locate .ico {
+  width: 13px;
+  height: 13px;
+  flex: none;
 }
 
 @media (max-width: 1100px) {
@@ -8891,6 +9191,40 @@ html.is-sidebar-collapsed .sidebar-collapse {
   text-overflow: ellipsis;
 }
 
+/* Action cells carry a small leading icon: [icon][label] on the first row, with
+   the live value under the label so the cell keeps its two-line rhythm. */
+.live-bottom-dock .live-action.action-cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  justify-items: start;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+
+.action-cell .action-ico {
+  grid-area: 1 / 1;
+  width: 12px;
+  height: 12px;
+  color: var(--dock-ink-soft);
+  opacity: 0.8;
+}
+
+.action-cell .action-label { grid-area: 1 / 2; align-self: center; }
+
+.live-dock-card .live-action.action-cell .action-value {
+  grid-area: 2 / 2;
+  align-self: center;
+  margin-top: 0;
+}
+
+.live-bottom-dock .live-action.action-cell.is-active .action-ico {
+  color: var(--dock-accent);
+  opacity: 1;
+}
+
 .live-dock-card .action-dial {
   display: grid;
   width: min(42px, 100%);
@@ -9091,37 +9425,6 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .live-dock-card .live-event-more .ico { width: 13px; height: 13px; }
 
-.live-dock-card .live-event-list {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-  gap: 0;
-  margin: 3px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.live-dock-card .live-event-list li {
-  display: grid;
-  min-height: 34px;
-  flex: 1;
-  grid-template-columns: 36px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 8px;
-  border-top: 1px solid var(--dock-line);
-}
-
-.live-dock-card .live-event-list li:first-child { border-top-color: transparent; }
-
-.live-map-view .live-bottom-dock .live-event-list time {
-  color: var(--dock-muted);
-  font-size: 10.5px;
-  font-weight: 450;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
-}
 
 .live-dock-card .event-copy {
   display: flex;
@@ -9880,6 +10183,114 @@ html.is-sidebar-collapsed .sidebar-collapse {
   white-space: nowrap;
 }
 
+/* The preview says what the map is highlighting: the approach it is retiming,
+   the live lamp colours, and the alternative route around the junction. */
+.mp-preview-map {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(95, 156, 43, 0.22);
+}
+
+.mp-preview-map-row {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 9px 56px minmax(0, 1fr);
+  gap: 6px;
+  color: #6f7a5f;
+  font-size: 8.2px;
+}
+
+.mp-preview-map-row b {
+  overflow: hidden;
+  color: #3f4a37;
+  font-size: 8.6px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-preview-legend {
+  width: 9px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--green-deep);
+}
+
+.mp-preview-legend.is-approach { background: #c74a4a; }
+.mp-preview-legend.is-signal { width: 6px; height: 6px; border-radius: 50%; background: #d8a13a; }
+.mp-preview-legend.is-alt { background: repeating-linear-gradient(90deg, #2f7d3a 0 2px, transparent 2px 4px); }
+
+.mp-preview-note {
+  margin: 0;
+  color: #8c8776;
+  font-size: 7.6px;
+  line-height: 1.4;
+}
+
+/* --- Predict: route estimate A → B ---------------------------- */
+.eta-picks {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.eta-pick {
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(86, 80, 58, 0.16);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.34);
+  color: #5b563f;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.eta-pick:hover { background: rgba(255, 255, 255, 0.62); }
+.eta-pick.is-set { border-color: rgba(95, 156, 43, 0.45); background: rgba(124, 189, 64, 0.16); color: #3f6b1f; }
+.eta-pick.is-picking { border-color: rgba(95, 156, 43, 0.62); background: rgba(124, 189, 64, 0.28); color: #31571a; }
+
+.eta-picks .mp-btn {
+  margin-left: auto;
+  min-height: 24px;
+  padding: 0 6px;
+  font-size: 9px;
+}
+
+.eta-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.eta-result strong {
+  color: #38361f;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.eta-result strong small {
+  margin-left: 2px;
+  color: #8f8a79;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.eta-result span {
+  color: #7f8a72;
+  font-size: 8px;
+  line-height: 1.35;
+}
+
 /* --- Predict: forecast ------------------------------------------ */
 .predict-grid {
   display: grid;
@@ -10388,6 +10799,23 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .roam-pill:hover { background: rgba(255, 255, 255, 0.36); border-color: rgba(255, 255, 255, 0.6); color: #1f2b24; }
 .roam-pill:active { transform: translateY(1px); }
 
+/* Vehicle-class picker: a native select dressed as a Roam pill. */
+.roam-pill.roam-select {
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 160px;
+  padding-right: 22px;
+  text-align: left;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.roam-pill.roam-select:disabled { opacity: 0.55; cursor: default; }
+.roam-pill.roam-select option { color: #1f2b24; background: #ffffff; }
+
 /* Dark chrome for the roam action pills, matching the panel theme. */
 .live-map-view.live-roam-mode:not(.live-panels-light) .roam-pill {
   background: rgba(15, 24, 31, 0.68);
@@ -10441,9 +10869,59 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .roam-dot.is-dense { background: #d8b13a; }
 .roam-dot.is-jam { background: #c74a4a; }
 
-.roam-inspector {
+/* Compact keyboard legend under the traffic legend. */
+.roam-shortcuts {
   position: absolute;
   top: 112px;
+  left: var(--panel-edge);
+  display: flex;
+  margin: 0;
+  padding: 5px 9px;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  color: #273238;
+  font-size: 9.5px;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.roam-shortcuts li { display: inline-flex; align-items: center; gap: 3px; }
+
+.roam-shortcuts kbd {
+  min-width: 16px;
+  padding: 1px 4px;
+  border: 1px solid rgba(38, 49, 55, 0.25);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #273238;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-shortcuts {
+  background: rgba(15, 24, 31, 0.68);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  color: #f4f8fb;
+}
+
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-shortcuts kbd {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #f4f8fb;
+}
+
+.roam-inspector {
+  position: absolute;
+  top: 148px;
   left: var(--panel-edge);
   width: 236px;
   padding: 9px;
@@ -10560,30 +11038,35 @@ html.is-sidebar-collapsed .sidebar-collapse {
 }
 
 /* --- timeline bands (inside the scrub track) --------------------- */
+/* The forecast window is a neutral wash starting at "now": ink, not green, so it
+   never reads as live flow on top of the demand curve. The confidence band is a
+   blurred edge at the bottom whose height follows how uncertain the projection is. */
 .timeline-future {
   position: absolute;
   top: 0;
   bottom: 0;
   z-index: 3;
-  border-radius: 0;
-  border-left: 1px dashed rgba(95, 156, 43, 0.55);
-  background: repeating-linear-gradient(
-    135deg,
-    rgba(95, 156, 43, 0.13) 0 4px,
-    rgba(95, 156, 43, 0) 4px 9px
+  border-left: 1px dashed rgba(58, 66, 50, 0.45);
+  background: linear-gradient(
+    90deg,
+    rgba(58, 66, 50, 0.14) 0%,
+    rgba(58, 66, 50, 0.06) 55%,
+    rgba(58, 66, 50, 0) 100%
   );
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 62%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0, #000 62%, transparent 100%);
   pointer-events: none;
   transition: left var(--motion-fast) var(--ease-standard), width var(--motion-fast) var(--ease-standard);
 }
 
 .timeline-future::after {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  left: 3px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   height: var(--band, 8px);
-  border-radius: 0;
-  background: linear-gradient(180deg, rgba(124, 189, 64, 0), rgba(124, 189, 64, 0.5));
+  background: linear-gradient(180deg, rgba(58, 66, 50, 0), rgba(58, 66, 50, 0.24));
+  filter: blur(3px);
   content: '';
 }
 
@@ -10859,7 +11342,8 @@ html.is-sidebar-collapsed .sidebar-collapse {
   .roam-pills { top: 61px; flex-direction: column; align-items: flex-end; max-width: none; }
   .roam-pill { padding: 7px 12px; }
   .roam-legend { top: 61px; max-width: 42%; flex-wrap: wrap; gap: 6px 9px; }
-  .roam-inspector { top: 120px; width: min(236px, calc(100% - 2 * var(--panel-edge))); }
+  .roam-shortcuts { top: 96px; max-width: 42%; flex-wrap: wrap; gap: 6px 9px; }
+  .roam-inspector { top: 148px; width: min(236px, calc(100% - 2 * var(--panel-edge))); }
 
   .mode-pill { top: 61px; left: var(--panel-edge); max-width: calc(100% - 2 * var(--panel-edge)); }
 }
@@ -11071,3 +11555,209 @@ html.is-sidebar-collapsed .sidebar-collapse {
   border-color: rgba(124, 189, 64, 0.45);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
+
+/* Congestion tones must beat both themed status colours (light and dark), so
+   these live at the end of the sheet with an extra .zone-panel weight. */
+.live-map-view .zone-panel.zone-panel .zone-status-value[data-state] {
+  color: var(--zone-tone, #2b2924);
+}
+
+.live-map-view .zone-panel.zone-panel .zone-status-value[data-state] i {
+  background: var(--zone-tone, #33b864);
+  box-shadow: 0 0 0 4px var(--zone-tone-soft, rgba(51, 184, 100, 0.18));
+}
+
+/* Congestion legend under the status row. */
+.zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 7px 0 0;
+}
+
+.zone-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #8b8470;
+  font-size: 7px;
+  line-height: 1;
+}
+
+.zone-legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.zone-legend .is-flowing i { background: #2f9e57; }
+.zone-legend .is-busy i { background: #c97a16; }
+.zone-legend .is-congested i { background: #c0392b; }
+
+.live-map-view:not(.live-panels-light) .zone-panel .zone-legend span { color: #cdc7b8; }
+
+/* Queue and delay KPIs take the same congestion tone as the status. */
+.zone-kpi[data-state="flowing"] { --zone-tone: #2f9e57; }
+.zone-kpi[data-state="busy"] { --zone-tone: #c97a16; }
+.zone-kpi[data-state="congested"] { --zone-tone: #c0392b; }
+.zone-kpi[data-state="idle"] { --zone-tone: #8a8574; }
+
+.live-map-view .zone-panel.zone-panel .zone-kpi[data-state] strong {
+  color: var(--zone-tone, #373529);
+}
+
+.live-map-view .zone-panel.zone-panel .zone-kpi[data-state]::before {
+  background: var(--zone-tone, #e6b23b);
+}
+
+/* ---------------- Settings → Integrations (live credential state) ---------------- */
+
+.integration-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid #e3e3e3;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #7f7f7f;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.integration-status .ico { width: 12px; height: 12px; }
+
+.integration-status.is-connected {
+  border-color: #cfe6b8;
+  background: #f4faee;
+  color: #4f7f28;
+}
+
+.integration-card code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f3f3f3;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+
+.integration-form {
+  display: flex;
+  gap: 8px;
+}
+
+.integration-form input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.integration-form input:focus {
+  outline: 2px solid #b8d795;
+  outline-offset: 1px;
+  border-color: #b8d795;
+}
+
+.integration-form .settings-btn {
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.integration-card .integration-detail {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #8a8a8a;
+  word-break: break-word;
+}
+
+.integration-card .integration-detail.is-error { color: #b4543a; }
+
+/* ---------------- Overview empty state ---------------- */
+
+.events-card .overview-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 2px 4px;
+}
+
+.events-card .overview-empty h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.events-card .overview-empty p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #7f7f7f;
+}
+
+.ctecc-list b.status { white-space: nowrap; }
+
+.integration-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.integration-actions .settings-btn {
+  width: 100%;
+  height: 32px;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.integration-test .ico { width: 13px; height: 13px; }
+
+.integration-test:disabled { opacity: 0.6; cursor: progress; }
+
+.live-dock-card .action-value {
+  align-self: flex-start;
+  overflow: hidden;
+  max-width: 100%;
+  margin-top: 2px;
+  color: var(--dock-ink-soft);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+
+.live-bottom-dock .live-action.action-cell:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+/* ---------------- Live Optimize / Predict / Roam ---------------- */
+
+.predict-line.is-measured { stroke: #2f9e57; }
+
+.predict-key i.is-measured { background: #2f9e57; }
+
+.signal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 0;
+}
+
+.signal-note {
+  color: inherit;
+  font-size: 10.5px;
+  opacity: 0.75;
+}
+
+.sig-row.is-held .sig-name i { opacity: 0.6; font-style: normal; }

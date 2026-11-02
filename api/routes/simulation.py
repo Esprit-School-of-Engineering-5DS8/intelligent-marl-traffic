@@ -5,26 +5,52 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from api.simulation import SCENARIOS, network_geojson, session
+from api.simulation import (
+    NETWORK_SCENARIOS,
+    NotRunning,
+    SCENARIOS,
+    network_geojson,
+    resolve_scenario,
+    session,
+)
 
 router = APIRouter(tags=["simulation"])
 
 
 class SimulationRequest(BaseModel):
-    scenario: str = "grid-3x3"
+    # Either id may be sent: ``network`` names the cotraffic network to run on,
+    # ``scenario`` the dashboard scenario. A pair that disagrees is refused.
+    scenario: str | None = None
+    network: str | None = None
     speed: float = Field(default=1, ge=0.25, le=20)
     count: int = Field(default=1, ge=1, le=600)
+    # Optional weights for this run: choosing them goes through PUT /api/policy, so a
+    # request cannot start weights the policy layer would refuse.
+    method: str | None = None
+    checkpoint: str | None = None
 
     @field_validator("scenario")
     @classmethod
-    def known_scenario(cls, scenario: str) -> str:
-        if scenario not in SCENARIOS:
+    def known_scenario(cls, scenario: str | None) -> str | None:
+        if scenario is not None and scenario not in SCENARIOS:
             raise ValueError(f"unknown scenario {scenario}")
         return scenario
+
+    @field_validator("network")
+    @classmethod
+    def known_network(cls, network: str | None) -> str | None:
+        if network is not None and network not in NETWORK_SCENARIOS:
+            raise ValueError(f"unknown network {network}")
+        return network
+
+
+@router.get("/api/simulation/history")
+def simulation_history() -> dict[str, Any]:
+    return session.history()
 
 
 @router.get("/api/simulation/state")
@@ -42,7 +68,10 @@ def simulation_network(scenario: str) -> JSONResponse:
 @router.post("/api/simulation/start")
 def simulation_start(request: SimulationRequest) -> dict[str, Any]:
     try:
-        return session.start(request.scenario, request.speed)
+        scenario = resolve_scenario(request.scenario, request.network)
+        return session.start(
+            scenario, request.speed, request.method, request.checkpoint
+        )
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
 
@@ -60,6 +89,47 @@ def simulation_resume() -> dict[str, Any]:
 @router.post("/api/simulation/stop")
 def simulation_stop() -> dict[str, Any]:
     return session.stop()
+
+
+@router.post("/api/simulation/incident")
+def simulation_incident() -> dict[str, Any]:
+    """Inject an operator-reported collision into the live run."""
+    try:
+        return session.inject_incident()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+class SignalRequest(BaseModel):
+    junction: str = Field(min_length=1, max_length=40)
+    green: float = Field(ge=6, le=90)
+
+
+@router.post("/api/simulation/signal")
+def simulation_signal(request: SignalRequest) -> dict[str, Any]:
+    """Change the current phase's green time at one junction, for the running corridor."""
+    try:
+        return session.queue_signal(request.junction, request.green)
+    except NotRunning as error:
+        raise HTTPException(409, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
+@router.get("/api/simulation/junctions")
+def simulation_junctions() -> dict[str, Any]:
+    return session.junctions()
+
+
+@router.get("/api/simulation/forecast")
+def simulation_forecast(horizon: int = Query(default=15, ge=5, le=30)) -> dict[str, Any]:
+    """Queue/throughput projection from the run's own history."""
+    try:
+        return session.forecast(horizon)
+    except NotRunning as error:
+        raise HTTPException(409, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
 
 
 @router.post("/api/simulation/step")

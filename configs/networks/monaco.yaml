@@ -70,14 +70,25 @@ demand:
   # 1300 matches the scenario's own peak rate and sits at the "clear congestion without
   # permanent gridlock" point, so peak is the MoST rush hour (medium 910, low 585).
   peak_vehicles_per_hour: 1300
+  # The dashboard's live run is a 10-minute quick window, where the calibrated
+  # benchmark rate reads as an almost empty principality. The live view runs
+  # 2400 veh/h: short of the ~3800 that gridlocked fixed-time control, dense
+  # enough to show the network working. Benchmark cells keep the peak rate.
+  live_vehicles_per_hour: 2400
+  # Footways of a tourist-heavy principality (the scenario default is 900/h).
+  pedestrians_per_hour: 2600
   origin_side_weights: {west: 1.0, east: 1.0, north: 0.5, south: 1.5}
   opposite_side_prob: 0.55
   route_random_factor: 1.2
 
-# Incident placement is left empty: MoST edge ids change with every upstream
-# release. Pick one from the current net before enabling the incident scenario:
+# Incident placement for the incident scenario: a 233 m two-lane street 364 m west
+# of the live map's centre (mid-point 7.42093, 43.73667).
+# MoST builds a sidewalk as lane 0 on most edges, so the rightmost *vehicle* lane
+# is 1 — lane 0 would park the stopped vehicle on the footway.
+# Upstream edge ids change with every MoSTScenario release: if demand generation
+# reports the edge is missing, re-pick one from the current net with
 #   grep -o 'id="[^"]*"' sumo_files/monaco/monaco.net.xml | head
-# incident:
-#   edge: "<edge id>"
-#   lane: 0
-#   position_frac: 0.75
+incident:
+  edge: "152820"
+  lane: 1
+  position_frac: 0.75

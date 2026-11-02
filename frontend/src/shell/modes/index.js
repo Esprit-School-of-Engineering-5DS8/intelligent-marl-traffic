@@ -7,6 +7,31 @@
  */
 
 import { modeData, formatClock } from './data.js';
+import {
+  bypassFor,
+  geometryFor,
+  geometryState,
+  junctionApproaches,
+  loadGeometry,
+  metersBetween,
+  nearestEdge,
+  routeBetween,
+  routeFeature
+} from './geometry.js';
+import {
+  applySignalChange,
+  forecastState,
+  getLiveHistory,
+  getLiveRunId,
+  getLiveState,
+  isLive,
+  liveEfficiency,
+  liveForecast,
+  liveLoad,
+  liveMetrics,
+  refreshForecast,
+  setLiveState,
+} from './live.js';
 
 const STORAGE_KEY = 'sumo.liveModes.v1';
 
@@ -22,18 +47,28 @@ const state = {
   panelsPreset: 'full',
   panelCollapsed: false,
   followMode: false,
+  povMode: false,
+  followVehicleId: null,
+  roamClass: '',
+  sigDrafts: new Map(),
   forecastMinute: null,
-  hiddenPanels: new Set()
+  hiddenPanels: new Set(),
+  // Predict's trip estimator: two points picked on the map.
+  etaA: null,
+  etaB: null,
+  etaPick: null
 };
 
 let map = null;
 let getMap = () => null;
 let showToast = () => {};
-let dashTimer = 0;
 let lastRenderedMode = '';
 let modeLayerExitTimer = 0;
 let dockSwapTimer = 0;
 let styleHooked = false;
+let clickHooked = false;
+let lastRunId = null;
+let getScenario = () => null;
 
 const MODE_LAYER_EXIT_MS = 620;
 const DOCK_SWAP_MS = 760;
@@ -80,6 +115,34 @@ function loadState() {
 
 const clock = (minute) => formatClock(minute);
 
+const SCENARIO_LABELS = {
+  'grid-2x2': 'SF Mission 2x2',
+  'grid-3x3': 'SF Mission 3x3',
+  monaco: 'Monaco',
+  tunis: 'Tunis'
+};
+
+/* The panel "now" is the run's own clock while live; the scrubber only drives the
+   deterministic demo model. */
+function nowMinute() {
+  const live = getLiveState();
+  const seconds = Number(live?.simulationTime);
+  if (isLive() && Number.isFinite(seconds)) return Math.floor(seconds / 60) % 1440;
+  return state.minute;
+}
+
+function zoneLabel() {
+  const scenario = getLiveState()?.scenario;
+  if (isLive() && scenario) return SCENARIO_LABELS[scenario] || scenario;
+  return 'Sector 6';
+}
+
+function runStatusLabel() {
+  const status = String(getLiveState()?.status || 'idle');
+  if (!isLive()) return 'model';
+  return status === 'paused' ? 'paused' : 'live';
+}
+
 const KIND_LABELS = {
   signal: 'Signal',
   reroute: 'Reroute',
@@ -105,7 +168,7 @@ function panelHead({
     <header class="mp-head">
       <div class="mp-eyebrow">
         <span class="mp-system"><svg class="ico" aria-hidden="true"><use href="#${icon}"/></svg>${label}</span>
-        <span class="mp-clock">${clock(state.minute)}</span>
+        <span class="mp-clock">${runStatusLabel()} · ${clock(nowMinute())}</span>
       </div>
       <div class="mp-headline">
         <div class="mp-heading">
@@ -127,103 +190,356 @@ function panelHead({
 
 /* ------------------------------------------------------------------ map ops */
 
-function ensureAdaptive(mapbox, intensity = 1) {
-  const features = modeData.congestion(state.zone, intensity);
+/* The corridor congestion / reroute lines that used to be painted here came from
+   the mock provider (a hardcoded Monaco polyline), so they drew a road the run was
+   not simulating. The modes now draw only measured geometry: Optimize's preview
+   lines and Predict's routed trip both come from the loaded network (geometry.js). */
 
-  if (!mapbox.getSource('mode-congestion')) {
-    mapbox.addSource('mode-congestion', { type: 'geojson', data: features });
-  } else {
-    mapbox.getSource('mode-congestion').setData(features);
-  }
+/* -------------------------------------------------- Optimize preview geometry */
 
-  if (!mapbox.getLayer('mode-congestion-line')) {
-    mapbox.addLayer({
-      id: 'mode-congestion-line',
-      type: 'line',
-      source: 'mode-congestion',
-      filter: ['==', ['get', 'kind'], 'corridor'],
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-width': 7,
-        'line-opacity': 0,
-        'line-color': [
-          'interpolate',
-          ['linear'],
-          ['get', 'intensity'],
-          0, '#7cbd40',
-          0.55, '#d8b13a',
-          1, '#c74a4a'
-        ]
-      }
-    });
-  }
+/* The preview draws the road the run is actually changing: the junction's inbound
+   approaches, a lamp for every controlled lane in its live phase colour, and the
+   alternative that reaches the same downstream point without those approaches. */
 
-  if (!mapbox.getLayer('mode-reroute-line')) {
-    mapbox.addLayer({
-      id: 'mode-reroute-line',
-      type: 'line',
-      source: 'mode-congestion',
-      filter: ['==', ['get', 'kind'], 'reroute'],
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-width': 3,
-        'line-opacity': 0,
-        'line-color': '#5f9c2b',
-        'line-dasharray': [0, 4, 3]
-      }
-    });
-  }
-}
+let previewCache = { key: null, value: null };
 
-/* Predict needs a halo behind the corridor: the softer and wider it is, the
-   less certain the forecast. It sits under the coloured line. */
-function ensureForecastBand(mapbox) {
-  if (mapbox.getLayer('mode-forecast-band')) return;
-  mapbox.addLayer(
-    {
-      id: 'mode-forecast-band',
-      type: 'line',
-      source: 'mode-congestion',
-      filter: ['==', ['get', 'kind'], 'corridor'],
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-width': 22,
-        'line-opacity': 0,
-        'line-color': '#3d6f9e',
-        'line-blur': 10
-      }
-    },
-    mapbox.getLayer('mode-congestion-line') ? 'mode-congestion-line' : undefined
+function previewRecommendation() {
+  if (!state.previewId) return null;
+  return (
+    modeData
+      .recommendations(state.zone, nowMinute())
+      .find((rec) => rec.id === state.previewId) || null
   );
 }
 
-function fadeLayers(mapbox, ids, opacity, duration = 420) {
-  ids.forEach((id) => {
-    if (!mapbox.getLayer(id)) return;
-    const start = performance.now();
-    const from = Number(mapbox.getPaintProperty(id, 'line-opacity') ?? 0);
-    if (prefersReducedMotion()) {
-      mapbox.setPaintProperty(id, 'line-opacity', opacity);
-      return;
-    }
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / duration);
-      mapbox.setPaintProperty(id, 'line-opacity', from + (opacity - from) * t);
-      if (t < 1 && mapbox.getLayer(id)) requestAnimationFrame(step);
+function signalLampState(stateString, linkIndices) {
+  if (!stateString) return null;
+  const chars = (linkIndices || []).map((index) => stateString[index]).filter(Boolean);
+  if (chars.some((value) => value === 'G' || value === 'g')) return 'green';
+  if (chars.some((value) => value === 'y' || value === 'Y')) return 'amber';
+  return chars.length ? 'red' : null;
+}
+
+function previewContext(rec) {
+  const empty = { roads: [], signals: '', bypass: null, note: '' };
+  if (!rec?.junction) return empty;
+  const scenario = getLiveState()?.scenario;
+  const key = `${getLiveRunId()}:${scenario}:${rec.junction}:${rec.green}`;
+  if (previewCache.key === key) return previewCache.value;
+  const geometry = geometryFor(scenario);
+  if (!geometry) {
+    const { pending } = geometryState(scenario);
+    return {
+      ...empty,
+      note: pending ? 'Loading the corridor geometry…' : 'Corridor geometry is not loaded.'
     };
-    requestAnimationFrame(step);
+  }
+  const approaches = junctionApproaches(geometry, rec.junction);
+  const live = (getLiveState()?.signals || []).find((signal) => signal.id === rec.junction);
+  const lamps = (approaches?.lanes || [])
+    .map((lane) => signalLampState(live?.state, lane.linkIndices))
+    .filter(Boolean);
+  const green = lamps.filter((lamp) => lamp === 'green').length;
+  const red = lamps.filter((lamp) => lamp === 'red').length;
+  const bypass = bypassFor(geometry, rec.junction);
+  const value = {
+    roads: approaches
+      ? [...new Set(approaches.edges.map((edge) => edge.name))].slice(0, 3)
+      : [],
+    signals: lamps.length ? `${green} green · ${red} red of ${lamps.length}` : '',
+    bypass,
+    note: bypass ? '' : 'No alternative road through this junction in the loaded network.'
+  };
+  previewCache = { key, value };
+  return value;
+}
+
+function previewFeatures() {
+  const rec = previewRecommendation();
+  const empty = { type: 'FeatureCollection', features: [] };
+  if (!rec?.junction) return empty;
+  const geometry = geometryFor(getLiveState()?.scenario);
+  if (!geometry) return empty;
+  const approaches = junctionApproaches(geometry, rec.junction);
+  if (!approaches) return empty;
+  const live = (getLiveState()?.signals || []).find((signal) => signal.id === rec.junction);
+  const features = [];
+
+  approaches.edges.forEach((edge) => {
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'approach', name: edge.name },
+      geometry: { type: 'LineString', coordinates: edge.coords }
+    });
+  });
+
+  approaches.lanes.forEach((lane) => {
+    const lamp = signalLampState(live?.state, lane.linkIndices);
+    if (!lamp) return;
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'signal', lamp },
+      geometry: { type: 'Point', coordinates: lane.point }
+    });
+  });
+
+  const attachment = previewContext(rec).bypass;
+  if (attachment?.alternative) {
+    features.push(
+      routeFeature(attachment.alternative, {
+        kind: 'alternative',
+        name: attachment.approachNames.join(', ')
+      })
+    );
+  }
+
+  return { type: 'FeatureCollection', features };
+}
+
+/* The preview strip names the road being changed and the detour beside it, so the
+   operator can read the map highlight instead of guessing what the lines mean. */
+function previewMapMarkup(rec) {
+  if (!rec.junction) {
+    return `<p class="mp-preview-note">Modelled corridor action — no single junction to highlight.</p>`;
+  }
+  const context = previewContext(rec);
+  const rows = [];
+  if (context.roads.length) {
+    rows.push(`
+      <div class="mp-preview-map-row">
+        <span class="mp-preview-legend is-approach"></span>
+        <span>Approach</span>
+        <b>${context.roads.join(' · ')}</b>
+      </div>`);
+  }
+  if (context.signals) {
+    rows.push(`
+      <div class="mp-preview-map-row">
+        <span class="mp-preview-legend is-signal"></span>
+        <span>Signals</span>
+        <b>${context.signals}</b>
+      </div>`);
+  }
+  if (context.bypass) {
+    const { alternative, original } = context.bypass;
+    const delta = alternative.distanceM - (original?.distanceM ?? alternative.distanceM);
+    rows.push(`
+      <div class="mp-preview-map-row">
+        <span class="mp-preview-legend is-alt"></span>
+        <span>Alternative</span>
+        <b>${(alternative.distanceM / 1000).toFixed(2)} km · ${delta >= 0 ? '+' : '−'}${Math.abs(Math.round(delta))} m</b>
+      </div>`);
+  }
+  return `<div class="mp-preview-map">${rows.join('')}</div>${
+    context.note ? `<p class="mp-preview-note">${context.note}</p>` : ''
+  }`;
+}
+
+function ensurePreviewLayers(mapbox) {
+  if (!mapbox.getSource('mode-preview')) {
+    mapbox.addSource('mode-preview', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  }
+
+  if (!mapbox.getLayer('mode-approach-line')) {
+    mapbox.addLayer({
+      id: 'mode-approach-line',
+      type: 'line',
+      source: 'mode-preview',
+      filter: ['==', ['get', 'kind'], 'approach'],
+      layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
+      paint: {
+        'line-width': 6,
+        'line-color': '#c74a4a',
+        'line-opacity': 0.85,
+        'line-blur': 0.4
+      }
+    });
+  }
+
+  if (!mapbox.getLayer('mode-alternative-line')) {
+    mapbox.addLayer({
+      id: 'mode-alternative-line',
+      type: 'line',
+      source: 'mode-preview',
+      filter: ['==', ['get', 'kind'], 'alternative'],
+      layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
+      paint: {
+        'line-width': 4,
+        'line-color': '#2f7d3a',
+        'line-opacity': 0.95,
+        'line-dasharray': [1.6, 1.4]
+      }
+    });
+  }
+
+  if (!mapbox.getLayer('mode-signal-dot')) {
+    mapbox.addLayer({
+      id: 'mode-signal-dot',
+      type: 'circle',
+      source: 'mode-preview',
+      filter: ['==', ['get', 'kind'], 'signal'],
+      layout: { visibility: 'none' },
+      paint: {
+        'circle-radius': 5,
+        'circle-color': [
+          'match',
+          ['get', 'lamp'],
+          'green', '#4f9d2f',
+          'amber', '#d8a13a',
+          '#c74a4a'
+        ],
+        'circle-stroke-color': '#fffdf6',
+        'circle-stroke-width': 1.6,
+        'circle-opacity': 0.95
+      }
+    });
+  }
+}
+
+function setPreviewVisible(mapbox, visible) {
+  ['mode-approach-line', 'mode-alternative-line', 'mode-signal-dot'].forEach((id) => {
+    if (mapbox.getLayer(id)) {
+      mapbox.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    }
   });
 }
 
-function animateDashes(active) {
-  window.clearInterval(dashTimer);
-  if (!active || !map || prefersReducedMotion()) return;
-  let offset = 0;
-  dashTimer = window.setInterval(() => {
-    if (!map?.getLayer('mode-reroute-line')) return;
-    offset = (offset + 0.6) % 12;
-    map.setPaintProperty('mode-reroute-line', 'line-dasharray', [0, offset, 3]);
-  }, 90);
+function syncPreviewLayers(mapbox) {
+  const source = mapbox.getSource('mode-preview');
+  if (!source) return;
+  const collection = previewFeatures();
+  source.setData(collection);
+  setPreviewVisible(mapbox, collection.features.length > 0);
+}
+
+/* ------------------------------------------------------ Predict route estimate */
+
+/* Two points picked on the map, joined along the network's lanes, with the arrival
+   time estimated from the speed the run is actually measuring. */
+
+let etaMemo = { key: null, value: null };
+
+function routeEstimate() {
+  const { etaA: a, etaB: b } = state;
+  if (!a || !b) return null;
+  const scenario = getLiveState()?.scenario;
+  const geometry = geometryFor(scenario);
+  if (!geometry) return { pending: true };
+  const key = `${scenario}:${a.join(',')}:${b.join(',')}`;
+  if (etaMemo.key !== key) etaMemo = { key, value: routeBetween(geometry, a, b) };
+  const route = etaMemo.value;
+  if (!route) return { error: 'No road path between A and B.' };
+  const crossings = geometry.signals.filter((signal) =>
+    route.coordinates.some((point) => metersBetween(point, signal.center) < 26)
+  ).length;
+  const speed = Number(liveMetrics().avgSpeedKmh) || 0;
+  const minutes =
+    speed > 0
+      ? Math.max(1, Math.round((route.distanceM / 1000 / speed) * 60 + crossings * 0.4))
+      : null;
+  return { distanceKm: route.distanceM / 1000, crossings, speed, minutes };
+}
+
+function etaFeatures() {
+  const features = [];
+  const estimate = routeEstimate();
+  if (estimate && !estimate.error && !estimate.pending && etaMemo.value) {
+    features.push(routeFeature(etaMemo.value, { kind: 'route' }));
+  }
+  [
+    ['a', state.etaA],
+    ['b', state.etaB]
+  ].forEach(([end, point]) => {
+    if (!point) return;
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'endpoint', end },
+      geometry: { type: 'Point', coordinates: point }
+    });
+  });
+  return { type: 'FeatureCollection', features };
+}
+
+function ensureEtaLayers(mapbox) {
+  if (!mapbox.getSource('mode-eta')) {
+    mapbox.addSource('mode-eta', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  }
+
+  if (!mapbox.getLayer('mode-eta-line')) {
+    mapbox.addLayer({
+      id: 'mode-eta-line',
+      type: 'line',
+      source: 'mode-eta',
+      filter: ['==', ['get', 'kind'], 'route'],
+      layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
+      paint: {
+        'line-width': 4.5,
+        'line-color': '#2f6d4f',
+        'line-opacity': 0.92,
+        'line-dasharray': [1.6, 1.2]
+      }
+    });
+  }
+
+  if (!mapbox.getLayer('mode-eta-point')) {
+    mapbox.addLayer({
+      id: 'mode-eta-point',
+      type: 'circle',
+      source: 'mode-eta',
+      filter: ['==', ['get', 'kind'], 'endpoint'],
+      layout: { visibility: 'none' },
+      paint: {
+        'circle-radius': 7,
+        'circle-color': ['match', ['get', 'end'], 'a', '#5f9c2b', '#c74a4a'],
+        'circle-stroke-color': '#fffdf6',
+        'circle-stroke-width': 2
+      }
+    });
+  }
+}
+
+function setEtaVisible(mapbox, visible) {
+  ['mode-eta-line', 'mode-eta-point'].forEach((id) => {
+    if (mapbox.getLayer(id)) {
+      mapbox.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    }
+  });
+}
+
+function syncEtaLayers(mapbox) {
+  const source = mapbox.getSource('mode-eta');
+  if (!source) return;
+  const collection = etaFeatures();
+  source.setData(collection);
+  setEtaVisible(mapbox, collection.features.length > 0);
+}
+
+/** A click on the map sets the point the Predict picker is waiting for. */
+function handleMapClick(event) {
+  if (state.mode !== 'predict' || !state.etaPick) return;
+  const point = [event.lngLat.lng, event.lngLat.lat];
+  const scenario = getLiveState()?.scenario;
+  const geometry = geometryFor(scenario);
+  if (!geometry) {
+    showToast('Corridor geometry is still loading.');
+    return;
+  }
+  if (!nearestEdge(geometry, point)) {
+    showToast('Pick a point on a road.');
+    return;
+  }
+  if (state.etaPick === 'a') state.etaA = point;
+  else state.etaB = point;
+  // A is set first, then the picker moves to B, then it closes.
+  state.etaPick = state.etaPick === 'a' ? 'b' : null;
+  render();
+  syncMapForMode(state.mode);
 }
 
 function syncMapForMode(mode) {
@@ -241,45 +557,29 @@ function syncMapForMode(mode) {
 }
 
 function applyModeLayers(mapbox, mode) {
-  const wantsOptimize = mode === 'optimize';
-  const wantsPredict = mode === 'predict';
-  const wantsPreview = wantsOptimize && Boolean(state.previewId);
-
-  if (wantsOptimize) {
-    ensureAdaptive(mapbox);
-    fadeLayers(mapbox, ['mode-congestion-line'], 0.85);
-    fadeLayers(mapbox, ['mode-reroute-line'], wantsPreview ? 1 : 0.55);
-    if (mapbox.getLayer('mode-forecast-band')) fadeLayers(mapbox, ['mode-forecast-band'], 0);
-    animateDashes(wantsPreview);
+  if (mode === 'optimize') {
+    ensurePreviewLayers(mapbox);
+    setEtaVisible(mapbox, false);
+    syncPreviewLayers(mapbox);
     return;
   }
 
-  if (wantsPredict) {
-    const forecast = modeData.forecast(state.zone, state.minute, [...state.inputs]);
-    const predicted = Math.min(0.96, (LIVE_LOAD + forecast.expectedDelay * 0.9) / 100);
-    ensureAdaptive(mapbox, predicted);
-    ensureForecastBand(mapbox);
-    if (mapbox.getLayer('mode-forecast-band')) {
-      mapbox.setPaintProperty('mode-forecast-band', 'line-width', 16 + forecast.band * 2.4);
-      fadeLayers(mapbox, ['mode-forecast-band'], 0.5);
-    }
-    fadeLayers(mapbox, ['mode-congestion-line'], 0.8);
-    fadeLayers(mapbox, ['mode-reroute-line'], 0);
-    animateDashes(false);
+  if (mode === 'predict') {
+    ensureEtaLayers(mapbox);
+    setPreviewVisible(mapbox, false);
+    syncEtaLayers(mapbox);
     return;
   }
 
-  if (mapbox.getLayer('mode-congestion-line')) {
-    fadeLayers(mapbox, ['mode-congestion-line', 'mode-reroute-line', 'mode-forecast-band'], 0);
-    animateDashes(false);
-  }
+  setPreviewVisible(mapbox, false);
+  setEtaVisible(mapbox, false);
 }
 
 /* -------------------------------------------------------------- mode markup */
 
 function optimizePanel() {
   const recs = modeData
-    .recommendations(state.zone, state.minute)
+    .recommendations(state.zone, nowMinute())
     .filter((rec) => !state.dismissed.has(rec.id));
 
   if (!recs.length) {
@@ -289,7 +589,7 @@ function optimizePanel() {
           icon: 'i-bulb',
           label: 'Optimize',
           title: 'Recommendations',
-          sub: 'Sector 6 · all clear',
+          sub: `${zoneLabel()} · all clear`,
           badge: '0',
           collapseLabel: 'Collapse recommendations panel',
           summaryLabel: 'Top impact',
@@ -349,7 +649,7 @@ function optimizePanel() {
         icon: 'i-bulb',
         label: 'Optimize',
         title: 'Recommendations',
-        sub: 'Sector 6 · ranked by delay saved',
+        sub: `${zoneLabel()} · ranked by delay saved`,
         badge: String(recs.length),
         collapseLabel: 'Collapse recommendations panel',
         summaryLabel: 'Top impact',
@@ -373,8 +673,9 @@ function optimizePanel() {
                 <span class="mp-delta"><i>Flow</i><b>+${preview.throughput}%</b></span>
                 <span class="mp-delta"><i>Efficiency</i><b>+${preview.efficiency}%</b></span>
               </div>
+              ${previewMapMarkup(preview)}
             </div>`
-          : `<p class="mp-foot-note">Impact is a modelled estimate for this sector at ${clock(state.minute)}. Preview before applying.</p>`
+          : `<p class="mp-foot-note">Impact is a modelled estimate for ${zoneLabel()} at ${clock(nowMinute())}. Preview before applying.</p>`
       }
     </aside>`;
 }
@@ -451,7 +752,7 @@ function predictPanel() {
         icon: 'i-cloud-sun',
         label: 'Predict',
         title: 'Forecast',
-        sub: `Sector 6 · ${horizon}`,
+        sub: `${zoneLabel()} · ${horizon}`,
         badge: `${confidence}%`,
         collapseLabel: 'Collapse forecast panel',
         summaryLabel: 'Expected delay',
@@ -482,7 +783,7 @@ function predictPanel() {
         </div>
         <footer class="predict-key">
           <span><i class="is-forecast"></i>Forecast</span>
-          ${state.compareTypical ? '<span><i class="is-typical"></i>Typical day</span>' : ''}
+          ${state.compareTypical ? `<span><i class="is-typical"></i>${forecast.baselineLabel || 'Typical day'}</span>` : ''}
           <span class="predict-key-meta">Peak ${forecast.peak.label}</span>
         </footer>
       </section>
@@ -501,7 +802,7 @@ function predictPanel() {
           <span class="mp-card-meta">${activeCount ? `${activeCount} active` : 'Baseline'}</span>
         </header>
         <div class="whatif-chips">${chips}</div>
-        <p class="predict-note">Toggling an input re-runs the forecast for the selected time.</p>
+        <p class="predict-note">${forecast.basisNote ? `Live basis: ${forecast.basisNote}` : 'Toggling an input re-runs the forecast for the selected time.'}</p>
       </section>
 
       <footer class="mp-footer">
@@ -516,15 +817,191 @@ function predictPanel() {
     </aside>`;
 }
 
+/* ------------------------------------------------------------------ Predict ETA */
+
+/* Pick A and B on the map and the panel reports the road distance and the arrival
+   time that distance implies at the speed the run is measuring. */
+function etaCard(estimate) {
+  const pick = (slot) => {
+    const set = slot === 'a' ? state.etaA : state.etaB;
+    const active = state.etaPick === slot;
+    const letter = slot.toUpperCase();
+    return `<button type="button" class="eta-pick${set ? ' is-set' : ''}${
+      active ? ' is-picking' : ''
+    }" data-eta-pick="${slot}">${
+      active ? 'Click the map…' : set ? `${letter} set` : `Pick ${letter}`
+    }</button>`;
+  };
+
+  const body = !estimate
+    ? `<p class="predict-note">Pick an origin and a destination on the network; the estimate follows the run's own lanes at the measured speed.</p>`
+    : estimate.pending
+      ? `<p class="predict-note">Loading the corridor geometry…</p>`
+      : estimate.error
+        ? `<p class="predict-note">${estimate.error}</p>`
+        : `<div class="eta-result">
+             <strong>${estimate.minutes == null ? '—' : estimate.minutes}<small>min</small></strong>
+             <span>${estimate.distanceKm.toFixed(2)} km · ${estimate.crossings} signal${estimate.crossings === 1 ? '' : 's'}${estimate.speed ? ` · ${Math.round(estimate.speed)} km/h measured` : ''}</span>
+           </div>
+           <p class="predict-note">${
+             estimate.minutes == null
+               ? 'No measured corridor speed yet — start or unpause the run.'
+               : 'Estimated at the measured corridor speed plus 0.4 min per signalised crossing.'
+           }</p>`;
+
+  return `
+    <section class="predict-card eta-card">
+      <header class="mp-card-head">
+        <h3>Route estimate A → B</h3>
+        <span class="mp-card-meta">${
+          estimate && estimate.minutes != null ? `${estimate.minutes} min` : 'pick two points'
+        }</span>
+      </header>
+      <div class="eta-picks">
+        ${pick('a')}
+        ${pick('b')}
+        ${state.etaA || state.etaB ? '<button type="button" class="mp-btn is-ghost" data-eta-clear>Clear</button>' : ''}
+      </div>
+      ${body}
+    </section>`;
+}
+
+/* Predict while a run is live: the measured queue up to now and the backend's
+   projection after it, on one axis. Every projected number carries its basis. */
+function predictLivePanel() {
+  const forecast = liveForecast();
+  const status = forecastState();
+  if (!forecast) {
+    return `
+      <aside class="mode-panel mp-predict" data-panel="predict">
+        ${panelHead({
+          icon: 'i-cloud-sun',
+          label: 'Predict',
+          title: 'Forecast',
+          sub: `${zoneLabel()} · collecting run samples`,
+          badge: '—',
+          collapseLabel: 'Collapse forecast panel',
+          summaryLabel: 'Queue ahead',
+          summaryValue: '—',
+          summaryUnit: 'veh',
+          summaryMeta: status.error || 'needs a few decision ticks'
+        })}
+        <div class="mp-empty">
+          <strong>Collecting samples.</strong>
+          <span>The projection appears once the run has published a few decision ticks${status.error ? ` — ${status.error}` : '.'}</span>
+        </div>
+      </aside>`;
+  }
+
+  const values = forecast.values;
+  const max = Math.max(...values, 1);
+  const toPoint = (value, index) => {
+    const x = values.length > 1 ? (index / (values.length - 1)) * 100 : 0;
+    const y = 34 - (value / max) * 30;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  };
+  const measuredPoints = forecast.measured.map((entry, index) => toPoint(entry.queue, index)).join(' ');
+  const projectedPoints = forecast.projected
+    .map((entry, index) => toPoint(entry.queue, forecast.split + index))
+    .join(' ');
+  const splitX = values.length > 1 ? ((Math.max(1, forecast.split) - 1) / (values.length - 1)) * 100 : 0;
+  const peakIndex = values.lastIndexOf(forecast.peak.queue);
+  const peakPoint = toPoint(forecast.peak.queue, peakIndex < 0 ? values.length - 1 : peakIndex);
+  const peakX = peakPoint.split(',')[0];
+  const peakY = peakPoint.split(',')[1];
+  const horizon = Number(forecast.horizonMin) || 15;
+  const confidence = Math.round(forecast.confidence * 100);
+  const growth = Math.round(forecast.projectedQueue - forecast.currentQueue);
+  const risk = [...forecast.projected].sort((a, b) => b.queue - a.queue).slice(0, 3).sort((a, b) => a.minute - b.minute);
+  const nowClock = forecast.measured[forecast.measured.length - 1]?.clock || '—';
+  const endClock = forecast.projected[forecast.projected.length - 1]?.clock || '—';
+  const estimate = routeEstimate();
+
+  return `
+    <aside class="mode-panel mp-predict" data-panel="predict">
+      ${panelHead({
+        icon: 'i-cloud-sun',
+        label: 'Predict',
+        title: 'Forecast',
+        sub: `${zoneLabel()} · next ${horizon} min`,
+        badge: `${confidence}%`,
+        collapseLabel: 'Collapse forecast panel',
+        summaryLabel: `Queue in ${horizon} min`,
+        summaryValue: `${Math.round(forecast.projectedQueue)}`,
+        summaryUnit: 'veh',
+        summaryMeta: `now ${Math.round(forecast.currentQueue)} · peak ${Math.round(forecast.peak.queue)} at ${forecast.peak.clock}`
+      })}
+
+      <dl class="predict-grid">
+        <div><dt>Now</dt><dd>${Math.round(forecast.currentQueue)}<small>veh queued</small></dd></div>
+        <div><dt>In ${horizon} min</dt><dd>${Math.round(forecast.projectedQueue)}<small>${growth >= 0 ? '+' : ''}${growth} vs now</small></dd></div>
+        <div><dt>Confidence</dt><dd>${confidence}<small>% · ${forecast.samples} samples</small></dd></div>
+      </dl>
+
+      <section class="predict-card">
+        <header class="mp-card-head">
+          <h3>Measured → projected queue</h3>
+          <span class="mp-card-meta">±${forecast.band} veh</span>
+        </header>
+        <div class="predict-spark">
+          <svg viewBox="0 0 100 36" preserveAspectRatio="none" role="img" aria-label="Measured queue and the projected queue">
+            <polyline class="predict-line is-measured" points="${measuredPoints}" />
+            <polyline class="predict-line is-forecast" points="${projectedPoints}" />
+            <line class="predict-now" x1="${splitX.toFixed(2)}" y1="0" x2="${splitX.toFixed(2)}" y2="34" />
+            <circle class="predict-peak" cx="${peakX}" cy="${peakY}" r="1.5" />
+          </svg>
+          <span class="predict-spark-axis"><i>${forecast.measured[0]?.clock || '—'}</i><i>${nowClock}</i><i>${endClock}</i></span>
+        </div>
+        <footer class="predict-key">
+          <span><i class="is-measured"></i>Measured</span>
+          <span><i class="is-forecast"></i>Forecast</span>
+          <span class="predict-key-meta">${forecast.method}</span>
+        </footer>
+      </section>
+
+      <section class="predict-card">
+        <header class="mp-card-head">
+          <h3>Highest projected queue</h3>
+          <span class="mp-card-meta">next ${horizon} min</span>
+        </header>
+        <ul class="risk-list">
+          ${risk
+            .map(
+              (row) => `
+            <li class="risk-row is-${row.queue > forecast.currentQueue * 1.2 ? 'heavy' : row.queue > forecast.currentQueue ? 'busy' : 'steady'}">
+              <span class="risk-time">${row.clock}</span>
+              <span class="risk-bar"><i style="width:${Math.round((row.queue / max) * 100)}%"></i></span>
+              <span class="risk-delay">${Math.round(row.queue)} veh</span>
+            </li>`
+            )
+            .join('')}
+        </ul>
+      </section>
+
+      ${etaCard(estimate)}
+
+      <footer class="mp-footer">
+        <p class="mp-foot-note">Live basis: ${forecast.basisNote}. Projection assumes the vehicle count stays at ${Number(liveMetrics().vehicles) || 0}.</p>
+      </footer>
+    </aside>`;
+}
+
 function roamStrip() {
-  const stats = modeData.roamStats(state.zone, state.minute);
+  const stats = modeData.roamStats(state.zone, nowMinute());
   const segments = stats.segments
     .map(
       (seg) => `
       <li class="roam-seg is-${seg.state}" data-roam-seg="${seg.id}">
-        <span class="roam-seg-name">${seg.label}</span>
-        <span class="roam-seg-speed">${seg.speed} km/h</span>
+        <span class="roam-seg-name">${seg.label}${seg.lanes ? ` · ${seg.lanes} lanes` : ''}</span>
+        <span class="roam-seg-speed">${seg.speed} km/h${seg.queue != null ? ` · ${seg.queue} queued` : ''}</span>
       </li>`
+    )
+    .join('');
+  const classes = roamClassCounts();
+  const classOptions = classes
+    .map(
+      ([key, count]) =>
+        `<option value="${key}"${state.roamClass === key ? ' selected' : ''}>${ROAM_CLASS_LABELS[key] || key} · ${count}</option>`
     )
     .join('');
 
@@ -538,7 +1015,11 @@ function roamStrip() {
       </div>
 
       <div class="roam-pills">
-        <button type="button" class="roam-pill${state.followMode ? ' is-on' : ''}" data-roam-follow>Follow vehicle</button>
+        <select class="roam-pill roam-select" data-roam-class aria-label="Follow a vehicle class"${classes.length ? '' : ' disabled'}>
+          <option value="">Vehicle class</option>${classOptions}
+        </select>
+        <button type="button" class="roam-pill${state.followMode ? ' is-on' : ''}" data-roam-follow aria-pressed="${state.followMode}">Follow vehicle</button>
+        <button type="button" class="roam-pill${state.povMode ? ' is-on' : ''}" data-roam-pov aria-pressed="${state.povMode}">Vehicle POV</button>
         <button type="button" class="roam-pill" data-roam-flythrough>Fly-through</button>
         <button type="button" class="roam-pill" data-roam-open>Segments</button>
         <button type="button" class="roam-pill" data-roam-recenter>Recenter</button>
@@ -550,6 +1031,13 @@ function roamStrip() {
         <li><span class="roam-dot is-jam"></span>Jammed</li>
       </ul>
 
+      <ul class="roam-shortcuts" aria-label="Roam keyboard shortcuts">
+        <li><kbd>F</kbd>Follow</li>
+        <li><kbd>V</kbd>POV</li>
+        <li><kbd>N</kbd><kbd>P</kbd>Cycle</li>
+        <li><kbd>Esc</kbd>Stop</li>
+      </ul>
+
       <div class="roam-inspector" hidden>
         <header><strong data-roam-inspector-title>Inspector</strong><button type="button" class="mp-btn is-ghost" data-roam-close>Close</button></header>
         <ul class="roam-seg-list">${segments}</ul>
@@ -557,25 +1045,215 @@ function roamStrip() {
     </div>`;
 }
 
+/* Roam camera: the map follows one vehicle. The panels own the choice; app.js
+   owns the camera, so the two never fight over who moves the view. */
+function roamVehicles() {
+  return isLive() ? getLiveState()?.vehicles || [] : [];
+}
+
+function pickRoamVehicle(candidates = roamVehicles()) {
+  const vehicles = candidates;
+  if (!vehicles.length) return null;
+  const emergency = vehicles.find(
+    (vehicle) =>
+      vehicle.vehicleClass === 'emergency' || String(vehicle.type || '').includes('emergency')
+  );
+  if (emergency) return emergency;
+  // Follow something that is actually moving: the slowest car is usually stopped
+  // at a red light, which would pin the camera to one corner of the corridor.
+  const moving = vehicles.filter((vehicle) => Number(vehicle.speed) > 1);
+  return [...(moving.length ? moving : vehicles)].sort(
+    (a, b) => Number(b.speed || 0) - Number(a.speed || 0)
+  )[0];
+}
+
+const ROAM_CLASS_LABELS = {
+  passenger: 'Cars',
+  car: 'Cars',
+  taxi: 'Taxis',
+  bus: 'Buses',
+  truck: 'Trucks',
+  trailer: 'Trucks',
+  emergency: 'Emergency',
+  bicycle: 'Bikes',
+  motorcycle: 'Motorcycles'
+};
+
+let roamClassSignature = '';
+let povStopVehicleId = null;
+let povStoppedAt = null;
+
+/** Vehicle classes in the current run, busiest first, for the Roam picker. */
+function roamClassCounts() {
+  const counts = new Map();
+  roamVehicles().forEach((vehicle) => {
+    if (vehicle.pedestrian) return;
+    const key = String(vehicle.vehicleClass || 'car');
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+/** Refresh the picker only when the classes or their counts actually change. */
+function syncRoamClassOptions() {
+  const select = document.querySelector('[data-roam-class]');
+  if (!select) return;
+  // Counts change every snapshot; rebuilding the options while the native
+  // dropdown is open would close it mid-choice. Catch up after it loses focus.
+  if (document.activeElement === select) return;
+  const classes = roamClassCounts();
+  const signature = classes.map(([key, count]) => `${key}:${count}`).join('|');
+  if (signature === roamClassSignature) return;
+  roamClassSignature = signature;
+  select.innerHTML = [
+    '<option value="">Vehicle class</option>',
+    ...classes.map(
+      ([key, count]) =>
+        `<option value="${key}">${ROAM_CLASS_LABELS[key] || key} · ${count}</option>`
+    )
+  ].join('');
+  select.value = classes.some(([key]) => key === state.roamClass) ? state.roamClass : '';
+  if (!select.value) state.roamClass = '';
+  select.disabled = classes.length === 0;
+}
+
+function dispatchRoamFollow(detail) {
+  document.dispatchEvent(new CustomEvent('sumo:roamfollow', { detail }));
+}
+
+function syncRoamPills() {
+  document.querySelectorAll('[data-roam-follow]').forEach((button) => {
+    button.classList.toggle('is-on', state.followMode);
+    button.setAttribute('aria-pressed', String(state.followMode));
+  });
+  document.querySelectorAll('[data-roam-pov]').forEach((button) => {
+    button.classList.toggle('is-on', state.povMode);
+    button.setAttribute('aria-pressed', String(state.povMode));
+  });
+}
+
+function roamView() {
+  return state.povMode ? 'pov' : 'follow';
+}
+
+function followRoamVehicle(vehicle) {
+  if (!vehicle) return;
+  state.followMode = true;
+  state.followVehicleId = vehicle.id;
+  povStopVehicleId = null;
+  povStoppedAt = null;
+  dispatchRoamFollow({ id: vehicle.id, view: roamView() });
+  syncRoamPills();
+  showToast(
+    state.povMode
+      ? `In-vehicle view of ${vehicle.id}.`
+      : `Following ${vehicle.id} at ${Math.round((vehicle.speed || 0) * 3.6)} km/h.`
+  );
+}
+
+function stopRoamFollow() {
+  if (!state.followMode && !state.povMode) return;
+  state.followMode = false;
+  state.povMode = false;
+  state.followVehicleId = null;
+  povStopVehicleId = null;
+  povStoppedAt = null;
+  dispatchRoamFollow(null);
+  syncRoamPills();
+  showToast('Follow mode off.');
+}
+
+/**
+ * A windscreen view of a parked car shows nothing, so POV falls back to chase
+ * after 3 s of simulated standstill. Simulated time (not wall time) means a
+ * paused run never triggers it.
+ */
+function maybeDropStoppedPov() {
+  if (!state.povMode || !state.followVehicleId) {
+    povStopVehicleId = null;
+    povStoppedAt = null;
+    return;
+  }
+  const snapshot = getLiveState();
+  const now = Number(snapshot?.simulationTime);
+  const vehicle = (snapshot?.vehicles || []).find(
+    (item) => String(item.id) === String(state.followVehicleId)
+  );
+  if (!vehicle || !Number.isFinite(now)) {
+    povStopVehicleId = null;
+    povStoppedAt = null;
+    return;
+  }
+  if (String(povStopVehicleId) !== String(vehicle.id)) {
+    povStopVehicleId = vehicle.id;
+    povStoppedAt = now;
+    return;
+  }
+  if (Number(vehicle.speed) > 0.5) {
+    povStoppedAt = now;
+    return;
+  }
+  if (povStoppedAt == null) {
+    povStoppedAt = now;
+    return;
+  }
+  if (now - povStoppedAt < 3) return;
+  state.povMode = false;
+  dispatchRoamFollow({ id: state.followVehicleId, view: 'follow' });
+  syncRoamPills();
+  showToast(`${state.followVehicleId} stopped — switched to chase view.`);
+  povStoppedAt = null;
+}
+
+/** N/P cycle the follow target in a stable id order, keeping the current view. */
+function cycleRoamVehicle(direction) {
+  const vehicles = roamVehicles()
+    .filter((vehicle) => !vehicle.pedestrian)
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  if (!vehicles.length) {
+    showToast('No vehicles in the live run to cycle through.');
+    return;
+  }
+  const current = vehicles.findIndex(
+    (vehicle) => String(vehicle.id) === String(state.followVehicleId)
+  );
+  const index = current < 0 ? 0 : (current + direction + vehicles.length) % vehicles.length;
+  followRoamVehicle(vehicles[index]);
+}
+
 /* --------------------------------------------------------------- dock bits */
 
 function signalEditor() {
-  const timing = modeData.signalTiming(state.zone, state.minute);
+  const timing = modeData.signalTiming(state.zone, nowMinute());
+  const maximum = timing.live ? 90 : 60;
   const rows = timing.phases
-    .map(
-      (phase) => `
-      <label class="sig-row">
-        <span class="sig-name">${phase.label}</span>
-        <input type="range" min="6" max="60" step="1" value="${phase.green}" data-sig="${phase.id}" aria-label="${phase.label} green time">
-        <span class="sig-value" data-sig-value="${phase.id}">${phase.green}s</span>
-      </label>`
-    )
+    .map((phase) => {
+      const value = state.sigDrafts.get(phase.id) ?? phase.green;
+      return `
+      <label class="sig-row${phase.held ? ' is-held' : ''}">
+        <span class="sig-name">${phase.label}${phase.held ? ' <i>held</i>' : ''}</span>
+        <input type="range" min="6" max="${maximum}" step="1" value="${value}" data-sig="${phase.id}" aria-label="${phase.label} green time">
+        <span class="sig-value" data-sig-value="${phase.id}">${value}s</span>
+      </label>`;
+    })
     .join('');
+  const heldCount = timing.phases.filter((phase) => phase.held).length;
+  const caption = timing.live
+    ? `${timing.phases.length} signals${heldCount ? ` · ${heldCount} held open` : ''}`
+    : `${timing.cycle}s cycle`;
 
   return `
     <div class="signal-editor" data-panel="signal-editor" hidden>
-      <header class="signal-head"><h3>Signal timing</h3><span>${timing.cycle}s cycle</span></header>
+      <header class="signal-head"><h3>Signal timing</h3><span>${caption}</span></header>
       <div class="signal-body">${rows}</div>
+      ${
+        timing.live
+          ? `<footer class="signal-foot">
+              <button type="button" class="mp-btn is-apply" data-sig-apply>Apply plan</button>
+              <span class="signal-note">Sets the current phase's duration</span>
+            </footer>`
+          : ''
+      }
     </div>`;
 }
 
@@ -735,7 +1413,7 @@ function syncTabIndicator() {
 function collapsedPill() {
   if (state.mode === 'optimize') {
     const recs = modeData
-      .recommendations(state.zone, state.minute)
+      .recommendations(state.zone, nowMinute())
       .filter((rec) => !state.dismissed.has(rec.id));
     const lead = recs[0];
     return `
@@ -746,11 +1424,24 @@ function collapsedPill() {
   }
 
   if (state.mode === 'predict') {
-    const forecast = modeData.forecast(state.zone, state.minute, [...state.inputs]);
+    const forecast = isLive()
+      ? liveForecast()
+      : modeData.forecast(state.zone, state.minute, [...state.inputs]);
+    if (!forecast) {
+      return `
+      <button type="button" class="mode-pill" data-panel-expand aria-expanded="false" aria-label="Expand forecast">
+        <span class="mode-pill-dot is-predict" aria-hidden="true"></span>
+        <span class="mode-pill-copy"><strong>Forecast</strong><i>collecting run samples</i></span>
+      </button>`;
+    }
+    const peakLabel = isLive() ? forecast.peak.clock : forecast.peak.label;
+    const headline = isLive()
+      ? `${Math.round(forecast.projectedQueue)} veh in ${forecast.horizonMin} min`
+      : `+${forecast.expectedDelay} m`;
     return `
       <button type="button" class="mode-pill" data-panel-expand aria-expanded="false" aria-label="Expand forecast">
         <span class="mode-pill-dot is-predict" aria-hidden="true"></span>
-        <span class="mode-pill-copy"><strong>Peak ${forecast.peak.label}</strong><i>+${forecast.expectedDelay} m · ${Math.round(forecast.confidence * 100)}% conf.</i></span>
+        <span class="mode-pill-copy"><strong>Peak ${peakLabel}</strong><i>${headline} · ${Math.round(forecast.confidence * 100)}% conf.</i></span>
       </button>`;
   }
 
@@ -758,12 +1449,13 @@ function collapsedPill() {
 }
 
 function modeLayerMarkup(mode) {
-  if (mode === 'optimize' || mode === 'predict') {
-    return state.panelCollapsed
-      ? collapsedPill()
-      : mode === 'optimize'
-        ? optimizePanel()
-        : predictPanel();
+  if (mode === 'optimize') {
+    return state.panelCollapsed ? collapsedPill() : optimizePanel();
+  }
+  if (mode === 'predict') {
+    if (state.panelCollapsed) return collapsedPill();
+    // A live run forecasts the run; only the idle demo uses the synthetic day model.
+    return isLive() ? predictLivePanel() : predictPanel();
   }
   return mode === 'roam' ? roamStrip() : '';
 }
@@ -798,9 +1490,32 @@ function swapModeLayer(markup) {
 
 function render() {
   if (!root) return;
+  // Reset when the run changes: a restart must not inherit applied/dismissed rows.
+  const runId = getLiveRunId();
+  if (runId !== lastRunId) {
+    lastRunId = runId;
+    state.applied.clear();
+    state.dismissed.clear();
+    state.sigDrafts.clear();
+    state.previewId = null;
+    saveState();
+  }
   const view = document.getElementById('liveMapView');
   const mode = state.mode;
   const previousMode = lastRenderedMode;
+
+  // The map highlight and the trip estimate both come from the run's own network;
+  // fetch it once per scenario and re-render when it lands.
+  const scenario = getLiveState()?.scenario;
+  if (isLive() && scenario && (mode === 'optimize' || mode === 'predict')) {
+    if (!geometryFor(scenario) && !geometryState(scenario).pending) {
+      loadGeometry(scenario).then(() => {
+        if (getLiveState()?.scenario !== scenario) return;
+        render();
+        syncMapForMode(state.mode);
+      });
+    }
+  }
   const modeChanged = mode !== previousMode;
 
   if (view) view.dataset.mode = mode;
@@ -846,6 +1561,8 @@ function render() {
   }
 
   syncMapForMode(mode);
+  const canvas = getMap()?.getCanvas?.();
+  if (canvas) canvas.style.cursor = mode === 'predict' && state.etaPick ? 'crosshair' : '';
   lastRenderedMode = mode;
 }
 
@@ -867,7 +1584,7 @@ function updateCompareBand() {
   const after = $('.tc-after', compare);
   if (before) before.style.width = `${Math.max(2, progress)}%`;
   const preview = state.previewId
-    ? modeData.recommendations(state.zone, state.minute).find((r) => r.id === state.previewId)
+    ? modeData.recommendations(state.zone, nowMinute()).find((r) => r.id === state.previewId)
     : null;
   if (after) {
     after.style.width = `${Math.max(2, progress)}%`;
@@ -875,26 +1592,39 @@ function updateCompareBand() {
   }
 }
 
+/* The timeline is an operating day starting at 08:00, so a run's elapsed seconds
+   land on that axis, not at 0:00. */
+function timelineMinute(seconds) {
+  return Math.floor((((Number(seconds) || 0) + 8 * 3600) % 86400) / 60);
+}
+
 function updateFutureBand() {
   const future = $('.timeline-future');
   if (!future) return;
+  const live = isLive();
   const forecast = modeData.forecast(state.zone, state.minute, [...state.inputs]);
-  const nowPct = (state.minute / 1440) * 100;
+  // A live run forecasts a horizon of minutes from its own clock; only the idle
+  // demo shades the rest of the day, because that is what it is modelling.
+  const nowMinute = live ? timelineMinute(getLiveState()?.simulationTime) : state.minute;
+  const span = live
+    ? Math.max(5, Number(liveForecast()?.horizonMin) || 15)
+    : 1440 - nowMinute;
+  const nowPct = (nowMinute / 1440) * 100;
   future.style.left = `${nowPct}%`;
-  future.style.width = `${Math.max(0, 100 - nowPct)}%`;
+  future.style.width = `${Math.max(0, (span / 1440) * 100)}%`;
   future.style.setProperty('--band', `${Math.min(34, 10 + forecast.band * 4)}px`);
 
   const handle = $('.timeline-forecast-handle');
   if (handle) {
-    const target = Number(handle.dataset.minute || Math.min(1439, state.minute + 120));
+    const target = Number(
+      handle.dataset.minute || (live ? nowMinute + span : Math.min(1439, state.minute + 120))
+    );
     handle.style.left = `${(Number(target) / 1440) * 100}%`;
   }
 }
 
 /* ----------------------------------------------------------------- gauges */
 
-const LIVE_LOAD = 52;
-const LIVE_EFFICIENCY = 46;
 
 function setGaugeValue(index, value) {
   const hosts = $$('[data-gauge]');
@@ -910,6 +1640,12 @@ function setGaugeGhost(index, value) {
 }
 
 /* Numbers count between values instead of jumping. */
+function setDockMetricText(selector, text) {
+  const metric = $(selector);
+  if (!metric?.firstChild) return;
+  metric.firstChild.nodeValue = String(text);
+}
+
 function setDockMetric(selector, value) {
   const metric = $(selector);
   if (!metric?.firstChild) return;
@@ -930,43 +1666,107 @@ function setDockMetric(selector, value) {
   requestAnimationFrame(tick);
 }
 
+/* The header lines are data too: they name what the gauges are measuring. */
+function syncGaugeCaptions() {
+  const loadSub = $('.live-load-card .live-dock-sub');
+  if (loadSub) {
+    const metrics = liveMetrics();
+    loadSub.textContent = isLive()
+      ? `${Number(metrics.vehicles) || 0} vehicles · ${Number(metrics.queued) || 0} queued`
+      : zoneLabel();
+  }
+}
+
+/* Efficiency delta against the first sample of the run, not a fixed +4.2. */
+function syncEfficiencyDelta() {
+  const delta = $('.live-efficiency-card .live-dock-delta');
+  if (!delta) return;
+  const current = liveEfficiency();
+  const history = getLiveHistory();
+  const first = history.length > 1 ? history[0] : null;
+  if (current == null || !first) {
+    delta.innerHTML = '<strong>—</strong> vs. run start';
+    return;
+  }
+  const startVehicles = Number(first.vehicles) || 0;
+  const startQueued = Number(first.queued) || 0;
+  const startLoad = startVehicles ? (startQueued / startVehicles) * 100 : 0;
+  const startEfficiency = Math.max(0, Math.min(100, 100 - startLoad * 0.82));
+  const diff = current - startEfficiency;
+  const magnitude = Math.abs(diff).toFixed(1);
+  const sign = diff > 0.05 ? '+' : diff < -0.05 ? '−' : '';
+  delta.innerHTML = `<strong>${sign}${magnitude}</strong> vs. run start`;
+}
+
 function syncGaugesForMode() {
   const loadSelector = '.live-load-card .live-dock-metric';
   const effSelector = '.live-efficiency-card .live-dock-metric';
+  syncGaugeCaptions();
 
   if (state.mode === 'optimize') {
-    const base = modeData.recommendations(state.zone, state.minute);
+    const base = modeData.recommendations(state.zone, nowMinute());
     const preview = state.previewId ? base.find((r) => r.id === state.previewId) : null;
-    const projectedLoad = preview ? preview.projected.load : LIVE_LOAD;
-    const projectedEff = preview ? preview.projected.efficiency : LIVE_EFFICIENCY;
+    const projectedLoad = preview ? preview.projected.load : (liveLoad() ?? 0);
+    const projectedEff = preview ? preview.projected.efficiency : (liveEfficiency() ?? 0);
     setGaugeValue(0, projectedLoad);
     setGaugeValue(1, projectedEff);
-    setGaugeGhost(0, preview ? LIVE_LOAD : null);
-    setGaugeGhost(1, preview ? LIVE_EFFICIENCY : null);
+    setGaugeGhost(0, preview ? (liveLoad() ?? 0) : null);
+    setGaugeGhost(1, preview ? (liveEfficiency() ?? 0) : null);
     setDockMetric(loadSelector, projectedLoad);
     setDockMetric(effSelector, projectedEff);
     return;
   }
 
   if (state.mode === 'predict') {
-    const forecast = modeData.forecast(state.zone, state.minute, [...state.inputs]);
-    const predictedLoad = Math.min(96, LIVE_LOAD + forecast.expectedDelay * 0.9);
-    const predictedEff = Math.max(24, LIVE_EFFICIENCY - forecast.band);
+    const metrics = liveMetrics();
+    const vehicles = Number(metrics.vehicles) || 0;
+    const forecast = isLive() ? liveForecast() : null;
+    const current = liveLoad();
+    // Projected load assumes the vehicle count stays where it is now; the panel shows
+    // the projection with its confidence for that reason.
+    const projected = forecast && vehicles
+      ? Math.round(Math.min(100, (forecast.projectedQueue / vehicles) * 100))
+      : null;
+    const predictedLoad = projected ?? current ?? 0;
+    const predictedEff = Math.round(Math.max(0, 100 - predictedLoad * 0.82));
     setGaugeValue(0, predictedLoad);
     setGaugeValue(1, predictedEff);
-    setGaugeGhost(0, LIVE_LOAD);
-    setGaugeGhost(1, LIVE_EFFICIENCY);
-    setDockMetric(loadSelector, predictedLoad);
+    setGaugeGhost(0, current);
+    setGaugeGhost(1, liveEfficiency());
+    if (projected == null) setDockMetricText(loadSelector, '—');
+    else setDockMetric(loadSelector, projected);
     setDockMetric(effSelector, predictedEff);
     return;
   }
 
-  setGaugeValue(0, LIVE_LOAD);
-  setGaugeValue(1, LIVE_EFFICIENCY);
+  const load = liveLoad();
+  const efficiency = liveEfficiency();
+  // Idle means nothing measured yet: empty gauges, not a permanent 52% / 46%.
+  setGaugeValue(0, load ?? 0);
+  setGaugeValue(1, efficiency ?? 0);
   setGaugeGhost(0, null);
   setGaugeGhost(1, null);
-  setDockMetric(loadSelector, LIVE_LOAD);
-  setDockMetric(effSelector, LIVE_EFFICIENCY);
+  if (load == null) setDockMetricText(loadSelector, '—');
+  else setDockMetric(loadSelector, load);
+  if (efficiency == null) setDockMetricText(effSelector, '—');
+  else setDockMetric(effSelector, efficiency);
+  syncEfficiencyDelta();
+}
+
+/** app.js calls this on every published simulation snapshot. */
+export function refreshLiveGauges() {
+  if (state.mode === 'roam') {
+    syncRoamClassOptions();
+    maybeDropStoppedPov();
+  }
+  if (state.mode === 'predict' && isLive()) {
+    refreshForecast(15).then((arrived) => {
+      if (!arrived) return;
+      render();
+      syncGaugesForMode();
+    });
+  }
+  syncGaugesForMode();
 }
 
 /* ------------------------------------------------------------------ presets */
@@ -1013,7 +1813,7 @@ function setMinute(minute) {
 
 function wire() {
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('[data-rec-apply],[data-rec-preview],[data-rec-dismiss],[data-rec-clear],[data-whatif],[data-compare-toggle],[data-sig],[data-roam-seg],[data-roam-open],[data-roam-follow],[data-roam-flythrough],[data-roam-recenter],[data-roam-close],[data-preset],[data-panel-toggle],[data-panel-collapse],[data-panel-expand]');
+    const target = event.target.closest('[data-rec-apply],[data-rec-preview],[data-rec-dismiss],[data-rec-clear],[data-whatif],[data-compare-toggle],[data-sig-apply],[data-eta-pick],[data-eta-clear],[data-roam-seg],[data-roam-open],[data-roam-follow],[data-roam-pov],[data-roam-flythrough],[data-roam-recenter],[data-roam-close],[data-preset],[data-panel-toggle],[data-panel-collapse],[data-panel-expand]');
     if (!target) return;
 
     if (target.dataset.recApply) {
@@ -1021,13 +1821,36 @@ function wire() {
       if (state.applied.has(id)) {
         state.applied.delete(id);
         showToast('Recommendation reverted.');
-      } else {
-        state.applied.add(id);
-        showToast('Recommendation applied to the corridor.');
+        saveState();
+        render();
+        syncGaugesForMode();
+        return;
       }
-      saveState();
-      render();
-      syncGaugesForMode();
+      const rec = modeData
+        .recommendations(state.zone, nowMinute())
+        .find((entry) => entry.id === id);
+      if (!rec) return;
+      if (!rec.junction) {
+        showToast('Start a live run to change a signal.');
+        return;
+      }
+      target.disabled = true;
+      applySignalChange(rec.junction, rec.green)
+        .then((snapshot) => {
+          setLiveState(snapshot, snapshot.trend);
+          state.applied.add(id);
+          saveState();
+          showToast(
+            rec.held
+              ? `${rec.junction} green held for ${rec.green}s.`
+              : `${rec.junction} green extended to ${rec.green}s.`
+          );
+        })
+        .catch((error) => showToast(`Not applied: ${error.message}`))
+        .finally(() => {
+          render();
+          syncGaugesForMode();
+        });
       return;
     }
 
@@ -1059,6 +1882,24 @@ function wire() {
       return;
     }
 
+    if (target.dataset.etaPick) {
+      const slot = target.dataset.etaPick;
+      state.etaPick = state.etaPick === slot ? null : slot;
+      render();
+      syncMapForMode(state.mode);
+      return;
+    }
+
+    if ('etaClear' in target.dataset) {
+      state.etaA = null;
+      state.etaB = null;
+      state.etaPick = null;
+      etaMemo = { key: null, value: null };
+      render();
+      syncMapForMode(state.mode);
+      return;
+    }
+
     if (target.dataset.whatif) {
       const id = target.dataset.whatif;
       if (state.inputs.has(id)) state.inputs.delete(id);
@@ -1077,10 +1918,32 @@ function wire() {
       return;
     }
 
-    if (target.dataset.sig) {
-      const value = Number(target.value);
-      const out = $(`[data-sig-value="${target.dataset.sig}"]`);
-      if (out) out.textContent = `${value}s`;
+    if ('sigApply' in target.dataset) {
+      const timing = modeData.signalTiming(state.zone, nowMinute());
+      const staged = [...state.sigDrafts.entries()]
+        .map(([id, green]) => {
+          const phase = timing.phases.find((entry) => entry.id === id);
+          return phase?.tls ? { tls: phase.tls, green } : null;
+        })
+        .filter(Boolean);
+      if (!staged.length) {
+        showToast('Move a slider to stage a change.');
+        return;
+      }
+      target.disabled = true;
+      Promise.allSettled(staged.map((entry) => applySignalChange(entry.tls, entry.green))).then(
+        (results) => {
+          const applied = results.filter((result) => result.status === 'fulfilled').length;
+          const refused = results.length - applied;
+          state.sigDrafts.clear();
+          render();
+          showToast(
+            refused
+              ? `${applied} split(s) applied, ${refused} refused by the run.`
+              : `${applied} split(s) applied to the live run.`
+          );
+        }
+      );
       return;
     }
 
@@ -1106,23 +1969,87 @@ function wire() {
     }
 
     if ('roamFollow' in target.dataset) {
-      state.followMode = !state.followMode;
-      target.classList.toggle('is-on', state.followMode);
-      showToast(state.followMode ? 'Following vehicle M-204.' : 'Follow mode off.');
+      if (state.followMode) {
+        state.followMode = false;
+        state.povMode = false;
+        state.followVehicleId = null;
+        dispatchRoamFollow(null);
+        syncRoamPills();
+        showToast('Follow mode off.');
+        return;
+      }
+      const vehicle = pickRoamVehicle();
+      if (!vehicle) {
+        showToast('Start a live run with vehicles to follow.');
+        return;
+      }
+      state.followMode = true;
+      state.povMode = false;
+      state.followVehicleId = vehicle.id;
+      dispatchRoamFollow({ id: vehicle.id, view: 'follow' });
+      syncRoamPills();
+      showToast(`Following ${vehicle.id} at ${Math.round((vehicle.speed || 0) * 3.6)} km/h.`);
+      return;
+    }
+
+    if ('roamPov' in target.dataset) {
+      if (state.povMode) {
+        state.povMode = false;
+        if (state.followVehicleId) {
+          dispatchRoamFollow({ id: state.followVehicleId, view: 'follow' });
+        } else {
+          state.followMode = false;
+          dispatchRoamFollow(null);
+        }
+        syncRoamPills();
+        showToast(state.followVehicleId ? 'Back to chase view.' : 'POV off.');
+        return;
+      }
+      const followed = roamVehicles().find((vehicle) => vehicle.id === state.followVehicleId);
+      const vehicle = followed || pickRoamVehicle();
+      if (!vehicle) {
+        showToast('Start a live run with vehicles for the in-vehicle view.');
+        return;
+      }
+      state.followMode = true;
+      state.povMode = true;
+      state.followVehicleId = vehicle.id;
+      povStopVehicleId = null;
+      povStoppedAt = null;
+      dispatchRoamFollow({ id: vehicle.id, view: 'pov' });
+      syncRoamPills();
+      showToast(`In-vehicle view of ${vehicle.id}.`);
       return;
     }
 
     if ('roamFlythrough' in target.dataset) {
       const mapbox = getMap();
       if (!mapbox) return showToast('Map is not ready yet.');
-      mapbox.flyTo({ center: [7.4245, 43.7335], zoom: 15.6, pitch: 58, bearing: 34, duration: prefersReducedMotion() ? 0 : 2600, essential: true });
+      const scenario = getScenario();
+      if (!scenario?.liveCenter) return showToast('Scenario view is not available yet.');
+      mapbox.flyTo({
+        center: scenario.liveCenter,
+        zoom: (scenario.liveZoom || 15) + 0.4,
+        pitch: 58,
+        bearing: 34,
+        duration: prefersReducedMotion() ? 0 : 2600,
+        essential: true
+      });
       return;
     }
 
     if ('roamRecenter' in target.dataset) {
       const mapbox = getMap();
       if (!mapbox) return;
-      mapbox.easeTo({ center: [7.4245, 43.7335], zoom: 14.6, pitch: 45, bearing: 0, duration: prefersReducedMotion() ? 0 : 900 });
+      const scenario = getScenario();
+      if (!scenario?.liveCenter) return showToast('Scenario view is not available yet.');
+      mapbox.easeTo({
+        center: scenario.liveCenter,
+        zoom: scenario.liveZoom || 15,
+        pitch: 45,
+        bearing: 0,
+        duration: prefersReducedMotion() ? 0 : 900
+      });
       return;
     }
 
@@ -1159,6 +2086,18 @@ function wire() {
     }
   });
 
+  // Signal sliders stage a change only; nothing is sent until Apply is pressed.
+  document.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !('sig' in target.dataset)) return;
+    const value = Number(target.value);
+    const out = $(`[data-sig-value="${target.dataset.sig}"]`);
+    if (out) out.textContent = `${value}s`;
+    const timing = modeData.signalTiming(state.zone, nowMinute());
+    const phase = timing.phases.find((entry) => entry.id === target.dataset.sig);
+    if (timing.live && phase?.tls) state.sigDrafts.set(target.dataset.sig, value);
+  });
+
   // Timeline scrubbing drives the mode panels.
   const scrubber = document.getElementById('simulationTime');
   scrubber?.addEventListener('input', () => {
@@ -1169,11 +2108,80 @@ function wire() {
   document.addEventListener('sumo:livetabchange', (event) => {
     state.mode = event.detail?.tab || 'events';
     state.panelCollapsed = false;
+    if (state.mode !== 'roam' && (state.followMode || state.povMode)) {
+      state.followMode = false;
+      state.povMode = false;
+      state.followVehicleId = null;
+      dispatchRoamFollow(null);
+    }
     if (state.mode !== 'optimize') state.previewId = null;
     render();
     syncGaugesForMode();
+    if (state.mode === 'predict' && isLive()) {
+      refreshForecast(15).then((arrived) => {
+        if (!arrived) return;
+        render();
+        syncGaugesForMode();
+      });
+    }
     syncTabIndicator();
     showModeHint();
+  });
+
+  // The followed vehicle can leave the run (arrived, teleported, run restarted).
+  document.addEventListener('sumo:roamfollowlost', () => {
+    if (!state.followMode && !state.povMode) return;
+    state.followMode = false;
+    state.povMode = false;
+    state.followVehicleId = null;
+    syncRoamPills();
+    showToast('Follow ended: that vehicle left the live run.');
+  });
+
+  // Clicking a vehicle on the Roam map retargets the camera. app.js finds the
+  // nearest rendered vehicle (the 3D bodies are a custom layer, so Mapbox cannot
+  // query them) and sends the id here.
+  document.addEventListener('sumo:roamvehiclepick', (event) => {
+    if (state.mode !== 'roam') return;
+    const id = String(event.detail?.id || '');
+    const vehicle = roamVehicles().find((item) => String(item.id) === id);
+    if (!vehicle) return;
+    state.followMode = true;
+    state.followVehicleId = vehicle.id;
+    dispatchRoamFollow({ id: vehicle.id, view: state.povMode ? 'pov' : 'follow' });
+    syncRoamPills();
+    showToast(
+      state.povMode
+        ? `In-vehicle view of ${vehicle.id}.`
+        : `Following ${vehicle.id} at ${Math.round((vehicle.speed || 0) * 3.6)} km/h.`
+    );
+  });
+
+  // The class picker targets a representative of the chosen class. Emergency and
+  // bus are explicitly selectable even when cars dominate the headcount.
+  document.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement) || !('roamClass' in target.dataset)) return;
+    state.roamClass = target.value;
+    if (!state.roamClass) return;
+    const candidates = roamVehicles().filter(
+      (vehicle) =>
+        !vehicle.pedestrian && String(vehicle.vehicleClass || 'car') === state.roamClass
+    );
+    const vehicle = pickRoamVehicle(candidates);
+    if (!vehicle) {
+      showToast('No vehicle of that class in the run right now.');
+      return;
+    }
+    state.followMode = true;
+    state.followVehicleId = vehicle.id;
+    dispatchRoamFollow({ id: vehicle.id, view: state.povMode ? 'pov' : 'follow' });
+    syncRoamPills();
+    showToast(
+      state.povMode
+        ? `In-vehicle view of ${vehicle.id}.`
+        : `Following ${ROAM_CLASS_LABELS[state.roamClass] || state.roamClass}: ${vehicle.id}.`
+    );
   });
 
   const view = document.getElementById('liveMapView');
@@ -1187,6 +2195,27 @@ function wire() {
 
     if (event.key >= '1' && event.key <= '4') {
       document.querySelector(`[data-live-mode="${tabs[Number(event.key) - 1]}"]`)?.click();
+      return;
+    }
+
+    if (state.mode === 'roam' && !event.shiftKey) {
+      const key = event.key.toLowerCase();
+      if (key === 'f') {
+        document.querySelector('[data-roam-follow]')?.click();
+        return;
+      }
+      if (key === 'v') {
+        document.querySelector('[data-roam-pov]')?.click();
+        return;
+      }
+      if (key === 'n' || key === 'p') {
+        cycleRoamVehicle(key === 'n' ? 1 : -1);
+        return;
+      }
+    }
+
+    if (state.mode === 'roam' && event.key === 'Escape') {
+      stopRoamFollow();
       return;
     }
 
@@ -1222,7 +2251,7 @@ function showModeHint() {
   const hints = {
     optimize: 'Optimize · preview a recommendation to see its effect on the map.',
     predict: 'Predict · scrub past now to shade the forecast window.',
-    roam: 'Roam · free camera over the live network.',
+    roam: 'Roam · click a vehicle, F follow, V POV, N/P cycle, Esc stop.',
     events: ''
   };
   const hint = hints[state.mode];
@@ -1234,6 +2263,7 @@ function showModeHint() {
 export function initModes(options = {}) {
   getMap = options.getMap || (() => window.sumoLiveMap || null);
   showToast = options.showToast || (() => {});
+  getScenario = options.getScenario || (() => null);
   mount();
 
   /* The map style is often still loading on first paint; re-apply the mode's
@@ -1254,8 +2284,17 @@ export function initModes(options = {}) {
       mapbox.on?.('style.load', () => syncMapForMode(state.mode));
     }
   if (mapbox) {
+    if (!clickHooked) {
+      clickHooked = true;
+      mapbox.on?.('click', handleMapClick);
+    }
     syncMapForMode(state.mode);
-    if (state.mode === 'events' || mapbox.getLayer?.('mode-congestion-line')) return;
+    // Events needs no mode layers; the others are ready once their own source exists.
+    const ready =
+      state.mode === 'events' ||
+      mapbox.getLayer?.('mode-approach-line') ||
+      mapbox.getLayer?.('mode-eta-line');
+    if (ready) return;
   }
   if (attempt < 60) window.setTimeout(() => attachToMap(attempt + 1), 250);
   };

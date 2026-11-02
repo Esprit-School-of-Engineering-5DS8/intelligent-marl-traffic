@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import shutil
+import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -247,7 +248,9 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
     final_dir = directory
     # Build in a private directory and rename at the end: parallel runs may request the
     # same bundle, and a half-written bundle must never be visible.
-    directory = final_dir.with_name(f"{final_dir.name}.tmp{os.getpid()}")
+    # Unique per call, not per process: two generations in one process (the dashboard
+    # retiring a run while another starts) used to delete each other's work in progress.
+    directory = final_dir.with_name(f"{final_dir.name}.tmp{os.getpid()}-{uuid.uuid4().hex[:6]}")
     shutil.rmtree(directory, ignore_errors=True)
     directory.mkdir(parents=True)
 
@@ -380,7 +383,11 @@ def generate(request: DemandRequest, force: bool = False) -> RouteBundle:
 
     # pedestrians walking between random points of the street network
     if "pedestrians" in scen_cfg:
-        rate = float(scen_cfg["pedestrians"]["persons_per_hour"])
+        # The network's own footfall wins: a city-scale net and a four-junction
+        # corridor do not carry the same number of people.
+        rate = float(
+            dem.get("pedestrians_per_hour") or scen_cfg["pedestrians"]["persons_per_hour"]
+        )
         walkable = [net.getEdge(e) for e in walkable_component(net)]
         ped_times = poisson_arrivals(rate, 0.0, end, rng["pedestrians"])
         ped_file = directory / "persons.rou.xml"

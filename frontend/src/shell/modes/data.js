@@ -10,6 +10,14 @@
  * dashboard never "flickers" between renders.
  */
 
+import {
+  liveEfficiency,
+  liveForecast,
+  liveRecommendations,
+  liveRoamStats,
+  liveSignalTiming,
+} from './live.js';
+
 const ZONES = {
   'sec-6': { id: 'sec-6', name: 'Sector 6', junction: 'Junction 4', baseDelay: 18, baseVolume: 12500 },
   'sec-4': { id: 'sec-4', name: 'Sector 4', junction: 'Junction 2', baseDelay: 11, baseVolume: 9400 },
@@ -68,6 +76,10 @@ const RECOMMENDATION_BLUEPRINTS = [
 ];
 
 function recommendations(zoneId, minuteOfDay) {
+  // A live run wins over the deterministic sample: the panels then describe the
+  // corridor that is actually being simulated.
+  const live = liveRecommendations();
+  if (live) return live;
   const z = zone(zoneId);
   const t = Number(minuteOfDay) || 0;
   const load = 0.75 + noise(`${z.id}-load-${Math.floor(t / 30)}`) * 0.5;
@@ -94,6 +106,8 @@ function recommendations(zoneId, minuteOfDay) {
 }
 
 function signalTiming(zoneId, minuteOfDay) {
+  const live = liveSignalTiming();
+  if (live) return live;
   const z = zone(zoneId);
   const phase = Math.floor((Number(minuteOfDay) || 0) / 15);
   const wave = noise(`${z.id}-signal-${phase}`);
@@ -116,6 +130,8 @@ const FORECAST_INPUTS = [
 ];
 
 function forecast(zoneId, minuteOfDay, activeInputs = []) {
+  const live = liveForecast();
+  if (live) return live;
   const z = zone(zoneId);
   const t = Number(minuteOfDay) || 0;
   const active = new Set(activeInputs);
@@ -163,6 +179,8 @@ function forecast(zoneId, minuteOfDay, activeInputs = []) {
 /* -------------------------------------------------------------------- Roam */
 
 function roamStats(zoneId, minuteOfDay) {
+  const live = liveRoamStats();
+  if (live) return live;
   const z = zone(zoneId);
   const t = Number(minuteOfDay) || 0;
   const n = noise(`${z.id}-roam-${Math.floor(t / 10)}`);
@@ -187,38 +205,6 @@ export function formatClock(minutes) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
-function congestionFeatureCollection(zoneId, intensity = 1) {
-  // A short Monaco corridor, roughly matching the live scene's default view.
-  const line = [
-    [7.4155, 43.7295],
-    [7.4195, 43.7312],
-    [7.4235, 43.7328],
-    [7.4275, 43.7344],
-    [7.4315, 43.7359]
-  ];
-  const split = [
-    [7.4235, 43.7328],
-    [7.4265, 43.7349],
-    [7.4298, 43.7372]
-  ];
-  const z = zone(zoneId);
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: { kind: 'corridor', intensity, zone: z.id },
-        geometry: { type: 'LineString', coordinates: line }
-      },
-      {
-        type: 'Feature',
-        properties: { kind: 'reroute', intensity: Math.min(1, intensity + 0.15), zone: z.id },
-        geometry: { type: 'LineString', coordinates: split }
-      }
-    ]
-  };
-}
-
 /* ------------------------------------------------------------------ Adapter */
 
 export function createModeAdapter(provider) {
@@ -226,8 +212,7 @@ export function createModeAdapter(provider) {
     recommendations: (zoneId, minute) => provider.recommendations(zoneId, minute),
     signalTiming: (zoneId, minute) => provider.signalTiming(zoneId, minute),
     forecast: (zoneId, minute, inputs) => provider.forecast(zoneId, minute, inputs),
-    roamStats: (zoneId, minute) => provider.roamStats(zoneId, minute),
-    congestion: (zoneId, intensity) => provider.congestion(zoneId, intensity)
+    roamStats: (zoneId, minute) => provider.roamStats(zoneId, minute)
   };
 }
 
@@ -235,8 +220,7 @@ export const mockProvider = {
   recommendations,
   signalTiming,
   forecast,
-  roamStats,
-  congestion: congestionFeatureCollection
+  roamStats
 };
 
 export const modeData = createModeAdapter(mockProvider);

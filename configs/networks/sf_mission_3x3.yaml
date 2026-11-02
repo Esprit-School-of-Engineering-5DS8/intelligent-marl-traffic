@@ -61,6 +61,11 @@ neighbours:
 demand:
   # placeholder until `cotraffic calibrate-demand --net sf_mission_3x3` runs
   peak_vehicles_per_hour: 2600
+  # The live window keeps the medium rate (0.7 x peak): nine junctions cannot drain
+  # a calibrated-peak inflow in a 10-minute window.
+  live_vehicles_per_hour: 1800
+  # Nine crossings over six arterials: more footfall than the 2x2, less than Tunis.
+  pedestrians_per_hour: 1400
   origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
   opposite_side_prob: 0.5
   route_random_factor: 1.2
