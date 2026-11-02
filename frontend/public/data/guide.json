@@ -1,0 +1,325 @@
+{
+ "source": "docs/RESUME_CONTROLEUR_FINAL.md; code excerpts located in the files (scripts/export_guide.py)",
+ "title": "Le contrôleur final de CoTraffic : résumé complet, partie par partie",
+ "commit": "760fd07",
+ "intro": "Pour chaque partie : **ce qu'elle fait**, **le calcul exact**, **comment on est arrivé au\nrésultat**, et **où se trouve le code**. Les liens pointent vers les fichiers du dépôt (les\nnuméros de ligne sont ceux de la branche `feat/frontend-pro`). Les chiffres viennent de\n`results/combined/` (évaluation finale) et `results/exploration/combined/` (validation).",
+ "sections": [
+  {
+   "id": "part-0",
+   "number": "0",
+   "title": "La vue d'ensemble en un schéma",
+   "markdown": "```\n            toutes les 5 s, à chaque feu\n capteurs ──► [1] COOP-FULL (PPO) note chaque phase ──► logits\n                                                          │\n compteurs ─► [2] Max-Pressure choisit sa phase ──► +4 sur le logit de cette phase (β = 4)\n                                                          │  phase = la plus haute note\n ambulance ─► [3] EV-RULE : ambulance à < 200 m ? ──► oui : sa phase remplace tout\n                                                          │\n              [4] Bouclier : vert min 10 s, rouge max 90 s, vert max 60 s ──► feu SUMO\n```\n\nDepuis le 2 novembre, une cinquième couche, le **LLM stratège**, choisit au-dessus de cette chaîne le mode du réseau toutes les 5 minutes (partie 13 bis, exploratoire). Le chemin pour arriver là :\n\n```\n15 variantes ──► classement sur graines de validation 1000, 1001, 1002 ──► H2 β = 4 retenue\n      ──► oracle de stratégie (phase B) : pas de place pour un LLM stratège ──► arrêt\n      ──► pré-enregistrement figé (commit 2c0dd1d) ──► évaluation unique : 1 265 épisodes,\n          graines de test 0 à 4 ──► analyse figée : 36 tests, Holm ──► figures et tableau de bord\n```"
+  },
+  {
+   "id": "part-1",
+   "number": "1",
+   "title": "Le terrain : la simulation et le protocole",
+   "markdown": "**Ce que c'est.** Le trafic est simulé avec SUMO. Chaque feu est un agent qui décide toutes\nles 5 s. Trois réseaux :\n\n- `grid4x4` : grille de 16 carrefours (entraînement et évaluation) ;\n- `real_district` : quartier réel de Tunis importé d'OpenStreetMap, 7 feux ;\n- `grid8x8` : grille de 64 carrefours, **jamais vue à l'entraînement** (généralisation).\n\n**Un épisode d'évaluation** dure 90 min simulées : 15 min de mise en route (non comptées),\n60 min mesurées, 15 min pour laisser finir les véhicules partis pendant l'heure mesurée.\n\n**Les temps des feux** (identiques pour tous les contrôleurs) : décision toutes les 5 s,\njaune 3 s, vert minimal 10 s, vert maximal 60 s, rouge maximal 90 s pour une file qui attend.\n\n**Code.**\n- Tous ces nombres : [configs/protocol.yaml](../configs/protocol.yaml) (lignes 5-10 pour les\n  temps des feux, 23-27 pour l'épisode).\n- L'environnement (un agent par feu, une décision toutes les 5 s) :\n  [src/cotraffic/envs/traffic_env.py](../src/cotraffic/envs/traffic_env.py), méthode `step`\n  ligne 180.\n- Les graines : [src/cotraffic/seeds.py](../src/cotraffic/seeds.py) : test = 0 à 999,\n  validation = 1000 à 1999. **Rien n'a jamais été réglé sur une graine de test.**"
+  },
+  {
+   "id": "part-2",
+   "number": "2",
+   "title": "Couche 1 : COOP-FULL, l'agent appris",
+   "markdown": "### Ce qu'il fait\nUn réseau de neurones regarde la situation d'un carrefour et donne une **note (logit) à\nchaque phase** : 2 phases sur la grille (nord-sud, est-ouest), jusqu'à 3 dans le quartier\nréel. Seul, il choisirait la phase de plus haute note.\n\n### Ce qu'il voit (l'observation)\nUn vecteur de nombres entre 0 et 1, fait de blocs :\n\n| Bloc | Contenu | Taille sur la grille |\n|---|---|---|\n| voies | par voie d'arrivée : file, densité, vitesse | 4 côtés × 2 voies × 3 = 24 |\n| phase | phase actuelle, file et pression servies par chaque phase, temps écoulé, vert minimal atteint | 3 × 2 + 2 = 8 |\n| voisins | message de chaque voisin amont : sa file vers nous, s'il nous envoie du trafic, sa plus forte pression | 4 × 3 = 12 |\n| urgences | ambulance qui arrive et sa proximité, par côté et par phase | 4 × 2 + 2 = 10 |\n| piétons | piétons qui attendent, par passage | 4 |\n| bus | bus pondérés par leur occupation, par côté | 4 |\n\nTotal : **62 valeurs** sur la grille (78 dans le quartier réel, qui a 3 voies par côté et 3\nphases). Les cases manquantes sont remplies de zéros, pour qu'un même réseau serve à tous\nles carrefours.\n\n### Ce qu'il apprend à faire (la récompense)\nÀ chaque décision, pour chaque feu :\n\n```\nr = − ΔAttente / n_attente  − 0,5 × CO2 / n_CO2  − 2,0 × AttenteAmbulances / n_amb\n    − 0,5 × AttentePiétons / n_piétons            (puis bornée entre −5 et +5)\n```\n\n- **ΔAttente** : augmentation de l'attente des véhicules sur les voies d'arrivée **depuis\n  leur entrée sur ces voies** (on ne punit pas l'agent pour un bouchon causé ailleurs),\n  pondérée par le nombre de personnes (un bus compte plus qu'une voiture).\n- Les constantes `n_*` mettent chaque terme à l'échelle 1, à partir de simulations de\n  référence.\n- Le poids 2,0 sur les ambulances explique pourquoi COOP-FULL les sert bien.\n\n### Comment il a été entraîné\n- **PPO** avec **partage des paramètres** : un seul réseau pour tous les carrefours.\n- Deux couches cachées de 64 neurones ; 500 000 décisions d'agent par entraînement.\n- Demandes variées (faible, moyenne, pointe, profil d'heure de pointe), avec ambulances,\n  piétons et bus dans chaque épisode.\n- **3 entraînements indépendants** (modèles t1, t2, t3) par réseau ; pour chacun, le\n  meilleur des 4 derniers points de sauvegarde, choisi sur la graine de validation 1000.\n\n### Code\n- Observation : [src/cotraffic/envs/observations.py](../src/cotraffic/envs/observations.py),\n  `block_sizes` lignes 75-90.\n- Récompense : [src/cotraffic/envs/rewards.py](../src/cotraffic/envs/rewards.py), formule\n  lignes 1-17, calcul `raw_terms` lignes 92-135, combinaison `combine` lignes 137-147.\n- Configuration de COOP-FULL : [configs/agents/coop_full.yaml](../configs/agents/coop_full.yaml)\n  (poids 0,5 / 2,0 / 0,5), héritée de [coop.yaml](../configs/agents/coop.yaml) (voisins)\n  et de [base.yaml](../configs/agents/base.yaml) (PPO, 500 000 pas).\n- Entraînement : [src/cotraffic/training/train.py](../src/cotraffic/training/train.py),\n  `train` ligne 121 ; sélection : [src/cotraffic/training/select.py](../src/cotraffic/training/select.py)."
+  },
+  {
+   "id": "part-3",
+   "number": "3",
+   "title": "Couche 2 : Max-Pressure et le biais β = 4",
+   "markdown": "### Max-Pressure seul\nPour chaque phase, on calcule sa **pression** :\n\n```\npression(phase) = somme, sur ses mouvements au vert, de\n                  (véhicules sur la voie d'arrivée − véhicules sur la voie de sortie)\n```\n\nMax-Pressure choisit la phase de plus forte pression (en cas d'égalité, il garde la phase\nactuelle). L'idée : vider en priorité là où ça s'accumule, sans envoyer de voitures dans une\nrue déjà pleine.\n\n> **Exemple inventé pour expliquer.** Phase nord-sud : N→S (8 en arrivée, 2 en sortie) et\n> S→N (6, 1) : pression = (8 − 2) + (6 − 1) = **11**. Phase est-ouest : E→O (3, 0) et\n> O→E (4, 3) : pression = 3 + 1 = **4**. Max-Pressure choisit nord-sud.\n\n### Le biais : comment COOP-FULL et Max-Pressure sont combinés\nLes notes de COOP-FULL sont des **logits normalisés**, c'est-à-dire le logarithme de la\nprobabilité qu'il donne à chaque phase. On **ajoute 4 à la note de la phase de\nMax-Pressure**, puis on prend la plus haute note.\n\nAjouter 4 à un logarithme revient à **multiplier la probabilité par e⁴ ≈ 54,6**. Donc :\n\n> COOP-FULL ne garde sa phase contre celle de Max-Pressure que s'il la juge **plus de\n> 54,6 fois plus probable**. Avec 2 phases, cela veut dire qu'il en est sûr à **plus de\n> 98,2 %** (car p > 54,6 × (1 − p) ⇔ p > 54,6 / 55,6).\n\n> **Exemple chiffré.** COOP-FULL : nord-sud 70 %, est-ouest 30 % ; Max-Pressure préfère\n> est-ouest. Notes : ln 0,70 = −0,36 et ln 0,30 = −1,20 + 4 = **2,80** → **est-ouest gagne**.\n> Si COOP-FULL donnait 99 % à nord-sud : ln 0,99 = −0,01 contre ln 0,01 + 4 = −0,61 →\n> **nord-sud reste**.\n\n**En une phrase pour le jury :** Max-Pressure décide par défaut ; l'agent appris ne le\ncontredit que quand il est presque certain d'avoir raison.\n\n### Pourquoi β = 4 et pas un autre\nβ = 1, 2, 4 et 8 ont été essayés sur les graines de validation (partie 7). β = 4 est premier\nou à égalité avec le premier sur les trois graines ; β = 8 (pousser encore plus vers\nMax-Pressure) est 5ᵉ, 5ᵉ et 6ᵉ.\n\n### Code\n- Pression et Max-Pressure : [src/cotraffic/controllers/classical.py](../src/cotraffic/controllers/classical.py),\n  `phase_pressure` lignes 37-50, `MaxPressure.act` lignes 62-68.\n- Le biais : [src/cotraffic/controllers/hybrid.py](../src/cotraffic/controllers/hybrid.py),\n  lignes 262-264 (les logits de COOP-FULL) et **lignes 274-277** :\n  `row[int(mp[a])] += self.mp_beta` puis `phase = row.argmax()`."
+  },
+  {
+   "id": "part-4",
+   "number": "4",
+   "title": "Couche 3 : la priorité aux ambulances (EV-RULE)",
+   "markdown": "### Ce qu'elle fait\nÀ chaque décision, pour chaque feu, on regarde les ambulances dont **ce feu est le prochain**\nsur leur route. Si l'une est à **moins de 200 m**, on demande la phase qui lui donne le vert\n(un vert protégé si possible). Cette demande **remplace** la phase choisie par les couches 1\net 2. Si plusieurs ambulances approchent du même feu, la plus proche compte.\n\n### Code\n- Le guide utilisé par la candidate : [src/cotraffic/controllers/combined.py](../src/cotraffic/controllers/combined.py),\n  `EvRuleGuide` lignes 69-88.\n- Les ambulances proches et la bonne phase :\n  [src/cotraffic/controllers/ev_preemption.py](../src/cotraffic/controllers/ev_preemption.py),\n  `approaching` lignes 33-43 (via `getNextTLS` de SUMO), `phase_for` lignes 46-50.\n- Le remplacement dans la candidate : [hybrid.py](../src/cotraffic/controllers/hybrid.py),\n  lignes 255-257 (les demandes) et 279-280 (elles passent en dernier, donc l'emportent).\n- La distance de 200 m : [configs/protocol.yaml](../configs/protocol.yaml), ligne 20."
+  },
+  {
+   "id": "part-5",
+   "number": "5",
+   "title": "Couche 4 : le bouclier de sécurité",
+   "markdown": "### Ce qu'il fait\nIl reçoit la phase demandée et renvoie celle qui sera vraiment appliquée. Ses règles, dans\ncet ordre :\n\n1. **action invalide** (phase qui n'existe pas à ce carrefour) : on garde la phase actuelle ;\n2. **vert minimal** : une phase ne peut pas être coupée avant 10 s ;\n3. **anti-famine** : un mouvement qui a de la demande et attend au rouge depuis plus de 90 s\n   est servi en priorité ;\n4. **vert maximal** : une phase n'est pas prolongée au-delà de 60 s si une autre phase a de\n   la demande.\n\nLe jaune (3 s) est toujours inséré par le modèle du carrefour, jamais par la politique :\n**aucune suite de décisions ne peut produire un feu dangereux**. Le bouclier s'applique à\ntous les contrôleurs de la même façon (Max-Pressure aussi), ce qui rend la comparaison juste.\n\n### Code\n- [src/cotraffic/envs/shield.py](../src/cotraffic/envs/shield.py), `apply_shield`\n  lignes 84-138 (logique pure, testée exhaustivement).\n- Appliqué à chaque décision : [traffic_env.py](../src/cotraffic/envs/traffic_env.py), ligne 190."
+  },
+  {
+   "id": "part-6",
+   "number": "6",
+   "title": "Une décision complète, ligne par ligne",
+   "markdown": "`HybridPolicy.act` dans [hybrid.py](../src/cotraffic/controllers/hybrid.py#L248-L284) :\n\n| Étape | Lignes | Ce qui se passe |\n|---|---|---|\n| 1 | 251-253 | Max-Pressure calcule sa phase pour chaque feu (car β > 0) |\n| 2 | 254-257 | les demandes des ambulances sont relevées |\n| 3 | 259-264 | COOP-FULL calcule ses logits pour tous les feux d'un coup |\n| 4 | 265 | on retient ce que COOP-FULL aurait choisi seul (pour les statistiques) |\n| 5 | 274-277 | +4 sur la phase de Max-Pressure, puis la plus haute note |\n| 6 | 279-280 | une demande d'ambulance remplace le résultat |\n| 7 | 281-283 | on compte qui a décidé (coop, mix, ev) et la phase est envoyée |\n| 8 | traffic_env.py 190 | le bouclier a le dernier mot |\n\nLa candidate est construite ainsi dans [src/cotraffic/controllers/registry.py](../src/cotraffic/controllers/registry.py),\nlignes 69-77 : `HybridPolicy(base COOP-FULL, mp_beta=4, ev_guide=EvRuleGuide())`. C'est la\nméthode `hybrid_h2` (constante `CANDIDATE`, ligne 17)."
+  },
+  {
+   "id": "part-7",
+   "number": "7",
+   "title": "Comment la candidate a été choisie (validation)",
+   "markdown": "### Les variantes essayées (15)\n- **COOP-FULL seul**, et **V1** = COOP-FULL + EV-RULE ;\n- V1 + notre règle piétons (PED-RULE), et V1 + les règles piétons de notre coéquipier ;\n- **H1** : chaque feu passe en Max-Pressure quand son voisinage est congestionné, sinon\n  COOP-FULL (seuils : quantiles 50, 75, 90 et 95 % de la congestion) ;\n- **H2** : le biais de la partie 3, avec β = 1, 2, 4 et 8 ;\n- **H3** : H2 β = 4, et Max-Pressure **partout** quand la file d'attente à l'entrée du réseau\n  dépasse un seuil (quantiles 75, 90 et 95 %).\n\nLes seuils de H1 et H3 viennent eux aussi de la graine de validation.\n\n### La règle de classement, fixée avant les résultats\nDans chaque case (réseau × scénario × demande, 14 cases) et pour le temps de trajet et\nl'attente, on compare la variante à la **meilleure référence** de la case (MP, EV-RULE-MP,\nCOOP-FULL, TEAM-RULES, et PED-RULE-MP avec piétons) :\n\n```\nécart = (variante − meilleure référence) / meilleure référence      (positif = pire)\n  ≥ « meilleure ou égale » : écart moyen des 3 modèles ≤ 1 %\n  ✗ « pire »               : écart moyen > 3 %, ou les 3 modèles pires de plus de 1 %\n  ? « incertaine »         : sinon\n```\n\nUne case est « ≥ » si les deux mesures le sont, « ✗ » si l'une l'est. Classement : le plus\nde cases « ≥ », puis le moins de « ✗ », puis le retard des ambulances, puis l'attente des\npiétons.\n\n### Le résultat\n\n| Variante | Graine 1000 | Graine 1001 | Graine 1002 |\n|---|---|---|---|\n| **H2 β = 4** | 3ᵉ (≥ 7, ? 2, ✗ 5), à égalité de cases avec les deux premières | **1ʳᵉ** (≥ 7, ? 3, ✗ 4) | **1ʳᵉ** (≥ 10, ? 1, ✗ 3) |\n| H3 (q90) | 1ʳᵉ (mêmes cases, départagée par les ambulances) | 3ᵉ | 2ᵉ |\n| H2 β = 8 | 5ᵉ | 5ᵉ | 6ᵉ |\n| COOP-FULL seul | 12ᵉ | 8ᵉ | 9ᵉ |\n\nH3 a presque partout **les mêmes épisodes** que H2 (sa bascule se déclenche rarement) et fait\nmoins bien là où elle s'en écarte. La règle de choix retient donc la plus simple : **H2 β = 4**.\n\n### Code\n- [scripts/hybrid_rank.py](../scripts/hybrid_rank.py) : règles lignes 1-20,\n  `best_reference` lignes 91-98, `classify` lignes 101-107 (les seuils 1 % et 3 %).\n- Résultats : [results/exploration/combined/rank_s1000.md](../results/exploration/combined/rank_s1000.md),\n  `rank_s1001.md`, `rank_s1002.md`.\n- Les variantes sont construites dans [scripts/combined_eval.py](../scripts/combined_eval.py),\n  lignes 181-197."
+  },
+  {
+   "id": "part-8",
+   "number": "8",
+   "title": "Phase B : l'oracle de stratégie (faut-il un LLM stratège ?)",
+   "markdown": "### L'idée\nAvant de construire un LLM qui choisirait la stratégie du réseau toutes les 5 minutes, on a\nmesuré **ce que rapporterait un choix parfait** : un « oracle » qui connaît le futur.\n\n### Le calcul\n- Toutes les 5 min, on essaie chacun des trois modes (COOP-FULL, Max-Pressure partout,\n  la meilleure hybride), en rejouant l'épisode **depuis le début** avec le plan déjà choisi,\n  puis le mode sur la fenêtre, puis 5 min de COOP-FULL pour tous.\n- On garde le mode de **coût** le plus bas :\n\n```\ncoût = véhicules-secondes d'attente + 10 × secondes d'arrêt des ambulances\n       + personnes-secondes d'attente des piétons\n```\n\n- Un **placebo** joue des plans tirés au hasard : la part du gain que le hasard seul donne.\n\n### La règle de décision, fixée à l'avance\nUne case « passe » si l'oracle bat **à la fois** la meilleure hybride fixe **et** le meilleur\nplacebo de **plus de 3 %** (sur le trajet ou l'attente). Il fallait au moins **4 cases sur 14**\npour continuer.\n\n**Résultat : 3 sur 14 → arrêt.** Il n'y avait pas assez de place pour un LLM stratège ; on\nne l'a pas construit.\n\n**Limite connue, dite dans le rapport :** le coût ne comptait pas les voitures bloquées à\nl'entrée du réseau. Dans les cas saturés, l'oracle sous-estime ce qu'une stratégie pourrait\ngagner.\n\n### Code\n- [scripts/strategy_oracle.py](../scripts/strategy_oracle.py) : principe lignes 1-24, poids\n  10 des ambulances ligne 50, coût ligne 81.\n- [scripts/oracle_report.py](../scripts/oracle_report.py) : marge de 3 % ligne 35, critère\n  ligne 81, seuil de 4 cases ligne 103.\n- Résultat : [results/exploration/combined/oracle_s1000.md](../results/exploration/combined/oracle_s1000.md)."
+  },
+  {
+   "id": "part-9",
+   "number": "9",
+   "title": "Le pré-enregistrement et l'évaluation unique",
+   "markdown": "### Ce qui a été figé avant toute graine de test\nContrôleurs, situations, graines, mesures, tests et règles de décision, dans\n[docs/COMBINED_PREREGISTRATION.md](COMBINED_PREREGISTRATION.md), figé au commit **2c0dd1d**.\n\n**Le script refuse de démarrer** si un seul fichier figé (le code `src/cotraffic`, les\n`configs`, les scripts d'évaluation et d'analyse, les seuils de H1 et H3) a changé depuis ce\ncommit.\n\n### Le plan de l'évaluation\n- **18 situations** : 14 principales (grille : normal, urgences, incident, piétons ; quartier\n  réel : normal, urgences, incident ; chaque fois en demande moyenne et en pointe), 3 de robustesse (capteurs bruités, pertes de messages\n  30 %, bus), 1 de généralisation (grid8x8 sans réentraînement).\n- **Graines de test 0 à 4** ; les contrôleurs appris avec leurs **3 modèles**.\n- **1 265 épisodes** au total (dont 5 pour la variante LLM, jouée en dernier, seule). Chaque\n  épisode enregistre le commit du code (2c0dd1d pour les 1 265).\n\n### Code\n- [scripts/combined_final.py](../scripts/combined_final.py) : graines ligne 36, modèles\n  ligne 37, fichiers figés lignes 38-47, plan lignes 48-62, vérification `frozen_since`\n  lignes 103-112."
+  },
+  {
+   "id": "part-10",
+   "number": "10",
+   "title": "Les mesures",
+   "markdown": "Calculées à partir des sorties de SUMO, sur les véhicules **partis pendant l'heure mesurée** :\n\n- **Temps de trajet** = arrivée − départ **prévu** (l'attente pour entrer dans le réseau\n  compte). Un véhicule téléporté par SUMO (bouchon) reçoit **+300 s** : un bouchon caché ne\n  doit jamais avantager une méthode. Un véhicule pas arrivé compte jusqu'à la fin.\n- **Attente** = temps à moins de 0,1 m/s + retard d'insertion.\n- **Retard des ambulances** = temps perdu par rapport à la vitesse libre, moyenne des\n  ambulances de l'épisode (3 à 5 par épisode).\n\n### Code\n- [src/cotraffic/evaluation/metrics.py](../src/cotraffic/evaluation/metrics.py) :\n  définitions lignes 1-30, trajet lignes 241-244, attente lignes 246-248, retard des\n  ambulances ligne 306. Pénalité de 300 s : [protocol.yaml](../configs/protocol.yaml), ligne 27."
+  },
+  {
+   "id": "part-11",
+   "number": "11",
+   "title": "Les statistiques : du résultat brut au verdict",
+   "markdown": "### a. La référence de chaque comparaison\nDans chaque situation et pour chaque mesure, on prend **la meilleure** des références\n(MP, EV-RULE-MP, COOP-FULL, TEAM-RULES, et PED-RULE-MP avec piétons). C'est la comparaison\nla plus exigeante possible.\n\n### b. Le gain\n```\ngain (%) = 100 × (moyenne référence − moyenne candidate) / moyenne référence\n           positif = la candidate fait mieux\n```\n\n### c. L'intervalle de confiance (bootstrap croisé)\nOn a un tableau de 3 modèles × 5 graines. On le **rééchantillonne 10 000 fois** : à chaque\ntirage, on tire au hasard (avec remise) les modèles **et** les graines, et on recalcule le\ngain. L'intervalle à 95 % va du 2,5ᵉ au 97,5ᵉ pourcentile des 10 000 gains. Quand la\nréférence est COOP-FULL, les tirages sont **appariés par modèle** (la candidate est construite\nsur les mêmes modèles).\n\n### d. Les p-valeurs\n```\np (non-infériorité) = (1 + nombre de tirages où le gain ≤ −2 %) / (1 + 10 000)\np (supériorité)     = (1 + nombre de tirages où le gain ≤ 0)    / (1 + 10 000)\n```\n\n### e. La correction de Holm (36 tests à la fois)\nFaire 36 tests augmente le risque d'une « victoire » due au hasard. Holm trie les p du plus\npetit au plus grand et multiplie le k-ième par (36 − k + 1), en gardant l'ordre croissant.\nUn test passe si sa p corrigée est **< 0,025**.\n\n### f. Le verdict\n- **Prouvée meilleure** : passe le test de supériorité (famille « hybrid-sup ») ;\n- **Prouvée non inférieure** : passe le test de non-infériorité à −2 % (famille « hybrid ») ;\n- sinon : **vraie perte** si **tout** l'intervalle est sous 0 (« au-delà de −2 % » s'il est\n  aussi sous −2 %) ; **trop large pour conclure** dans les autres cas.\n\n### Trois exemples réels\n\n| Situation | Référence | Moyennes (réf. / cand.) | Gain | IC à 95 % | p Holm | Verdict |\n|---|---|---|---|---|---|---|\n| grille, capteurs bruités, pointe, attente | COOP-FULL | 68,23 s / 58,60 s | 100 × (68,23 − 58,60) / 68,23 = **+14,1 %** | [+3,3 ; +34,0] | 0,0036 (sup. : 0,019) | **prouvée meilleure** |\n| grille, normal, pointe, trajet | MP | 210,18 s / 213,59 s | **−1,6 %** | [−3,4 ; −0,2] | 1 | **vraie perte** (tout l'IC < 0) |\n| quartier réel, normal, pointe, attente | MP | 36,20 s / 40,22 s | **−11,1 %** | [−32,1 ; +7,9] | 1 | **trop large pour conclure** |\n\nDans le premier exemple, aucun des 10 000 tirages n'est sous −2 % : p = 1 / 10 001 ≈ 0,0001,\net la p corrigée vaut 36 × 0,0001 = 0,0036 < 0,025.\n\n### Code\n- [scripts/combined_analysis.py](../scripts/combined_analysis.py) : marge, α et nombre de\n  tirages ligne 47 ; tableau modèles × graines `table` lignes 86-97 ; gain et bootstrap\n  `gain_draws` lignes 100-121 ; meilleure référence et p `compare` lignes 124-165 (p ligne\n  158) ; Holm et verdicts `with_holm` lignes 168-187.\n- Holm : [src/cotraffic/analysis/stats.py](../src/cotraffic/analysis/stats.py), lignes 120-133.\n- Sortie complète : [results/combined/analysis.md](../results/combined/analysis.md)."
+  },
+  {
+   "id": "part-12",
+   "number": "12",
+   "title": "Les résultats et leur calcul",
+   "markdown": "### a. Les 36 tests\n**15 prouvées non inférieures, dont 6 meilleures ; 5 vraies pertes ; 16 trop larges.**\n\n- Meilleure : l'attente en demande moyenne sur la grille (normal, incident, piétons, bus :\n  +2 à +3 %) et, sous capteurs bruités, le trajet (+6,1 %) et l'attente (+14,1 %).\n- Vraies pertes, toutes contre MP : le trajet en pointe sur la grille (normal −1,6 %,\n  urgences −1,2 %, pertes de messages −1,7 %) et grid8x8 (trajet −2,1 %, attente −1,5 %).\n- Trop larges : surtout le quartier réel en pointe ; deux cas ont une estimation nettement\n  défavorable (quartier réel en pointe, grille avec piétons en pointe).\n\n### b. Le compromis : « 12,2 % contre 35 à 99 % »\nPour chacun des 5 critères et chacune de ses cases :\n\n```\nécart(contrôleur) = 100 × (sa moyenne − meilleure des 5) / meilleure des 5\nécart du critère   = moyenne de ces écarts sur les cases du critère\npire écart         = le plus grand de ses 5 écarts\n```\n\n| Contrôleur | Trajet | Attente | Ambulances | Piétons | Capteurs bruités | **Pire écart** |\n|---|---|---|---|---|---|---|\n| **Candidate** | +1,4 % | **+2,7 %** (meilleure) | +12,2 % | +9,4 % | **0 %** (meilleure) | **12,2 %** |\n| EV-RULE-MP | +0,6 % | +4,9 % | **+8,4 %** (meilleure) | +26,8 % | +34,8 % | 34,8 % |\n| TEAM-RULES | +2,6 % | +9,8 % | +19,8 % | +26,4 % | +34,8 % | 34,8 % |\n| COOP-FULL | +3,9 % | +8,0 % | +51,5 % | **0 %** (meilleure) | +11,5 % | 51,5 % |\n| MP | **+0,4 %** (meilleure) | +4,5 % | +99,1 % | +26,8 % | +34,8 % | 99,1 % |\n\nLecture : chacun des autres a un critère où il décroche (MP sur les ambulances, EV-RULE-MP et\nTEAM-RULES sous capteurs bruités, COOP-FULL sur les ambulances) ; **la candidate n'en a pas**.\n\nCode : [scripts/combined_figures.py](../scripts/combined_figures.py), `criteria`\nlignes 217-240, `compromis` lignes 242-295.\n\n### c. Les ambulances : « 71 trajets sur 72 »\nPour chaque ambulance (même identifiant, même graine, donc même trafic des deux côtés) :\n`gain = retard avec MP − retard avec la candidate`, pour les 3 modèles. On compte les gains\npositifs : **71 sur 72** à l'heure de pointe (24 ambulances × 3 modèles), 53 s gagnées en\nmédiane ; 68 sur 72 en demande moyenne.\n\nRetard moyen : **44 s** contre **106 s** avec MP en pointe (23 s contre 52 s en demande\nmoyenne) ; la meilleure règle dédiée, EV-RULE-MP, fait 38 s et 21 s. C'est une mesure\n**secondaire** (pas de test de Holm).\n\nCode : [combined_figures.py](../scripts/combined_figures.py), `ambulance_counts`\nlignes 426-446, `ambulances` lignes 297-334.\n\n### d. L'ablation : ce que chaque couche apporte\nOn compare chaque couche à COOP-FULL seul, sur les mêmes graines (sans test) :\n\n- **+ préemption (V1)** : presque rien sur le trafic (entre −0,9 et +0,7 % selon la case) ;\n  elle sert les ambulances ;\n- **+ biais Max-Pressure (la candidate)** : c'est **lui qui apporte le gain**, surtout là où\n  COOP-FULL s'engorge : grille avec piétons en pointe, **+17,8 %** de trajet et **+35,4 %**\n  d'attente ; capteurs bruités +6,1 % et +14,1 % ;\n- **+ bascule sur saturation (H3)** : quasi identique à la candidate.\n\nCode : [combined_analysis.py](../scripts/combined_analysis.py), `ablation` lignes 213-234."
+  },
+  {
+   "id": "part-13",
+   "number": "13",
+   "title": "Le conseiller LLM (testé à part, pas dans la candidate)",
+   "markdown": "### Comment il fonctionne\n- Le modèle local **qwen2.5:3b** (Ollama) reçoit un résumé de la situation (files,\n  événements) quand un **nouvel événement** arrive ou **toutes les 10 min**, jamais deux fois\n  en moins de 30 s.\n- Sa réponse JSON est vérifiée (carrefours et phases existants) ; un conseil ne devient actif\n  qu'après la **latence réelle** de l'appel.\n- Un conseil ajoute `β × poids` (au plus 4) au logit de la phase conseillée, **avant** le\n  biais Max-Pressure. Ensuite, comme toujours : ambulance, puis bouclier.\n\n### Le résultat (grille, urgences, pointe, 5 graines de test, modèle t1)\n- Techniquement tout marche : 13,8 appels par épisode, **100 % de réponses valides**, aucun\n  repli, environ 7,9 s par réponse.\n- Mais il fait **un peu moins bien** que la candidate seule : trajet −1,4 % [−2,4 ; −0,7],\n  attente −2,9 % [−5,1 ; −1,4], ambulances 48,8 s contre 40,4 s.\n\nAvec l'oracle (partie 8), c'est un **résultat négatif mesuré** : on le dit tel quel.\n\n### Code\n- [src/cotraffic/llm/advised.py](../src/cotraffic/llm/advised.py) : principe lignes 1-11,\n  paramètres `AdvisorConfig` lignes 39-45, déclencheurs `_trigger` ligne 104,\n  biais `bias_logits` lignes 228-256.\n- Branchement dans la candidate : [hybrid.py](../src/cotraffic/controllers/hybrid.py),\n  lignes 266-267.\n- Réglages justifiés : [configs/llm.yaml](../configs/llm.yaml).\n- Journal de chaque appel : `results/combined/calls/*.jsonl`."
+  },
+  {
+   "id": "part-13-bis",
+   "number": "13 bis",
+   "title": "Le LLM dans la boucle de décision : le « LLM stratège » (ajouté après l'évaluation)",
+   "markdown": "### Ce qu'il fait\nUne cinquième couche, **au-dessus** des quatre de la candidate. Toutes les **5 minutes**, le LLM\nlocal (qwen2.5:3b) lit un résumé du réseau et choisit le **mode** de tout le réseau pour les\n5 minutes suivantes, parmi trois modes déjà validés :\n\n| Mode | Ce qui décide les phases | Quand le choisir (consigne du prompt) |\n|---|---|---|\n| **équilibre** | la candidate (COOP-FULL + biais β = 4) | par défaut |\n| **fluidité** | Max-Pressure à chaque feu | quand la file à l'entrée du réseau grandit (saturation) |\n| **agent seul** | COOP-FULL sans biais (β = 0) | peu de véhicules arrêtés et une foule de piétons |\n\nDans les trois modes, **la priorité ambulance et le bouclier restent actifs** : le LLM ne\ncommande jamais un feu directement.\n\n### Ce qu'il lit (exemple réel, graine de validation)\n```\nt=600s of 2700s; current mode: equilibre (since t=0s)\nnetwork: 16 junctions, 472 vehicles, 93 halted (5 min ago: 78)\nvehicles waiting to enter the network: 2 (5 min ago: 0)\nhalted per junction: mean 5.8, max 11 at D1; junctions with >= 10 halted: 1 of 16\npedestrians waiting: 0\nevents: none\n```\nRéponse imposée par un schéma JSON : `{\"mode\": \"equilibre\", \"reason\": \"...\"}`.\n\n### Les garde-fous (le calcul exact)\n1. **Trois modes seulement** : le schéma JSON n'accepte que `equilibre`, `fluidite` ou `agent`.\n2. **Réponse invalide** : une seconde tentative, puis le mode actuel est gardé.\n3. **Latence honnête** : la décision ne s'applique qu'à `t + latence réelle` (environ 7 s).\n4. **Serveur absent ou délai dépassé** : le mode actuel est gardé, l'épisode continue.\n5. **Sécurité** : EV-RULE puis le bouclier, après le mode, comme pour la candidate.\n\n### Pourquoi à ce niveau\nLe LLM met plusieurs secondes à répondre : il ne peut pas décider une phase toutes les 5 s.\nLe premier essai (le conseiller de phases, partie 13) faisait un peu moins bien. Le rôle de\nstratège est celui dont l'**oracle** (partie 8) a mesuré le plafond, avec **les mêmes trois\nmodes et la même fenêtre de 5 minutes** : on peut donc comparer le LLM au choix parfait et au\nhasard.\n\n### Comment on l'a évalué\n- **Graine de validation 1000**, les 14 cases principales : comparé à la candidate seule (même\n  modèle t1), à l'oracle et au placebo.\n- Puis **graines de test**, les 18 situations, modèle t1, contre les épisodes de la candidate\n  de l'évaluation finale (mêmes graines). **Exploratoire** : ajouté après le pré-enregistrement,\n  qui reste la référence.\n- Gain = (candidate − avec LLM) / candidate ; intervalle à 95 % par bootstrap sur les épisodes\n  appariés.\n\n### Résultat sur la graine de validation\nDans 10 cases sur 14, le LLM garde « équilibre » : les épisodes sont **identiques** à ceux de la\ncandidate (la simulation est déterministe). Dans les 4 cases où il intervient, le trafic\ns'améliore à chaque fois. Par exemple, sur le quartier réel avec incident en pointe : trajet\n+3,0 %, attente +14,0 %. Seul bémol : sur le quartier réel avec urgences en pointe, le retard\ndes ambulances augmente de 4,4 % (une seule graine).\n\n### Résultat sur les graines de test (exploratoire)\n**90 épisodes** : les 18 situations, 5 graines de test, modèle t1. Chacun est comparé à\nl'épisode de la candidate seule sur la même graine. **1 746 appels, 100 % de réponses\nvalides, 7,1 s de réponse en médiane.**\n\n- **Effet moyen nul, non démontré** : trajet +0,2 % [−0,4 ; +1,1], attente +0,6 % [−1,3 ;\n  +3,4], ambulances +4,3 % [−0,3 ; +10,5]. Tous les intervalles contiennent 0.\n- **9 situations sur 18 identiques** : le LLM y garde toujours « équilibre ».\n- **Il aide là où la candidate était faible** :\n  - grille avec piétons en pointe : trajet +3,1 %, attente +7,2 % ;\n  - quartier réel avec urgences en pointe : attente +4,7 %, ambulances +9,0 %.\n- **Il se trompe parfois** :\n  - capteurs bruités : attente −2,7 %, car il choisit « fluidité » alors que Max-Pressure\n    souffre justement des capteurs bruités ;\n  - quartier réel avec incident en pointe : attente −7,2 %.\n\n**En une phrase pour le jury :** le LLM est vraiment dans la boucle de décision ; il ne coûte\nrien en moyenne, il aide là où la candidate souffrait (piétons en pointe), il se trompe dans\nd'autres cas, et la sécurité ne dépend jamais de lui.\n\nDétail : page « Le LLM dans la boucle » du tableau de bord, `results/llm_loop/report.md`.\n\n### Limite à dire\nSes justifications ne sont pas toujours exactes. Il écrit parfois « peu de véhicules arrêtés »\nalors qu'il y en a 195 : c'est un modèle de 3 milliards de paramètres. C'est justement pour cela\nqu'il ne choisit qu'entre des modes validés, et que la sécurité reste hors de son contrôle.\n\n### Code\n- [src/cotraffic/llm/strategist.py](../src/cotraffic/llm/strategist.py) : les trois modes\n  ligne 36, ce que le LLM lit `network_state` ligne 87 et `state_text` ligne 112, l'appel et\n  les garde-fous `_ask` lignes 168-202 (latence ligne 199), le mode appliqué au réseau\n  `modes` ligne 204, la politique `LlmStrategyPolicy.act` ligne 229 (β = 4 en équilibre,\n  0 sinon).\n- Le prompt : [configs/prompts/strategist-v1.yaml](../configs/prompts/strategist-v1.yaml).\n- L'étude : [scripts/llm_loop.py](../scripts/llm_loop.py) ; les journaux de chaque appel :\n  `results/llm_loop/calls/*.jsonl`.\n- Tests : [tests/test_strategist.py](../tests/test_strategist.py)."
+  },
+  {
+   "id": "part-14",
+   "number": "14",
+   "title": "Robustesse, généralisation et grande ville",
+   "markdown": "| Situation | Ce qu'on perturbe | Trajet | Attente |\n|---|---|---|---|\n| Capteurs bruités | bruit de 2 véhicules sur chaque comptage, 20 % des détecteurs à 0 | +6,1 % **prouvée meilleure** | +14,1 % **prouvée meilleure** |\n| Pertes de messages | 30 % des messages des voisins perdus | −1,7 % vraie perte | −1,0 % trop large |\n| Bus | un bus toutes les 5 min par ligne et par sens | −0,9 % prouvée non inférieure | +2,0 % **prouvée meilleure** |\n| grid8x8 | 64 feux, modèles entraînés sur 16 | −2,1 % vraie perte | −1,5 % vraie perte |\n\nPourquoi les capteurs bruités sont la plus grande victoire : Max-Pressure ne voit que ce qui\nest détecté, donc il se trompe quand les détecteurs mentent (255 s de trajet contre 218 s pour\nla candidate) ; l'agent seul aussi (232 s). La combinaison résiste le mieux.\n\n**La grande ville n'est pas testée** : à Barcelone, le réseau importé se bloque sous tous les\ncontrôleurs, temps fixe compris ; à Paris, Max-Pressure s'effondre là où le temps fixe\nfonctionne. Un test y mesurerait ces défaillances, pas la qualité du contrôle. Arrêté avant\ntoute graine de test : [docs/FAILURES.md](FAILURES.md), F-016.\n\nCode : les perturbations dans [configs/scenarios/](../configs/scenarios/) ; la tentative\ndans [scripts/bigcity.py](../scripts/bigcity.py)."
+  },
+  {
+   "id": "part-15",
+   "number": "15",
+   "title": "Le tableau de bord : d'où viennent les chiffres affichés",
+   "markdown": "[scripts/dashboard_combined.py](../scripts/dashboard_combined.py) relit les résultats avec\n  les fonctions figées de l'analyse et écrit `frontend/public/data/combined/` : `study`,\n  `cells`, `tests`, `layers`, `validation`, `bilan`, `bigcity`.\n- [scripts/combined_figures.py](../scripts/combined_figures.py) écrit\n  `frontend/public/data/final_controller.json` (compromis, ambulances, démo).\n- Chaque fichier est vérifié par un schéma Zod :\n  [frontend/src/shared/schemas/combined.ts](../frontend/src/shared/schemas/combined.ts).\n- Les phrases des pages sont construites autour de ces nombres, jamais écrites à la main :\n  [frontend/src/features/combined/claims.ts](../frontend/src/features/combined/claims.ts) ;\n  un test vérifie qu'ils correspondent à l'analyse figée\n  ([claims.test.ts](../frontend/src/features/combined/claims.test.ts)).\n- Les pages : [accueil](../frontend/src/features/home/HomePage.tsx),\n  [contrôleur final](../frontend/src/features/final-controller/FinalControllerPage.tsx)\n  (forest plot : [ForestPlot.tsx](../frontend/src/features/final-controller/ForestPlot.tsx)),\n  [robustesse](../frontend/src/features/robustness/RobustnessPage.tsx)."
+  },
+  {
+   "id": "part-16",
+   "number": "16",
+   "title": "Antisèche pour la validation (10 phrases)",
+   "markdown": "1. Aucun contrôleur n'est le meilleur partout ; le nôtre est **le meilleur compromis** :\n   pire écart de 12,2 % contre 35 à 99 % pour les autres.\n2. Il a 4 couches : l'agent PPO propose, Max-Pressure corrige avec un bonus de 4, l'ambulance\n   passe avant tout, le bouclier garantit la sécurité.\n3. Le bonus de 4 multiplie par 55 la probabilité de la phase de Max-Pressure : l'agent ne le\n   contredit que s'il est sûr à plus de 98 %.\n4. On l'a choisi parmi 15 variantes, **sur des graines de validation seulement**.\n5. Tout a été **figé avant le test** (commit 2c0dd1d), et le script refusait de tourner si un\n   fichier changeait.\n6. Une seule évaluation : 1 265 épisodes, graines 0 à 4, 3 modèles, 18 situations.\n7. 36 tests de non-infériorité avec Holm : 15 passent dont 6 meilleurs ; 5 vraies pertes,\n   petites ; 16 trop larges.\n8. Ambulances : 71 trajets sur 72 plus rapides qu'avec Max-Pressure à l'heure de pointe.\n9. Le LLM : un oracle a montré qu'un choix parfait de stratégie rapportait trop peu ; le\n   conseiller testé fait un peu moins bien. Il n'est pas dans la décision.\n10. Ce qu'on ne prétend pas : être meilleur partout, ni généraliser à une grande ville."
+  }
+ ],
+ "code": [
+  {
+   "part": "2",
+   "title": "La récompense de COOP-FULL",
+   "file": "src/cotraffic/envs/rewards.py",
+   "name": "RewardComputer.combine",
+   "start": 137,
+   "end": 147,
+   "code": "    def combine(self, raw: Mapping[str, float]) -> float:\n        c, n = self.cfg, self.norm\n        # the waiting term is already signed (less waiting = positive); the others are costs\n        r = raw[\"wait\"] / n[\"wait\"] if c.base == \"wait\" else -raw[c.base] / n[c.base]\n        if c.co2:\n            r -= c.co2 * raw[\"co2\"] / n[\"co2\"]\n        if c.ev:\n            r -= c.ev * raw[\"ev\"] / n[\"ev\"]\n        if c.ped:\n            r -= c.ped * raw[\"ped\"] / n[\"ped\"]\n        return float(np.clip(r, -c.clip, c.clip))"
+  },
+  {
+   "part": "2",
+   "title": "La taille de l'observation",
+   "file": "src/cotraffic/envs/observations.py",
+   "name": "block_sizes",
+   "start": 75,
+   "end": 90,
+   "code": "def block_sizes(cfg: ObservationConfig, pad: Padding) -> dict[str, int]:\n    sizes = {\n        \"lanes\": 4 * pad.lanes_per_side * 3,\n        \"phase\": 3 * pad.max_phases + 2,\n    }\n    if cfg.neighbours:\n        sizes[\"neighbours\"] = 4 * MESSAGE_SIZE\n    if cfg.emergency:\n        sizes[\"emergency\"] = 4 * 2 + pad.max_phases\n    if cfg.pedestrians:\n        sizes[\"pedestrians\"] = pad.max_crossings\n    if cfg.buses:\n        sizes[\"buses\"] = 4\n    if cfg.forecast:\n        sizes[\"forecast\"] = 4\n    return sizes"
+  },
+  {
+   "part": "3",
+   "title": "La pression d'une phase",
+   "file": "src/cotraffic/controllers/classical.py",
+   "name": "phase_pressure",
+   "start": 37,
+   "end": 50,
+   "code": "def phase_pressure(inter, meas) -> list[float]:\n    \"\"\"Max-Pressure weight of each phase: sum over its green vehicle links of\n    (vehicles on the incoming lane - vehicles on the outgoing lane).\"\"\"\n    count = meas.count\n    weights = []\n    for links in inter.phase_links:\n        total = 0.0\n        for index in links:\n            link = inter.link_by_index[index]\n            if link.crossing:\n                continue\n            total += count.get(link.in_lane, 0.0) - count.get(link.out_lane, 0.0)\n        weights.append(total)\n    return weights"
+  },
+  {
+   "part": "3",
+   "title": "Max-Pressure",
+   "file": "src/cotraffic/controllers/classical.py",
+   "name": "MaxPressure.act",
+   "start": 62,
+   "end": 68,
+   "code": "    def act(self, env, obs: dict[str, Any]) -> dict[str, int]:\n        actions = {}\n        for tid, inter in env.intersections.items():\n            weights = phase_pressure(inter, env.meas)\n            best = max(weights)\n            actions[tid] = inter.phase if weights[inter.phase] >= best else weights.index(best)\n        return actions"
+  },
+  {
+   "part": "3",
+   "title": "Le biais β : une décision de la candidate",
+   "file": "src/cotraffic/controllers/hybrid.py",
+   "name": "HybridPolicy.act",
+   "start": 248,
+   "end": 284,
+   "code": "    def act(self, env, obs: dict[str, Any]) -> dict[str, int]:\n        import torch\n\n        modes = self.strategy.modes(env)\n        need_mp = self.mp_beta > 0 or any(m == \"mp\" for m in modes.values())\n        mp = self.mp.act(env, obs) if need_mp else {}\n        pre: dict[str, tuple[int, str]] = {}\n        for guide, source in ((self.ped_guide, \"ped\"), (self.ev_guide, \"ev\")):\n            if guide is not None:  # emergency vehicles last: they take precedence\n                pre.update({tid: (p, source) for tid, p in guide.requests(env).items()})\n\n        agents = list(obs)\n        batch = np.stack([obs[a] for a in agents])\n        policy = self.base.model.policy\n        with torch.no_grad():\n            logits = policy.get_distribution(policy.obs_to_tensor(batch)[0]).distribution.logits\n        logits = logits.numpy()\n        plain = logits.argmax(axis=1)  # the phase COOP-FULL would choose alone\n        if self.advisor is not None:\n            logits = self.advisor.bias_logits(env, agents, logits)\n        coop = logits.argmax(axis=1)  # COOP-FULL with the LLM bias, if any\n        actions = {}\n        for i, a in enumerate(agents):\n            phase, source = int(coop[i]), \"coop\"\n            if modes.get(a) == \"mp\":\n                phase, source = int(mp[a]), \"mp\"\n            elif self.mp_beta > 0 and mp.get(a, -1) < logits.shape[1]:\n                row = logits[i].copy()\n                row[int(mp[a])] += self.mp_beta\n                phase, source = int(row.argmax()), \"mix\"\n                self.mix_changed += phase != int(coop[i])\n            if a in pre and pre[a][0] < logits.shape[1]:\n                phase, source = pre[a]\n            self.counts[source] += 1\n            self.changed_decisions += phase != int(plain[i])\n            actions[a] = int(phase)\n        return actions"
+  },
+  {
+   "part": "4",
+   "title": "Les ambulances proches d'un feu",
+   "file": "src/cotraffic/controllers/ev_preemption.py",
+   "name": "approaching",
+   "start": 33,
+   "end": 43,
+   "code": "def approaching(env, signals, range_m: float) -> dict[str, tuple[float, int]]:\n    \"\"\"Closest approaching emergency vehicle per signal: (distance, link index).\"\"\"\n    out: dict[str, tuple[float, int]] = {}\n    for ev in env.ev_ids:\n        upcoming = env.conn.vehicle.getNextTLS(ev)\n        if not upcoming:\n            continue\n        tls, link, dist, _ = upcoming[0]\n        if tls in signals and dist <= range_m and (tls not in out or dist < out[tls][0]):\n            out[tls] = (dist, link)\n    return out"
+  },
+  {
+   "part": "4",
+   "title": "La demande de vert pour l'ambulance",
+   "file": "src/cotraffic/controllers/combined.py",
+   "name": "EvRuleGuide.requests",
+   "start": 81,
+   "end": 85,
+   "code": "    def requests(self, env) -> dict[str, int]:\n        found = approaching(env, env.intersections, self.range_m)\n        self.preemptions += len(set(found) - self.active)\n        self.active = set(found)\n        return {tid: phase_for(env.intersections[tid], link) for tid, (_, link) in found.items()}"
+  },
+  {
+   "part": "5",
+   "title": "Le bouclier de sécurité",
+   "file": "src/cotraffic/envs/shield.py",
+   "name": "apply_shield",
+   "start": 84,
+   "end": 138,
+   "code": "def apply_shield(requested: int, state: ShieldState, cfg: ShieldConfig) -> ShieldDecision:\n    \"\"\"Return the phase to execute given the controller's ``requested`` phase.\n\n    ``phase_demand[p]`` is the demand that phase ``p`` would serve beyond what the\n    current phase already serves; it picks the target when the shield must switch.\n    \"\"\"\n    current = state.current_phase  # [Exigence 9] bouclier : vert min, anti-famine, vert max\n    reason: str | None = None\n    if not 0 <= requested < state.n_phases:\n        requested, reason = current, INVALID\n\n    if state.green_elapsed < cfg.min_green:\n        return ShieldDecision(current, MIN_GREEN if requested != current else reason)\n\n    starving = [\n        link\n        for link in state.links_with_demand\n        if state.link_red_time.get(link, 0.0) > cfg.max_red\n        and link not in state.phase_links[current]\n        and any(link in links for links in state.phase_links)\n    ]\n    if starving:\n        worst = max(starving, key=lambda link: (state.link_red_time[link], -link))\n        if worst in state.phase_links[requested]:\n            return ShieldDecision(requested, reason)\n        candidates = [p for p in range(state.n_phases) if worst in state.phase_links[p]]\n        target = max(\n            candidates,\n            key=lambda p: (\n                sum(link in state.phase_links[p] for link in starving),\n                state.phase_demand[p],\n                -p,\n            ),\n        )\n        return ShieldDecision(target, STARVATION)\n\n    if requested == current and state.green_elapsed >= cfg.max_green:\n        others = [p for p in range(state.n_phases) if p != current and state.phase_demand[p] > 0]\n        if others:\n            target = max(others, key=lambda p: (state.phase_demand[p], -p))\n            return ShieldDecision(target, MAX_GREEN)\n\n    if cfg.spillback > 0 and state.blocked_links:\n        served = state.phase_links[requested] & state.links_with_demand\n        if served and served <= state.blocked_links:\n\n            def moves(p: int) -> bool:\n                return bool((state.phase_links[p] & state.links_with_demand) - state.blocked_links)\n\n            others = [p for p in range(state.n_phases) if p != requested and moves(p)]\n            if others:\n                target = max(others, key=lambda p: (state.phase_demand[p], -p))\n                return ShieldDecision(target, SPILLBACK)\n\n    return ShieldDecision(requested, reason)"
+  },
+  {
+   "part": "6",
+   "title": "La candidate, telle qu'elle est construite",
+   "file": "src/cotraffic/controllers/registry.py",
+   "name": null,
+   "start": 69,
+   "end": 77,
+   "code": "    if method == CANDIDATE:\n        from cotraffic.controllers.combined import EvRuleGuide\n        from cotraffic.controllers.hybrid import HybridPolicy\n\n        if checkpoint is None:\n            raise ValueError(f\"method {method!r} needs a COOP-FULL checkpoint\")\n        base = make_controller(\"coop_full\", checkpoint)\n        beta = float(kwargs.get(\"beta\", 4.0))\n        return HybridPolicy(base, mp_beta=beta, ev_guide=EvRuleGuide(), name=CANDIDATE)"
+  },
+  {
+   "part": "7",
+   "title": "La règle de classement sur la validation",
+   "file": "scripts/hybrid_rank.py",
+   "name": "classify",
+   "start": 101,
+   "end": 107,
+   "code": "def classify(gaps: list[float]) -> str:\n    mean = float(np.mean(gaps))\n    if mean <= 1.0:\n        return BETTER\n    if mean > 3.0 or all(g > 1.0 for g in gaps):\n        return WORSE\n    return UNCERTAIN"
+  },
+  {
+   "part": "8",
+   "title": "Le critère de l'oracle",
+   "file": "scripts/oracle_report.py",
+   "name": null,
+   "start": 76,
+   "end": 82,
+   "code": "            g_c = gain(min(fixed.values()), o)\n            line[f\"{name} oracle (s)\"] = round(o, 1)\n            line[f\"{name} gain vs hybride (%)\"] = round(g_h, 2)\n            line[f\"{name} gain vs meilleur du hasard (%)\"] = round(g_r, 2)\n            line[f\"{name} gain vs meilleur mode fixe (%)\"] = round(g_c, 2)\n            ok = ok or (g_h > MARGIN and g_r > MARGIN)\n        line[\"critère\"] = \"oui\" if ok else \"non\""
+  },
+  {
+   "part": "9",
+   "title": "Les fichiers figés",
+   "file": "scripts/combined_final.py",
+   "name": null,
+   "start": 38,
+   "end": 47,
+   "code": "FROZEN = [  # must not differ from the preregistration commit\n    \"docs/COMBINED_PREREGISTRATION.md\",\n    \"src/cotraffic\",\n    \"configs\",\n    \"scripts/combined_eval.py\",\n    \"scripts/combined_final.py\",\n    \"scripts/combined_analysis.py\",\n    \"results/exploration/combined/congestion_thresholds.json\",\n    \"results/exploration/combined/backlog_thresholds.json\",\n]"
+  },
+  {
+   "part": "9",
+   "title": "Le refus de démarrer",
+   "file": "scripts/combined_final.py",
+   "name": "frozen_since",
+   "start": 103,
+   "end": 112,
+   "code": "def frozen_since(commit: str) -> list[str]:\n    \"\"\"Frozen paths that differ between ``commit`` and the working tree.\"\"\"\n    out = subprocess.run(\n        [\"git\", \"diff\", \"--name-only\", commit, \"--\", *FROZEN],\n        cwd=REPO_ROOT,\n        capture_output=True,\n        text=True,\n        check=True,\n    ).stdout.split()\n    return out"
+  },
+  {
+   "part": "10",
+   "title": "Temps de trajet et attente",
+   "file": "src/cotraffic/evaluation/metrics.py",
+   "name": null,
+   "start": 241,
+   "end": 249,
+   "code": "    travel = np.where(\n        finished, pop[\"arrival\"] - pop[\"planned_depart\"], end_time - pop[\"planned_depart\"]\n    )\n    travel = travel + np.where(teleported_mask, penalty, 0.0)\n    never = ~inserted\n    waiting = np.where(\n        never, end_time - pop[\"planned_depart\"], pop[\"waiting_time\"] + pop[\"depart_delay\"]\n    )\n    time_loss = np.where("
+  },
+  {
+   "part": "11",
+   "title": "Le gain et le bootstrap croisé",
+   "file": "scripts/combined_analysis.py",
+   "name": "gain_draws",
+   "start": 100,
+   "end": 121,
+   "code": "def gain_draws(cand: pd.DataFrame, ref: pd.DataFrame, rng) -> tuple[float, np.ndarray]:\n    \"\"\"Gain of ``cand`` over ``ref`` (percent, positive = better) and its bootstrap draws.\"\"\"\n    seeds = [s for s in cand.columns if s in ref.columns]\n    paired_runs = len(ref) > 1  # COOP-FULL: the same models as the hybrids\n    if paired_runs:\n        runs = [r for r in cand.index if r in ref.index]\n        cand, ref = cand.loc[runs, seeds], ref.loc[runs, seeds]\n    else:\n        cand, ref = cand[seeds], ref[seeds]\n    c, r = cand.to_numpy(float), ref.to_numpy(float)\n    if np.isnan(c).any() or np.isnan(r).any():\n        raise ValueError(\"incomplete table: every training run and test seed must be there\")\n    rows = rng.multinomial(c.shape[0], np.full(c.shape[0], 1 / c.shape[0]), size=N_BOOT)\n    cols = rng.multinomial(c.shape[1], np.full(c.shape[1], 1 / c.shape[1]), size=N_BOOT)\n    norm = rows.sum(1) * cols.sum(1)\n    cand_b = np.einsum(\"bi,ij,bj->b\", rows, c, cols) / norm\n    if paired_runs:\n        ref_b = np.einsum(\"bi,ij,bj->b\", rows, r, cols) / norm\n    else:\n        ref_b = cols @ r[0] / cols.sum(1)\n    point = 100 * (r.mean() - c.mean()) / r.mean()\n    return float(point), 100 * (ref_b - cand_b) / ref_b"
+  },
+  {
+   "part": "11",
+   "title": "Holm et les verdicts",
+   "file": "scripts/combined_analysis.py",
+   "name": "with_holm",
+   "start": 168,
+   "end": 187,
+   "code": "def with_holm(rows: list[dict]) -> pd.DataFrame:\n    out = pd.DataFrame(rows)\n    out[\"p Holm\"] = holm(out[\"p\"].tolist())\n    sup = out[\"famille\"].eq(\"hybrid-sup\")\n    shown = out[\"p Holm\"] < ALPHA\n    # a failed non-inferiority: a true loss when the whole interval is below 0, else an\n    # interval too wide to conclude (preregistration, section 9)\n    loss = out[\"IC haut\"] < 0\n    beyond = out[\"IC haut\"] < -MARGIN\n    failed = np.where(\n        loss,\n        np.where(beyond, f\"vraie perte (au-delà de −{MARGIN:g} %)\", \"vraie perte\"),\n        \"intervalle trop large pour conclure\",\n    )\n    out[\"verdict\"] = np.where(\n        sup,\n        np.where(shown, \"meilleure (démontré)\", \"supériorité non démontrée\"),\n        np.where(shown, \"non inférieure (démontré)\", failed),\n    )\n    return out"
+  },
+  {
+   "part": "11",
+   "title": "La correction de Holm",
+   "file": "src/cotraffic/analysis/stats.py",
+   "name": "holm",
+   "start": 120,
+   "end": 133,
+   "code": "def holm(pvalues: Sequence[float]) -> list[float]:\n    \"\"\"Holm-Bonferroni adjusted p-values (NaN entries are left out of the family).\"\"\"\n    p = np.asarray(pvalues, dtype=float)\n    out = np.full(p.shape, np.nan)\n    idx = np.where(~np.isnan(p))[0]\n    m = idx.size\n    if m == 0:\n        return out.tolist()\n    order = idx[np.argsort(p[idx])]\n    running = 0.0\n    for rank, i in enumerate(order):\n        running = max(running, min(1.0, (m - rank) * p[i]))\n        out[i] = running\n    return out.tolist()"
+  },
+  {
+   "part": "12",
+   "title": "Le compromis : l'écart au meilleur",
+   "file": "scripts/combined_figures.py",
+   "name": "criteria",
+   "start": 217,
+   "end": 239,
+   "code": "def criteria(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Mean gap (%) of each controller to the best of the five, per criterion.\"\"\"\n    cells = {k: g for k, g in df.groupby([\"network\", \"scenario\", \"demand\"])}\n    main = [k for k in cells if k[0] != \"grid8x8\" and k[1] in SCEN and k[1] not in (\n        \"sensor_noise\", \"comm_dropout_30\", \"buses\")]  # fmt: skip\n    spec = {\n        \"Trajet (14 cases)\": [(k, \"mean_travel_time\") for k in main],\n        \"Attente (14 cases)\": [(k, \"mean_waiting_time\") for k in main],\n        \"Ambulances (4 cases)\": [(k, \"ev_delay\") for k in main if k[1] == \"emergency\"],\n        \"Piétons (2 cases)\": [(k, \"ped_mean_waiting_time\") for k in main if k[1] == \"pedestrians\"],\n        \"Capteurs bruités\": [((\"grid4x4\", \"sensor_noise\", \"peak\"), m)\n                             for m in (\"mean_travel_time\", \"mean_waiting_time\")],\n    }  # fmt: skip\n    out = {}\n    for crit, items in spec.items():\n        gaps = {name: [] for _, _, name in CONTROLLERS}\n        for key, metric in items:\n            values = {n: cell_mean(cells[key], m, p, metric) for m, p, n in CONTROLLERS}\n            best = min(values.values())\n            for n, v in values.items():\n                gaps[n].append(100 * (v - best) / best)\n        out[crit] = {n: float(np.mean(g)) for n, g in gaps.items()}\n    return pd.DataFrame(out)"
+  },
+  {
+   "part": "12",
+   "title": "Les 71 trajets sur 72",
+   "file": "scripts/combined_figures.py",
+   "name": "ambulance_counts",
+   "start": 426,
+   "end": 445,
+   "code": "def ambulance_counts(df: pd.DataFrame, demand: str) -> dict:\n    \"\"\"How many emergency vehicles the candidate gets through faster than Max-Pressure\n    (same vehicle, same test seed), with the three training runs and with run 1 (the demo).\"\"\"\n    cell = df[(df.network == \"grid4x4\") & (df.scenario == \"emergency\") & (df.demand == demand)]\n    mp = cell[cell.method == \"mp\"].set_index(\"seed\")\n\n    def parse(s) -> dict[str, float]:\n        return {k: float(v) for k, v in (x.split(\":\") for x in str(s).split())}\n\n    gains: dict[int, list[float]] = {1: [], 2: [], 3: []}\n    for _, r in cell[(cell.method == \"hybrid_h2\") & (cell.param == 4.0)].iterrows():\n        dc, dm = parse(r.ev_delays), parse(mp.loc[r.seed, \"ev_delays\"])\n        gains[int(r.run)] += [dm[e] - dc[e] for e in dc if e in dm]\n    every = np.concatenate([np.array(g) for g in gains.values()])\n    run1 = np.array(gains[1])\n    return {\n        \"faster\": int((every > 0).sum()), \"total\": int(every.size),\n        \"medianGainS\": round(float(np.median(every)), 1),\n        \"run1Faster\": int((run1 > 0).sum()), \"run1Total\": int(run1.size),\n    }  # fmt: skip"
+  },
+  {
+   "part": "13",
+   "title": "Le conseiller : le biais sur les notes",
+   "file": "src/cotraffic/llm/advised.py",
+   "name": "AdvisedPolicy.bias_logits",
+   "start": 228,
+   "end": 256,
+   "code": "    def bias_logits(self, env, agents: list[str], logits: np.ndarray) -> np.ndarray:\n        \"\"\"The steps of ``act`` for a policy that owns the logits (the hybrid controller of\n        the combined study): advice activation and expiry, a call when one is due, then\n        the LLM bias on a copy of ``logits`` (one row per agent of ``agents``).\"\"\"\n        from cotraffic.llm.situation import events\n\n        now = env.now\n        ready = [a for a in self.pending if a.start <= now]\n        self.pending = [a for a in self.pending if a.start > now]\n        self.active = [a for a in self.active + ready if a.end > now]\n        latest: dict[str, Active] = {}\n        for a in self.active:\n            if a.junction not in latest or a.call >= latest[a.junction].call:\n                latest[a.junction] = a\n        self.active = list(latest.values())\n        trigger = self._trigger(env, events(env))\n        if trigger is not None:\n            self._ask(env, trigger)\n        out = np.array(logits, dtype=float, copy=True)\n        index = {a: i for i, a in enumerate(agents)}\n        for a in self.active:\n            i = index.get(a.junction)\n            if i is not None and a.phase < out.shape[1]:\n                out[i, a.phase] += self.cfg.beta * a.weight\n                self.biased_decisions += 1\n        self.changed_decisions += int(\n            (out.argmax(axis=1) != np.asarray(logits).argmax(axis=1)).sum()\n        )\n        return out"
+  },
+  {
+   "part": "13 bis",
+   "title": "Ce que lit le LLM stratège",
+   "file": "src/cotraffic/llm/strategist.py",
+   "name": "network_state",
+   "start": 87,
+   "end": 109,
+   "code": "def network_state(env) -> dict[str, Any]:\n    \"\"\"What the strategist reads: network-level counts, from the controllers' own sensors.\"\"\"\n    halted_by = {\n        tid: float(sum(env.meas.halting.get(ln, 0.0) for ln in inter.in_lanes))\n        for tid, inter in env.intersections.items()\n    }\n    peds = {\n        tid: int(sum(env.ped_waiting.get(c, 0.0) for c in inter.crossings))\n        for tid, inter in env.intersections.items()\n    }\n    worst = max(halted_by, key=halted_by.get) if halted_by else \"\"\n    return {\n        \"junctions\": len(halted_by),\n        \"vehicles\": int(env.conn.vehicle.getIDCount()),\n        \"halted\": round(sum(halted_by.values())),\n        \"backlog\": insertion_backlog(env),\n        \"queue_mean\": round(sum(halted_by.values()) / max(1, len(halted_by)), 1),\n        \"queue_max\": round(halted_by.get(worst, 0.0)),\n        \"queue_max_at\": worst,\n        \"long_queues\": sum(v >= LONG_QUEUE for v in halted_by.values()),\n        \"pedestrians\": sum(peds.values()),\n        \"events\": network_events(env),\n    }"
+  },
+  {
+   "part": "13 bis",
+   "title": "L'appel au LLM et ses garde-fous",
+   "file": "src/cotraffic/llm/strategist.py",
+   "name": "LlmStrategist._ask",
+   "start": 168,
+   "end": 202,
+   "code": "    def _ask(self, env) -> None:\n        now = env.now\n        s = network_state(env)\n        text = state_text(s, now, self.end or now, self.current, self.since, self.before)\n        self.before = _Snapshot(now, s[\"halted\"], s[\"backlog\"])\n        messages = [{\"role\": \"system\", \"content\": self.prompt.system},\n                    {\"role\": \"user\", \"content\": wrap(text)}]  # fmt: skip\n        call = StrategyCall(now, 0.0, now, self.current, self.current, False, state=text)\n        for attempt in range(2):\n            call.attempts = attempt + 1\n            try:\n                reply = self.client.chat(messages, self.prompt.schema())\n            except LLMError as err:  # server down or timeout: the current mode stays\n                call.error = str(err)[:200]\n                break\n            call.latency_s += reply.latency_s\n            call.prompt_tokens += reply.prompt_tokens\n            call.output_tokens += reply.output_tokens\n            call.raw = reply.text[:400]\n            try:\n                answer = json.loads(reply.text)\n                mode = str(answer[\"mode\"])\n                if mode not in MODES:\n                    raise ValueError(f\"unknown mode {mode!r}\")\n                call.mode, call.reason, call.valid = mode, str(answer.get(\"reason\", \"\"))[:200], True\n                break\n            except (ValueError, KeyError, TypeError) as err:\n                call.error = str(err)[:200]\n                messages = [*messages, {\"role\": \"assistant\", \"content\": reply.text[:400]},\n                            {\"role\": \"user\", \"content\": \"Not valid. Answer again with JSON \"\n                             \"only, in the requested format.\"}]  # fmt: skip\n        call.applies_at = now + call.latency_s\n        if call.valid:\n            self.pending = (call.mode, call.applies_at)\n        self.calls.append(call)"
+  },
+  {
+   "part": "13 bis",
+   "title": "Le mode appliqué à la candidate",
+   "file": "src/cotraffic/llm/strategist.py",
+   "name": "LlmStrategyPolicy.act",
+   "start": 229,
+   "end": 232,
+   "code": "    def act(self, env, obs: dict[str, Any]) -> dict[str, int]:\n        self.strategy.update(env)\n        self.mp_beta = self.beta if self.strategy.current == \"equilibre\" else 0.0\n        return super().act(env, obs)"
+  }
+ ]
+}

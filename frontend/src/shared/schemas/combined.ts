@@ -287,3 +287,26 @@ export const Cities = z.object({
   ),
 });
 export type Cities = z.infer<typeof Cities>;
+
+/** The technical summary of the final controller (scripts/export_guide.py). */
+export const Guide = z.object({
+  source: z.string(),
+  title: z.string(),
+  commit: z.string(),
+  intro: z.string(),
+  sections: z.array(
+    z.object({ id: z.string(), number: z.string(), title: z.string(), markdown: z.string() }),
+  ),
+  code: z.array(
+    z.object({
+      part: z.string(),
+      title: z.string(),
+      file: z.string(),
+      name: z.string().nullable(),
+      start: num,
+      end: num,
+      code: z.string(),
+    }),
+  ),
+});
+export type Guide = z.infer<typeof Guide>;

@@ -18,6 +18,7 @@ question, la réponse en une phrase en haut, le détail replié pour les experts
 | `07-grandes-villes-*.png` | Paris et Barcelone : plans des réseaux et tous les contrôleurs (exploratoire) |
 | `08-simulation-3d-*.png`, `09-simulation-3d-zoom-*.png` | La ville 3D : immeubles, arbres, trottoirs, feux sur poteaux, voitures |
 | `10-palette-ctrl-k-*.png` | La palette de commandes (Ctrl+K) |
+| `11-resume-technique-*.png` | Le résumé technique : chaque partie, ses calculs et les extraits du vrai code |
 
 Lancer le tableau de bord :
 
@@ -31,4 +32,5 @@ Régénérer les données des pages après une nouvelle analyse :
 
 ```
 python scripts/dashboard_combined.py
+python scripts/export_guide.py      # le résumé technique et ses extraits de code
 ```

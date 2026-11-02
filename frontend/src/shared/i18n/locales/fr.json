@@ -28,7 +28,8 @@
     "robustness": "Robustesse et généralisation",
     "howItWorks": "Comment ça marche",
     "llm": "Le LLM dans la boucle",
-    "cities": "Grandes villes"
+    "cities": "Grandes villes",
+    "guide": "Le résumé technique"
   },
   "topbar": {
     "dataSource": "Source des données",
@@ -110,6 +111,10 @@
     "cities": {
       "title": "Grandes villes",
       "description": "Paris et Barcelone, importées d'OpenStreetMap."
+    },
+    "guide": {
+      "title": "Le résumé technique",
+      "description": "Chaque partie du contrôleur, ses calculs et son code."
     }
   },
   "common": {

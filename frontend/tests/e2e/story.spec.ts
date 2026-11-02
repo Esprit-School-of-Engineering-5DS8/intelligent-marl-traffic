@@ -76,4 +76,25 @@ test.describe("defence story", () => {
     }
     await expect(main(page).getByText("Exploratoire").first()).toBeVisible();
   });
+  test("technical summary: every part, its real code, and a search", async ({ page }) => {
+    const guide = read<{
+      sections: { id: string; title: string }[];
+      code: { part: string; file: string; start: number; code: string }[];
+    }>("guide.json");
+    await open(page, "/guide", "Le résumé technique, partie par partie");
+    const toc = main(page).getByRole("navigation", { name: "Sommaire du résumé" });
+    await expect(toc.getByRole("link")).toHaveCount(guide.sections.length);
+    // the bias of the candidate: its code, read from the file at export time
+    const bias = guide.code.find((c) => c.code.includes("self.mp_beta"))!;
+    const part = main(page).locator(`#part-${bias.part.replace(" ", "-")}`);
+    await part.getByRole("button", { name: /^Voir le code/ }).click();
+    await expect(part.getByRole("region", { name: `${bias.file}:${bias.start}` })).toContainText(
+      "row[int(mp[a])] += self.mp_beta",
+    );
+    await main(page).getByRole("searchbox").fill("holm");
+    await expect(main(page).locator("section[id^=part-]").first()).toBeVisible();
+    expect(await main(page).locator("section[id^=part-]").count()).toBeLessThan(
+      guide.sections.length,
+    );
+  });
 });

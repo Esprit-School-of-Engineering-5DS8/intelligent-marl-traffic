@@ -11,6 +11,7 @@ const PAGES = [
   "/llm",
   "/robustness",
   "/cities",
+  "/guide",
   "/agents",
   "/pedestrians",
   "/emergency",

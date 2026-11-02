@@ -28,7 +28,8 @@
     "robustness": "Robustness and generalisation",
     "howItWorks": "How it works",
     "llm": "The LLM in the loop",
-    "cities": "Large cities"
+    "cities": "Large cities",
+    "guide": "The technical summary"
   },
   "topbar": {
     "dataSource": "Data source",
@@ -110,6 +111,10 @@
     "cities": {
       "title": "Large cities",
       "description": "Paris and Barcelona, imported from OpenStreetMap."
+    },
+    "guide": {
+      "title": "The technical summary",
+      "description": "Each part of the controller, its computations and its code."
     }
   },
   "common": {

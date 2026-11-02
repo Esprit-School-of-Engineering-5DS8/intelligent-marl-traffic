@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Bot,
   BrainCircuit,
   Building2,
@@ -25,6 +26,7 @@ export type PageKey =
   | "llm"
   | "robustness"
   | "cities"
+  | "guide"
   | "overview"
   | "analytics"
   | "liveMap"
@@ -61,6 +63,7 @@ export const NAV: NavGroup[] = [
       { key: "llm", path: "/llm", icon: MessagesSquare },
       { key: "robustness", path: "/robustness", icon: ShieldHalf },
       { key: "cities", path: "/cities", icon: Building2 },
+      { key: "guide", path: "/guide", icon: BookOpen },
     ],
   },
   {

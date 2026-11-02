@@ -607,5 +607,15 @@
       "hint": "Le calibrage à la demande prévue : le réseau se bloque, Max-Pressure s’effondre."
     },
     "blocked": "Ce réseau se bloque sous tous les contrôleurs, temps fixe compris : plus d’un trajet sur dix n’arrive pas. Ces attentes mesurent surtout le blocage d’un import brut, pas la qualité du contrôle."
+  },
+  "guide": {
+    "eyebrow": "Présentation · étape 7 · pour aller au fond",
+    "title": "Le résumé technique, partie par partie",
+    "answer": "Chaque brique du contrôleur : ce qu’elle fait, le calcul exact, comment on est arrivé au résultat, et le code qui le calcule ({{parts}} parties, {{excerpts}} extraits de code lus dans les fichiers du projet).",
+    "search": "Rechercher dans le résumé…",
+    "toc": "Sommaire du résumé",
+    "empty": "Aucune partie ne contient ces mots.",
+    "code": "Voir le code ({{n}})",
+    "codeHint": "Les lignes exactes, lues dans les fichiers du projet au moment de l’export."
   }
 }

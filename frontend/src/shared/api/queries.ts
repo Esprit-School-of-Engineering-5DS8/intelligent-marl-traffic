@@ -24,6 +24,7 @@ import {
   Bilan,
   Cells,
   Cities,
+  Guide,
   Layers,
   LlmLoop,
   Study,
@@ -61,6 +62,7 @@ export const useBilan = () => useData("combined/bilan", Bilan, true);
 export const useBigCity = () => useData("combined/bigcity", BigCity, true);
 export const useLlmLoop = () => useData("combined/llm_loop", LlmLoop, true);
 export const useCities = () => useData("combined/cities", Cities, true);
+export const useGuide = () => useData("guide", Guide, true);
 
 export const useTimeseries = (cell: Cell | null) =>
   useData(cell ? `timeseries/${cellKey(cell)}` : null, TimeseriesCell, true);

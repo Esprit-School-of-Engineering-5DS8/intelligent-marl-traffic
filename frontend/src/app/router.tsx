@@ -12,6 +12,7 @@ const PAGES: Record<PageKey, LazyExoticComponent<ComponentType>> = {
   howItWorks: lazy(() => import("@/features/how-it-works/HowItWorksPage")),
   llm: lazy(() => import("@/features/llm/LlmPage")),
   cities: lazy(() => import("@/features/cities/CitiesPage")),
+  guide: lazy(() => import("@/features/guide/GuidePage")),
   robustness: lazy(() => import("@/features/robustness/RobustnessPage")),
   overview: lazy(() => import("@/features/overview/OverviewPage")),
   liveMap: lazy(() => import("@/features/live-map/LiveMapPage")),
