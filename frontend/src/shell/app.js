@@ -2989,19 +2989,15 @@ function liveRainConfig() {
 }
 
 function syncRainIntensityControl(raining) {
-  const picker = document.querySelector('.live-rain-picker');
   const slider = $('liveRainIntensity');
   const readout = $('liveRainIntensityValue');
-  picker?.classList.toggle('is-raining', raining);
+  // The wet-road slider shares the map-style popup and only shows with rain.
+  const section = $('liveRainSection');
+  if (section) section.hidden = !raining;
   const level = Math.round(rainIntensity * 100);
   if (slider && slider.value !== String(level)) slider.value = String(level);
   if (slider) slider.setAttribute('aria-valuetext', `${level}%`);
   if (readout) readout.textContent = `${level}%`;
-  if (!raining) {
-    const menu = picker?.querySelector('.live-rain-menu');
-    if (menu) menu.hidden = true;
-    picker?.querySelector('[data-live-action="rain-level"]')?.setAttribute('aria-expanded', 'false');
-  }
 }
 
 /* The applied weather pass, so a 4 Hz state stream never rebuilds it: calling
@@ -3016,6 +3012,8 @@ function applyLiveWeatherEffects(weather) {
     button.setAttribute('aria-pressed', String(raining));
     button.setAttribute('aria-label', raining ? 'Clear the rain' : 'Start rain');
     button.setAttribute('title', raining ? 'Rain: on' : 'Rain: off');
+    // One button, two weathers: the icon names the condition currently running.
+    button.querySelector('use')?.setAttribute('href', raining ? '#i-rain' : '#i-cloud-sun');
   }
   syncRainIntensityControl(raining);
   if (!liveMap || typeof liveMap.setRain !== 'function') return;
@@ -3130,14 +3128,6 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
 
     if (action === 'style') {
       const menu = button.parentElement?.querySelector('.live-style-menu');
-      const open = menu?.hidden;
-      if (menu) menu.hidden = !open;
-      button.setAttribute('aria-expanded', String(Boolean(open)));
-      return;
-    }
-
-    if (action === 'rain-level') {
-      const menu = button.parentElement?.querySelector('.live-rain-menu');
       const open = menu?.hidden;
       if (menu) menu.hidden = !open;
       button.setAttribute('aria-expanded', String(Boolean(open)));

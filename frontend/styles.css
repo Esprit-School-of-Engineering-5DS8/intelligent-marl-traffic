@@ -7665,10 +7665,10 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .live-style-picker { position: relative; }
 .live-layer-picker { position: relative; }
-.live-rain-picker { position: relative; display: inline-flex; align-items: center; }
-.live-rain-picker .live-rain-level { display: none; }
-.live-rain-picker.is-raining .live-rain-level { display: inline-flex; }
-.live-rain-menu { width: 218px; }
+/* Wet-road intensity lives in the map-style popup: it only shows once rain is
+   falling, so the toolbar keeps one weather button in both states. */
+.live-rain-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+.live-rain-section[hidden] { display: none; }
 .live-rain-slider { display: grid; gap: 6px; padding: 4px 8px 6px; }
 .live-rain-slider > span { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .live-rain-slider strong { color: #35362f; font-size: 11px; font-weight: 600; }

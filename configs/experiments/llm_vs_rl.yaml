@@ -1,0 +1,22 @@
+name: llm_vs_rl
+description: >-
+  Paired head-to-head of Amen's three-role LLM team (llm_team) against the trained
+  end-to-end RL policy (generalist). Both arms run the same cells and evaluation
+  seeds, and only the networks that have a selected generalist checkpoint are
+  listed, so no cell is silently skipped. Add mp to methods for a classical
+  reference point; the LLM arm uses the provider set in the environment
+  (COTRAFFIC_LLM_BACKEND=mock to run without spending tokens).
+#
+# The RL arm needs selected weights at results/checkpoints/generalist/<network>/seed<k>.zip
+# (train + select first); until then the matrix skips that arm with a warning.
+
+seeds: [0, 1, 2]
+cells:
+  - network: sf_mission_3x3
+    methods: [generalist, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency, pedestrians]
+  - network: tunis
+    methods: [generalist, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency]

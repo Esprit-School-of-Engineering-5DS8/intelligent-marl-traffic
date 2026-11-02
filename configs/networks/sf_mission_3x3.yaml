@@ -69,3 +69,11 @@ demand:
   origin_side_weights: {west: 1.0, east: 1.0, north: 1.0, south: 1.0}
   opposite_side_prob: 0.5
   route_random_factor: 1.2
+
+# Incident scenario site: the blocked edge must exist in the built net and end at a
+# signal, so the stopped vehicle backs traffic up into a controlled approach. Lane 0
+# of these arterials is the sidewalk, hence the rightmost vehicle lane is lane 1.
+incident:
+  edge: "91181771#0"      # Howard Street, 262 m, northbound into Howard x 8th (tls 65306827)
+  lane: 1                 # rightmost vehicle lane (lane 0 is the sidewalk)
+  position_frac: 0.85     # stopped vehicle just before the stop line

@@ -572,21 +572,18 @@
                     <button type="button" class="live-style-option" data-map-style="dark" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dark"></span><span><strong>Night</strong><small>Mapbox Standard · night</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                     <button type="button" class="live-style-option" data-map-style="sunset" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-sunset"></span><span><strong>Dusk</strong><small>Mapbox Standard · dusk</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                     <button type="button" class="live-style-option" data-map-style="dawn" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dawn"></span><span><strong>Dawn</strong><small>Soft morning tones</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
+                    <div class="live-rain-section" id="liveRainSection" hidden>
+                      <span class="live-style-menu-title">Wet road</span>
+                      <label class="live-rain-slider">
+                        <span><strong>Rain &amp; fog</strong><small id="liveRainIntensityValue">60%</small></span>
+                        <input type="range" id="liveRainIntensity" min="0" max="100" step="5" value="60" aria-label="Rain and vignette intensity">
+                      </label>
+                      <p class="live-rain-note">Drop density, blur and the vignette follow this level. The overlay thins out as you zoom away from the street.</p>
+                    </div>
                   </div>
                 </div>
                 <button type="button" class="live-tool panel-theme-tool is-light" data-panel-theme-toggle aria-label="Switch panels to dark mode" title="Panels: Light"><svg class="ico"><use href="#i-sun"/></svg></button>
-                <div class="live-rain-picker">
-                  <button type="button" class="live-tool" data-live-action="weather" aria-pressed="false" aria-label="Start rain" title="Rain: off"><svg class="ico"><use href="#i-cloud"/></svg></button>
-                  <button type="button" class="live-tool live-rain-level" data-live-action="rain-level" aria-label="Rain intensity" title="Rain intensity" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-rain"/></svg></button>
-                  <div class="live-style-menu live-rain-menu" role="group" aria-label="Wet-road intensity" hidden>
-                    <span class="live-style-menu-title">Wet road</span>
-                    <label class="live-rain-slider">
-                      <span><strong>Rain &amp; fog</strong><small id="liveRainIntensityValue">60%</small></span>
-                      <input type="range" id="liveRainIntensity" min="0" max="100" step="5" value="60" aria-label="Rain and vignette intensity">
-                    </label>
-                    <p class="live-rain-note">Drop density, blur and the vignette follow this level. The overlay thins out as you zoom away from the street.</p>
-                  </div>
-                </div>
+                <button type="button" class="live-tool" data-live-action="weather" aria-pressed="false" aria-label="Start rain" title="Rain: off"><svg class="ico"><use href="#i-cloud-sun"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="locate" aria-label="Recenter map"><svg class="ico"><use href="#i-crosshair"/></svg></button>
                 <button type="button" class="live-tool" data-live-action="fullscreen" aria-label="Toggle fullscreen"><svg class="ico"><use href="#i-expand"/></svg></button>
               </div>

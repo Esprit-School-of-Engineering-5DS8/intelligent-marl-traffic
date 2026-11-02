@@ -76,6 +76,7 @@ cd frontend && npm install
 python -m cotraffic networks --net grid2x2           # build the SUMO network
 python -m cotraffic episode --net grid2x2 --demand medium --seconds 600
 python -m cotraffic evaluate --experiment llm_ab_quick --jobs 1
+python -m cotraffic evaluate --experiment llm_vs_rl --jobs 2   # LLM team vs trained RL arm
 python -m cotraffic aggregate && python -m cotraffic tables
 ```
 
@@ -97,6 +98,12 @@ python scripts/export_dashboard_data.py              # refresh served result fil
 | `ind`, `coop`, `coop_full`, `coop_eco*` | PPO learned variants (checkpoint required) |
 | `dqn` | DQN comparison agent |
 | `llm` | Batched language-model controller, MP fallback |
+| `llm_team` | Three-role LLM team (Operator, Emergency, Pedestrian) over Max-Pressure; typed directives are validated, arbitrated and then passed through the safety shield |
+
+`generalist` is the flagship learned policy (all demand levels and event scenarios, one
+checkpoint per training seed). `configs/experiments/llm_vs_rl.yaml` runs it head-to-head
+against `llm_team` on the same seeds; set `COTRAFFIC_LLM_BACKEND=mock` to run the LLM arm
+without spending tokens, and train + select a `generalist` checkpoint first.
 
 Full architecture, controller catalog and A/B protocol: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
