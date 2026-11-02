@@ -579,7 +579,7 @@
     "eyebrow": "Présentation · étape 6",
     "title": "Et dans une vraie grande ville ?",
     "answer": "Paris et Barcelone, importées d’OpenStreetMap avec leurs vrais feux, sans aucun réentraînement : les modèles appris sur le quartier de Tunis y pilotent des dizaines de carrefours, avec et sans le LLM.",
-    "facts": "{{lights}} feux, dont {{driven}} pilotés par nos agents ({{pct}} %) ; environ {{veh}} véhicules par heure ({{scale}} % de la demande prévue, au-delà même le temps fixe se bloque) ; {{seeds}} graines.",
+    "facts": "{{lights}} feux, dont {{driven}} pilotés par nos agents ({{pct}} %) ; environ {{veh}} véhicules par heure ({{scale}} % de la demande prévue, réduite pour que le réseau tienne) ; {{seeds}} graine(s).",
     "legend": {
       "driven": "feu piloté par nos agents",
       "kept": "feu gardant son programme SUMO"
@@ -593,18 +593,19 @@
     "llm": "Le LLM a choisi l’équilibre {{equilibre}} % du temps, la fluidité {{fluidite}} %, l’agent seul {{agent}} %.",
     "claims": {
       "can": {
-        "transfer": "Sans réentraînement, nos contrôleurs appris fonctionnent dans une vraie ville importée, et font bien mieux que Max-Pressure là où celui-ci s’effondre.",
-        "protocol": "Le même protocole s’applique à une nouvelle ville : mêmes contrôleurs, même bouclier, mêmes mesures."
+        "transfer": "Sans réentraînement, nos contrôleurs appris fonctionnent dans une vraie ville importée, et font bien mieux que Max-Pressure là où celui-ci s’effondre (Paris).",
+        "protocol": "Le LLM s’adapte à la ville : il garde l’équilibre à Paris, où Max-Pressure s’effondre, et bascule souvent en fluidité à Barcelone, où tout sature."
       },
       "cannot": {
         "prereg": "Exploratoire : ces villes ne font pas partie de l’évaluation pré-enregistrée, et la demande a été réduite pour que le réseau tienne.",
-        "ft": "Le temps fixe (Webster, réglé pour la demande jouée) reste meilleur à Paris : un réseau importé tel quel favorise les plans fixes.",
+        "ft": "Le temps fixe (Webster, réglé pour la demande jouée) reste le meilleur dans les deux villes : un réseau importé tel quel favorise les plans fixes.",
         "network": "Un vrai test demanderait un réseau nettoyé, une demande réelle et probablement un réentraînement par ville (F-016)."
       }
     },
     "history": {
       "title": "Pourquoi l’étude avait été arrêtée (F-016)",
       "hint": "Le calibrage à la demande prévue : le réseau se bloque, Max-Pressure s’effondre."
-    }
+    },
+    "blocked": "Ce réseau se bloque sous tous les contrôleurs, temps fixe compris : plus d’un trajet sur dix n’arrive pas. Ces attentes mesurent surtout le blocage d’un import brut, pas la qualité du contrôle."
   }
 }

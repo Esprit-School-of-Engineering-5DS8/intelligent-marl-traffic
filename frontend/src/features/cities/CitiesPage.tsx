@@ -124,6 +124,11 @@ function CityCard({ city }: { city: City }) {
   const cand = by("hybrid_h2");
   const llm = by("hybrid_h2_llmstrat");
   const mp = by("mp");
+  // a network that blocks under every controller: the waiting then measures the blockage
+  const blocked =
+    city.vehPerH !== null &&
+    normal.length > 0 &&
+    normal.every((r) => (r.unfinished ?? 0) > 0.1 * (city.vehPerH ?? 0));
   return (
     <Section
       id={`city-${city.network}`}
@@ -175,7 +180,7 @@ function CityCard({ city }: { city: City }) {
             {normal.map((r) => (
               <li
                 key={r.controller}
-                className="grid grid-cols-[10.5rem_1fr_7.5rem] items-center gap-3 text-sm"
+                className="grid grid-cols-[13rem_1fr_7.5rem] items-center gap-3 text-sm"
               >
                 <ControllerName controller={r.controller} className="truncate text-text-2" />
                 <span className="h-3 rounded-full bg-surface-3">
@@ -196,6 +201,11 @@ function CityCard({ city }: { city: City }) {
               </li>
             ))}
           </ul>
+          {blocked ? (
+            <p className="rounded-lg border border-dashed border-critical-ink/50 bg-critical-soft p-3 text-sm text-text">
+              {t("cities.blocked")}
+            </p>
+          ) : null}
           <p className="text-xs text-muted">{t("cities.barsNote")}</p>
           {city.llmShares ? (
             <p className="text-sm text-text-2">

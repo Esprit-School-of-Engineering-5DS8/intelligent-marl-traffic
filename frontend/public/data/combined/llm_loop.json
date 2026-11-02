@@ -1,0 +1,1057 @@
+{
+ "source": "results/llm_loop/raw, calls (scripts/llm_loop.py); candidate t1: results/exploration/combined/raw (seed 1000), results/combined/raw (seeds 0-4); oracle and placebo: results/exploration/combined/raw (phase B)",
+ "model": "qwen2.5:3b",
+ "prompt": "strategist-v1",
+ "windowS": 300.0,
+ "beta": 4.0,
+ "episodes": 104,
+ "calls": 1746,
+ "validRate": 1.0,
+ "latencyP50S": 7.14,
+ "shares": {
+  "equilibre": 0.9343,
+  "fluidite": 0.0375,
+  "agent": 0.0282
+ },
+ "validation": [
+  {
+   "network": "grid4x4",
+   "scenario": "emergency",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 159.39,
+    "candidate": 159.39,
+    "gain": 0.0,
+    "oracle": 158.93,
+    "placeboBest": 158.98
+   },
+   "waiting": {
+    "llm": 25.18,
+    "candidate": 25.18,
+    "gain": 0.0,
+    "oracle": 24.8,
+    "placeboBest": 25.01
+   },
+   "ambulances": {
+    "llm": 30.41,
+    "candidate": 30.41,
+    "gain": 0.0,
+    "oracle": 21.65,
+    "placeboBest": 16.33
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "emergency",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 205.79,
+    "candidate": 205.79,
+    "gain": 0.0,
+    "oracle": 205.52,
+    "placeboBest": 208.27
+   },
+   "waiting": {
+    "llm": 51.61,
+    "candidate": 51.61,
+    "gain": 0.0,
+    "oracle": 50.76,
+    "placeboBest": 52.23
+   },
+   "ambulances": {
+    "llm": 34.08,
+    "candidate": 34.08,
+    "gain": 0.0,
+    "oracle": 40.53,
+    "placeboBest": 31.61
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "incident",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 2.0,
+   "shares": {
+    "equilibre": 0.8889,
+    "fluidite": 0.1111,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 159.79,
+    "candidate": 159.98,
+    "gain": 0.12,
+    "oracle": 158.19,
+    "placeboBest": 159.35
+   },
+   "waiting": {
+    "llm": 25.36,
+    "candidate": 25.36,
+    "gain": -0.0,
+    "oracle": 24.08,
+    "placeboBest": 25.7
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "incident",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 207.35,
+    "candidate": 207.35,
+    "gain": 0.0,
+    "oracle": 205.96,
+    "placeboBest": 207.18
+   },
+   "waiting": {
+    "llm": 51.66,
+    "candidate": 51.66,
+    "gain": 0.0,
+    "oracle": 50.88,
+    "placeboBest": 52.34
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "normal",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 159.47,
+    "candidate": 159.47,
+    "gain": 0.0,
+    "oracle": 157.77,
+    "placeboBest": 158.53
+   },
+   "waiting": {
+    "llm": 25.12,
+    "candidate": 25.12,
+    "gain": 0.0,
+    "oracle": 24.27,
+    "placeboBest": 24.64
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "normal",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 205.41,
+    "candidate": 205.41,
+    "gain": 0.0,
+    "oracle": 204.75,
+    "placeboBest": 204.13
+   },
+   "waiting": {
+    "llm": 51.53,
+    "candidate": 51.53,
+    "gain": 0.0,
+    "oracle": 50.11,
+    "placeboBest": 50.24
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "pedestrians",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 166.21,
+    "candidate": 166.21,
+    "gain": 0.0,
+    "oracle": 165.62,
+    "placeboBest": 165.82
+   },
+   "waiting": {
+    "llm": 29.43,
+    "candidate": 29.43,
+    "gain": 0.0,
+    "oracle": 28.76,
+    "placeboBest": 29.25
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "pedestrians",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 3.0,
+   "shares": {
+    "equilibre": 0.4481,
+    "fluidite": 0.1111,
+    "agent": 0.4407
+   },
+   "travel": {
+    "llm": 238.47,
+    "candidate": 240.44,
+    "gain": 0.82,
+    "oracle": 235.19,
+    "placeboBest": 235.46
+   },
+   "waiting": {
+    "llm": 69.4,
+    "candidate": 71.48,
+    "gain": 2.91,
+    "oracle": 69.25,
+    "placeboBest": 67.98
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "emergency",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 110.6,
+    "candidate": 110.6,
+    "gain": 0.0,
+    "oracle": 109.18,
+    "placeboBest": 110.18
+   },
+   "waiting": {
+    "llm": 7.38,
+    "candidate": 7.38,
+    "gain": 0.0,
+    "oracle": 6.7,
+    "placeboBest": 7.23
+   },
+   "ambulances": {
+    "llm": 21.66,
+    "candidate": 21.66,
+    "gain": 0.0,
+    "oracle": 32.58,
+    "placeboBest": 24.97
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "emergency",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 2.0,
+   "shares": {
+    "equilibre": 0.8889,
+    "fluidite": 0.1111,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 155.05,
+    "candidate": 156.83,
+    "gain": 1.13,
+    "oracle": 164.47,
+    "placeboBest": 141.13
+   },
+   "waiting": {
+    "llm": 36.77,
+    "candidate": 38.1,
+    "gain": 3.5,
+    "oracle": 44.75,
+    "placeboBest": 24.73
+   },
+   "ambulances": {
+    "llm": 40.54,
+    "candidate": 38.84,
+    "gain": -4.37,
+    "oracle": 26.82,
+    "placeboBest": 31.64
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "incident",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 109.72,
+    "candidate": 109.72,
+    "gain": 0.0,
+    "oracle": 109.91,
+    "placeboBest": 110.22
+   },
+   "waiting": {
+    "llm": 6.96,
+    "candidate": 6.96,
+    "gain": 0.0,
+    "oracle": 6.93,
+    "placeboBest": 7.2
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "incident",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 2.0,
+   "shares": {
+    "equilibre": 0.8889,
+    "fluidite": 0.1111,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 156.87,
+    "candidate": 161.72,
+    "gain": 3.0,
+    "oracle": 175.67,
+    "placeboBest": 155.9
+   },
+   "waiting": {
+    "llm": 36.16,
+    "candidate": 42.03,
+    "gain": 13.97,
+    "oracle": 54.46,
+    "placeboBest": 36.5
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "normal",
+   "demand": "medium",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 110.35,
+    "candidate": 110.35,
+    "gain": 0.0,
+    "oracle": 109.23,
+    "placeboBest": 110.16
+   },
+   "waiting": {
+    "llm": 7.15,
+    "candidate": 7.15,
+    "gain": 0.0,
+    "oracle": 6.7,
+    "placeboBest": 7.36
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "normal",
+   "demand": "peak",
+   "seeds": 1,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 153.05,
+    "candidate": 153.05,
+    "gain": 0.0,
+    "oracle": 159.09,
+    "placeboBest": 154.46
+   },
+   "waiting": {
+    "llm": 34.91,
+    "candidate": 34.91,
+    "gain": 0.0,
+    "oracle": 38.57,
+    "placeboBest": 35.54
+   }
+  }
+ ],
+ "test": [
+  {
+   "network": "grid4x4",
+   "scenario": "buses",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 158.98,
+    "candidate": 158.98,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 25.03,
+    "candidate": 25.03,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "comm_dropout_30",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 4.0,
+   "shares": {
+    "equilibre": 0.8663,
+    "fluidite": 0.1337,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 212.27,
+    "candidate": 213.71,
+    "gain": 0.67
+   },
+   "waiting": {
+    "llm": 55.4,
+    "candidate": 56.01,
+    "gain": 1.1
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "emergency",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 158.88,
+    "candidate": 158.88,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 25.02,
+    "candidate": 25.02,
+    "gain": 0.0
+   },
+   "ambulances": {
+    "llm": 23.35,
+    "candidate": 23.35,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "emergency",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 213.69,
+    "candidate": 213.69,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 56.1,
+    "candidate": 56.1,
+    "gain": 0.0
+   },
+   "ambulances": {
+    "llm": 40.37,
+    "candidate": 40.37,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "incident",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.4,
+   "shares": {
+    "equilibre": 0.9889,
+    "fluidite": 0.0111,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 158.86,
+    "candidate": 158.96,
+    "gain": 0.07
+   },
+   "waiting": {
+    "llm": 24.94,
+    "candidate": 25.0,
+    "gain": 0.24
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "incident",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 0.4,
+   "shares": {
+    "equilibre": 0.9889,
+    "fluidite": 0.0111,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 214.25,
+    "candidate": 214.49,
+    "gain": 0.11
+   },
+   "waiting": {
+    "llm": 56.12,
+    "candidate": 56.26,
+    "gain": 0.24
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "normal",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 158.6,
+    "candidate": 158.6,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 24.84,
+    "candidate": 24.84,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "normal",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 213.62,
+    "candidate": 213.62,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 55.77,
+    "candidate": 55.77,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "pedestrians",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 1.2,
+   "shares": {
+    "equilibre": 0.8563,
+    "fluidite": 0.0,
+    "agent": 0.1437
+   },
+   "travel": {
+    "llm": 165.58,
+    "candidate": 165.46,
+    "gain": -0.07
+   },
+   "waiting": {
+    "llm": 29.15,
+    "candidate": 29.16,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "pedestrians",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 5.4,
+   "shares": {
+    "equilibre": 0.5337,
+    "fluidite": 0.1113,
+    "agent": 0.355
+   },
+   "travel": {
+    "llm": 266.15,
+    "candidate": 274.57,
+    "gain": 3.07
+   },
+   "waiting": {
+    "llm": 85.12,
+    "candidate": 91.68,
+    "gain": 7.15
+   }
+  },
+  {
+   "network": "grid4x4",
+   "scenario": "sensor_noise",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 4.0,
+   "shares": {
+    "equilibre": 0.8663,
+    "fluidite": 0.1337,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 221.82,
+    "candidate": 219.38,
+    "gain": -1.11
+   },
+   "waiting": {
+    "llm": 61.5,
+    "candidate": 59.87,
+    "gain": -2.72
+   }
+  },
+  {
+   "network": "grid8x8",
+   "scenario": "normal",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 305.79,
+    "candidate": 305.79,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 53.11,
+    "candidate": 53.11,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "emergency",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 109.49,
+    "candidate": 109.49,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 7.41,
+    "candidate": 7.41,
+    "gain": 0.0
+   },
+   "ambulances": {
+    "llm": 21.28,
+    "candidate": 21.28,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "emergency",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 1.2,
+   "shares": {
+    "equilibre": 0.8998,
+    "fluidite": 0.1002,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 150.93,
+    "candidate": 152.55,
+    "gain": 1.07
+   },
+   "waiting": {
+    "llm": 33.79,
+    "candidate": 35.45,
+    "gain": 4.7
+   },
+   "ambulances": {
+    "llm": 71.1,
+    "candidate": 78.1,
+    "gain": 8.96
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "incident",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 109.23,
+    "candidate": 109.23,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 7.32,
+    "candidate": 7.32,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "incident",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 0.8,
+   "shares": {
+    "equilibre": 0.8554,
+    "fluidite": 0.1446,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 152.71,
+    "candidate": 150.19,
+    "gain": -1.68
+   },
+   "waiting": {
+    "llm": 36.33,
+    "candidate": 33.91,
+    "gain": -7.16
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "normal",
+   "demand": "medium",
+   "seeds": 5,
+   "switches": 0.0,
+   "shares": {
+    "equilibre": 1.0,
+    "fluidite": 0.0,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 109.46,
+    "candidate": 109.46,
+    "gain": 0.0
+   },
+   "waiting": {
+    "llm": 7.41,
+    "candidate": 7.41,
+    "gain": 0.0
+   }
+  },
+  {
+   "network": "real_district",
+   "scenario": "normal",
+   "demand": "peak",
+   "seeds": 5,
+   "switches": 1.2,
+   "shares": {
+    "equilibre": 0.9554,
+    "fluidite": 0.0446,
+    "agent": 0.0
+   },
+   "travel": {
+    "llm": 157.54,
+    "candidate": 156.69,
+    "gain": -0.54
+   },
+   "waiting": {
+    "llm": 40.15,
+    "candidate": 39.34,
+    "gain": -2.04
+   }
+  }
+ ],
+ "testOverall": {
+  "travel": {
+   "gain": 0.18,
+   "low": -0.43,
+   "high": 1.1,
+   "pairs": 90
+  },
+  "waiting": {
+   "gain": 0.61,
+   "low": -1.34,
+   "high": 3.35,
+   "pairs": 90
+  },
+  "ambulances": {
+   "gain": 4.29,
+   "low": -0.31,
+   "high": 10.48,
+   "pairs": 20
+  }
+ },
+ "timeline": {
+  "network": "grid4x4",
+  "scenario": "comm_dropout_30",
+  "demand": "peak",
+  "seed": 1,
+  "end": 5400.0,
+  "calls": [
+   {
+    "time": 0.0,
+    "appliesAt": 11.7,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "No vehicles or pedestrians, and no halted vehicles per junction.",
+    "latency": 11.7,
+    "halted": 0,
+    "backlog": 0
+   },
+   {
+    "time": 300.0,
+    "appliesAt": 306.4,
+    "mode": "fluidite",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network has increased and most junctions have long queues",
+    "latency": 6.4,
+    "halted": 90,
+    "backlog": 1
+   },
+   {
+    "time": 600.0,
+    "appliesAt": 607.8,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and no growth, and few junctions have long queues.",
+    "latency": 7.8,
+    "halted": 120,
+    "backlog": 0
+   },
+   {
+    "time": 900.0,
+    "appliesAt": 907.1,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and no growth in queues",
+    "latency": 7.1,
+    "halted": 118,
+    "backlog": 0
+   },
+   {
+    "time": 1200.0,
+    "appliesAt": 1207.3,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and no growth, and no long queues",
+    "latency": 7.3,
+    "halted": 115,
+    "backlog": 0
+   },
+   {
+    "time": 1500.0,
+    "appliesAt": 1509.4,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and no growth, and no long queues at junctions.",
+    "latency": 9.4,
+    "halted": 127,
+    "backlog": 0
+   },
+   {
+    "time": 1800.0,
+    "appliesAt": 1809.8,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and no growth, and no long queues",
+    "latency": 9.8,
+    "halted": 164,
+    "backlog": 0
+   },
+   {
+    "time": 2100.0,
+    "appliesAt": 2107.5,
+    "mode": "fluidite",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 1 and growing, and most junctions have long queues",
+    "latency": 7.5,
+    "halted": 125,
+    "backlog": 1
+   },
+   {
+    "time": 2400.0,
+    "appliesAt": 2410.9,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and has not grown, and no junctions have long queues.",
+    "latency": 10.9,
+    "halted": 145,
+    "backlog": 0
+   },
+   {
+    "time": 2700.0,
+    "appliesAt": 2711.3,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network: 0 and no growth, and no long queues at junctions.",
+    "latency": 11.3,
+    "halted": 118,
+    "backlog": 0
+   },
+   {
+    "time": 3000.0,
+    "appliesAt": 3009.7,
+    "mode": "fluidite",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 1 and growing, and most junctions have long queues",
+    "latency": 9.7,
+    "halted": 140,
+    "backlog": 1
+   },
+   {
+    "time": 3300.0,
+    "appliesAt": 3307.6,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and has not grown, and no junctions have long queues.",
+    "latency": 7.6,
+    "halted": 155,
+    "backlog": 0
+   },
+   {
+    "time": 3600.0,
+    "appliesAt": 3607.2,
+    "mode": "fluidite",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 1 and growing, and most junctions have long queues",
+    "latency": 7.2,
+    "halted": 108,
+    "backlog": 1
+   },
+   {
+    "time": 3900.0,
+    "appliesAt": 3908.5,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and has not grown, and no junctions have long queues.",
+    "latency": 8.5,
+    "halted": 107,
+    "backlog": 0
+   },
+   {
+    "time": 4200.0,
+    "appliesAt": 4207.9,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network is 0 and no growth, and no junctions have long queues.",
+    "latency": 7.9,
+    "halted": 97,
+    "backlog": 0
+   },
+   {
+    "time": 4500.0,
+    "appliesAt": 4508.2,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "vehicles waiting to enter the network: 0",
+    "latency": 8.2,
+    "halted": 86,
+    "backlog": 0
+   },
+   {
+    "time": 4800.0,
+    "appliesAt": 4808.6,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "No vehicles or pedestrians, and no junctions with halted vehicles.",
+    "latency": 8.6,
+    "halted": 0,
+    "backlog": 0
+   },
+   {
+    "time": 5100.0,
+    "appliesAt": 5105.2,
+    "mode": "equilibre",
+    "valid": true,
+    "reason": "network is clear, no vehicles or pedestrians waiting",
+    "latency": 5.2,
+    "halted": 0,
+    "backlog": 0
+   }
+  ]
+ },
+ "advisor": {
+  "travel": {
+   "gain": -1.38,
+   "low": -2.4,
+   "high": -0.69,
+   "pairs": 5
+  },
+  "waiting": {
+   "gain": -2.91,
+   "low": -5.14,
+   "high": -1.24,
+   "pairs": 5
+  },
+  "ambulances": {
+   "gain": -20.89,
+   "low": -52.12,
+   "high": 1.47,
+   "pairs": 5
+  }
+ }
+}
