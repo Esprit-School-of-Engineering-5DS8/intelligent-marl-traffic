@@ -7,10 +7,8 @@
   "nav": {
     "label": "Main navigation",
     "groups": {
-      "synthesis": "Summary",
-      "results": "Results",
-      "demo": "Demo and replays",
-      "operations": "Operations",
+      "presentation": "Presentation",
+      "exploration": "Exploration",
       "tools": "Tools"
     },
     "home": "Home",
@@ -27,7 +25,10 @@
     "expand": "Expand menu",
     "assistant": "Assistant",
     "finalController": "Final controller",
-    "robustness": "Robustness and generalisation"
+    "robustness": "Robustness and generalisation",
+    "howItWorks": "How it works",
+    "llm": "The LLM in the loop",
+    "cities": "Large cities"
   },
   "topbar": {
     "dataSource": "Data source",
@@ -97,6 +98,18 @@
     "robustness": {
       "title": "Robustness and generalisation",
       "description": "Noisy sensors, lost messages, buses, a larger network never seen in training, and the stopped attempt on a large city."
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "description": "The five layers of a decision."
+    },
+    "llm": {
+      "title": "The LLM in the loop",
+      "description": "The LLM chooses the network's strategy."
+    },
+    "cities": {
+      "title": "Large cities",
+      "description": "Paris and Barcelona, imported from OpenStreetMap."
     }
   },
   "common": {
@@ -520,5 +533,14 @@
       "pages": "Pages",
       "actions": "Actions"
     }
+  },
+  "scene3d": {
+    "legend": "Legend of the 3D city",
+    "cars": "Cars (solid colours, never those of the signals)",
+    "bus": "Bus",
+    "ambulance": "Ambulance (blue beacon)",
+    "brakes": "Brake lights: vehicle stopped",
+    "signals": "Traffic light (and stop bar on the road)",
+    "pedestrians": "Pedestrians"
   }
 }

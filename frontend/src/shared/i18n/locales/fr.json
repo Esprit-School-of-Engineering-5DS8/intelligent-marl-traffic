@@ -7,10 +7,8 @@
   "nav": {
     "label": "Navigation principale",
     "groups": {
-      "synthesis": "Synthèse",
-      "results": "Résultats",
-      "demo": "Démo et replays",
-      "operations": "Opérations",
+      "presentation": "Présentation",
+      "exploration": "Exploration",
       "tools": "Outils"
     },
     "home": "Accueil",
@@ -27,7 +25,10 @@
     "expand": "Déplier le menu",
     "assistant": "Assistant",
     "finalController": "Contrôleur final",
-    "robustness": "Robustesse et généralisation"
+    "robustness": "Robustesse et généralisation",
+    "howItWorks": "Comment ça marche",
+    "llm": "Le LLM dans la boucle",
+    "cities": "Grandes villes"
   },
   "topbar": {
     "dataSource": "Source des données",
@@ -97,6 +98,18 @@
     "robustness": {
       "title": "Robustesse et généralisation",
       "description": "Capteurs bruités, pertes de messages, bus, un réseau plus grand jamais vu à l'entraînement, et la tentative arrêtée sur une grande ville."
+    },
+    "howItWorks": {
+      "title": "Comment ça marche",
+      "description": "Les cinq couches d'une décision."
+    },
+    "llm": {
+      "title": "Le LLM dans la boucle",
+      "description": "Le LLM choisit la stratégie du réseau."
+    },
+    "cities": {
+      "title": "Grandes villes",
+      "description": "Paris et Barcelone, importées d'OpenStreetMap."
     }
   },
   "common": {
@@ -520,5 +533,14 @@
       "pages": "Pages",
       "actions": "Actions"
     }
+  },
+  "scene3d": {
+    "legend": "Légende de la ville 3D",
+    "cars": "Voitures (couleurs unies, jamais celles des feux)",
+    "bus": "Bus",
+    "ambulance": "Ambulance (gyrophare bleu)",
+    "brakes": "Feux stop : véhicule arrêté",
+    "signals": "Feu tricolore (et barre d'arrêt au sol)",
+    "pedestrians": "Piétons"
   }
 }

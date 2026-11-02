@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { PageHeader } from "@/shared/ui/page-header";
 
+import { Legend3D } from "./Legend3D";
 import { Scene3D } from "./Scene3D";
 
 function hasWebGL(): boolean {
@@ -119,6 +120,7 @@ function View({ net, replay }: { net: NetworkGeometry; replay: Replay }) {
           </Button>
         </div>
       </div>
+      <Legend3D />
       <ReplayStats replay={replay} sides={[...sides]} />
     </div>
   );

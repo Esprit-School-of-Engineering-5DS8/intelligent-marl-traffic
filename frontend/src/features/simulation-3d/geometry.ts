@@ -44,7 +44,10 @@ function pushQuad(
   }
 }
 
-/** Roads, sidewalks, crossings and junction plates merged into one mesh (one draw call). */
+/**
+ * Roads, sidewalks, lane markings, crossings and junction plates merged into one mesh (one
+ * draw call).
+ */
 export function buildRoads(
   net: NetworkGeometry,
   p: Projector,
@@ -52,7 +55,7 @@ export function buildRoads(
 ): THREE.BufferGeometry {
   const pos: number[] = [];
   const col: number[] = [];
-  const road = new THREE.Color(dark ? "#56636f" : "#8d99a6");
+  const road = new THREE.Color(dark ? "#4b5663" : "#8d99a6");
   const internal = new THREE.Color(dark ? "#505c68" : "#949fab");
   const sidewalk = new THREE.Color(dark ? "#8792a0" : "#d9dee4");
   const crossing = new THREE.Color("#e8edf2");
@@ -67,9 +70,49 @@ export function buildRoads(
     for (const tri of tris) {
       for (const i of tri) {
         const v = pts[i]!;
-        pos.push(v.x, 0.02, v.y);
+        pos.push(v.x, 0.05, v.y);
         col.push(c.r, c.g, c.b);
       }
+    }
+  }
+  const kerb = new THREE.Color(dark ? "#6f7a87" : "#c7ced6");
+  const marking = new THREE.Color(dark ? "#d5dce4" : "#f4f6f8");
+  for (const lane of net.lanes) {
+    if (lane.kind !== "normal" || lane.allows === "pedestrian") continue;
+    // a sidewalk band under every roadway: it shows beyond the outer lanes of each street
+    const pts = lane.shape.map(([x, y]) => p.to(x, y));
+    for (let i = 0; i + 1 < pts.length; i += 1)
+      pushQuad(pos, col, pts[i]!, pts[i + 1]!, lane.width / 2 + 2.8, 0.0, kerb);
+  }
+  for (const lane of net.lanes) {
+    if (lane.kind !== "normal" || lane.allows === "pedestrian") continue;
+    // dashed line on the left edge of each lane: lane separators and centre lines
+    const pts = lane.shape.map(([x, y]) => p.to(x, y));
+    let walked = 0;
+    for (let i = 0; i + 1 < pts.length; i += 1) {
+      const [ax, az] = pts[i]!;
+      const [bx, bz] = pts[i + 1]!;
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 0.1) continue;
+      // left normal in three.js (x, z) for a direction (dx, dz) is (dz, -dx)
+      const ox = ((bz - az) / len) * (lane.width / 2);
+      const oz = (-(bx - ax) / len) * (lane.width / 2);
+      for (let s = 0; s < len; s += 1) {
+        const phase = (walked + s) % 9;
+        if (phase >= 4.5 || s + 1 > len - 6) continue; // no marking in the last metres
+        const f0 = s / len;
+        const f1 = Math.min(1, (s + 1) / len);
+        pushQuad(
+          pos,
+          col,
+          [ax + (bx - ax) * f0 + ox, az + (bz - az) * f0 + oz],
+          [ax + (bx - ax) * f1 + ox, az + (bz - az) * f1 + oz],
+          0.07,
+          0.13,
+          marking,
+        );
+      }
+      walked += len;
     }
   }
   for (const lane of net.lanes) {
@@ -83,7 +126,7 @@ export function buildRoads(
         : lane.kind === "internal"
           ? internal
           : road;
-    const y = isCrossing ? 0.06 : ped ? 0.12 : 0.04;
+    const y = isCrossing ? 0.15 : ped ? 0.17 : 0.1;
     for (let i = 0; i + 1 < pts.length; i += 1) {
       pushQuad(pos, col, pts[i]!, pts[i + 1]!, lane.width / 2, y, color);
     }
