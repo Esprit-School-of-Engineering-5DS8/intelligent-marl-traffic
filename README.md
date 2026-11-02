@@ -95,10 +95,11 @@ python scripts/export_dashboard_data.py              # refresh served result fil
 
 ![Live map](docs/screenshots/live-map-events.png)
 
-Captured from `npm run dev` with the API on `:8000`. These are shell captures, not a
-populated run: the live map asks for a Mapbox access token in the browser (no token is
-committed), and the model registry is empty until a checkpoint is trained, selected and
-promoted.
+Captured from `npm run dev` with the API on `:8000`. The live map and the dashboard's
+street panel are drawn with a public Mapbox `pk.` token read from the browser's
+`localStorage`, so no token is committed with the screenshots. The registry row is a real
+`generalist` checkpoint (`sf_mission_3x3`, PPO, seed 1); the 500k-step training run and
+its validation-based checkpoint selection are separate, long-lived steps.
 
 ### Controller methods
 | `method` | Description |
