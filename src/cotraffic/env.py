@@ -33,6 +33,17 @@ def parse_dotenv(text: str) -> dict[str, str]:
     return values
 
 
+def _normalise_sumo_binding() -> None:
+    """Drop ``LIBSUMO_AS_TRACI`` when it asks for TraCI.
+
+    SUMO's ``traci`` package aliases itself to libsumo whenever the variable is mereley
+    *present* — ``LIBSUMO_AS_TRACI=0`` still ends up as libsumo, which has no
+    ``getConnection``. Removing the false values keeps presence and value in agreement.
+    """
+    if os.environ.get("LIBSUMO_AS_TRACI", "0") in ("", "0", "false", "False"):
+        os.environ.pop("LIBSUMO_AS_TRACI", None)
+
+
 def load_dotenv(path: Path | None = None) -> Path | None:
     candidates = [path] if path is not None else [
         Path(__file__).resolve().parents[2] / ".env",
@@ -42,5 +53,6 @@ def load_dotenv(path: Path | None = None) -> Path | None:
         if candidate is not None and candidate.is_file():
             for key, value in parse_dotenv(candidate.read_text(encoding="utf-8")).items():
                 os.environ.setdefault(key, value)
+            _normalise_sumo_binding()
             return candidate
     return None

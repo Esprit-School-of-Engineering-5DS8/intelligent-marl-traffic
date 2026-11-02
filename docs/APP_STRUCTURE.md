@@ -18,7 +18,6 @@ Sidebar
 │   ├── Predict                   forecasting overlay
 │   └── Roam                      free camera inspection of junctions, signals, vehicles
 ├── Message
-├── Rules Engine
 ├── Roles & Permissions
 │   ├── Roles
 │   └── Permissions

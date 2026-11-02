@@ -109,6 +109,15 @@ export function useStartTraining() {
   });
 }
 
+export type LlmTeamSettings = {
+  persona?: string;
+  system_prompt?: string;
+  temperature?: number;
+  cadence_s?: number;
+  safety_guardrails?: boolean;
+  explainability?: boolean;
+};
+
 export type CompareRequest = {
   network: string;
   scenario?: string;
@@ -118,6 +127,7 @@ export type CompareRequest = {
   methods: string[];
   quick?: boolean;
   overrides?: Record<string, Record<string, unknown>>;
+  llm_settings?: LlmTeamSettings;
 };
 
 export type ModelBenchmarkRequest = {

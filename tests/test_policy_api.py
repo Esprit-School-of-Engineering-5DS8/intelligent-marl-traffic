@@ -50,13 +50,14 @@ def test_unknown_network_is_refused():
 
 
 def test_learned_method_without_checkpoint_is_refused():
-    response = client.put("/api/policy", json={"method": "dqn", "network": "grid2x2"})
+    method = policy.LEARNED[0]
+    response = client.put("/api/policy", json={"method": method, "network": "sf_mission_2x2"})
     assert response.status_code == 422
-    assert "no trained dqn model for grid2x2" in response.json()["detail"]
+    assert f"no trained {method} model for sf_mission_2x2" in response.json()["detail"]
 
 
 def test_valid_baseline_round_trips():
-    response = client.put("/api/policy", json={"method": "mp", "network": "grid3x3"})
+    response = client.put("/api/policy", json={"method": "mp", "network": "sf_mission_3x3"})
     assert response.status_code == 200
     body = response.json()
     assert body["method"] == "mp"
@@ -68,7 +69,7 @@ def test_llm_without_a_key_stays_runnable_but_degraded(monkeypatch):
     monkeypatch.setenv("COTRAFFIC_LLM_PROVIDER", "gemini")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    response = client.put("/api/policy", json={"method": "llm", "network": "grid2x2"})
+    response = client.put("/api/policy", json={"method": "llm", "network": "sf_mission_2x2"})
     assert response.status_code == 200
     body = response.json()
     # It starts (falling back to Max-Pressure per call) instead of refusing the run.

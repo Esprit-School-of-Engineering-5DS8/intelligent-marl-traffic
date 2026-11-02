@@ -15,6 +15,8 @@ router = APIRouter(tags=["policy"])
 class PolicyRequest(BaseModel):
     method: str
     network: str | None = None
+    # A checkpoint picked in the dashboard (results/... path), or "auto" for the default.
+    checkpoint: str | None = None
 
 
 @router.get("/api/policy")
@@ -25,6 +27,6 @@ def read_policy() -> dict[str, Any]:
 @router.put("/api/policy")
 def write_policy(req: PolicyRequest) -> dict[str, Any]:
     try:
-        return policy.update(req.method, req.network)
+        return policy.update(req.method, req.network, req.checkpoint)
     except ValueError as error:
         raise HTTPException(422, str(error)) from error

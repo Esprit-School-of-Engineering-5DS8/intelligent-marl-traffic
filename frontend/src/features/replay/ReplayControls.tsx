@@ -7,6 +7,7 @@ import { methodColor } from "@/shared/domain/methods";
 import { cn } from "@/shared/lib/cn";
 import type { Meta, Replay } from "@/shared/schemas";
 import { Button } from "@/shared/ui/button";
+import { SelectControl } from "@/shared/ui/select";
 
 import { duration } from "./scene";
 import { replayTitle } from "./title";
@@ -30,18 +31,18 @@ export function ReplayPicker({ meta }: { meta: Meta }) {
       <label htmlFor={id} className="text-xs font-medium text-text-2">
         {t("replay.replay")}
       </label>
-      <select
+      <SelectControl
         id={id}
         value={replayId ?? ""}
-        onChange={(e) => setReplay(e.target.value)}
-        className="select-control w-full text-sm"
-      >
-        {meta.replays.map((r) => (
-          <option key={r.id} value={r.id}>
-            {replayTitle(r.id, f)} · {f.methodName(r.left)} / {f.methodName(r.right)}
-          </option>
-        ))}
-      </select>
+        ariaLabel={t("replay.replay")}
+        placeholder={t("replay.replay")}
+        className="text-sm"
+        onChange={setReplay}
+        options={meta.replays.map((r) => ({
+          value: r.id,
+          label: `${replayTitle(r.id, f)} · ${f.methodName(r.left)} / ${f.methodName(r.right)}`,
+        }))}
+      />
     </div>
   );
 }
@@ -129,18 +130,14 @@ export function ReplayControls({ replay }: { replay: Replay }) {
       <label htmlFor={speedId} className="sr-only">
         {t("replay.speed")}
       </label>
-      <select
+      <SelectControl
         id={speedId}
-        value={speed}
-        onChange={(e) => setSpeed(Number(e.target.value))}
-        className="select-control w-auto text-sm"
-      >
-        {SPEEDS.map((s) => (
-          <option key={s} value={s}>
-            ×{s}
-          </option>
-        ))}
-      </select>
+        value={String(speed)}
+        ariaLabel={t("replay.speed")}
+        className="w-auto text-sm"
+        onChange={(value) => setSpeed(Number(value))}
+        options={SPEEDS.map((s) => ({ value: String(s), label: `×${s}` }))}
+      />
       <div
         role="group"
         aria-label={t("replay.side")}

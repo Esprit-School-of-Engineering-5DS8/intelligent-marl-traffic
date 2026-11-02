@@ -4,12 +4,12 @@ Standalone Vite + vanilla JS dashboard styled to match the KEMETRA operations re
 
 ## UI composition
 
-- **Sidebar** — KEMETRA brand, primary navigation (Dashboard, Live Map, Events, Optimize, Predict, Message, Rules Engine, Permissions, Settings), and Store / Get Help.
+- **Sidebar** — KEMETRA brand, primary navigation (Dashboard, Live Map, Events, Optimize, Predict, Message, Permissions, Settings), and Store / Get Help.
 - **Top bar** — location switcher for **Central Austin**, Overview / Device log / Settings tabs, notifications, and the operator account card.
 - **Map** — Mapbox GL `light-v11` street map centered on **East 7th & Comal, Austin**, with a green focus marker and custom zoom / reset controls.
-- **Traffic Insights** — vehicle count (VEH) and speed (MPH) cards with average / max / min legends and SVG trend charts.
-- **Events / CTECC** — accident severity summary, event facts, and department dispatch statuses.
-- **Key Metrics** — camera, V2X, signal, conflict, accident, and flood counters.
+- **Traffic Insights** — live vehicle count (VEH) and average speed (KM/H) from the running simulation, with the run's trend series and average line.
+- **Events** — the live run's rising-edge events (newest first); **Live Run** — status, controller, weights, phase changes and decision latency.
+- **Key Metrics** — measured counters for this run: vehicles, pedestrians, queued share, average speed, throughput, phase changes.
 
 The previous Material 3 stylesheet and the 3D/SUMO overlay HUD have been removed. The visual language is now the light KEMETRA dashboard from the reference image.
 

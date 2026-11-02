@@ -52,13 +52,25 @@ def find_sumo_home() -> Path:
 
 
 def binary(name: str = "sumo") -> str:
-    """Absolute path of a SUMO executable such as ``sumo``, ``sumo-gui`` or ``netconvert``."""
+    """Absolute path of a SUMO executable such as ``sumo``, ``sumo-gui`` or ``netconvert``.
+
+    A system install puts the executables in ``$SUMO_HOME/bin``. The pip wheel installs
+    them into the environment's script directory instead, and on Windows an application
+    control policy can block the system copy while leaving the wheel usable, so fall back
+    to the interpreter's own directory and then to PATH.
+    """
     home = find_sumo_home()
     exe = name + (".exe" if sys.platform == "win32" else "")
-    path = home / "bin" / exe
-    if not path.is_file():
-        raise SumoNotFoundError(f"SUMO executable {exe} not found in {home / 'bin'}")
-    return str(path)
+    candidates = [Path(sys.executable).resolve().parent / exe, home / "bin" / exe]
+    on_path = shutil.which(name)
+    if on_path:
+        candidates.append(Path(on_path))
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    raise SumoNotFoundError(
+        f"SUMO executable {exe} not found in {home / 'bin'} or next to the interpreter"
+    )
 
 
 def tool(relative: str) -> Path:
@@ -75,6 +87,10 @@ def use_libsumo(gui: bool = False) -> bool:
     """libsumo is much faster than TraCI but cannot drive sumo-gui."""
     if gui:
         return False
+    if os.environ.get("COTRAFFIC_FORCE_TRACI", "0") not in ("", "0", "false", "False"):
+        # Some managed Windows machines block the libsumo DLL outright (application
+        # control policy). The pure-python TraCI binding is slower but always loads.
+        return False
     if os.environ.get("LIBSUMO_AS_TRACI", "0") in ("", "0", "false", "False"):
         return False
     return importlib.util.find_spec("libsumo") is not None
@@ -87,6 +103,11 @@ def backend(gui: bool = False) -> ModuleType:
         import libsumo
 
         return libsumo
+    # SUMO's own ``traci`` package aliases itself to libsumo as soon as
+    # LIBSUMO_AS_TRACI is *present* (even as "0"), and libsumo has no
+    # ``getConnection``. Drop a false value before importing so the value, not
+    # the presence, decides the binding — see ``cotraffic.env.load_dotenv``.
+    os.environ.pop("LIBSUMO_AS_TRACI", None)
     import traci
 
     return traci

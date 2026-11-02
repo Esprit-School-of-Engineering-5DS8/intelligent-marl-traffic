@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+REPLAYS = ROOT / "frontend" / "public" / "data" / "replays"
 
 
 @dataclass
@@ -113,7 +114,15 @@ class RunQueue:
                 export = [sys.executable, "scripts/export_dashboard_data.py", "--skip-networks"]
                 if self._stream(run, export) != 0:
                     raise RuntimeError("the export failed (see the log)")
-                replay = f"{r['network']}__{scen}__{r['demand']}__s{r['seed']}"
+                # The script appends a tag when either side is a saved model, so read
+                # back the file it just wrote instead of guessing the suffix.
+                prefix = f"{r['network']}__{scen}__{r['demand']}__s{r['seed']}"
+                candidates = sorted(
+                    REPLAYS.glob(f"{prefix}*.json"),
+                    key=lambda path: path.stat().st_mtime,
+                    reverse=True,
+                )
+                replay = candidates[0].stem if candidates else prefix
                 self._set(run, status="done", replay_id=replay)
             except Exception as err:  # reported to the user, the worker keeps running
                 self._set(run, status="failed", error=str(err))

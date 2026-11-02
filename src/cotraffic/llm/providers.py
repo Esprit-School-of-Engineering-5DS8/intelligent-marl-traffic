@@ -1,9 +1,18 @@
-"""Small JSON-capable LLM providers (Groq and Gemini) with no extra dependency.
+"""Small JSON-capable LLM providers (OpenCode Go, Groq and Gemini) with no extra dependency.
 
-The traffic controller needs a strict, short JSON answer. Both APIs are called with
-the standard library so that the simulation can run on a laptop without installing
-another SDK. Keys are read from the environment and are never written to logs or
-result files.
+The traffic controllers need a strict, short JSON answer. Every API is called with the
+standard library so that the simulation runs on a laptop without another SDK. Keys are
+read from the environment and are never written to logs or result files.
+
+Three providers share one contract:
+
+* ``groq`` and ``gemini`` keep their original request shapes;
+* ``opencode`` speaks the OpenAI-compatible OpenCode Go endpoint and honours a
+  ``reasoning_effort`` hint (the single biggest latency lever for the LLM team).
+
+``chat_json`` returns the parsed answer plus the token counters needed to audit a run:
+prompt/completion tokens, and, when the provider reports them, cached prompt tokens and
+hidden reasoning tokens.
 """
 
 from __future__ import annotations
@@ -11,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -29,6 +39,8 @@ LOGGER = logging.getLogger("cotraffic.llm")
 
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_OPENCODE_MODEL = "deepseek-v4.1-flash"
+DEFAULT_OPENCODE_BASE_URL = "https://opencode.ai/zen/go/v1"
 
 
 @dataclass(frozen=True)
@@ -40,6 +52,10 @@ class LLMResult:
     latency_ms: float
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cached_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    model: str = ""
+    attempts: int = 1
 
 
 class BaseProvider:
@@ -53,6 +69,7 @@ class BaseProvider:
         attempts: int = 2,
         min_interval_s: float = 0.0,
         tracer: LLMTracer | None = None,
+        temperature: float = 0.0,
     ) -> None:
         self.model = model
         self.api_key = api_key
@@ -60,7 +77,29 @@ class BaseProvider:
         self.attempts = max(1, int(attempts))
         self.min_interval_s = max(0.0, float(min_interval_s))
         self.tracer = tracer
+        # 0 keeps the historical deterministic decoding; the team's dashboard setting
+        # can raise it for exploration.
+        self.temperature = max(0.0, float(temperature))
+        self._local = threading.local()
         self._last_request_at: float | None = None
+
+    # Reasoning effort and the last usage block are thread-local: the LLM team calls
+    # several roles concurrently on one provider instance.
+    @property
+    def reasoning_effort(self) -> str:
+        return getattr(self._local, "reasoning_effort", "")
+
+    @reasoning_effort.setter
+    def reasoning_effort(self, value: str | None) -> None:
+        self._local.reasoning_effort = value or ""
+
+    @property
+    def _last_usage(self) -> dict[str, int | None]:
+        return getattr(self._local, "last_usage", {})
+
+    @_last_usage.setter
+    def _last_usage(self, value: dict[str, int | None]) -> None:
+        self._local.last_usage = value
 
     def _throttle(self) -> None:
         if self.min_interval_s <= 0:
@@ -120,8 +159,11 @@ class BaseProvider:
         messages: Sequence[Mapping[str, str]],
         schema: Mapping[str, Any],
         max_tokens: int = 700,
+        effort: str | None = None,
     ) -> LLMResult:
         """Call the model until it returns JSON that satisfies ``schema``."""
+        if effort is not None:
+            self.reasoning_effort = effort
         schema_message = {
             "role": "system",
             "content": "Reply with a JSON object that validates against this JSON Schema:\n"
@@ -138,6 +180,7 @@ class BaseProvider:
         for attempt in range(1, self.attempts + 1):
             started = time.perf_counter()
             prompt_snapshot = [dict(message) for message in history]
+            self._last_usage = {}
             try:
                 text, prompt_tokens, completion_tokens = self._complete(
                     history, max_tokens, schema
@@ -187,6 +230,8 @@ class BaseProvider:
                 else:
                     problems = ["response is not a JSON object"]
                 if not problems:
+                    cached_tokens = self._last_usage.get("cached")
+                    reasoning_tokens = self._last_usage.get("reasoning")
                     self._trace(
                         {
                             "attempt": attempt,
@@ -198,6 +243,8 @@ class BaseProvider:
                             "parsed": value,
                             "prompt_tokens": prompt_tokens,
                             "completion_tokens": completion_tokens,
+                            "cached_tokens": cached_tokens,
+                            "reasoning_tokens": reasoning_tokens,
                             "total_tokens": (prompt_tokens or 0) + (completion_tokens or 0),
                             "latency_ms": round(latency_ms, 2),
                             "context_window_tokens": window,
@@ -213,6 +260,10 @@ class BaseProvider:
                         latency_ms,
                         prompt_tokens,
                         completion_tokens,
+                        cached_tokens,
+                        reasoning_tokens,
+                        self.model,
+                        attempt,
                     )
                 last = "; ".join(problems[:3])
             self._trace(
@@ -263,7 +314,7 @@ class GroqProvider(BaseProvider):
             "model": self.model,
             "messages": [dict(message) for message in messages],
             "max_tokens": max_tokens,
-            "temperature": 0,
+            "temperature": self.temperature,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -285,6 +336,83 @@ class GroqProvider(BaseProvider):
         if not isinstance(text, str) or not text.strip():
             raise LLMUnavailableError("Groq returned an empty response")
         usage = body.get("usage", {})
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        self._last_usage = {
+            "cached": _as_int(prompt_details.get("cached_tokens")),
+            "reasoning": None,
+        }
+        return (
+            text,
+            _as_int(usage.get("prompt_tokens")),
+            _as_int(usage.get("completion_tokens")),
+        )
+
+
+class OpenCodeGoProvider(BaseProvider):
+    """OpenCode Go's OpenAI-compatible endpoint."""
+
+    name = "opencode"
+
+    def __init__(
+        self,
+        model: str,
+        api_key: str = "",
+        timeout_s: float = 30.0,
+        attempts: int = 2,
+        min_interval_s: float = 0.0,
+        tracer: LLMTracer | None = None,
+        base_url: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        temperature: float = 0.0,
+    ) -> None:
+        super().__init__(
+            model, api_key, timeout_s, attempts, min_interval_s, tracer, temperature
+        )
+        self.base_url = (
+            base_url
+            or os.environ.get("COTRAFFIC_LLM_BASE_URL")
+            or os.environ.get("LLM_BASE_URL")
+            or DEFAULT_OPENCODE_BASE_URL
+        ).rstrip("/")
+        self.extra_headers = dict(
+            extra_headers if extra_headers is not None else _env_headers()
+        )
+
+    def _complete(self, messages, max_tokens, schema):
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": [dict(message) for message in messages],
+            "max_tokens": max_tokens,
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+        }
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
+        headers = {"Authorization": f"Bearer {self.api_key}", **self.extra_headers}
+        try:
+            body = self._request(f"{self.base_url}/chat/completions", payload, headers)
+        except LLMUnavailableError as error:
+            # Some proxies reject the effort hint instead of ignoring it.
+            if self.reasoning_effort and "HTTP 400" in str(error):
+                payload.pop("reasoning_effort", None)
+                body = self._request(f"{self.base_url}/chat/completions", payload, headers)
+            else:
+                raise
+        try:
+            text = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as error:
+            raise LLMUnavailableError("OpenCode Go returned an unexpected response") from error
+        if not isinstance(text, str) or not text.strip():
+            raise LLMUnavailableError("OpenCode Go returned an empty response")
+        usage = body.get("usage") or {}
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        completion_details = usage.get("completion_tokens_details") or {}
+        self._last_usage = {
+            "cached": _as_int(
+                prompt_details.get("cached_tokens") or usage.get("prompt_cache_hit_tokens")
+            ),
+            "reasoning": _as_int(completion_details.get("reasoning_tokens")),
+        }
         return (
             text,
             _as_int(usage.get("prompt_tokens")),
@@ -312,7 +440,7 @@ class GeminiProvider(BaseProvider):
         payload: dict[str, Any] = {
             "contents": contents,
             "generationConfig": {
-                "temperature": 0,
+                "temperature": self.temperature,
                 "maxOutputTokens": max_tokens,
                 "responseMimeType": "application/json",
             },
@@ -342,27 +470,95 @@ def _as_int(value: Any) -> int | None:
         return None
 
 
+def _env_headers() -> dict[str, str]:
+    raw = (
+        os.environ.get("COTRAFFIC_LLM_EXTRA_HEADERS")
+        or os.environ.get("LLM_EXTRA_HEADERS")
+        or ""
+    ).strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(key): str(value) for key, value in data.items()}
+
+
+def opencode_api_key() -> str:
+    return (
+        os.environ.get("COTRAFFIC_LLM_API_KEY")
+        or os.environ.get("OPENCODE_API_KEY")
+        or os.environ.get("LLM_API_KEY")
+        or ""
+    )
+
+
+def provider_available(provider: str) -> tuple[bool, str | None]:
+    """Whether ``provider`` has the key it needs, plus the UI's explanation."""
+    name = (provider or "groq").lower()
+    if name in ("opencode", "opencode-go"):
+        return (
+            (True, None)
+            if opencode_api_key()
+            else (False, "COTRAFFIC_LLM_API_KEY is not configured")
+        )
+    if name == "gemini":
+        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        return (True, None) if key else (False, "GEMINI_API_KEY is not configured")
+    if name == "groq":
+        return (
+            (True, None)
+            if os.environ.get("GROQ_API_KEY")
+            else (False, "GROQ_API_KEY is not configured")
+        )
+    return False, f"unknown LLM provider {name!r}"
+
+
 def make_provider(
     provider: str | None = None,
     model: str | None = None,
     timeout_s: float | None = None,
     attempts: int = 2,
     tracer: LLMTracer | None = None,
+    temperature: float | None = None,
 ) -> BaseProvider:
     """Build the configured provider, or raise ``LLMUnavailableError`` with a clear message."""
     name = (provider or os.environ.get("COTRAFFIC_LLM_PROVIDER") or "groq").lower()
     timeout = float(timeout_s if timeout_s is not None else os.environ.get("COTRAFFIC_LLM_TIMEOUT", "30"))
+    sampling = 0.0 if temperature is None else max(0.0, float(temperature))
     min_interval = float(os.environ.get("COTRAFFIC_LLM_MIN_WALL_INTERVAL_S", "0"))
     if name == "groq":
         key = os.environ.get("GROQ_API_KEY", "")
         if not key:
             raise LLMUnavailableError("GROQ_API_KEY is not configured")
         chosen = model or os.environ.get("GROQ_MODEL") or DEFAULT_GROQ_MODEL
-        return GroqProvider(chosen, key, timeout, attempts, min_interval, tracer)
+        return GroqProvider(
+            chosen, key, timeout, attempts, min_interval, tracer, sampling
+        )
     if name == "gemini":
         key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
         if not key:
             raise LLMUnavailableError("GEMINI_API_KEY is not configured")
         chosen = model or os.environ.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
-        return GeminiProvider(chosen, key, timeout, attempts, min_interval, tracer)
-    raise LLMUnavailableError(f"unknown LLM provider {name!r} (expected groq or gemini)")
+        return GeminiProvider(
+            chosen, key, timeout, attempts, min_interval, tracer, sampling
+        )
+    if name in ("opencode", "opencode-go"):
+        key = opencode_api_key()
+        if not key:
+            raise LLMUnavailableError("COTRAFFIC_LLM_API_KEY is not configured")
+        chosen = (
+            model
+            or os.environ.get("COTRAFFIC_LLM_MODEL")
+            or os.environ.get("LLM_MODEL")
+            or DEFAULT_OPENCODE_MODEL
+        )
+        return OpenCodeGoProvider(
+            chosen, key, timeout, attempts, min_interval, tracer, temperature=sampling
+        )
+    raise LLMUnavailableError(
+        f"unknown LLM provider {name!r} (expected opencode, groq or gemini)"
+    )

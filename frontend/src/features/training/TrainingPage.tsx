@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCatalog } from "@/shared/api/backend";
-import { useStartTraining, useJobs, isActiveJob } from "@/shared/api/jobs";
+import { useStartCompare, useStartTraining, useJobs, isActiveJob } from "@/shared/api/jobs";
 import { useFormat } from "@/shared/domain/format";
 import { NumberField } from "@/shared/ui/number-field";
 import { RangeInput } from "@/shared/ui/range-input";
@@ -42,6 +42,9 @@ interface LLMProviderInfo {
 interface ProvidersResponse {
   providers: LLMProviderInfo[];
   default: { provider: string; model: string };
+  // "mock" and "replay" answer without a provider key.
+  backend?: string;
+  keyless?: boolean;
 }
 
 interface ArchetypeCard {
@@ -105,6 +108,18 @@ const ARCHETYPES: ArchetypeCard[] = [
 
 const AVAILABLE_SEEDS = [1, 2, 3, 7, 21, 42, 100, 1337];
 
+// The demand profiles that exist in configs/demand/. `emergency` is an event scenario,
+// not a demand level, and the backend rejects it as one.
+const DEMAND_LEVELS = [
+  { value: "low", label: "Low", hint: "45% of the calibrated peak rate" },
+  { value: "medium", label: "Medium", hint: "70% of the calibrated peak rate" },
+  { value: "peak", label: "Peak", hint: "100% of the calibrated peak rate" },
+  { value: "rush_profile", label: "Rush", hint: "ramp up, hold, ramp down over the hour" },
+];
+const ALL_DEMAND_LEVELS = DEMAND_LEVELS.map((level) => level.value);
+// Every event the simulator can inject, so one policy covers all situations.
+const TRAINING_SCENARIOS = ["normal", "emergency", "pedestrians", "buses", "incident"];
+
 const GEMINI_MODELS = [
   { value: "gemini-2.5-flash", label: "gemini-2.5-flash (Ultra-fast / Low latency)" },
   { value: "gemini-2.5-pro", label: "gemini-2.5-pro (Deep corridor reasoning)" },
@@ -133,6 +148,7 @@ export default function TrainingPage() {
   const catalog = useCatalog();
   const jobs = useJobs();
   const startTraining = useStartTraining();
+  const startCompare = useStartCompare();
   const f = useFormat();
 
   // Query live LLM providers and API key readiness from backend
@@ -154,10 +170,14 @@ export default function TrainingPage() {
 
   // Active training job indicator
   const activeJob = jobs.data?.find((j) => j.kind === "train" && isActiveJob(j));
+  // The LLM arms are evaluated, never trained, so their "run" is a compare job.
+  const activeCompare = jobs.data?.find((j) => j.kind === "compare" && isActiveJob(j));
 
   // --- Common Settings ---
   const [network, setNetwork] = useState("sf_mission_2x2");
-  const [demand, setDemand] = useState("rush_profile");
+  // Coverage, not one setting: every selected level is drawn by a training episode, so the
+  // policy learns the whole range instead of a single congestion regime.
+  const [demandLevels, setDemandLevels] = useState<string[]>([...ALL_DEMAND_LEVELS]);
   const [modelCustomName, setModelCustomName] = useState("Kemetra-SF-Mission-Supervisor-v1");
   const [runTag, setRunTag] = useState("exp_sf_mission_rush");
   const [selectedSeeds, setSelectedSeeds] = useState<number[]>([1, 2, 3]);
@@ -167,11 +187,9 @@ export default function TrainingPage() {
   const [rlPreset, setRlPreset] = useState("standard");
   const [timesteps, setTimesteps] = useState(100000);
   const [checkpointEvery, setCheckpointEvery] = useState(25000);
-  const [rewardDelay, setRewardDelay] = useState(-0.5);
-  const [rewardQueue, setRewardQueue] = useState(-0.3);
-  const [rewardPressure, setRewardPressure] = useState(0.2);
+  // reward.base is the objective (envs/rewards.py); co2/ev/ped are additive weights.
+  const [rewardBase, setRewardBase] = useState<"wait" | "queue" | "pressure">("wait");
   const [rewardEmergency, setRewardEmergency] = useState(2.0);
-  const [rewardSwitchPenalty, setRewardSwitchPenalty] = useState(-0.1);
   const [minGreen, setMinGreen] = useState(10);
   const [maxGreen, setMaxGreen] = useState(60);
 
@@ -235,6 +253,37 @@ export default function TrainingPage() {
     else if (mode === "all") setSelectedSeeds([...AVAILABLE_SEEDS]);
   };
 
+  const toggleDemandLevel = (level: string) => {
+    setDemandLevels((prev) => {
+      if (!prev.includes(level)) return [...prev, level];
+      if (prev.length === 1) return prev; // never send an empty coverage
+      return prev.filter((l) => l !== level);
+    });
+  };
+
+  const handleLlmCompare = () => {
+    // llm = single-call baseline, llm_team = Operator/Emergency/Pedestrian team. Both are
+    // runtime controllers, so a paired quick compare is the honest run - not training.
+    startCompare.mutate({
+      network,
+      scenario: "normal",
+      demand: demandLevels.includes("medium") ? "medium" : demandLevels[0],
+      seeds: selectedSeeds,
+      methods: ["llm", "llm_team"],
+      quick: true,
+      // The panel's conditioning travels with the job; the backend applies it to the
+      // llm_team arm and leaves every other controller on its config-file defaults.
+      llm_settings: {
+        persona: llmPersona,
+        system_prompt: llmSystemPrompt,
+        temperature: llmTemperature,
+        cadence_s: llmDecisionCycle,
+        safety_guardrails: llmSafetyGuardrails,
+        explainability: llmExplainability,
+      },
+    });
+  };
+
   // Network list from catalog fallback
   const networkOptions =
     catalog.data?.networks && catalog.data.networks.length > 0
@@ -246,57 +295,31 @@ export default function TrainingPage() {
 
   // Validation: Check if the required API key for the chosen LLM is ready
   const isHybridKeyReady = hybridLlmProvider === "gemini" ? geminiReady : groqReady;
-  const isFullLlmKeyReady = llmProviderChoice === "gemini" ? geminiReady : groqReady;
+  // Mock and replay backends need no key, so requiring one would block a free run.
+  const isFullLlmKeyReady =
+    Boolean(providersData?.keyless) ||
+    (llmProviderChoice === "gemini" ? geminiReady : groqReady);
 
   const handleLaunch = () => {
+    // Only the RL card trains a policy: "hybrid" has no recipe file and "llm" is a runtime
+    // controller, so POST /api/train refuses both. Their launch buttons are disabled.
+    if (selected !== "rl") return;
+    // Send only keys cotraffic.recipes.normalize_recipe accepts. An unknown reward key
+    // (e.g. "delay") makes the backend reject the job before it starts.
     startTraining.mutate({
       network,
       seeds: selectedSeeds,
       timesteps,
-      recipe_id: selected === "rl" ? "generalist" : selected === "hybrid" ? "hybrid" : "llm",
+      recipe_id: "generalist",
       overrides: {
-        network,
-        archetype: selected,
-        demand,
-        model_name: modelCustomName.trim() || `kemetra_${selected}_model`,
-        run_tag: runTag.trim() || `run_${Date.now()}`,
-        ...(selected === "rl" || selected === "hybrid"
-          ? {
-              algo: rlAlgo,
-              reward: {
-                delay: rewardDelay,
-                queue: rewardQueue,
-                pressure: rewardPressure,
-                emergency: rewardEmergency,
-                switch_penalty: rewardSwitchPenalty,
-              },
-              safety: { min_green: minGreen, max_green: maxGreen },
-              checkpoint_every: checkpointEvery,
-            }
-          : {}),
-        ...(selected === "hybrid"
-          ? {
-              coupling: hybridCoupling,
-              provider: hybridLlmProvider,
-              llm_model: hybridLlmModel,
-              update_interval_s: hybridUpdateInterval,
-              base_policy: hybridBasePolicy,
-              fallback_to_rl: hybridFallback,
-              chain_of_thought: hybridCoT,
-              incident_override: hybridIncidentOverride,
-            }
-          : selected === "llm"
-          ? {
-              provider: llmProviderChoice,
-              model: llmModel,
-              temperature: llmTemperature,
-              decision_cycle_s: llmDecisionCycle,
-              persona: llmPersona,
-              explainability: llmExplainability,
-              safety_guardrails: llmSafetyGuardrails,
-              system_prompt: llmSystemPrompt,
-            }
-          : {}),
+        ...(modelCustomName.trim() ? { label: modelCustomName.trim() } : {}),
+        training: {
+          demand_levels: [...demandLevels].sort(),
+          scenarios: TRAINING_SCENARIOS,
+          checkpoint_every: checkpointEvery,
+        },
+        reward: { base: rewardBase, ev: rewardEmergency },
+        runtime: { shield: { min_green: minGreen, max_green: maxGreen } },
       },
     });
   };
@@ -338,19 +361,30 @@ export default function TrainingPage() {
 
           <div className="flex items-center gap-1.5 px-2">
             <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Demand:</span>
-            <SelectControl
-              ariaLabel="Demand profile"
-              value={demand}
-              options={[
-                { value: "low", label: "Low (Off-peak)" },
-                { value: "medium", label: "Medium (Standard)" },
-                { value: "peak", label: "Peak (Congested)" },
-                { value: "emergency", label: "Emergency Incident" },
-              ]}
-              onChange={setDemand}
-              className="text-xs font-medium"
-              style={{ minWidth: 180 }}
-            />
+            <div className="flex items-center gap-1" role="group" aria-label="Training demand levels">
+              {DEMAND_LEVELS.map((level) => {
+                const active = demandLevels.includes(level.value);
+                return (
+                  <button
+                    key={level.value}
+                    type="button"
+                    aria-pressed={active}
+                    title={`${level.label}: ${level.hint}`}
+                    onClick={() => toggleDemandLevel(level.value)}
+                    className={`px-2 py-1 rounded-md border text-[11px] font-medium transition-colors ${
+                      active
+                        ? "border-accent bg-accent/15 text-accent"
+                        : "border-border bg-surface text-muted hover:text-text"
+                    }`}
+                  >
+                    {level.label}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-[10px] font-mono text-muted">
+              {demandLevels.length}/{ALL_DEMAND_LEVELS.length}
+            </span>
           </div>
         </div>
       </div>
@@ -378,10 +412,10 @@ export default function TrainingPage() {
                 transition-all duration-300 ease-out select-none
                 ${
                   isSelected
-                    ? "border-accent bg-surface shadow-lg md:scale-[1.02] z-10 ring-2 ring-accent/40"
+                    ? "border-accent bg-surface md:scale-[1.02] z-10 ring-2 ring-accent/40"
                     : isDimmed
                     ? "border-border/40 bg-surface-2/40 opacity-40 blur-[1px] grayscale-[50%] hover:opacity-60 hover:blur-none hover:grayscale-0"
-                    : "border-border bg-surface hover:border-accent/50 hover:bg-surface-2 hover:shadow-md"
+                    : "border-border bg-surface hover:border-accent/50 hover:bg-surface-2"
                 }
               `}
             >
@@ -467,7 +501,7 @@ export default function TrainingPage() {
 
       {/* Expanded Detailed Workspace */}
       {selected && (
-        <div className="p-6 rounded-xl border border-accent/40 bg-surface shadow-md animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="p-6 rounded-none border border-accent/40 bg-surface animate-in fade-in slide-in-from-top-2 duration-300">
           {/* Header of Workspace */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-4 mb-6">
             <div className="flex items-center gap-3">
@@ -604,68 +638,52 @@ export default function TrainingPage() {
                     <span className="text-[11px] text-muted">SUMO TraCI Feedback Sliders</span>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text font-medium">Vehicle Delay Penalty</span>
-                      <span className="font-mono text-accent">{rewardDelay.toFixed(2)}</span>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs text-text font-medium">Reward Objective</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          { id: "wait", name: "Delay", desc: "Minimise waiting time." },
+                          { id: "queue", name: "Queue", desc: "Minimise halting vehicles." },
+                          { id: "pressure", name: "Pressure", desc: "Balance inflow against exit capacity." },
+                        ] as const
+                      ).map((term) => (
+                        <button
+                          key={term.id}
+                          type="button"
+                          aria-pressed={rewardBase === term.id}
+                          onClick={() => setRewardBase(term.id)}
+                          className={`px-2 py-1.5 rounded-lg border text-start transition-colors ${
+                            rewardBase === term.id
+                              ? "border-accent bg-accent/10 text-text"
+                              : "border-border bg-surface text-muted hover:text-text"
+                          }`}
+                        >
+                          <span className="block text-xs font-semibold">{term.name}</span>
+                          <span className="block text-[10px] leading-snug">{term.desc}</span>
+                        </button>
+                      ))}
                     </div>
-                    <RangeInput
-                      ariaLabel="Vehicle delay penalty"
-                      min={-1.5}
-                      max={0}
-                      step={0.05}
-                      value={rewardDelay}
-                      onChange={setRewardDelay}
-                    />
-                    <span className="text-[10px] text-muted">Penalizes cumulative travel time losses at red signals.</span>
+                    <span className="text-[10px] text-muted">
+                      Training covers every selected demand level and all five event scenarios
+                      (normal, emergency, pedestrians, buses, incident).
+                    </span>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
                     <div className="flex justify-between text-xs">
-                      <span className="text-text font-medium">Stop-bar Queue Length Penalty</span>
-                      <span className="font-mono text-accent">{rewardQueue.toFixed(2)}</span>
+                      <span className="text-text font-medium">Emergency Vehicle Wait Weight</span>
+                      <span className="font-mono text-accent">{rewardEmergency.toFixed(1)}</span>
                     </div>
                     <RangeInput
-                      ariaLabel="Stop-bar queue length penalty"
-                      min={-1.0}
-                      max={0}
-                      step={0.05}
-                      value={rewardQueue}
-                      onChange={setRewardQueue}
-                    />
-                    <span className="text-[10px] text-muted">Penalizes long lines of stationary vehicles.</span>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text font-medium">Inter-junction Pressure Balance</span>
-                      <span className="font-mono text-accent">{rewardPressure.toFixed(2)}</span>
-                    </div>
-                    <RangeInput
-                      ariaLabel="Inter-junction pressure balance"
-                      min={0}
-                      max={1.0}
-                      step={0.05}
-                      value={rewardPressure}
-                      onChange={setRewardPressure}
-                    />
-                    <span className="text-[10px] text-muted">Balances upstream inflow with downstream exit capacity.</span>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text font-medium">Emergency Priority Clearance</span>
-                      <span className="font-mono text-accent">+{rewardEmergency.toFixed(1)}x</span>
-                    </div>
-                    <RangeInput
-                      ariaLabel="Emergency priority clearance"
+                      ariaLabel="Emergency vehicle wait weight"
                       min={0}
                       max={5.0}
                       step={0.5}
                       value={rewardEmergency}
                       onChange={setRewardEmergency}
                     />
-                    <span className="text-[10px] text-muted">Reward multiplier when clearing lanes occupied by emergency vehicles.</span>
+                    <span className="text-[10px] text-muted">Weight of the EV waiting term (reward.ev).</span>
                   </div>
                 </div>
               </div>
@@ -1141,7 +1159,7 @@ export default function TrainingPage() {
                     <button
                       type="button"
                       onClick={handleLaunch}
-                      disabled={startTraining.isPending || !!activeJob || !isHybridKeyReady}
+                      disabled
                       className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                     >
                       <Play className="w-4 h-4 fill-current" />
@@ -1150,7 +1168,7 @@ export default function TrainingPage() {
                           ? "Job in Progress..."
                           : !isHybridKeyReady
                           ? "API Key Required to Launch"
-                          : "Launch Hybrid Co-Orchestration"}
+                          : "Hybrid orchestration is not implemented yet"}
                       </span>
                     </button>
                   </div>
@@ -1225,63 +1243,14 @@ export default function TrainingPage() {
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-text font-medium">Vehicle Delay Penalty</span>
-                          <span className="font-mono text-accent">{rewardDelay.toFixed(2)}</span>
-                        </div>
-                        <RangeInput
-                          ariaLabel="Vehicle delay penalty"
-                          min={-1.5}
-                          max={0}
-                          step={0.05}
-                          value={rewardDelay}
-                          onChange={setRewardDelay}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-text font-medium">Queue Length Penalty</span>
-                          <span className="font-mono text-accent">{rewardQueue.toFixed(2)}</span>
-                        </div>
-                        <RangeInput
-                          ariaLabel="Queue length penalty"
-                          min={-1.0}
-                          max={0}
-                          step={0.05}
-                          value={rewardQueue}
-                          onChange={setRewardQueue}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-text font-medium">Corridor Pressure Balance</span>
-                          <span className="font-mono text-accent">{rewardPressure.toFixed(2)}</span>
-                        </div>
-                        <RangeInput
-                          ariaLabel="Corridor pressure balance"
-                          min={0}
-                          max={1.0}
-                          step={0.05}
-                          value={rewardPressure}
-                          onChange={setRewardPressure}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-text font-medium">Emergency Priority Boost</span>
-                          <span className="font-mono text-accent">+{rewardEmergency.toFixed(1)}x</span>
-                        </div>
-                        <RangeInput
-                          ariaLabel="Emergency priority boost"
-                          min={0}
-                          max={5.0}
-                          step={0.5}
-                          value={rewardEmergency}
-                          onChange={setRewardEmergency}
-                        />
+                        <span className="text-xs text-text font-medium">
+                          Reward Objective (shared with the RL tier)
+                        </span>
+                        <span className="text-[11px] text-muted leading-snug">
+                          Base term: <code className="text-text-2">{rewardBase}</code> · EV wait weight:{" "}
+                          <code className="text-text-2">{rewardEmergency.toFixed(1)}</code>. Both are configured in
+                          the RL panel and sent with every training job.
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1358,7 +1327,7 @@ export default function TrainingPage() {
                     <button
                       type="button"
                       onClick={handleLaunch}
-                      disabled={startTraining.isPending || !!activeJob || !isHybridKeyReady}
+                      disabled
                       className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                     >
                       <Play className="w-4 h-4 fill-current" />
@@ -1367,7 +1336,7 @@ export default function TrainingPage() {
                           ? "Job in Progress..."
                           : !isHybridKeyReady
                           ? "API Key Required to Launch"
-                          : "Launch Hybrid Co-Orchestration"}
+                          : "Hybrid orchestration is not implemented yet"}
                       </span>
                     </button>
                   </div>
@@ -1559,6 +1528,13 @@ export default function TrainingPage() {
                     </button>
                   </div>
 
+                  <p className="text-[10px] text-muted leading-snug">
+                    The multi-role team (<code className="text-text-2">llm_team</code>) runs on this
+                    provider too. OpenCode Go is enabled by{" "}
+                    <code className="text-text-2">COTRAFFIC_LLM_API_KEY</code>; the mock and replay
+                    backends need no key at all.
+                  </p>
+
                   {/* Model Picker */}
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-muted">
@@ -1654,20 +1630,20 @@ export default function TrainingPage() {
                   </label>
                 </div>
 
-                {/* Launch Action */}
+                {/* Launch Action: evaluate, never train */}
                 <button
                   type="button"
-                  onClick={handleLaunch}
-                  disabled={startTraining.isPending || !!activeJob || !isFullLlmKeyReady}
+                  onClick={handleLlmCompare}
+                  disabled={startCompare.isPending || !!activeCompare || !isFullLlmKeyReady}
                   className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Play className="w-4 h-4 fill-current" />
                   <span>
-                    {activeJob
-                      ? "Job in Progress..."
+                    {activeCompare
+                      ? "Comparison running..."
                       : !isFullLlmKeyReady
                       ? "API Key Required to Launch"
-                      : "Launch Full LLM Controller Run"}
+                      : "Run LLM vs LLM-team comparison"}
                   </span>
                 </button>
               </div>

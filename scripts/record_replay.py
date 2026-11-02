@@ -116,7 +116,36 @@ class Recorder:
 
 
 def resolve_source(spec: str) -> dict[str, Any]:
-    """``model:<name>[@vN]`` - a version from results/models.json - or a controller id."""
+    """A controller id, ``model:<name>[@vN]`` from the registry, or ``checkpoint:<path>``.
+
+    ``checkpoint:`` is the free-hand form: any saved weights under ``results/`` (a
+    selected run, a raw training checkpoint or a registry copy) can drive a side,
+    whatever agent and hyperparameters produced it.
+    """
+    if spec.startswith("checkpoint:"):
+        raw = spec.split(":", 1)[1].replace("\\", "/")
+        path = Path(raw)
+        if not path.is_absolute():
+            path = ROOT / raw
+        path = path.resolve()
+        allowed = (
+            (ROOT / "results" / "checkpoints").resolve(),
+            (ROOT / "results" / "training").resolve(),
+            (ROOT / "results" / "models").resolve(),
+        )
+        if not any(path.is_relative_to(root) for root in allowed):
+            raise SystemExit("checkpoint must live under results/")
+        if not path.is_file():
+            raise SystemExit(f"checkpoint not found: {raw}")
+        sidecar = path.with_suffix(".json")
+        meta = json.loads(sidecar.read_text(encoding="utf-8")) if sidecar.is_file() else {}
+        config = meta.get("config") or {}
+        method = str(config.get("name") or meta.get("agent") or path.parent.parent.name)
+        return {
+            "method": method,
+            "label": str(config.get("label") or method),
+            "checkpoint": path,
+        }
     if not spec.startswith("model:"):
         return {"method": spec, "label": None, "checkpoint": None}
     raw = spec.split(":", 1)[1]
@@ -188,21 +217,32 @@ def main() -> None:
     parser.add_argument("--scenarios", nargs="*", default=["emergency"])
     parser.add_argument("--demand", default="peak")
     parser.add_argument("--seed", type=int, default=3)
-    parser.add_argument("--left", default="ft", help="controller id or model:<name>[@vN]")
-    parser.add_argument("--right", default="llm", help="controller id or model:<name>[@vN]")
+    parser.add_argument(
+        "--left", default="ft",
+        help="controller id, model:<name>[@vN] or checkpoint:<path under results/>",
+    )
+    parser.add_argument(
+        "--right", default="llm",
+        help="controller id, model:<name>[@vN] or checkpoint:<path under results/>",
+    )
     parser.add_argument("--window", type=float, default=480.0)
     parser.add_argument("--every", type=int, default=2)
     args = parser.parse_args()
 
     scen = "+".join(args.scenarios) or "normal"
     replay_id = f"{args.net}__{scen}__{args.demand}__s{args.seed}"
-    sides = (args.left, args.right)
-    if any(side.startswith("model:") for side in sides):
-        tag = "-vs-".join(side.removeprefix("model:").replace("@", "v") for side in sides)
-        replay_id = f"{replay_id}__{tag.replace(':', '-')}"
+    left_source = resolve_source(args.left)
+    right_source = resolve_source(args.right)
+
+    def _tag(source: dict[str, Any]) -> str:
+        name = str(source["label"] or source["method"])
+        return "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in name).strip("-")
+
+    if left_source["checkpoint"] or right_source["checkpoint"]:
+        replay_id = f"{replay_id}__{_tag(left_source)}-vs-{_tag(right_source)}"
     print(f"recording {replay_id}: {args.left} | {args.right}")
-    left = record(resolve_source(args.left), args)
-    right = record(resolve_source(args.right), args)
+    left = record(left_source, args)
+    right = record(right_source, args)
     payload = {
         "id": replay_id,
         "network": args.net,

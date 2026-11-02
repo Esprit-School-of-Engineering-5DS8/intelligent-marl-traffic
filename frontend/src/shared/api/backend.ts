@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { useSettings } from "@/features/settings/store";
-import { Run, type ScenarioRequest } from "@/shared/schemas";
+import { Run } from "@/shared/schemas";
 
 import { DataError } from "./source";
 
@@ -182,6 +182,44 @@ export function useRecipe(recipeId: string) {
   });
 }
 
+export const ModelCatalogEntry = z.object({
+  id: z.string(),
+  source: z.string(),
+  agent: z.string(),
+  label: z.string(),
+  network: z.string(),
+  seed: z.number().nullable(),
+  timesteps: z.number().nullable(),
+  algorithm: z.string(),
+  checkpoint: z.string(),
+  checkpointPath: z.string(),
+  available: z.boolean(),
+  reason: z.string().nullable(),
+  modelName: z.string().optional(),
+  version: z.number().optional(),
+});
+
+export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntry>;
+
+const ModelCatalog = z.object({
+  network: z.string().nullable(),
+  count: z.number(),
+  models: z.array(ModelCatalogEntry),
+});
+
+/** Every saved checkpoint for a network: selected runs, raw training runs and registry versions. */
+export function useModelCatalog(network: string | null) {
+  const live = useSettings((s) => s.dataSource) === "live";
+  return useQuery({
+    queryKey: ["model-catalog", network],
+    queryFn: () =>
+      api(`models/catalog${network ? `?network=${encodeURIComponent(network)}` : ""}`, ModelCatalog),
+    enabled: live,
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
 export function useRuns() {
   const live = useSettings((s) => s.dataSource) === "live";
   return useQuery({
@@ -194,10 +232,20 @@ export function useRuns() {
   });
 }
 
+/** The run request the backend accepts: controller ids or saved-checkpoint specs. */
+export type RunRequest = {
+  network: string;
+  demand: "low" | "medium" | "peak";
+  events: ("emergency" | "pedestrians" | "incident" | "buses")[];
+  seed: number;
+  left: string;
+  right: string;
+};
+
 export function useCreateRun() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (request: ScenarioRequest) =>
+    mutationFn: (request: RunRequest) =>
       api("runs", Run, { method: "POST", body: JSON.stringify(request) }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["runs"] });

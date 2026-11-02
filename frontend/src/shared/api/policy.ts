@@ -22,6 +22,8 @@ export const Policy = z.object({
   available: z.boolean(),
   degraded: z.boolean().optional(),
   reason: z.string().nullable(),
+  llmProvider: z.string().optional(),
+  llmBackend: z.string().optional(),
   catalog: z.array(PolicyMethod),
   networks: z.array(z.string()),
 });

@@ -1,4 +1,6 @@
 name: buses
 description: Bus lines of the network config are active; person-based delay is measured.
 buses:
-  period_s: 300      # one bus every 5 min per line and direction
+  # One bus every 90 s per line and direction: the corridor is short, so at a 5 min
+  # headway a bus is almost never on screen. A dense headway keeps them visible.
+  period_s: 90

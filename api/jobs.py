@@ -391,6 +391,7 @@ class JobRunner:
         seeds: list[int] | None = None,
         quick: bool = True,
         overrides: dict[str, dict[str, Any]] | None = None,
+        llm_settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self.lock:
             if network not in NETWORKS:
@@ -422,6 +423,7 @@ class JobRunner:
                     "methods": methods,
                     "quick": bool(quick),
                     "overrides": overrides or {},
+                    "llmSettings": llm_settings or {},
                 },
                 total_steps=len(methods) * len(seeds),
             )
@@ -1060,6 +1062,13 @@ class JobRunner:
                     raw_dir=raw_dir,
                     logs_dir=logs_dir,
                     agent_overrides=(job.request.get("overrides") or {}).get(method),
+                    # The Training page's LLM settings condition the team only; every
+                    # other controller keeps its config-file defaults.
+                    controller_kwargs=(
+                        (job.request.get("llmSettings") or {})
+                        if method == "llm_team"
+                        else None
+                    ),
                 )
                 by_method[method].append(row)
                 done += 1

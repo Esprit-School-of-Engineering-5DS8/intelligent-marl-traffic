@@ -12,6 +12,7 @@ This module only assembles the app: CORS, health, and one router per concern
 - ``GET/POST /api/runs``: record a side-by-side replay (scripts/record_replay.py);
 - ``/api/simulation/*``: the live run, driven by the active control policy;
 - ``GET/PUT /api/policy``: read or change that policy (RL checkpoint, LLM or baseline);
+- ``GET/PUT /api/integrations``: real Groq / Gemini / Mapbox / SUMO configuration;
 - ``WS /ws/status``, ``WS /ws/simulation``: liveness and live state.
 """
 
@@ -30,7 +31,20 @@ if str(SRC) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import assistant, catalog, data, jobs, llm, models, policy, recipes, runs, simulation
+from api.routes import (
+    assistant,
+    catalog,
+    data,
+    integrations,
+    jobs,
+    llm,
+    model_catalog,
+    models,
+    policy,
+    recipes,
+    runs,
+    simulation,
+)
 
 DEFAULT_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
 
@@ -50,7 +64,20 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (data, assistant, runs, simulation, policy, catalog, recipes, jobs, llm, models):
+    for module in (
+        data,
+        assistant,
+        runs,
+        simulation,
+        policy,
+        catalog,
+        recipes,
+        jobs,
+        llm,
+        models,
+        model_catalog,
+        integrations,
+    ):
         app.include_router(module.router)
 
     @app.get("/api/health")

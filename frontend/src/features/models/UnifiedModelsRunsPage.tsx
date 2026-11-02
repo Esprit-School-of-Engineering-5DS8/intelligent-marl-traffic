@@ -200,7 +200,7 @@ function ModelCard({ name, versions }: { name: string; versions: ModelRow[] }) {
   });
 
   return (
-    <Card className="border border-border bg-surface shadow-sm">
+    <Card className="border border-border bg-surface">
       <CardHeader className="border-b border-border/60 pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2.5 text-base font-bold text-text">
@@ -450,7 +450,7 @@ function RunsLedgerView({ registry }: { registry: RunsRegistry }) {
       </div>
 
       {/* Ledger Table */}
-      <Card className="border border-border bg-surface shadow-sm overflow-hidden">
+      <Card className="border border-border bg-surface overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-xs">
             <thead>

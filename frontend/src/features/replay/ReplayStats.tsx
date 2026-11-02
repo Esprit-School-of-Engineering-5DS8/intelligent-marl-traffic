@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { useFormat } from "@/shared/domain/format";
 import { methodColor } from "@/shared/domain/methods";
+import { cn } from "@/shared/lib/cn";
 import type { Replay } from "@/shared/schemas";
 
 import { sceneAt, sceneStats, type Side } from "./scene";
@@ -32,28 +33,30 @@ export function ReplayStats({ replay, sides }: { replay: Replay; sides: Side[] }
           <section
             key={side}
             aria-label={name}
-            className="rounded-lg border border-border bg-surface p-3"
+            className="rounded-lg border border-border bg-surface p-3.5"
             style={{ borderTopColor: methodColor(data.method), borderTopWidth: 3 }}
           >
-            <h3 className="mb-2 text-sm font-semibold text-text">{name}</h3>
-            <dl className="tabular grid grid-cols-4 gap-2 text-xs">
-              <Stat label={t("replay.vehicles")} value={f.number(stats.vehicles, 0)} />
-              <Stat
+            <h3 className="mb-2.5 truncate text-sm font-semibold text-text">{name}</h3>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Kpi label={t("replay.vehicles")} value={f.number(stats.vehicles, 0)} />
+              <Kpi
                 label={t("replay.halted")}
                 value={f.number(stats.halted, 0)}
                 tone={stats.halted > stats.vehicles * 0.4 ? "text-jam" : undefined}
               />
-              <Stat label={t("replay.meanSpeed")} value={f.speed(stats.meanSpeed)} />
-              <Stat label={t("replay.persons")} value={f.number(stats.persons, 0)} />
-            </dl>
+              <Kpi label={t("replay.meanSpeed")} value={f.speed(stats.meanSpeed)} />
+              <Kpi label={t("replay.persons")} value={f.number(stats.persons, 0)} />
+            </div>
             {kpis.length ? (
               <>
-                <p className="mt-3 mb-1 text-[11px] text-muted">{t("replay.kpisOfRun")}</p>
-                <dl className="tabular grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:grid-cols-3">
+                <p className="mt-3 mb-1.5 text-[11px] font-medium tracking-wide text-muted uppercase">
+                  {t("replay.kpisOfRun")}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {kpis.map((k) => (
-                    <Stat key={k} label={f.metricName(k)} value={f.metric(data.kpis[k], k)} />
+                    <Kpi key={k} label={f.metricName(k)} value={f.metric(data.kpis[k], k)} />
                   ))}
-                </dl>
+                </div>
               </>
             ) : null}
           </section>
@@ -63,11 +66,15 @@ export function ReplayStats({ replay, sides }: { replay: Replay; sides: Side[] }
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+function Kpi({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="flex min-w-0 flex-col">
-      <dt className="truncate text-[11px] text-muted">{label}</dt>
-      <dd className={tone ?? "text-text"}>{value}</dd>
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-md border border-border bg-surface-2 px-2.5 py-2">
+      <span className="truncate text-[11px] text-muted" title={label}>
+        {label}
+      </span>
+      <span className={cn("tabular text-base leading-tight font-semibold", tone ?? "text-text")}>
+        {value}
+      </span>
     </div>
   );
 }

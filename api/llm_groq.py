@@ -1,6 +1,8 @@
 """Small Groq adapter used by the backend assistant.
 
-The API key stays on the server. The browser only talks to our own API.
+The API key stays on the server. The browser only talks to our own API. The key and
+model are read from the environment on every call, so a key saved in
+Settings → Integrations applies to a running backend without a restart.
 """
 
 from __future__ import annotations
@@ -22,16 +24,21 @@ class GroqError(RuntimeError):
 
 
 class GroqClient:
-    def __init__(self) -> None:
-        self.api_key = os.getenv("GROQ_API_KEY", "")
-        self.model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+    @property
+    def api_key(self) -> str:
+        return os.getenv("GROQ_API_KEY", "")
+
+    @property
+    def model(self) -> str:
+        return os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
     def status(self) -> dict[str, Any]:
+        key = self.api_key
         return {
-            "available": bool(self.api_key),
+            "available": bool(key),
             "provider": "groq",
-            "model": self.model if self.api_key else None,
-            "message": "ready" if self.api_key else "GROQ_API_KEY is not configured",
+            "model": self.model if key else None,
+            "message": "ready" if key else "GROQ_API_KEY is not configured",
         }
 
     def chat(self, messages: Sequence[Mapping[str, str]], max_tokens: int = 600) -> str:

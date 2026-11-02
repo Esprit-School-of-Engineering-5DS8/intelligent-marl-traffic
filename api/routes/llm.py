@@ -34,7 +34,11 @@ KNOWN_MODELS = {
 def providers() -> dict[str, Any]:
     groq_key = bool(os.environ.get("GROQ_API_KEY"))
     gemini_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    backend = (os.environ.get("COTRAFFIC_LLM_BACKEND") or "provider").lower()
     return {
+        # The team runs keyless on mock/replay; the dashboard unlocks its launch on this.
+        "backend": backend,
+        "keyless": backend in ("mock", "replay"),
         "providers": [
             {
                 "id": "groq",

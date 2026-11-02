@@ -50,7 +50,7 @@ export function KpiCard({
   return (
     <section
       aria-label={f.metricName(metric)}
-      className="flex flex-col gap-2 rounded-none border border-border bg-surface/85 p-4 shadow-xs backdrop-blur-md 2xl:gap-1.5 2xl:p-3"
+      className="flex flex-col gap-2 rounded-none border border-border bg-surface p-4 2xl:gap-1.5 2xl:p-3"
     >
       <h3 className="text-xs font-medium text-text-2">{f.metricName(metric)}</h3>
       <p className="tabular text-2xl font-semibold tracking-tight text-text 2xl:text-xl">

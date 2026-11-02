@@ -15,3 +15,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+# Always test this checkout's backend. An editable install of another copy would
+# otherwise shadow src/cotraffic and silently run the tests against it.
+pythonpath = ["src"]

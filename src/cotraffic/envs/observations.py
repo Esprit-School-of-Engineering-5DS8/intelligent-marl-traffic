@@ -110,13 +110,18 @@ class Measurements:
         self.halting = dict.fromkeys(self.lanes, 0.0)
         self.count = dict.fromkeys(self.lanes, 0.0)
         self.speed = dict(self.speed_limit)
+        # Total accumulated waiting time of the vehicles on each lane. The LLM team's
+        # snapshot needs it; getWaitingTime is one cheap TraCI call per lane.
+        self.waiting = dict.fromkeys(self.lanes, 0.0)
 
     def refresh(self, conn) -> None:
         lane = conn.lane
+        waiting = getattr(lane, "getWaitingTime", None)
         for ln in self.lanes:
             self.halting[ln] = float(lane.getLastStepHaltingNumber(ln))
             self.count[ln] = float(lane.getLastStepVehicleNumber(ln))
             self.speed[ln] = float(lane.getLastStepMeanSpeed(ln))
+            self.waiting[ln] = float(waiting(ln)) if waiting is not None else 0.0
 
     def queue(self, lanes: Iterable[str]) -> float:
         lanes = list(lanes)

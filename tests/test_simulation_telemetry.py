@@ -80,8 +80,8 @@ def test_start_honours_the_requested_network(monkeypatch):
     """The stored policy's network must not decide where the run happens."""
     calls: dict = {}
 
-    def fake_start(scenario, speed=1, method=None, checkpoint=None):
-        calls.update(scenario=scenario, speed=speed, method=method)
+    def fake_start(scenario, speed=1, method=None, checkpoint=None, weather="clear"):
+        calls.update(scenario=scenario, speed=speed, method=method, weather=weather)
         return {"scenario": scenario, "network": "sf_mission_2x2"}
 
     monkeypatch.setattr(
@@ -91,11 +91,14 @@ def test_start_honours_the_requested_network(monkeypatch):
     monkeypatch.setattr("api.routes.simulation.session.start", fake_start)
 
     body = client.post(
-        "/api/simulation/start", json={"network": "sf_mission_2x2", "speed": 4}
+        "/api/simulation/start",
+        json={"network": "sf_mission_2x2", "speed": 4, "weather": "rain"},
     ).json()
 
     assert calls["scenario"] == "grid-2x2"
     assert calls["speed"] == 4
+    # Rain travels with the run request, so a restart keeps the condition.
+    assert calls["weather"] == "rain"
     assert body["network"] == "sf_mission_2x2"
 
 

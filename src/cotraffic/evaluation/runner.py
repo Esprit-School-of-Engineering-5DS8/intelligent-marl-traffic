@@ -55,6 +55,7 @@ def run_episode(
     mode: str = "evaluation",
     extra: bool = False,
     agent_overrides: dict[str, Any] | None = None,
+    controller_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Simulate one episode with ``method`` and return (and store) its result row.
 
@@ -63,7 +64,9 @@ def run_episode(
     ``results/extra/``."""
     protocol = config.load_protocol()
     scenarios = [s for s in scenarios if s != "normal"]
-    controller = controller or make_controller(method, checkpoint)
+    controller = controller or make_controller(
+        method, checkpoint, **(controller_kwargs or {})
+    )
     agent_cfg = (
         config.deep_merge(controller.agent_cfg, agent_overrides)
         if agent_overrides

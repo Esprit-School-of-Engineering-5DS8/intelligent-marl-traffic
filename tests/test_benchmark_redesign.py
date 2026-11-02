@@ -19,13 +19,15 @@ def test_catalog_endpoint_returns_networks_and_controllers():
     assert "controllers" in data
 
     network_names = [n["network"] for n in data["networks"]]
-    assert "grid2x2" in network_names
-    assert "grid3x3" in network_names
+    assert "sf_mission_2x2" in network_names
+    assert "sf_mission_3x3" in network_names
     assert "tunis" in network_names
     assert "monaco" in network_names
+    assert "grid2x2" not in network_names
+    assert "grid3x3" not in network_names
 
-    # Verify controller strip availability on grid2x2
-    grid2 = next(n for n in data["networks"] if n["network"] == "grid2x2")
+    # Verify controller strip availability on sf_mission_2x2
+    grid2 = next(n for n in data["networks"] if n["network"] == "sf_mission_2x2")
     assert "mp" in grid2["controllers"]
     assert grid2["controllers"]["mp"]["available"] is True
 
@@ -49,6 +51,6 @@ def test_compare_request_validation():
     # Less than 2 methods should be rejected by pydantic
     response = client.post(
         "/api/compare",
-        json={"network": "grid3x3", "methods": ["mp"]},
+        json={"network": "sf_mission_3x3", "methods": ["mp"]},
     )
     assert response.status_code == 422

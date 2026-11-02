@@ -1,0 +1,12 @@
+name: llm_team_tunisia
+description: >-
+  Real-world comparison on the Tunis city network (the branch's real_district).
+  Paired seeds so every method sees the same demand realisation.
+
+seeds: [0, 1, 2]
+cells:
+  - network: tunis
+    methods: [mp, llm, llm_team]
+    demands: [medium]
+    scenarios: [normal, emergency, incident]
+    ssm: true

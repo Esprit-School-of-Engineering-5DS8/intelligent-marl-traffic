@@ -24,6 +24,7 @@ needs no absolute URLs.
 | `routes/runs.py` | `GET/POST /api/runs`, `WS /ws/status` (replay queue) |
 | `routes/simulation.py` | `/api/simulation/*`, `WS /ws/simulation` (live run) |
 | `routes/policy.py` | `GET/PUT /api/policy` (active control policy) |
+| `routes/integrations.py` | `GET/PUT /api/integrations` (Groq/Gemini keys, Mapbox token, SUMO), `POST /api/integrations/<id>/test` |
 | `simulation.py` | `SimulationSession`: drives `CoTrafficEnv` + `make_controller` |
 | `policy.py` | policy state, validation, availability of checkpoints/LLM |
 | `runs.py` | replay subprocess queue (`scripts/record_replay.py`) |
@@ -33,7 +34,7 @@ needs no absolute URLs.
 
 `GET /api/policy` returns the active method, its label, whether it can run here (checkpoint
 present, LLM key configured) and the catalog the UI renders. `PUT /api/policy` accepts
-`{"method": "coop", "network": "grid3x3"}` and answers `422` when the method is unknown or
+`{"method": "coop", "network": "sf_mission_3x3"}` and answers `422` when the method is unknown or
 has no checkpoint. Defaults live in `configs/dashboard_policy.yaml`; the last choice is
 persisted to `results/dashboard_policy.json` (gitignored).
 
@@ -55,5 +56,5 @@ curl -s localhost:8000/api/health
 curl -s localhost:8000/api/data/meta
 curl -s localhost:8000/api/policy
 curl -s -X PUT localhost:8000/api/policy -H 'Content-Type: application/json' \
-     -d '{"method":"coop","network":"grid3x3"}'
+     -d '{"method":"coop","network":"sf_mission_3x3"}'
 ```

@@ -14,15 +14,19 @@ kind: osm
 description: >
   Central Tunis – city-scale network from the Tunisian lake through the medina
   and Avenue Habib Bourguiba to El Menzah. Built from OpenStreetMap via
-  Overpass API + netconvert, arterial and secondary roads only.
+  Overpass API + netconvert, covering the full street grid inside the bbox
+  (arterials, avenues, secondary and residential streets).
 
 osm:
   # The corridor OpenStreetMap extract is saved next to the network (tunis.osm.xml),
   # so `cotraffic networks tunis --force` rebuilds offline instead of
   # downloading Grand Tunis again.
   bbox: [10.160, 36.785, 10.215, 36.828]   # [west, south, east, north], WGS84
-  # Arterial-only: residential streets are unsignalised and would triple the
-  # network size without adding meaningful RL decisions.
+  # The whole drivable street grid inside the bbox. Dropping residential streets
+  # left only the arterials, so every car was forced onto them and the corridor
+  # jammed while the parallel streets stayed empty. Service ways are still
+  # excluded: they are driveways, parking aisles and yard access, not through
+  # traffic.
   road_types:
     - motorway
     - motorway_link
@@ -34,6 +38,9 @@ osm:
     - secondary_link
     - tertiary
     - tertiary_link
+    - residential
+    - unclassified
+    - living_street
   # netconvert only guesses sidewalks/crossings on edges at or below this speed.
   # The arterial build has a median lane speed of 100 km/h (max 142), so the default
   # 50 km/h threshold left 1 229 of 1 266 lanes without a footway; this covers the net.
@@ -45,7 +52,9 @@ osm:
   # OpenStreetMap tags very few signals in Tunis (72 nodes city-wide in Sept 2026;
   # 3 usable junctions here). We also signalise the key intersections where the two
   # main avenues meet (OSM node ids below). Verify these on-site (Empathize stage).
-  tls_set: [287863988, 387151797, 5294059357, cluster_1089663256_4940244077, 1089666873]
+  # The full-grid rebuild no longer joins 1089663256 and 4940244077 into one
+  # cluster, so both junctions are listed and tls.join merges them if they are close.
+  tls_set: [287863988, 387151797, 5294059357, 1089663256, 4940244077, 1089666873]
   tls_unset: []
 
 pedestrians: true

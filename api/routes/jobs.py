@@ -29,6 +29,20 @@ class TrainRequest(BaseModel):
     timesteps: int | None = Field(default=None, ge=500, le=2_000_000)
 
 
+class LLMTeamSettings(BaseModel):
+    """Run-time conditioning for the LLM team, sent by the Training page.
+
+    Only the team's slow layer reads these; the SUMO shield still owns hard safety.
+    """
+
+    persona: str | None = Field(default=None, max_length=40)
+    system_prompt: str | None = Field(default=None, max_length=4000)
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    cadence_s: float | None = Field(default=None, ge=5, le=120)
+    safety_guardrails: bool = True
+    explainability: bool = True
+
+
 class CompareRequest(BaseModel):
     """A paired A/B run: every method runs on the same seeds, so the deltas are paired."""
 
@@ -44,6 +58,8 @@ class CompareRequest(BaseModel):
     # Per-method agent-config override, e.g. {"coop_ev_ped": {"runtime": {"overlays": []}}}
     # toggles the runtime overlays at evaluation without retraining.
     overrides: dict[str, dict[str, Any]] | None = None
+    # llm_team conditioning: persona, prompt, temperature, cadence and safety toggles.
+    llm_settings: LLMTeamSettings | None = None
 
 
 @router.post("/api/train", status_code=202)
@@ -189,6 +205,7 @@ def start_compare(req: CompareRequest) -> dict[str, Any]:
             req.seeds,
             req.quick,
             req.overrides,
+            req.llm_settings.model_dump() if req.llm_settings else None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

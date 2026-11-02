@@ -19,12 +19,19 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { ReplayControls, ReplayPicker } from "@/features/replay/ReplayControls";
 import { ReplayStats } from "@/features/replay/ReplayStats";
 import { usePlayback, usePlaybackClock } from "@/features/replay/store";
 import { useMeta, useNetwork, useReplay, useComparisons, useSummary } from "@/shared/api/queries";
+import {
+  useCreateRun,
+  useModelCatalog,
+  useRuns,
+  type ModelCatalogEntry,
+} from "@/shared/api/backend";
 import { QueryState } from "@/shared/components/QueryState";
 import { useFormat } from "@/shared/domain/format";
 import { methodColor } from "@/shared/domain/methods";
@@ -58,6 +65,158 @@ function kindOf(key: (typeof LEGEND)[number]["key"]): keyof Visibility {
     : key === "incidentVehicle"
     ? "incident"
     : key;
+}
+
+const COMPARE_NETWORKS = ["sf_mission_2x2", "sf_mission_3x3"];
+const COMPARE_DEMANDS = ["low", "medium", "peak"] as const;
+
+/** Registry versions keep their name/version; any other saved weights use their path. */
+function modelSpec(model: ModelCatalogEntry): string {
+  if (model.modelName && model.version != null) return `model:${model.modelName}@v${model.version}`;
+  return `checkpoint:${model.checkpoint}`;
+}
+
+/**
+ * Free-hand A/B setup: pick any two saved checkpoints (selected runs, raw training
+ * runs or registry versions), a network/demand/seed, and record a fresh replay.
+ * Nothing here depends on a replay already existing.
+ */
+function ModelCompareBuilder() {
+  const f = useFormat();
+  const setReplay = usePlayback((s) => s.setReplay);
+  const queryClient = useQueryClient();
+  const [network, setNetwork] = useState(COMPARE_NETWORKS[0]);
+  const [demand, setDemand] = useState<(typeof COMPARE_DEMANDS)[number]>("peak");
+  const [seed, setSeed] = useState(3);
+  const [left, setLeft] = useState<string | null>(null);
+  const [right, setRight] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [openedId, setOpenedId] = useState<string | null>(null);
+
+  const catalog = useModelCatalog(network);
+  const createRun = useCreateRun();
+  const runs = useRuns();
+  const models = (catalog.data?.models ?? []).filter((model) => model.available);
+  const options = models.map((model) => ({
+    value: modelSpec(model),
+    label: `${model.label} · ${model.agent} · ${model.source}${
+      model.timesteps ? ` · ${model.timesteps} steps` : ""
+    }`,
+  }));
+
+  useEffect(() => {
+    setLeft(null);
+    setRight(null);
+  }, [network]);
+
+  const created = runs.data?.find((run) => run.id === createdId);
+  useEffect(() => {
+    if (created?.status === "done" && created.replayId && openedId !== created.id) {
+      setOpenedId(created.id);
+      setReplay(created.replayId);
+      void queryClient.invalidateQueries({ queryKey: ["data"] });
+    }
+  }, [created, openedId, setReplay, queryClient]);
+
+  const ready = Boolean(left && right && left !== right);
+  const busy =
+    createRun.isPending || created?.status === "queued" || created?.status === "running";
+
+  return (
+    <Card className="p-4 border border-border bg-surface">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs font-medium text-text-2">Network</span>
+          <SelectControl
+            ariaLabel="Comparison network"
+            value={network}
+            options={COMPARE_NETWORKS.map((n) => ({ value: n, label: f.networkName(n) }))}
+            onChange={setNetwork}
+            className="text-sm"
+            style={{ minWidth: 170 }}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs font-medium text-text-2">Model A</span>
+          <SelectControl
+            ariaLabel="Model A"
+            value={left ?? ""}
+            placeholder="Pick a saved model"
+            options={options}
+            onChange={setLeft}
+            disabled={!options.length}
+            className="text-sm"
+            style={{ minWidth: 260 }}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs font-medium text-text-2">Model B</span>
+          <SelectControl
+            ariaLabel="Model B"
+            value={right ?? ""}
+            placeholder="Pick a saved model"
+            options={options.filter((option) => option.value !== left)}
+            onChange={setRight}
+            disabled={!options.length}
+            className="text-sm"
+            style={{ minWidth: 260 }}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs font-medium text-text-2">Demand</span>
+          <SelectControl
+            ariaLabel="Comparison demand"
+            value={demand}
+            options={COMPARE_DEMANDS.map((d) => ({ value: d, label: f.demandName(d) }))}
+            onChange={(value) => setDemand(value as (typeof COMPARE_DEMANDS)[number])}
+            className="text-sm"
+            style={{ minWidth: 140 }}
+          />
+        </div>
+        <label className="flex flex-col gap-1 text-xs font-medium text-text-2">
+          Seed
+          <input
+            className="input-control w-20 text-sm"
+            type="number"
+            min={0}
+            max={999}
+            value={seed}
+            onChange={(event) => setSeed(Number(event.target.value) || 0)}
+          />
+        </label>
+        <Button
+          disabled={!ready || busy}
+          onClick={() => {
+            if (!left || !right) return;
+            createRun.mutate(
+              { network, demand, events: [], seed, left, right },
+              { onSuccess: (run) => setCreatedId(run.id) },
+            );
+          }}
+        >
+          {busy ? "Recording…" : "Record A/B"}
+        </Button>
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        {options.length
+          ? `${options.length} saved checkpoints on ${f.networkName(network)}. Recording writes a new replay and opens it in the player above.`
+          : `No saved checkpoints for ${f.networkName(network)} yet.`}
+      </p>
+      {createRun.isError ? (
+        <p role="alert" className="mt-1 text-xs text-jam">
+          {(createRun.error as Error).message}
+        </p>
+      ) : null}
+      {created?.status === "failed" ? (
+        <p role="alert" className="mt-1 text-xs text-jam">
+          {created.error ?? "The run failed."}
+        </p>
+      ) : null}
+      {created?.status === "done" ? (
+        <p className="mt-1 text-xs text-flow">Replay ready: {created.replayId}</p>
+      ) : null}
+    </Card>
+  );
 }
 
 export default function FreshCompare() {
@@ -185,6 +344,8 @@ export default function FreshCompare() {
               <QueryState query={replay} height={300}>
                 {(rep) => (
                   <div className="flex flex-col gap-6 w-full">
+                    <ModelCompareBuilder />
+
                     {/* Simulation Controls Toolbar */}
                     <div className="flex flex-wrap items-center justify-between gap-4 p-3.5 rounded-xl border border-border bg-surface shadow-sm">
                       <div className="flex items-center gap-3">
@@ -246,7 +407,7 @@ export default function FreshCompare() {
                           </div>
 
                           {/* Live Comparative Delta Telemetry */}
-                          <Card className="border border-border bg-surface p-4 shadow-sm">
+                          <Card className="border border-border bg-surface p-4">
                             <div className="flex items-center justify-between border-b border-border/70 pb-3 mb-3">
                               <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-2">
                                 <Activity className="w-4 h-4 text-accent" /> Live Comparative Telemetry Delta
@@ -306,7 +467,7 @@ function SidePanel({
     : "border-accent text-accent bg-accent/10";
 
   return (
-    <Card className="overflow-hidden border border-border bg-surface shadow-md flex flex-col">
+    <Card className="overflow-hidden border border-border bg-surface flex flex-col">
       {/* Title Bar */}
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 bg-surface-2/40">
         <div className="flex items-center gap-2.5">
@@ -421,19 +582,26 @@ function DetailedStatisticalPlots({
       .filter((v): v is number => v !== null && !isNaN(v));
     const meanDelta = validDeltas.reduce((a, b) => a + b, 0) / (validDeltas.length || 1);
     const sigCount = filteredRows.filter((r) => r.significant).length;
-    const avgP =
-      filteredRows
-        .map((r) => r.pValue)
-        .filter((v): v is number => v !== null)
-        .reduce((a, b) => a + b, 0) / (filteredRows.length || 1);
+    // The card says Holm-adjusted, so average the adjusted p when the export has it.
+    const pValues = filteredRows
+      .map((r) => r.pHolm ?? r.pValue)
+      .filter((v): v is number => v !== null && !isNaN(v));
+    const avgP = pValues.length ? pValues.reduce((a, b) => a + b, 0) / pValues.length : null;
+    const bestRow = filteredRows.reduce<(typeof filteredRows)[number] | null>((best, row) => {
+      if (row.pairedImprovementPct === null || Number.isNaN(row.pairedImprovementPct)) return best;
+      if (!best || (best.pairedImprovementPct ?? -Infinity) < row.pairedImprovementPct) return row;
+      return best;
+    }, null);
 
     return {
       meanDelta,
       sigCount,
       totalCount: filteredRows.length,
+      deltaCount: validDeltas.length,
       avgP,
       maxGain: validDeltas.length ? Math.max(...validDeltas) : 0,
       minGain: validDeltas.length ? Math.min(...validDeltas) : 0,
+      bestRow,
     };
   }, [filteredRows]);
 
@@ -564,8 +732,8 @@ function DetailedStatisticalPlots({
           </div>
         </div>
 
-        <div className="text-xs text-muted font-mono">
-          Sample Size: <strong className="text-text">{filteredRows.length}</strong> pairwise evaluations
+        <div className="text-xs text-muted">
+          Sample size: <strong className="tabular text-text">{filteredRows.length}</strong> pairwise evaluations
         </div>
       </div>
 
@@ -577,32 +745,36 @@ function DetailedStatisticalPlots({
             <div className="flex items-baseline gap-2 my-1">
               <span
                 className={cn(
-                  "text-2xl font-bold font-mono",
-                  stats.meanDelta >= 0 ? "text-emerald-500" : "text-jam"
+                  "tabular text-2xl font-semibold tracking-tight",
+                  stats.meanDelta >= 0 ? "text-flow" : "text-jam"
                 )}
               >
-                {stats.meanDelta >= 0 ? `+${stats.meanDelta.toFixed(1)}%` : `${stats.meanDelta.toFixed(1)}%`}
+                {f.pct(stats.meanDelta)}
               </span>
-              <span className="text-[11px] text-text-2">vs Fixed-Time baseline</span>
+              <span className="text-[11px] text-text-2">
+                vs {f.methodName("ft")} baseline
+              </span>
             </div>
             <div className="flex items-center gap-1 text-[11px] text-muted">
               {stats.meanDelta >= 0 ? (
-                <ArrowUpRight className="size-3.5 text-emerald-500" />
+                <ArrowUpRight className="size-3.5 text-flow" />
               ) : (
                 <ArrowDownRight className="size-3.5 text-jam" />
               )}
-              <span>Spread: [{stats.minGain.toFixed(1)}%, {stats.maxGain.toFixed(1)}%]</span>
+              <span className="tabular">
+                Spread: [{f.pct(stats.minGain)}, {f.pct(stats.maxGain)}]
+              </span>
             </div>
           </Card>
 
           <Card className="p-4 border border-border bg-surface flex flex-col justify-between">
             <span className="text-xs font-semibold text-muted uppercase">Statistical Significance</span>
             <div className="flex items-baseline gap-2 my-1">
-              <span className="text-2xl font-bold font-mono text-accent">
+              <span className="tabular text-2xl font-semibold tracking-tight text-accent">
                 {stats.sigCount} / {stats.totalCount}
               </span>
               <span className="text-[11px] text-text-2">
-                ({Math.round((stats.sigCount / stats.totalCount) * 100)}% valid)
+                ({Math.round((stats.sigCount / stats.totalCount) * 100)}% significant)
               </span>
             </div>
             <div className="flex items-center gap-1 text-[11px] text-muted">
@@ -614,26 +786,44 @@ function DetailedStatisticalPlots({
           <Card className="p-4 border border-border bg-surface flex flex-col justify-between">
             <span className="text-xs font-semibold text-muted uppercase">Mean p-value</span>
             <div className="flex items-baseline gap-2 my-1">
-              <span className="text-2xl font-bold font-mono text-text">
-                {stats.avgP.toFixed(4)}
+              <span className="tabular text-2xl font-semibold tracking-tight text-text">
+                {f.number(stats.avgP, 4)}
               </span>
-              <span className="text-[11px] text-text-2">paired t-test</span>
+              <span className="text-[11px] text-text-2">Mann–Whitney U · Holm</span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-emerald-500">
+            <div
+              className={cn(
+                "flex items-center gap-1 text-[11px]",
+                stats.sigCount > 0 ? "text-flow" : "text-muted"
+              )}
+            >
               <CheckCircle2 className="size-3.5" />
-              <span>Empirically verified across seeds</span>
+              <span>
+                {stats.sigCount > 0
+                  ? `${stats.sigCount} of ${stats.totalCount} survive Holm`
+                  : "No comparison survives Holm at p < 0.05"}
+              </span>
             </div>
           </Card>
 
           <Card className="p-4 border border-border bg-surface flex flex-col justify-between">
             <span className="text-xs font-semibold text-muted uppercase">Peak Optimization Gain</span>
             <div className="flex items-baseline gap-2 my-1">
-              <span className="text-2xl font-bold font-mono text-emerald-500">
-                +{stats.maxGain.toFixed(1)}%
+              <span
+                className={cn(
+                  "tabular text-2xl font-semibold tracking-tight",
+                  stats.maxGain >= 0 ? "text-flow" : "text-jam"
+                )}
+              >
+                {f.pct(stats.maxGain)}
               </span>
               <span className="text-[11px] text-text-2">maximum delta</span>
             </div>
-            <span className="text-[11px] text-muted">Best observed scenario corridor</span>
+            <span className="text-[11px] text-muted">
+              {stats.bestRow
+                ? `Best: ${f.networkName(stats.bestRow.network)} · ${f.scenarioName(stats.bestRow.scenario)}`
+                : "No paired delta available"}
+            </span>
           </Card>
         </div>
       )}
@@ -685,7 +875,7 @@ function DetailedStatisticalPlots({
       </div>
 
       {/* Comprehensive Raw Benchmark Table */}
-      <Card className="border border-border bg-surface p-4 shadow-xs">
+      <Card className="border border-border bg-surface p-4">
         <div className="flex items-center justify-between border-b border-border/70 pb-3 mb-3">
           <div>
             <h3 className="text-sm font-bold text-text">Empirical Hypothesis Test Ledger</h3>
@@ -714,41 +904,54 @@ function DetailedStatisticalPlots({
             <tbody>
               {filteredRows.map((c, i) => (
                 <tr key={i} className="border-b border-border/40 hover:bg-surface-2/30 transition-colors">
-                  <td className="py-2.5 px-3 font-mono font-medium">{c.network}</td>
-                  <td className="py-2.5 px-3 text-text font-medium">{c.scenario}</td>
-                  <td className="py-2.5 px-3 font-semibold flex items-center gap-1.5">
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ background: c.method === "llm" ? "var(--accent)" : "#2a78d6" }}
-                    />
-                    <span className="font-bold text-text">{(c as any).displayCandidate || "Kemetra End-to-End Model"}</span>
+                  <td className="py-2.5 px-3 tabular text-text-2">{f.networkName(c.network)}</td>
+                  <td className="py-2.5 px-3 text-text">{f.scenarioName(c.scenario)}</td>
+                  <td className="py-2.5 px-3">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="size-2 rounded-full"
+                        style={{ background: c.method === "llm" ? "var(--accent)" : "#2a78d6" }}
+                      />
+                      <span className="font-medium text-text">
+                        {c.displayCandidate || f.methodName(c.method)}
+                      </span>
+                    </span>
                   </td>
-                  <td className="py-2.5 px-3 text-muted">{(c as any).displayBaseline || "Standard Baselines"}</td>
-                  <td className="py-2.5 px-3 font-bold text-accent font-mono">
-                    {c.pairedImprovementPct !== null
-                      ? `${c.pairedImprovementPct >= 0 ? "+" : ""}${c.pairedImprovementPct.toFixed(1)}%`
-                      : "—"}
+                  <td className="py-2.5 px-3 text-muted">
+                    {c.displayBaseline || f.methodName(c.reference)}
                   </td>
-                  <td className="py-2.5 px-3 text-muted font-mono">
+                  <td
+                    className={cn(
+                      "py-2.5 px-3 tabular font-semibold",
+                      c.pairedImprovementPct === null
+                        ? "text-muted"
+                        : c.pairedImprovementPct >= 0
+                          ? "text-flow"
+                          : "text-jam"
+                    )}
+                  >
+                    {f.pct(c.pairedImprovementPct)}
+                  </td>
+                  <td className="py-2.5 px-3 tabular text-muted">
                     {c.pairedCiLo !== null && c.pairedCiHi !== null
-                      ? `[${c.pairedCiLo.toFixed(1)}%, ${c.pairedCiHi.toFixed(1)}%]`
+                      ? `[${f.number(c.pairedCiLo, 1)}%, ${f.number(c.pairedCiHi, 1)}%]`
                       : "—"}
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-muted">
-                    {c.cliffsDelta !== null ? c.cliffsDelta.toFixed(3) : "—"}{" "}
-                    {c.effect ? <span className="text-[10px]">({c.effect})</span> : null}
+                  <td className="py-2.5 px-3 tabular text-muted">
+                    {c.cliffsDelta !== null ? f.number(c.cliffsDelta, 3) : "—"}
+                    {c.effect ? <span className="text-[10px]"> ({c.effect})</span> : null}
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-muted">
-                    {c.pHolm !== null ? c.pHolm.toFixed(4) : c.pValue !== null ? c.pValue.toFixed(4) : "—"}
+                  <td className="py-2.5 px-3 tabular text-muted">
+                    {f.number(c.pHolm ?? c.pValue, 4)}
                   </td>
                   <td className="py-2.5 px-3 text-right">
                     {c.significant ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                      <span className="border border-flow/30 bg-flow-soft px-2 py-0.5 text-[10px] font-semibold text-flow">
                         Significant (p &lt; .05)
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-surface-3 text-muted border border-border">
-                        Not Significant
+                      <span className="border border-border bg-surface-3 px-2 py-0.5 text-[10px] font-semibold text-muted">
+                        Not significant
                       </span>
                     )}
                   </td>

@@ -402,14 +402,23 @@ async function retargetSimulation(name) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ scenario: name, speed: simulationSpeed })
   })
-    .then((response) => (response.ok ? response.json() : null))
+    .then(async (response) => {
+      const state = await response.json().catch(() => null);
+      if (!response.ok) {
+        // Silently swallowing this left the map on an empty frame with no reason shown.
+        showToast(state?.detail || `Could not start ${name} (HTTP ${response.status}).`);
+        return null;
+      }
+      return state;
+    })
     .then((state) => state && updateSimulationState(state))
-    .catch(() => {});
+    .catch(() => showToast('Simulation service is offline.'));
 }
 
 function setScenario(name, { announce = true, retarget = true } = {}) {
   if (!SCENARIOS[name]) return;
   activeScenario = name;
+  resetLiveVehicleFrame();
   try {
     localStorage.setItem(SCENARIO_KEY, activeScenario);
   } catch {
@@ -1755,6 +1764,17 @@ function resetVehicleHeadings() {
 
 let lastVehicleRunId = null;
 
+/* A scenario switch invalidates the frame the interpolation loop is holding: its
+   vehicles belong to the previous network, and the "wrong scenario" guard would
+   clear them on every animation frame until a new frame arrives. */
+function resetLiveVehicleFrame() {
+  currentVehicleFrame = null;
+  currentFrameKey = '';
+  previousVehicleFrame = null;
+  vehicleInstances.clear();
+  liveMap?.getSource('live-vehicles')?.setData({ type: 'FeatureCollection', features: [] });
+}
+
 function refreshSimulationVehicles(state) {
   if (!liveMap || !state?.scenario) return;
   const source = liveMap.getSource('live-vehicles');
@@ -2073,10 +2093,16 @@ function updateSimulationState(state) {
   latestSimulationState = state;
   // The Optimize / Predict / Roam panels read the same snapshot as the map.
   setLiveState(state, state.trend);
+  // Queue the map frame before the panels render: a panel error must not be able to
+  // freeze the vehicles on the previous scenario's last frame.
+  queueVehicleFrame(state);
   loadRunHistory(state.runId);
   refreshLiveGauges();
   renderLiveOps(state);
   syncRunControls(state);
+  // The rain overlay follows the run's weather, so a restart or another client
+  // turning rain on is reflected here without a local toggle.
+  applyLiveWeatherEffects(state.weather);
   // A chart-bar scrub holds the timeline for a few seconds; otherwise the 4 Hz
   // stream would snap the playhead back to the live time immediately.
   const followingLive = performance.now() >= simulationScrubUntil;
@@ -2512,6 +2538,29 @@ function buildLiveMapScene() {
       }
     }, liveMap.getLayer('live-vehicles-extrusion') ? 'live-vehicles-extrusion' : undefined);
   }
+  // City-scale views (Tunis opens at zoom 13.4) make a 4.5 m car sub-pixel, so the
+  // extrusion and flat body both read as "no vehicles". These screen-sized dots keep
+  // traffic legible while zoomed out and fade away once the 3D bodies are readable.
+  if (!liveMap.getLayer('live-vehicles-dots')) {
+    liveMap.addLayer({
+      id: 'live-vehicles-dots',
+      type: 'circle',
+      source: 'live-vehicles',
+      paint: {
+        'circle-color': ['coalesce', ['get', 'color'], '#5b8fb0'],
+        'circle-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          11, 2.2, 13.5, 3.4, 15, 2.6, 16.2, 0
+        ],
+        'circle-opacity': [
+          'interpolate', ['linear'], ['zoom'],
+          13.5, 0.9, 15.4, 0
+        ],
+        'circle-stroke-width': 0,
+        'circle-pitch-alignment': 'map'
+      }
+    });
+  }
   const ensureMapIcon = (name, width, height, draw) => {
     if (liveMap.hasImage(name)) return;
     const canvas = document.createElement('canvas');
@@ -2845,6 +2894,7 @@ function initLiveMap() {
   }
 
   mapboxgl.accessToken = token;
+  appliedRainSignature = null;
   liveMap = new mapboxgl.Map({
     container,
     ...getLiveScenarioView(),
@@ -2870,6 +2920,7 @@ function initLiveMap() {
   liveMap.on('load', () => {
     hideLiveMapFallback();
     buildLiveMapScene();
+    applyLiveWeatherEffects(latestSimulationState?.weather || 'clear');
     document.dispatchEvent(new CustomEvent('sumo:livemapready'));
   });
   liveMap.on('error', (event) => {
@@ -2889,6 +2940,109 @@ function initLiveMap() {
   });
 
   window.setTimeout(() => liveMap?.resize(), 80);
+}
+
+/* Rain on the live map, from the Mapbox weather effect. The backend applies the
+   same condition to SUMO's vehicle types, so what falls on the map is what the
+   vehicles are actually driving through. The wet-road setting below only shapes
+   the overlay (droplet density, blur, fog vignette); the driving penalty belongs
+   to the run's weather and lives in the backend. */
+const RAIN_INTENSITY_KEY = 'sumo.rainIntensity';
+const RAIN_ZOOM_FADE = { hidden: 13.2, full: 15.6 };
+
+function readRainIntensity() {
+  const stored = Number(localStorage.getItem(RAIN_INTENSITY_KEY));
+  return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 0.6;
+}
+
+let rainIntensity = readRainIntensity();
+const round3 = (value) => Math.round(value * 1000) / 1000;
+
+/* Below street zoom the overlay thins out instead of covering the map, so the
+   road layout stays readable while the camera pulls back. */
+function rainZoomReveal(value) {
+  // City-scale views keep a light drizzle instead of a full-screen sheet; the
+  // overlay only reaches the chosen level once the camera is on the street.
+  return [
+    'interpolate', ['linear'], ['zoom'],
+    11.8, 0,
+    RAIN_ZOOM_FADE.hidden, round3(value * 0.35),
+    RAIN_ZOOM_FADE.full, value
+  ];
+}
+
+function liveRainConfig() {
+  const level = rainIntensity;
+  return {
+    density: rainZoomReveal(round3(0.5 * level)),
+    intensity: round3(0.2 + 0.45 * level),
+    color: '#a8adbc',
+    opacity: round3(0.4 + 0.3 * level),
+    vignette: rainZoomReveal(round3(0.45 * level)),
+    'vignette-color': '#39454e',
+    direction: [0, 80],
+    'droplet-size': [2, round3(7 + 5 * level)],
+    'distortion-strength': round3(0.25 + 0.3 * level),
+    // Keep the middle of the map clear so labels and vehicles stay readable.
+    'center-thinning': 0.55
+  };
+}
+
+function syncRainIntensityControl(raining) {
+  const picker = document.querySelector('.live-rain-picker');
+  const slider = $('liveRainIntensity');
+  const readout = $('liveRainIntensityValue');
+  picker?.classList.toggle('is-raining', raining);
+  const level = Math.round(rainIntensity * 100);
+  if (slider && slider.value !== String(level)) slider.value = String(level);
+  if (slider) slider.setAttribute('aria-valuetext', `${level}%`);
+  if (readout) readout.textContent = `${level}%`;
+  if (!raining) {
+    const menu = picker?.querySelector('.live-rain-menu');
+    if (menu) menu.hidden = true;
+    picker?.querySelector('[data-live-action="rain-level"]')?.setAttribute('aria-expanded', 'false');
+  }
+}
+
+/* The applied weather pass, so a 4 Hz state stream never rebuilds it: calling
+   setRain on every frame tore the vehicle layers out of the render pass. */
+let appliedRainSignature = null;
+
+function applyLiveWeatherEffects(weather) {
+  const raining = weather === 'rain';
+  const button = document.querySelector('[data-live-action="weather"]');
+  if (button) {
+    button.classList.toggle('is-active', raining);
+    button.setAttribute('aria-pressed', String(raining));
+    button.setAttribute('aria-label', raining ? 'Clear the rain' : 'Start rain');
+    button.setAttribute('title', raining ? 'Rain: on' : 'Rain: off');
+  }
+  syncRainIntensityControl(raining);
+  if (!liveMap || typeof liveMap.setRain !== 'function') return;
+  const showing = raining && rainIntensity > 0;
+  const signature = showing ? rainIntensity.toFixed(2) : 'clear';
+  if (signature === appliedRainSignature) return;
+  try {
+    liveMap.setRain(showing ? liveRainConfig() : null);
+    appliedRainSignature = signature;
+  } catch {
+    // The style is still loading; the load handler applies it again.
+    appliedRainSignature = null;
+  }
+}
+
+const rainIntensitySlider = $('liveRainIntensity');
+if (rainIntensitySlider) {
+  syncRainIntensityControl(latestSimulationState?.weather === 'rain');
+  rainIntensitySlider.addEventListener('input', () => {
+    const level = Number(rainIntensitySlider.value);
+    if (Number.isFinite(level)) rainIntensity = Math.max(0, Math.min(1, level / 100));
+    applyLiveWeatherEffects(latestSimulationState?.weather || 'clear');
+  });
+  rainIntensitySlider.addEventListener('change', () => {
+    localStorage.setItem(RAIN_INTENSITY_KEY, String(rainIntensity));
+    showToast(`Wet-road intensity set to ${Math.round(rainIntensity * 100)}%.`);
+  });
 }
 
 function applyLiveMapStyle(styleName) {
@@ -2982,6 +3136,14 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
       return;
     }
 
+    if (action === 'rain-level') {
+      const menu = button.parentElement?.querySelector('.live-rain-menu');
+      const open = menu?.hidden;
+      if (menu) menu.hidden = !open;
+      button.setAttribute('aria-expanded', String(Boolean(open)));
+      return;
+    }
+
     if (action === 'locate') {
       resetLiveMapView();
       showToast(`Recentered on ${getScenario().title}.`);
@@ -2999,7 +3161,28 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
     }
 
     if (action === 'weather') {
-      showToast('Clear · 24°C · wind 8 km/h NW');
+      const raining = latestSimulationState?.weather === 'rain';
+      simulationFetch('/api/simulation/weather', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weather: raining ? 'clear' : 'rain' })
+      })
+        .then(async (response) => {
+          const state = await response.json().catch(() => null);
+          if (!response.ok) {
+            showToast(state?.detail || `Weather change failed (HTTP ${response.status}).`);
+            return null;
+          }
+          return state;
+        })
+        .then((state) => {
+          if (!state) return;
+          updateSimulationState(state);
+          showToast(state.weather === 'rain'
+            ? 'Rain started — vehicles slow down and keep a longer headway.'
+            : 'Rain cleared — dry-road driving restored.');
+        })
+        .catch(() => showToast('Simulation service is offline.'));
       return;
     }
 
@@ -3045,7 +3228,11 @@ async function runSimulationCommand(command) {
     path = '/api/simulation/incident';
   } else if (command === 'restart') {
     path = '/api/simulation/start';
-    body = { scenario: current.scenario || activeScenario || 'grid-2x2', speed: simulationSpeed };
+    body = {
+      scenario: current.scenario || activeScenario || 'grid-2x2',
+      speed: simulationSpeed,
+      weather: current.weather || 'clear'
+    };
   } else if (command === 'speed') {
     simulationSpeed = simulationSpeed === 1 ? 5 : simulationSpeed === 5 ? 20 : 1;
     path = '/api/simulation/speed';
@@ -3137,6 +3324,9 @@ function setMapLayerVisibility(layerName, enabled) {
     }
     if (liveMap.getLayer('live-vehicles-flat')) {
       liveMap.setLayoutProperty('live-vehicles-flat', 'visibility', enabled && liveMap.getPitch() < 6 ? 'visible' : 'none');
+    }
+    if (liveMap.getLayer('live-vehicles-dots')) {
+      liveMap.setLayoutProperty('live-vehicles-dots', 'visibility', enabled ? 'visible' : 'none');
     }
     document.querySelectorAll('[data-vehicle-class]').forEach((option) => { option.disabled = !enabled; });
     simulationSignalMarkers.forEach((marker) => marker.getElement().classList.toggle('is-hidden', !enabled));

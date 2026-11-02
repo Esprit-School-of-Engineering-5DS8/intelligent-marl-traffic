@@ -7665,6 +7665,16 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .live-style-picker { position: relative; }
 .live-layer-picker { position: relative; }
+.live-rain-picker { position: relative; display: inline-flex; align-items: center; }
+.live-rain-picker .live-rain-level { display: none; }
+.live-rain-picker.is-raining .live-rain-level { display: inline-flex; }
+.live-rain-menu { width: 218px; }
+.live-rain-slider { display: grid; gap: 6px; padding: 4px 8px 6px; }
+.live-rain-slider > span { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.live-rain-slider strong { color: #35362f; font-size: 11px; font-weight: 600; }
+.live-rain-slider small { color: #6f7a63; font-size: 10px; font-weight: 700; }
+.live-rain-slider input[type="range"] { width: 100%; height: 14px; margin: 0; accent-color: #5d8a63; cursor: pointer; }
+.live-rain-note { margin: 4px 0 2px; padding: 0 8px; color: #85847a; font-size: 9px; line-height: 1.45; }
 .live-layer-menu { right: auto; left: 0; }
 .live-layer-option { display: flex; width: 100%; align-items: center; gap: 9px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: #35362f; text-align: left; cursor: pointer; }
 .live-layer-option:hover, .live-layer-option.is-selected { background: rgba(255,255,255,.7); }

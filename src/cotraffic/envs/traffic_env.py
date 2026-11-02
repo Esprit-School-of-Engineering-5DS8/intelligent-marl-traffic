@@ -19,6 +19,7 @@ from gymnasium import spaces
 from pettingzoo import ParallelEnv
 
 from cotraffic import config
+from cotraffic.envs.ev import read_ev_states
 from cotraffic.controllers.overlays import build_overlays
 from cotraffic.envs.intersection import Intersection
 from cotraffic.envs.observations import (
@@ -62,6 +63,9 @@ class CoTrafficEnv(ParallelEnv):
         record_decisions: bool = False,
         protocol: Mapping[str, Any] | None = None,
         step_hooks: Sequence[StepHook] = (),
+        # Called after every simulated step inside one decision, for consumers that draw
+        # the run (the live map) instead of scoring it.
+        substep_hooks: Sequence[StepHook] = (),
         compute_observations: bool = True,
         sumo_options: Sequence[str] = (),
     ):
@@ -97,6 +101,7 @@ class CoTrafficEnv(ParallelEnv):
         self.record_decisions = record_decisions
         self.compute_observations = compute_observations
         self.step_hooks = list(step_hooks)
+        self.substep_hooks = list(substep_hooks)
         self.sumo_options = list(sumo_options)
         self.runtime = runtime_perturbations(runtime_scenarios)
         self.forecaster = None
@@ -166,6 +171,8 @@ class CoTrafficEnv(ParallelEnv):
         for overlay in self.overlays:
             overlay.reset(self)
         self.ev_ids: set[str] = set()
+        self.ev_states: list[Any] = []
+        self.ped_wait_sum: dict[str, float] = {}
         self.bus_ids: set[str] = set()
         self.person_ids: set[str] = set()
         self.teleported: set[str] = set()
@@ -247,6 +254,8 @@ class CoTrafficEnv(ParallelEnv):
                         * self.step_length
                     )
             for hook in self.step_hooks:
+                hook(self, self.now)
+            for hook in self.substep_hooks:
                 hook(self, self.now)
 
         self._sense()
@@ -337,14 +346,18 @@ class CoTrafficEnv(ParallelEnv):
             noise.apply(self.meas, self._rng)
 
         self.ped_waiting: dict[str, float] = defaultdict(float)
+        self.ped_wait_sum: dict[str, float] = defaultdict(float)
         for person in self.person_ids:
-            if (
-                conn.person.getRoadID(person) in self.walkingareas
-                and conn.person.getWaitingTime(person) > 0
-            ):
-                nxt = conn.person.getNextEdge(person)
-                if nxt in self.crossing_owner:
-                    self.ped_waiting[nxt] += 1.0
+            if conn.person.getRoadID(person) in self.walkingareas:
+                wait = float(conn.person.getWaitingTime(person))
+                if wait > 0:
+                    nxt = conn.person.getNextEdge(person)
+                    if nxt in self.crossing_owner:
+                        self.ped_waiting[nxt] += 1.0
+                        self.ped_wait_sum[nxt] += wait
+
+        # Full per-EV corridor state, read once per decision for the LLM team.
+        self.ev_states = read_ev_states(conn, self.ev_ids)
 
         rng_ev = float(self.protocol["observation"]["ev_detection_range_m"])
         self.ev_info: dict[str, dict[str, Any]] = {}

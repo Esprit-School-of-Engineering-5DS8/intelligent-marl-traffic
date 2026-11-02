@@ -29,5 +29,6 @@ pyarrow==23.0.1       # must match the Arrow version libsumo 1.27.1 is built aga
 # HTTP layer (api/)
 fastapi==0.143.2
 uvicorn==0.53.0
+websockets            # uvicorn's WebSocket support (/ws/simulation, /ws/status)
 pydantic
 pyyaml==6.0.3

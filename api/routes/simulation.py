@@ -32,6 +32,9 @@ class SimulationRequest(BaseModel):
     # request cannot start weights the policy layer would refuse.
     method: str | None = None
     checkpoint: str | None = None
+    # Rain slows vehicles and lengthens their headway inside SUMO, so it changes
+    # the run's numbers, not just the map's look.
+    weather: str = "clear"
 
     @field_validator("scenario")
     @classmethod
@@ -46,6 +49,13 @@ class SimulationRequest(BaseModel):
         if network is not None and network not in NETWORK_SCENARIOS:
             raise ValueError(f"unknown network {network}")
         return network
+
+    @field_validator("weather")
+    @classmethod
+    def known_weather(cls, weather: str) -> str:
+        if weather not in ("clear", "rain"):
+            raise ValueError(f"unknown weather {weather}")
+        return weather
 
 
 @router.get("/api/simulation/history")
@@ -70,7 +80,7 @@ def simulation_start(request: SimulationRequest) -> dict[str, Any]:
     try:
         scenario = resolve_scenario(request.scenario, request.network)
         return session.start(
-            scenario, request.speed, request.method, request.checkpoint
+            scenario, request.speed, request.method, request.checkpoint, request.weather
         )
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
@@ -84,6 +94,19 @@ def simulation_pause() -> dict[str, Any]:
 @router.post("/api/simulation/resume")
 def simulation_resume() -> dict[str, Any]:
     return session.resume()
+
+
+class WeatherRequest(BaseModel):
+    weather: str = Field(pattern="^(clear|rain)$")
+
+
+@router.post("/api/simulation/weather")
+def simulation_weather(request: WeatherRequest) -> dict[str, Any]:
+    """Turn rain on or off for the running live run."""
+    try:
+        return session.set_weather(request.weather)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
 
 
 @router.post("/api/simulation/stop")

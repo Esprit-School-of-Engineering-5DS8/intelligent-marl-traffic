@@ -34,14 +34,14 @@ NETWORK_TITLES = {
     "sf_mission_2x2": "SF Mission 2×2",
     "sf_mission_3x3": "SF Mission 3×3",
     "monaco": "Monaco Principality",
-    "tunis": "Tunis Corridor",
+    "tunis": "Tunis City Network",
 }
 
 NETWORK_DESCRIPTIONS = {
     "sf_mission_2x2": "San Francisco Mission & Howard corridor (2×2 intersections).",
     "sf_mission_3x3": "San Francisco Mission & Howard corridor (3×3 intersections).",
     "monaco": "Port Hercule to Monte-Carlo arterial network with complex geometry.",
-    "tunis": "Central Tunis city network (lake, medina, Bourguiba, El Menzah — 13 TLS).",
+    "tunis": "Central Tunis full street grid (lake, medina, Bourguiba, El Menzah — arterials, avenues and local streets).",
 }
 
 
@@ -158,20 +158,41 @@ def _checkpoints_for_network(network: str) -> dict[str, Any]:
     return res
 
 
+def _network_placeholder(name: str) -> dict[str, Any]:
+    """Metadata for a network whose artifacts are not built yet (``sumo_files/`` is gitignored)."""
+    cfg = config.load("networks", name)
+    bbox = (cfg.get("osm") or {}).get("bbox")
+    geo = (
+        {"west": bbox[0], "south": bbox[1], "east": bbox[2], "north": bbox[3]}
+        if bbox
+        else {"west": 0.0, "south": 0.0, "east": 0.0, "north": 0.0}
+    )
+    return {
+        "network": name,
+        "title": NETWORK_TITLES.get(name, name),
+        "description": NETWORK_DESCRIPTIONS.get(name, ""),
+        "tlsCount": 0,
+        "edgeCount": 0,
+        "junctionCount": 0,
+        "bounds": geo,
+        "geoBounds": geo,
+        "measuredWallTimeS": MEASURED_SECONDS_3MIN.get(name, 120),
+    }
+
+
 @router.get("/api/catalog")
 def get_catalog() -> dict[str, Any]:
     """Catalog of all networks, controllers, checkpoints and agent configurations."""
     networks_list = []
     for net in NETWORKS:
-        meta = _network_metadata(net)
         controllers = _checkpoints_for_network(net)
-
-        # Runnable verdict
-        runnable = True
-        disabled_reason = None
-        if net == "monaco":
-            # Monaco is runnable with ssm=False
-            runnable = True
+        try:
+            meta = _network_metadata(net)
+        except Exception as err:  # artifact missing or unbuildable here
+            meta = _network_placeholder(net)
+            runnable, disabled_reason = False, str(err).splitlines()[0][:300]
+        else:
+            runnable, disabled_reason = True, None
         networks_list.append(
             {
                 **meta,

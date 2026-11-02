@@ -26,6 +26,7 @@ OVERPASS_URLS = (
 def download_osm(bbox: list[float], out_file: Path, attempts: int = 6) -> Path:
     """Download all ``highway`` ways intersecting ``bbox`` = [west, south, east, north]."""
     west, south, east, north = bbox
+    out_file.parent.mkdir(parents=True, exist_ok=True)
     query = (
         f'[out:xml][timeout:120];(way["highway"]({south},{west},{north},{east}););(._;>;);out body;'
     )
@@ -47,14 +48,33 @@ def download_osm(bbox: list[float], out_file: Path, attempts: int = 6) -> Path:
     raise RuntimeError(f"OSM download failed after {attempts} attempts: {last_error}")
 
 
+def _extract_file(cfg: dict[str, Any], net_file: Path) -> Path:
+    """Path of the saved OSM extract of ``cfg``, building the source network of a variant.
+
+    A network with ``osm.extract_from`` reuses the extract of its source, so the source
+    has to exist first: building ``sf_mission_2x2`` before ``sf_mission_3x3`` must not
+    fail on a missing extract.
+    """
+    osm = cfg["osm"]
+    osm_file = net_file.with_name(f"{cfg['name']}.osm.xml")
+    if not osm.get("extract_from"):
+        return osm_file
+    source = osm["extract_from"]
+    osm_file = net_file.parent.parent / source / f"{source}.osm.xml"
+    if not osm_file.is_file():
+        from cotraffic.networks.build import ensure_network
+
+        ensure_network(source)
+        if not osm_file.is_file():
+            raise RuntimeError(f"network {cfg['name']}: OSM extract {osm_file} is missing")
+    return osm_file
+
+
 def build_osm(cfg: dict[str, Any], protocol: dict[str, Any], net_file: Path) -> Path:
     osm = cfg["osm"]
     if osm.get("keep_names"):
         return _build_corridor(cfg, osm, protocol, net_file)
-    osm_file = net_file.with_name(f"{cfg['name']}.osm.xml")
-    if osm.get("extract_from"):  # a variant of another network: the same saved extract
-        source = osm["extract_from"]
-        osm_file = net_file.parent.parent / source / f"{source}.osm.xml"
+    osm_file = _extract_file(cfg, net_file)
     if not osm_file.is_file():
         download_osm(osm["bbox"], osm_file)
     west, south, east, north = osm["bbox"]
@@ -159,10 +179,7 @@ def _build_corridor(
         max(c[1] for c in crossings) + margin_lat,
     ]
 
-    osm_file = net_file.with_name(f"{name}.osm.xml")
-    if osm.get("extract_from"):
-        source = osm["extract_from"]
-        osm_file = net_file.parent.parent / source / f"{source}.osm.xml"
+    osm_file = _extract_file(cfg, net_file)
     if not osm_file.is_file():
         download_osm(osm["bbox"], osm_file)
 

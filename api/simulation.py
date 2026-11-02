@@ -384,6 +384,17 @@ def _lanes_by_tls(scenario: str) -> dict[str, frozenset[str]]:
     }
 
 
+# Weather the live run can be set to. Rain is part of the run, not just a map
+# overlay: it is applied to the network's vehicle types, so the queue and speed
+# numbers the dashboard publishes move with it.
+WEATHER_EFFECTS: dict[str, dict[str, float | None]] = {
+    # SUMO models rain through driver behaviour: a lower desired speed and a
+    # longer headway between vehicles.
+    "clear": {"speed_factor": 1.0, "tau": None},
+    "rain": {"speed_factor": 0.75, "tau": 1.6},
+}
+
+
 class SimulationSession:
     """One live run at a time, on a background thread, mirroring ``run_episode``'s loop."""
 
@@ -408,6 +419,7 @@ class SimulationSession:
             "simulationTime": 0,
             "clock": "00:00:00",
             "speed": 1,
+            "weather": "clear",
             "method": None,
             "vehicles": [],
             "pedestrians": [],
@@ -431,6 +443,13 @@ class SimulationSession:
         self._time_offset = 0
         self._arrival_log: deque[tuple[int, int]] = deque(maxlen=600)
         self._event_seq = 0
+        # Rain rescales the vehicle types; the base values are captured once so
+        # clearing the rain restores the network's own calibration.
+        self._weather = "clear"
+        self._weather_base: dict[str, tuple[float, float]] = {}
+        # The run thread owns this link; set_weather only reads it to apply a
+        # change mid-run, and never closes it.
+        self._conn: Any | None = None
 
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
@@ -444,9 +463,12 @@ class SimulationSession:
         speed: float = 1,
         method_override: str | None = None,
         checkpoint_override: str | None = None,
+        weather: str = "clear",
     ) -> dict[str, Any]:
         if scenario not in SCENARIOS:
             raise ValueError(f"{scenario} is not a live scenario")
+        if weather not in WEATHER_EFFECTS:
+            raise ValueError(f"unknown weather {weather}")
         active = policy.current()
         method, network = active["method"], SCENARIOS[scenario]
         # Weights chosen by the UI travel through the policy layer, so a run can never
@@ -471,6 +493,10 @@ class SimulationSession:
         stop_event = threading.Event()
         self._run_stop = stop_event
         self._reset_telemetry()
+        # The weather belongs to the run: a restart keeps it, and the run thread
+        # reads it on every decision, so a change applies without a restart.
+        self._weather = weather
+        self._weather_base.clear()
         self.pause_event.clear()
         self._run_seq += 1
         run_id = f"live-{scenario}-{self._run_seq}"
@@ -483,6 +509,7 @@ class SimulationSession:
                     "network": network,
                     "simulationTime": 0,
                     "speed": speed,
+                    "weather": weather,
                     "method": method,
                     "vehicles": [],
                     "pedestrians": [],
@@ -541,6 +568,7 @@ class SimulationSession:
         self._run_stop.set()
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=5)
+        self._conn = None
         self._close_traci()
         with self.lock:
             self.state.update({"status": "idle", "vehicles": [], "pedestrians": [], "signals": []})
@@ -549,6 +577,22 @@ class SimulationSession:
     def set_speed(self, speed: float) -> dict[str, Any]:
         with self.lock:
             self.state["speed"] = max(0.25, min(float(speed), 20))
+        return self.snapshot()
+
+    def set_weather(self, weather: str) -> dict[str, Any]:
+        """Turn rain on or off for the running run.
+
+        The change is published immediately and applied to the vehicle types on
+        the next decision, so the map and the metrics agree.
+        """
+        if weather not in WEATHER_EFFECTS:
+            raise ValueError(f"unknown weather {weather}")
+        self._weather = weather
+        conn = self._conn
+        if conn is not None:
+            self._apply_weather(conn)
+        with self.lock:
+            self.state["weather"] = weather
         return self.snapshot()
 
     def inject_incident(self, message: str | None = None) -> dict[str, Any]:
@@ -948,6 +992,7 @@ class SimulationSession:
                         "pedestrians": len(pedestrians),
                         "arrived": int(conn.simulation.getArrivedNumber()),
                         **self._metrics(env, scenario, vehicles, pedestrians, signals, sim_time, clock),
+                        **self._controller_metrics(),
                     },
                 }
             )
@@ -1020,6 +1065,16 @@ class SimulationSession:
                 "checkpointSource": active.get("checkpointSource"),
             },
         )
+
+    def _controller_metrics(self) -> dict[str, Any]:
+        """Counters of the active controller (LLM calls, tokens, fallbacks, cost)."""
+        controller = getattr(self, "controller", None)
+        if controller is None:
+            return {}
+        try:
+            return dict(controller.metrics())
+        except Exception:  # noqa: BLE001 - telemetry must never stop the run
+            return {}
 
     def _metrics(
         self,
@@ -1202,6 +1257,9 @@ class SimulationSession:
             protocol = config.load_protocol()
             network = SCENARIOS[scenario]
             controller = make_controller(method, checkpoint)
+            # Published with every live frame so the dashboard can show the LLM team's
+            # calls, tokens and fallbacks while the run is still going.
+            self.controller = controller
             # The live map draws one shape per vehicle class, so the run also carries the
             # buses and the emergency vehicles, not just cars and pedestrians.
             net_cfg = config.load("networks", network)
@@ -1247,6 +1305,8 @@ class SimulationSession:
                 protocol=protocol,
             )
             env.run_id = str(self.state.get("runId") or f"live-{scenario}")
+            self._conn = env.conn
+            self._weather_base.clear()
             self._record_controller_event(checkpoint, scenario, network)
             while not stop_event.is_set():
                 obs, _ = env.reset()
@@ -1273,6 +1333,7 @@ class SimulationSession:
                     pass
             # A retired run must not close the connection of the run that replaced it.
             if self._run_stop is stop_event:
+                self._conn = None
                 self._close_traci()
 
     def _drive_cycle(
@@ -1283,6 +1344,7 @@ class SimulationSession:
         while env.agents and not stop_event.is_set():
             self._apply_pending_incidents(env, scenario)
             self._apply_pending_signals(env.conn)
+            self._apply_weather(env.conn)
             if self.pause_event.is_set():
                 with self.lock:
                     queued = self.pending_steps
@@ -1301,6 +1363,40 @@ class SimulationSession:
             # Wall pacing happens per simulated step in _substep, so the map gets
             # small frames spread across the decision instead of one jump.
         return obs
+
+    def _apply_weather(self, conn: Any) -> None:
+        """Bring the loaded network's vehicle types in line with the weather.
+
+        SUMO has no weather switch, so rain is expressed the way SUMO models it
+        for drivers: a lower speed factor and a longer desired headway. The base
+        values are captured the first time a type is seen, which is what lets
+        clearing the rain restore the network's calibration exactly.
+        """
+        effect = WEATHER_EFFECTS[self._weather]
+        try:
+            type_ids = list(conn.vehicletype.getIDList())
+        except Exception:
+            return
+        for type_id in type_ids:
+            base = self._weather_base.get(type_id)
+            if base is None:
+                try:
+                    base = (
+                        conn.vehicletype.getSpeedFactor(type_id),
+                        conn.vehicletype.getTau(type_id),
+                    )
+                except Exception:
+                    continue
+                self._weather_base[type_id] = base
+            try:
+                conn.vehicletype.setSpeedFactor(
+                    type_id, base[0] * float(effect["speed_factor"])
+                )
+                conn.vehicletype.setTau(
+                    type_id, base[1] if effect["tau"] is None else float(effect["tau"])
+                )
+            except Exception:
+                continue
 
     def _advance(self, env: CoTrafficEnv, controller, obs):
         started = time.perf_counter()
