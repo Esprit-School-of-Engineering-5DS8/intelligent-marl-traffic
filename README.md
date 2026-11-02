@@ -97,9 +97,10 @@ python scripts/export_dashboard_data.py              # refresh served result fil
 
 Captured from `npm run dev` with the API on `:8000`. The live map and the dashboard's
 street panel are drawn with a public Mapbox `pk.` token read from the browser's
-`localStorage`, so no token is committed with the screenshots. The live-map and dashboard
-shots come from a running `grid-2x2` simulation (`POST /api/simulation/start`, 4x speed)
-with vehicles and pedestrians on the network. The registry row is a real `generalist`
+`localStorage`, so no token is committed with the screenshots. The live-map shot was taken during a running `grid-2x2` simulation
+(`POST /api/simulation/start`, 4x speed) with vehicles and pedestrians on the network;
+the dashboard shows the same basemap while its live panels are still waiting for the
+run's feed. The registry row is a real `generalist`
 checkpoint (`sf_mission_3x3`, PPO, seed 1); the 500k-step training run and its
 validation-based checkpoint selection are separate, long-lived steps.
 
