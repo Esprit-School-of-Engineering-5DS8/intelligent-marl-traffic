@@ -61,3 +61,7 @@ out/
 .pytest_cache/
 .ruff_cache/
 frontend/dist/
+
+# Keep the README screenshots: only generated screenshot folders are ignored.
+!docs/screenshots/
+!docs/screenshots/*.png
