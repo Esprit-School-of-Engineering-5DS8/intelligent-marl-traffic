@@ -1,0 +1,44 @@
+{
+  "title": "Exploratory paired quick-mode baseline comparison",
+  "experiment_config": "configs/experiments/technical_report_quick.yaml",
+  "command": ".venv\\Scripts\\python.exe -m cotraffic evaluate --experiment technical_report_quick --methods baselines --jobs 1",
+  "git_commit": "91c33eee93b19f9adfbd53287b1218c69bad7528",
+  "python_version": "3.11.9",
+  "sumo_version": "Eclipse SUMO 1.27.1",
+  "network": "grid2x2",
+  "demand": "medium",
+  "methods": [
+    "ft",
+    "act",
+    "mp"
+  ],
+  "scenarios": [
+    "normal",
+    "emergency"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "total_runs": 30,
+  "quick_mode": true,
+  "protocol": {
+    "warmup_s": 300,
+    "measure_s": 600,
+    "cooldown_s": 300,
+    "decision_interval_s": 5
+  },
+  "artifact_note": "One CSV row per completed episode; source run outputs are under results/tmp/quick_raw/ (Git-ignored).",
+  "report_csv": "docs/technical_report_metrics.csv",
+  "summary_csv": "docs/technical_report_results_summary.csv",
+  "interpretation": "Exploratory short-run simulator evidence only. One small network, one demand intensity, five test seeds per scenario; not a full-horizon or real-world effectiveness claim. No significance tests are reported.",
+  "software_validation": {
+    "python_tests": "208 passed; one Starlette/httpx deprecation warning",
+    "frontend_tests": "5 passed (Vitest)",
+    "frontend_build": "passed; dependency annotation and large-bundle warnings",
+    "python_3_10": "not compatible: datetime.UTC import in api/jobs.py fails on Python 3.10.11"
+  }
+}

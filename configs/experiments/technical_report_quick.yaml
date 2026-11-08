@@ -1,0 +1,13 @@
+name: technical_report_quick
+description: >-
+  Reproducible short exploratory comparison of fixed-time, actuated, and
+  Max-Pressure on grid2x2. Five paired evaluation seeds per scenario; quick
+  episodes are for report evidence and software validation, not final full-horizon
+  efficacy claims.
+quick: true
+seeds: [0, 1, 2, 3, 4]
+cells:
+  - network: grid2x2
+    methods: [ft, act, mp]
+    demands: [medium]
+    scenarios: [normal, emergency]
