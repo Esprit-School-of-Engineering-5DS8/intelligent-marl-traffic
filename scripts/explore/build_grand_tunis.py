@@ -1,8 +1,10 @@
 import json
 import subprocess
 from pathlib import Path
+
 import osmium
 from shapely.geometry import shape
+
 
 class GrandTunisFilter(osmium.SimpleHandler):
     """

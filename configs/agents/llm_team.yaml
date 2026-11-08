@@ -4,7 +4,7 @@ description: >-
   Roles propose typed directives; code validates, arbitrates and applies them.
   The environment shield remains the final safety layer.
 
-# Provider is a setting, not a dependency: groq | gemini | opencode.
+# Provider is a setting, not a dependency: groq | gemini | opencode | openrouter.
 # The backend decides whether calls are real: provider | mock | replay.
 provider: groq
 backend: provider

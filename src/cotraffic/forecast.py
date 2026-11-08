@@ -10,7 +10,8 @@ to physical bounds; nothing here invents demand.
 from __future__ import annotations
 
 import math
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 DEFAULT_ALPHA = 0.35
 DEFAULT_HORIZON_MIN = 15

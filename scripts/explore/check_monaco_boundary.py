@@ -1,6 +1,6 @@
-import urllib.request
 import json
 import urllib.parse
+import urllib.request
 
 query = """[out:json][timeout:30];
 relation["boundary"="administrative"]["admin_level"="2"]["name"="Monaco"];

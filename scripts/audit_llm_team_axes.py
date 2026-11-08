@@ -30,7 +30,7 @@ def _vehicle_lane(net, lane_id: str) -> bool:
         return False
     try:
         return bool(lane.allows("passenger"))
-    except Exception:  # noqa: BLE001 - permissions are optional in old nets
+    except Exception:
         return True
 
 

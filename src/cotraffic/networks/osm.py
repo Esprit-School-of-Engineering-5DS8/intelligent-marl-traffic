@@ -218,7 +218,7 @@ def _build_corridor(
         cmd += ["--sidewalks.guess", "true", "--crossings.guess", "true"]
     run(cmd)
 
-    import sumolib  # noqa: PLC0415
+    import sumolib
 
     net = sumolib.net.readNet(str(net_file))
     signals = len([n for n in net.getNodes() if n.getType() == "traffic_light"])

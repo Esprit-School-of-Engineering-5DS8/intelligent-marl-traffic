@@ -84,6 +84,9 @@ class ScenarioRequest(BaseModel):
     seed: int = Field(ge=0, le=999)
     left: str
     right: str
+    # A replay is about the scenario, not about waiting on a provider: recordings use the
+    # mock LLM backend unless the caller explicitly asks for real (slow) calls.
+    llm: Literal["mock", "provider"] = "mock"
 
     @field_validator("network")
     @classmethod
@@ -133,6 +136,14 @@ def create_run(req: ScenarioRequest) -> dict[str, Any]:
                 422, f"these weights were trained for {trained_on}, not {req.network}"
             )
     return runs.submit(req.model_dump())
+
+
+@router.post("/api/runs/{run_id}/cancel")
+def cancel_run(run_id: str) -> dict[str, Any]:
+    run = runs.cancel(run_id)
+    if run is None:
+        raise HTTPException(404, f"no run {run_id}")
+    return run
 
 
 @router.websocket("/ws/status")

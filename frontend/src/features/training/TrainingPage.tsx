@@ -58,6 +58,8 @@ interface ArchetypeCard {
   highlights: string[];
 }
 
+import { openBenchmark } from "@/shared/benchmark-intent";
+
 const ARCHETYPES: ArchetypeCard[] = [
   {
     id: "rl",
@@ -135,13 +137,43 @@ const GROQ_MODELS = [
   { value: "openai/gpt-oss-20b", label: "openai/gpt-oss-20b (Default)" },
 ];
 
-const BASE_POLICIES = [
-  { value: "sf_mission_2x2", label: "sf_mission_2x2_ppo_checkpoint_100k.pt" },
-  { value: "sf_mission_3x3", label: "sf_mission_3x3_ppo_checkpoint_100k.pt" },
-  { value: "monaco", label: "monaco_ppo_checkpoint_100k.pt" },
-  { value: "tunis", label: "tunis_ppo_checkpoint_100k.pt" },
-  { value: "train_fresh", label: "Train fresh alongside supervisor" },
+// One key for every hosted open model; Gemma 4 is the controller default (api/routes/llm.py).
+const OPENROUTER_MODELS = [
+  { value: "google/gemma-4-26b-a4b-it:free", label: "google/gemma-4-26b-a4b-it:free (Gemma 4 · default)" },
+  { value: "google/gemma-4-31b-it:free", label: "google/gemma-4-31b-it:free (Gemma 4 large)" },
+  { value: "google/gemma-4-26b-a4b-it", label: "google/gemma-4-26b-a4b-it (paid)" },
+  { value: "google/gemma-4-31b-it", label: "google/gemma-4-31b-it (paid)" },
+  { value: "google/gemma-3-27b-it", label: "google/gemma-3-27b-it" },
+  { value: "meta-llama/llama-3.3-70b-instruct", label: "meta-llama/llama-3.3-70b-instruct" },
+  { value: "qwen/qwen3-32b", label: "qwen/qwen3-32b" },
 ];
+
+type LlmProvider = "gemini" | "groq" | "openrouter";
+
+/** The providers `GET /api/llm/providers` offers, and the env key each one needs. */
+const PROVIDER_LABELS: Record<LlmProvider, string> = {
+  gemini: "Gemini",
+  groq: "Groq",
+  openrouter: "OpenRouter",
+};
+
+const PROVIDER_KEYS: Record<LlmProvider, string> = {
+  gemini: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+};
+
+const PROVIDER_MODELS: Record<LlmProvider, { value: string; label: string }[]> = {
+  gemini: GEMINI_MODELS,
+  groq: GROQ_MODELS,
+  openrouter: OPENROUTER_MODELS,
+};
+
+const PROVIDER_DEFAULT_MODELS: Record<LlmProvider, string> = {
+  gemini: "gemini-2.5-flash",
+  groq: "qwen/qwen3.8-27b",
+  openrouter: "google/gemma-4-26b-a4b-it:free",
+};
 
 export default function TrainingPage() {
   const [selected, setSelected] = useState<TrainingArchetype | null>("hybrid");
@@ -164,9 +196,16 @@ export default function TrainingPage() {
 
   const groqProvider = providersData?.providers.find((p) => p.id === "groq");
   const geminiProvider = providersData?.providers.find((p) => p.id === "gemini");
+  const openrouterProvider = providersData?.providers.find((p) => p.id === "openrouter");
 
   const groqReady = Boolean(groqProvider?.available);
   const geminiReady = Boolean(geminiProvider?.available);
+  const openrouterReady = Boolean(openrouterProvider?.available);
+  const providerReady: Record<LlmProvider, boolean> = {
+    gemini: geminiReady,
+    groq: groqReady,
+    openrouter: openrouterReady,
+  };
 
   // Active training job indicator
   const activeJob = jobs.data?.find((j) => j.kind === "train" && isActiveJob(j));
@@ -198,16 +237,16 @@ export default function TrainingPage() {
   const [hybridCoupling, setHybridCoupling] = useState<"supervisory" | "gating" | "greenwave">(
     "supervisory"
   );
-  const [hybridLlmProvider, setHybridLlmProvider] = useState<"gemini" | "groq">("gemini");
+  const [hybridLlmProvider, setHybridLlmProvider] = useState<LlmProvider>("gemini");
   const [hybridLlmModel, setHybridLlmModel] = useState("gemini-2.5-flash");
   const [hybridUpdateInterval, setHybridUpdateInterval] = useState(30);
-  const [hybridBasePolicy, setHybridBasePolicy] = useState("pretrained_best");
+  const [hybridBasePolicy, setHybridBasePolicy] = useState("train_fresh");
   const [hybridFallback, setHybridFallback] = useState(true);
   const [hybridCoT, setHybridCoT] = useState(true);
   const [hybridIncidentOverride, setHybridIncidentOverride] = useState(true);
 
   // --- Option 3: Full LLM State ---
-  const [llmProviderChoice, setLlmProviderChoice] = useState<"gemini" | "groq">("gemini");
+  const [llmProviderChoice, setLlmProviderChoice] = useState<LlmProvider>("gemini");
   const [llmModel, setLlmModel] = useState("gemini-2.5-flash");
   const [llmTemperature, setLlmTemperature] = useState(0.1);
   const [llmDecisionCycle, setLlmDecisionCycle] = useState(10);
@@ -220,20 +259,38 @@ export default function TrainingPage() {
 
   // Sync default models when provider changes
   useEffect(() => {
-    if (hybridLlmProvider === "gemini") {
-      setHybridLlmModel("gemini-2.5-flash");
-    } else {
-      setHybridLlmModel("qwen/qwen3.8-27b");
-    }
+    setHybridLlmModel(PROVIDER_DEFAULT_MODELS[hybridLlmProvider]);
   }, [hybridLlmProvider]);
 
   useEffect(() => {
-    if (llmProviderChoice === "gemini") {
-      setLlmModel("gemini-2.5-flash");
-    } else {
-      setLlmModel("qwen/qwen3.8-27b");
-    }
+    setLlmModel(PROVIDER_DEFAULT_MODELS[llmProviderChoice]);
   }, [llmProviderChoice]);
+
+  // Real checkpoints for the selected network, instead of a hardcoded file-name list.
+  const { data: modelCatalog } = useQuery<{
+    models: { id: string; label: string; agent: string; source: string; available: boolean }[];
+  }>({
+    queryKey: ["model-catalog", "train-tab", network],
+    queryFn: async () => {
+      const res = await fetch(`/api/models/catalog?network=${encodeURIComponent(network)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  // Which arms can actually run here: RL only where the network has a generalist policy.
+  const { data: networkPolicy } = useQuery<{
+    catalogByNetwork?: Record<string, { method: string; available: boolean }[]>;
+  }>({
+    queryKey: ["policy", "train-tab", network],
+    queryFn: async () => {
+      const res = await fetch("/api/policy");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
 
   // Toggle seed selection
   const toggleSeed = (seed: number) => {
@@ -261,7 +318,21 @@ export default function TrainingPage() {
     });
   };
 
-  const handleLlmCompare = () => {
+  // The provider choice is a dashboard setting, so persist it before the job that uses it.
+  const saveProvider = async (provider: LlmProvider, model: string) => {
+    try {
+      await fetch("/api/llm/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, model }),
+      });
+    } catch {
+      // The job still runs on whatever provider is already configured.
+    }
+  };
+
+  const handleLlmCompare = async () => {
+    await saveProvider(llmProviderChoice, llmModel);
     // llm = single-call baseline, llm_team = Operator/Emergency/Pedestrian team. Both are
     // runtime controllers, so a paired quick compare is the honest run - not training.
     startCompare.mutate({
@@ -284,6 +355,28 @@ export default function TrainingPage() {
     });
   };
 
+  // Hybrid is a runtime controller as well (LLM supervisor over the local policy), so its
+  // launch records a paired evaluation of the two arms instead of training anything.
+  const handleHybridEvaluate = async () => {
+    await saveProvider(hybridLlmProvider, hybridLlmModel);
+    startCompare.mutate({
+      network,
+      scenario: "normal",
+      demand: demandLevels.includes("medium") ? "medium" : demandLevels[0],
+      seeds: selectedSeeds,
+      methods: hybridMethods,
+      quick: true,
+      llm_settings: {
+        persona: llmPersona,
+        system_prompt: llmSystemPrompt,
+        temperature: llmTemperature,
+        cadence_s: hybridUpdateInterval,
+        safety_guardrails: hybridFallback,
+        explainability: hybridCoT,
+      },
+    });
+  };
+
   // Network list from catalog fallback
   const networkOptions =
     catalog.data?.networks && catalog.data.networks.length > 0
@@ -294,11 +387,17 @@ export default function TrainingPage() {
         ];
 
   // Validation: Check if the required API key for the chosen LLM is ready
-  const isHybridKeyReady = hybridLlmProvider === "gemini" ? geminiReady : groqReady;
+  const isHybridKeyReady = providerReady[hybridLlmProvider];
+  // RL can only be the sparring partner where this network has a trained generalist.
+  const rlAvailable = Boolean(
+    (networkPolicy?.catalogByNetwork?.[network] ?? []).some(
+      (entry) => entry.method === "generalist" && entry.available
+    )
+  );
+  const hybridMethods: string[] = rlAvailable ? ["llm_team", "generalist"] : ["llm_team", "llm"];
   // Mock and replay backends need no key, so requiring one would block a free run.
   const isFullLlmKeyReady =
-    Boolean(providersData?.keyless) ||
-    (llmProviderChoice === "gemini" ? geminiReady : groqReady);
+    Boolean(providersData?.keyless) || providerReady[llmProviderChoice];
 
   const handleLaunch = () => {
     // Only the RL card trains a policy: "hybrid" has no recipe file and "llm" is a runtime
@@ -338,6 +437,18 @@ export default function TrainingPage() {
           <p className="text-xs sm:text-sm text-text-2">
             Configure reinforcement learning workloads, hybrid supervisors, or direct LLM signal control.
           </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => openBenchmark({ tab: "models", network })}
+              className="text-xs font-semibold text-accent hover:underline"
+            >
+              Finished training run? Register the checkpoint →
+            </button>
+            <span className="text-xs text-muted">
+              then benchmark it against the other policies in Compare.
+            </span>
+          </div>
         </div>
 
         {/* Global Network & Demand Toolbar */}
@@ -1035,7 +1146,7 @@ export default function TrainingPage() {
                       </div>
 
                       {/* Provider Selector Tabs */}
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           type="button"
                           onClick={() => setHybridLlmProvider("gemini")}
@@ -1091,17 +1202,49 @@ export default function TrainingPage() {
                           </div>
                           <span className="text-[10px] text-muted mt-0.5 pl-6">LPU High-Speed Inference</span>
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setHybridLlmProvider("openrouter")}
+                          className={`p-2.5 rounded-lg border text-left transition-all flex flex-col ${
+                            hybridLlmProvider === "openrouter"
+                              ? "border-accent bg-accent/10"
+                              : "border-border bg-surface hover:border-border-2"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="radio-mark"
+                                data-checked={hybridLlmProvider === "openrouter"}
+                                aria-hidden="true"
+                              />
+                              <span className="text-xs font-bold text-text">OpenRouter</span>
+                            </div>
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                openrouterReady ? "bg-accent" : "bg-jam"
+                              }`}
+                              title={
+                                openrouterReady
+                                  ? "OPENROUTER_API_KEY Configured"
+                                  : "OPENROUTER_API_KEY Not Found"
+                              }
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted mt-0.5 pl-6">Gemma 4 &amp; open models</span>
+                        </button>
                       </div>
 
                       {/* Model Selector based on provider */}
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-muted">
-                          {hybridLlmProvider === "gemini" ? "Gemini Model:" : "Groq Model:"}
+                          {PROVIDER_LABELS[hybridLlmProvider]} Model:
                         </span>
                         <SelectControl
                           ariaLabel="Supervisor model"
                           value={hybridLlmModel}
-                          options={hybridLlmProvider === "gemini" ? GEMINI_MODELS : GROQ_MODELS}
+                          options={PROVIDER_MODELS[hybridLlmProvider]}
                           onChange={setHybridLlmModel}
                           className="text-xs font-mono"
                         />
@@ -1113,7 +1256,7 @@ export default function TrainingPage() {
                           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                           <div className="leading-snug">
                             <span className="font-semibold block">
-                              {hybridLlmProvider === "gemini" ? "GEMINI_API_KEY" : "GROQ_API_KEY"} is not configured
+                              {PROVIDER_KEYS[hybridLlmProvider]} is not configured
                             </span>
                             Add it to your <code className="font-mono text-[11px]">.env</code> file or Settings to enable live inference.
                           </div>
@@ -1125,7 +1268,15 @@ export default function TrainingPage() {
                         <SelectControl
                           ariaLabel="Base micro-RL policy checkpoint"
                           value={hybridBasePolicy}
-                          options={BASE_POLICIES}
+                          options={[
+                            { value: "train_fresh", label: "Train fresh alongside supervisor" },
+                            ...(modelCatalog?.models ?? [])
+                              .filter((model) => model.available)
+                              .map((model) => ({
+                                value: model.id,
+                                label: `${model.label} · ${model.agent} · ${model.source}`,
+                              })),
+                          ]}
                           onChange={setHybridBasePolicy}
                           className="text-xs font-mono"
                         />
@@ -1158,17 +1309,19 @@ export default function TrainingPage() {
                     {/* Launch Action */}
                     <button
                       type="button"
-                      onClick={handleLaunch}
-                      disabled
+                      onClick={handleHybridEvaluate}
+                      disabled={!isHybridKeyReady || startCompare.isPending || !!activeCompare}
                       className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                     >
                       <Play className="w-4 h-4 fill-current" />
                       <span>
-                        {activeJob
-                          ? "Job in Progress..."
+                        {activeCompare
+                          ? "Evaluation Running..."
                           : !isHybridKeyReady
                           ? "API Key Required to Launch"
-                          : "Hybrid orchestration is not implemented yet"}
+                          : rlAvailable
+                          ? "Evaluate Hybrid vs trained RL"
+                          : "Evaluate Hybrid vs LLM"}
                       </span>
                     </button>
                   </div>
@@ -1326,17 +1479,19 @@ export default function TrainingPage() {
 
                     <button
                       type="button"
-                      onClick={handleLaunch}
-                      disabled
+                      onClick={handleHybridEvaluate}
+                      disabled={!isHybridKeyReady || startCompare.isPending || !!activeCompare}
                       className="w-full py-3 px-4 rounded-xl bg-accent text-accent-ink font-semibold flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.99] transition-all shadow-md disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                     >
                       <Play className="w-4 h-4 fill-current" />
                       <span>
-                        {activeJob
-                          ? "Job in Progress..."
+                        {activeCompare
+                          ? "Evaluation Running..."
                           : !isHybridKeyReady
                           ? "API Key Required to Launch"
-                          : "Hybrid orchestration is not implemented yet"}
+                          : rlAvailable
+                          ? "Evaluate Hybrid vs trained RL"
+                          : "Evaluate Hybrid vs LLM"}
                       </span>
                     </button>
                   </div>
@@ -1470,7 +1625,7 @@ export default function TrainingPage() {
                   </div>
 
                   {/* Provider Selection Tabs */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setLlmProviderChoice("gemini")}
@@ -1526,6 +1681,38 @@ export default function TrainingPage() {
                       </div>
                       <span className="text-[10px] text-muted mt-0.5 pl-6">High-Speed LPU Engine</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setLlmProviderChoice("openrouter")}
+                      className={`p-2.5 rounded-lg border text-left transition-all flex flex-col ${
+                        llmProviderChoice === "openrouter"
+                          ? "border-accent bg-accent/10"
+                          : "border-border bg-surface hover:border-border-2"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="radio-mark"
+                            data-checked={llmProviderChoice === "openrouter"}
+                            aria-hidden="true"
+                          />
+                          <span className="text-xs font-bold text-text">OpenRouter</span>
+                        </div>
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            openrouterReady ? "bg-accent" : "bg-jam"
+                          }`}
+                          title={
+                            openrouterReady
+                              ? "OPENROUTER_API_KEY Configured"
+                              : "OPENROUTER_API_KEY Missing"
+                          }
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted mt-0.5 pl-6">Gemma 4 &amp; open models</span>
+                    </button>
                   </div>
 
                   <p className="text-[10px] text-muted leading-snug">
@@ -1538,12 +1725,12 @@ export default function TrainingPage() {
                   {/* Model Picker */}
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-muted">
-                      {llmProviderChoice === "gemini" ? "Gemini Model:" : "Groq Model:"}
+                      {PROVIDER_LABELS[llmProviderChoice]} Model:
                     </span>
                     <SelectControl
                       ariaLabel="Reasoning model"
                       value={llmModel}
-                      options={llmProviderChoice === "gemini" ? GEMINI_MODELS : GROQ_MODELS}
+                      options={PROVIDER_MODELS[llmProviderChoice]}
                       onChange={setLlmModel}
                       className="text-xs font-mono"
                     />
@@ -1555,7 +1742,7 @@ export default function TrainingPage() {
                       <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                       <div className="leading-snug">
                         <span className="font-semibold block">
-                          {llmProviderChoice === "gemini" ? "GEMINI_API_KEY" : "GROQ_API_KEY"} is not configured
+                          {PROVIDER_KEYS[llmProviderChoice]} is not configured
                         </span>
                         Add the key to your backend environment or Settings to execute live inferences.
                       </div>

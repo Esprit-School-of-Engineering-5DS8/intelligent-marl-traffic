@@ -5,6 +5,8 @@ import { mountBenchmarkView, setBenchmarkTab } from './benchmark-mount.jsx';
 import { mountGauges } from './gauge.js';
 import { initModes, refreshLiveGauges } from './modes/index.js';
 import { setLiveState } from './modes/live.js';
+import { initIncidentResponse, renderIncidentResponse } from './incident-response.js';
+import { initSignalComms, renderSignalComms, setSignalCommsVisible, signalCommsVisible } from './signal-comms.js';
 
 const $ = (id) => document.getElementById(id);
 // Declared up here because applyScenarioChrome() runs during module evaluation and
@@ -400,7 +402,9 @@ async function retargetSimulation(name) {
   simulationFetch('/api/simulation/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scenario: name, speed: simulationSpeed })
+    // The weather belongs to the session, so moving to another network while it
+    // rains must not quietly dry the road: the new run inherits the condition.
+    body: JSON.stringify({ scenario: name, speed: simulationSpeed, weather: live.weather || 'clear', demand_level: live.demandLevel || demandLevel })
   })
     .then(async (response) => {
       const state = await response.json().catch(() => null);
@@ -715,7 +719,9 @@ const ROUTE_BASES = {
   Settings: '/settings',
   'Activity log': '/activity-log',
 };
-const BENCHMARK_TABS = ['training', 'models', 'runs', 'compare', 'simulation'];
+// The three benchmark pages, one per sidebar sub-item. No aliases: every tab has a
+// visible nav entry and a single handler (see #benchmarkSubnav below).
+const BENCHMARK_TABS = ['training', 'models', 'compare'];
 const LIVE_TABS = ['events', 'optimize', 'predict', 'roam'];
 const ACCESS_TABS = ['roles', 'permissions'];
 const SETTINGS_TABS = ['general', 'notifications', 'workspace', 'integrations', 'members', 'security', 'billing'];
@@ -743,7 +749,7 @@ function setRoute(view, subtab, { replace = false } = {}) {
 function routeFromLocation() {
   const parts = window.location.pathname.split('/').filter(Boolean);
   const [section, subtab] = parts;
-  if (section === 'benchmark') return { view: 'Benchmark', subtab: BENCHMARK_TABS.includes(subtab) ? subtab : 'runs' };
+  if (section === 'benchmark') return { view: 'Benchmark', subtab: BENCHMARK_TABS.includes(subtab) ? subtab : 'models' };
   if (section === 'live-map') return { view: 'Live Map', subtab: LIVE_TABS.includes(subtab) ? subtab : 'events' };
   if (section === 'access') return { view: 'Roles & Permissions', subtab: ACCESS_TABS.includes(subtab) ? subtab : 'roles' };
   if (section === 'messages') return { view: 'Message', subtab: null };
@@ -790,7 +796,7 @@ function navigateTo(view, subtab, { replace = false } = {}) {
     return;
   }
   if (view === 'Benchmark') {
-    benchmarkTab = BENCHMARK_TABS.includes(subtab) ? subtab : 'runs';
+    benchmarkTab = BENCHMARK_TABS.includes(subtab) ? subtab : 'models';
     setRoute(view, benchmarkTab, { replace });
     setActiveNav(view);
     setActiveViewTab('Dashboard');
@@ -902,7 +908,7 @@ function startLiveMapSimulationPolling() {
           await simulationFetch('/api/simulation/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ scenario, speed: simulationSpeed || 1 })
+            body: JSON.stringify({ scenario, speed: simulationSpeed || 1, weather: state.weather || 'clear', demand_level: state.demandLevel || demandLevel })
           });
         } else if (state) {
           updateSimulationState(state);
@@ -971,14 +977,10 @@ function showView(name) {
   }, 60);
 }
 
-document.querySelectorAll('[data-benchmark-tab]').forEach((tab) => tab.addEventListener('click', () => {
-  document.querySelectorAll('[data-benchmark-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
-  benchmarkTab = tab.dataset.benchmarkTab || 'runs';
-  setBenchmarkTab(benchmarkTab);
-}));
-
 window.addEventListener('benchmark:navigate', (event) => {
-  const tab = event.detail;
+  // The destination may be a bare tab name or an intent ({ tab, model, network }).
+  const detail = event.detail;
+  const tab = typeof detail === 'string' ? detail : detail && detail.tab;
   if (!BENCHMARK_TABS.includes(tab)) return;
   navigateTo('Benchmark', tab);
 });
@@ -1237,7 +1239,7 @@ benchmarkNavParent?.addEventListener('click', () => {
 });
 
 document.querySelectorAll('#benchmarkSubnav [data-benchmark-tab]').forEach((link) => {
-  link.addEventListener('click', () => navigateTo('Benchmark', link.dataset.benchmarkTab || 'runs'));
+  link.addEventListener('click', () => navigateTo('Benchmark', link.dataset.benchmarkTab || 'models'));
 });
 
 document.addEventListener('sumo:open-training', () => {
@@ -1294,6 +1296,22 @@ $('tokenSave')?.addEventListener('click', () => {
 $('tokenSkip')?.addEventListener('click', () => {
   hideTokenPanel();
   setOffline(true);
+});
+
+/* The live map's own "add a token" fallback. It has to be bound here, at module
+   scope: initLiveMap() returns early when no token is stored, so binding it in
+   there left the panel's Save button dead exactly when it was the only way in. */
+$('liveMapTokenSave')?.addEventListener('click', () => {
+  const input = $('liveMapTokenInput');
+  const value = input?.value.trim();
+  if (!value) {
+    input?.focus();
+    return;
+  }
+  localStorage.setItem(TOKEN_KEY, value);
+  hideLiveMapFallback();
+  if (liveMap) { liveMap.remove(); liveMap = null; }
+  ensureLiveMap();
 });
 
 const token = resolveToken();
@@ -1641,6 +1659,52 @@ function create3DVehicleMesh(vehicleClass, colorHex) {
   return container;
 }
 
+/* A crashed car twitches instead of sitting still: a stopped body on a live map is
+   indistinguishable from a car at a red light, so the pose jitters and the body rocks
+   a few degrees off its frozen heading. The motion is driven by wall time (not the
+   simulation clock) so it keeps moving while the run is paused, which is exactly when
+   an operator is looking at it. */
+const CRASH_TWITCH_MS = 90;
+
+function crashTwitch(now) {
+  const phase = now / CRASH_TWITCH_MS;
+  // Two incommensurate sines: the body never repeats a pattern the eye can lock onto,
+  // which is what makes it read as a damaged car rather than a looping animation.
+  return {
+    jitter: Math.sin(phase) * 0.55 + Math.sin(phase * 2.7) * 0.28,
+    rock: Math.sin(phase * 0.63) * 7.5 + Math.sin(phase * 1.9) * 2.4,
+    bounce: Math.abs(Math.sin(phase * 1.35)) * 0.35
+  };
+}
+
+let crashHaloMaterial = null;
+function crashHalo() {
+  if (!crashHaloMaterial) {
+    crashHaloMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff5a4e,
+      transparent: true,
+      opacity: 0.34,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+  }
+  return crashHaloMaterial;
+}
+
+let dispatchBeaconMaterial = null;
+function dispatchBeacon() {
+  if (!dispatchBeaconMaterial) {
+    dispatchBeaconMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd23f,
+      transparent: true,
+      opacity: 0.16,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+  }
+  return dispatchBeaconMaterial;
+}
+
 const customThreeVehicleLayer = {
   id: 'three-3d-vehicles',
   type: 'custom',
@@ -1667,6 +1731,7 @@ const customThreeVehicleLayer = {
   },
   render: function (gl, matrix) {
     if (!threeRenderer || !threeScene || !threeCamera || !liveMap) return;
+    const frameNow = performance.now();
 
     // Synchronize vehicle meshes with vehicleInstances
     if (threeVehicleGroup) {
@@ -1679,6 +1744,7 @@ const customThreeVehicleLayer = {
       for (const vehicle of vehicleInstances.values()) {
         if (!vehicle.position || !vehicleClassVisibility.get(vehicle.renderClass)) continue;
 
+        const twitch = vehicle.incident ? crashTwitch(frameNow) : null;
         const coords = vehicleBodyCenter(
           vehicle.position,
           vehicle.angle,
@@ -1701,7 +1767,45 @@ const customThreeVehicleLayer = {
         const rad = -(Number(vehicle.angle || 0)) * Math.PI / 180;
         vMesh.rotation.z = rad;
 
+        if (twitch) {
+          // Nudge the body off its pinned pose. The offset is in metres, so it stays
+          // proportional at every zoom instead of shrinking into nothing.
+          vMesh.position.x += twitch.jitter * meterScale * 0.9;
+          vMesh.position.y += twitch.bounce * meterScale * 0.6;
+          vMesh.rotation.z += (twitch.rock * Math.PI) / 180;
+        }
+
         threeVehicleGroup.add(vMesh);
+
+        if (vehicle.incident) {
+          const halo = new THREE.Mesh(
+            new THREE.RingGeometry(2.6, 4.2, 28),
+            crashHalo()
+          );
+          halo.position.set(
+            modelAsMercator.x,
+            modelAsMercator.y,
+            modelAsMercator.z + meterScale * 0.35
+          );
+          halo.scale.setScalar(meterScale);
+          threeVehicleGroup.add(halo);
+        }
+
+        if (vehicle.dispatch) {
+          // The inbound ambulance carries a beacon so it can be picked out of traffic
+          // while it is still a few blocks away from the scene.
+          const beacon = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.9, 0.9, 26, 10, 1, true),
+            dispatchBeacon()
+          );
+          beacon.position.set(
+            modelAsMercator.x,
+            modelAsMercator.y,
+            modelAsMercator.z + meterScale * 13
+          );
+          beacon.scale.setScalar(meterScale);
+          threeVehicleGroup.add(beacon);
+        }
 
         if (vehicle.selected) {
           const ring = new THREE.Mesh(
@@ -1793,9 +1897,14 @@ function refreshSimulationVehicles(state) {
     resetVehicleHeadings();
   }
   vehicleInstances.clear();
-  // The crash is whichever vehicle the operator's incident stopped.
+  // The crash is whichever vehicle the operator's incident stopped, and the
+  // dispatched ambulance is the one the session sent to it. Both are marked here so
+  // the 3D layer can animate them without re-reading the incident on every frame.
   const incidentVehicleId = state.incident?.active
     ? String(state.incident.vehicleId || '')
+    : '';
+  const incidentAmbulanceId = state.incident?.active
+    ? String(state.incident.ambulance || '')
     : '';
   const timestamp = Number(state.simulationTime || 0);
   const headingNow = performance.now();
@@ -1816,6 +1925,7 @@ function refreshSimulationVehicles(state) {
     const data = {
       id, vehicleClass: renderClass, classLabel: style.label, speed: Number(object.speed || 0),
       waiting, emergency: renderClass === 'emergency', incident: id === incidentVehicleId,
+      dispatch: id === incidentAmbulanceId,
       color: waiting ? '#d45c52' : style.color,
       height: style.height * VEHICLE_DRAW_SCALE, simulationTime: timestamp,
       pedestrian: pedestrian || renderClass === 'pedestrian',
@@ -2099,10 +2209,22 @@ function updateSimulationState(state) {
   loadRunHistory(state.runId);
   refreshLiveGauges();
   renderLiveOps(state);
+  renderIncidentResponse(state);
+  renderSignalComms(state);
   syncRunControls(state);
   // The rain overlay follows the run's weather, so a restart or another client
   // turning rain on is reflected here without a local toggle.
   applyLiveWeatherEffects(state.weather);
+  // The demand dial follows the run's level too, so a restart or another operator
+  // changing it is reflected here without a local toggle.
+  if (state.demandLevel && state.demandLevel !== demandLevel) {
+    demandLevel = state.demandLevel;
+    const preset = DEMAND_PRESETS.find((entry) => entry.level === demandLevel);
+    if (preset) demandFraction = preset.fraction;
+    syncDemandControl();
+  } else if (state.demandLevel) {
+    syncDemandControl();
+  }
   // A chart-bar scrub holds the timeline for a few seconds; otherwise the 4 Hz
   // stream would snap the playhead back to the live time immediately.
   const followingLive = performance.now() >= simulationScrubUntil;
@@ -2177,7 +2299,7 @@ document.getElementById('simulationStart')?.addEventListener('click', async () =
   connectSimulationSocket();
   const scenario = simulationScenarioId();
   try {
-    const response = await simulationFetch('/api/simulation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed }) });
+    const response = await simulationFetch('/api/simulation/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, speed: simulationSpeed, weather: latestSimulationState?.weather || 'clear', demand_level: latestSimulationState?.demandLevel || demandLevel }) });
     updateSimulationState(await response.json());
   } catch {
     showToast('Simulation service is offline.');
@@ -2930,29 +3052,35 @@ function initLiveMap() {
     }
   });
 
-  $('liveMapTokenSave')?.addEventListener('click', () => {
-    const val = $('liveMapTokenInput')?.value.trim();
-    if (!val) return;
-    localStorage.setItem(TOKEN_KEY, val);
-    hideLiveMapFallback();
-    if (liveMap) { liveMap.remove(); liveMap = null; }
-    ensureLiveMap();
-  });
-
   window.setTimeout(() => liveMap?.resize(), 80);
 }
 
-/* Rain on the live map, from the Mapbox weather effect. The backend applies the
+/* Rain on the live map is Mapbox's own weather effect: the Standard basemap's
+   setRain pass, configured to the reference rain settings. The backend applies the
    same condition to SUMO's vehicle types, so what falls on the map is what the
-   vehicles are actually driving through. The wet-road setting below only shapes
-   the overlay (droplet density, blur, fog vignette); the driving penalty belongs
-   to the run's weather and lives in the backend. */
+   vehicles are actually driving through. The wet-road slider only shapes the
+   droplets; the driving penalty belongs to the run's weather and lives in the
+   backend. */
 const RAIN_INTENSITY_KEY = 'sumo.rainIntensity';
-const RAIN_ZOOM_FADE = { hidden: 13.2, full: 15.6 };
+// Rain ramps in rather than switching on. Between the two zooms it fades from a
+// thin wash to full strength, so pulling the camera back does not drop a solid
+// sheet over the map, and the city-wide view still shows the weather.
+const RAIN_ZOOM_FADE = { hidden: 11, full: 13 };
 
 function readRainIntensity() {
-  const stored = Number(localStorage.getItem(RAIN_INTENSITY_KEY));
-  return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 0.6;
+  // A missing key must mean the default, not 0: Number(null) is 0, which passed the
+  // range check and left every rain effect drawing at zero intensity.
+  let raw = null;
+  try {
+    raw = localStorage.getItem(RAIN_INTENSITY_KEY);
+  } catch {
+    // Storage can be unavailable (private mode); the default still applies.
+  }
+  if (raw === null || raw === '') return 0.6;
+  const stored = Number(raw);
+  // 0 was a valid stored value, which left rain running with nothing drawn: the
+  // overlay's floor is 10%, and a legacy 0 falls back to the default.
+  return Number.isFinite(stored) && stored >= 0.1 && stored <= 1 ? stored : 0.6;
 }
 
 let rainIntensity = readRainIntensity();
@@ -2961,18 +3089,21 @@ const round3 = (value) => Math.round(value * 1000) / 1000;
 /* Below street zoom the overlay thins out instead of covering the map, so the
    road layout stays readable while the camera pulls back. */
 function rainZoomReveal(value) {
-  // City-scale views keep a light drizzle instead of a full-screen sheet; the
-  // overlay only reaches the chosen level once the camera is on the street.
   return [
     'interpolate', ['linear'], ['zoom'],
-    11.8, 0,
-    RAIN_ZOOM_FADE.hidden, round3(value * 0.35),
-    RAIN_ZOOM_FADE.full, value
+    RAIN_ZOOM_FADE.hidden, 0,
+    RAIN_ZOOM_FADE.full, round3(value * 0.35),
+    RAIN_ZOOM_FADE.full + 2, value
   ];
 }
 
 function liveRainConfig() {
   const level = rainIntensity;
+  // Every visual parameter scales with the slider. The previous pass pinned
+  // intensity, vignette and distortion at their maximums and removed the
+  // centre-thinning guard, which produced a full-screen white smear that washed
+  // out the operator panels and the vehicle labels underneath it. Rain has to read
+  // as weather over a readable map, not as a filter on top of one.
   return {
     density: rainZoomReveal(round3(0.5 * level)),
     intensity: round3(0.2 + 0.45 * level),
@@ -2983,7 +3114,8 @@ function liveRainConfig() {
     direction: [0, 80],
     'droplet-size': [2, round3(7 + 5 * level)],
     'distortion-strength': round3(0.25 + 0.3 * level),
-    // Keep the middle of the map clear so labels and vehicles stay readable.
+    // Keep the middle of the map clear so labels, panels and vehicles stay
+    // readable while it rains. This is the guard that makes the effect usable.
     'center-thinning': 0.55
   };
 }
@@ -3006,6 +3138,8 @@ let appliedRainSignature = null;
 
 function applyLiveWeatherEffects(weather) {
   const raining = weather === 'rain';
+  const toggle = document.querySelector('[data-live-weather-toggle]');
+  if (toggle) toggle.setAttribute('aria-pressed', String(raining));
   const button = document.querySelector('[data-live-action="weather"]');
   if (button) {
     button.classList.toggle('is-active', raining);
@@ -3029,12 +3163,49 @@ function applyLiveWeatherEffects(weather) {
   }
 }
 
+/* One weather call for both controls: the toolbar button and the labelled
+   Rain switch in the map-style menu. The run owns the condition, so both send
+   the same request and both read the state the backend publishes. */
+function requestLiveWeather(raining) {
+  simulationFetch('/api/simulation/weather', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weather: raining ? 'rain' : 'clear' })
+  })
+    .then(async (response) => {
+      const state = await response.json().catch(() => null);
+      if (!response.ok) {
+        showToast(state?.detail || `Weather change failed (HTTP ${response.status}).`);
+        return null;
+      }
+      return state;
+    })
+    .then((state) => {
+      if (!state) return;
+      updateSimulationState(state);
+      showToast(state.weather === 'rain'
+        ? 'Rain started — vehicles slow down and keep a longer headway.'
+        : 'Rain cleared — dry-road driving restored.');
+    })
+    .catch(() => showToast('Simulation service is offline.'));
+}
+
+document.querySelectorAll('[data-live-weather-toggle]').forEach((button) => {
+  button.addEventListener('click', () => requestLiveWeather(latestSimulationState?.weather !== 'rain'));
+});
+
 const rainIntensitySlider = $('liveRainIntensity');
 if (rainIntensitySlider) {
   syncRainIntensityControl(latestSimulationState?.weather === 'rain');
+  // The run may already be raining — another operator turned it on, or the page was
+  // reloaded mid-rain. Adopt that weather on load, with or without a Mapbox map.
+  simulationFetch('/api/simulation/state')
+    .then((response) => (response.ok ? response.json() : null))
+    .then((state) => applyLiveWeatherEffects(state?.weather || 'clear'))
+    .catch(() => {});
   rainIntensitySlider.addEventListener('input', () => {
     const level = Number(rainIntensitySlider.value);
-    if (Number.isFinite(level)) rainIntensity = Math.max(0, Math.min(1, level / 100));
+    if (Number.isFinite(level)) rainIntensity = Math.max(0.1, Math.min(1, level / 100));
     applyLiveWeatherEffects(latestSimulationState?.weather || 'clear');
   });
   rainIntensitySlider.addEventListener('change', () => {
@@ -3043,21 +3214,149 @@ if (rainIntensitySlider) {
   });
 }
 
+/* Demand dial. The three presets are the coarse control and the slider is the fine
+   one: both write the same number, and the preset that matches the number is the one
+   shown as selected. The backend multiplies this fraction by the network's own live
+   rate, so "High" is the calibrated live window and the other levels thin it out.
+   The run regenerates its demand every window, so a change lands on the next one
+   instead of restarting the map. */
+const DEMAND_PRESETS = [
+  { level: 'low', label: 'Low', fraction: 0.45 },
+  { level: 'medium', label: 'Medium', fraction: 0.7 },
+  { level: 'high', label: 'High', fraction: 1.0 }
+];
+const DEMAND_MIN = 45;
+const DEMAND_MAX = 100;
+let demandLevel = 'high';
+let demandFraction = 1.0;
+
+function demandPresetFor(fraction) {
+  // A preset matches when the slider sits on its value; anything between presets is
+  // a custom intensity and no preset reads as selected.
+  return DEMAND_PRESETS.find((preset) => Math.abs(preset.fraction - fraction) < 0.001) || null;
+}
+
+function syncDemandControl() {
+  const percent = Math.round(demandFraction * 100);
+  const preset = demandPresetFor(demandFraction);
+  const slider = $('liveDemandSlider');
+  if (slider && slider.value !== String(percent)) slider.value = String(percent);
+  if (slider) slider.setAttribute('aria-valuetext', `${percent}% of the live rate`);
+  const readout = $('liveDemandSliderValue');
+  if (readout) readout.textContent = `${percent}%`;
+  document.querySelectorAll('[data-demand-level]').forEach((button) => {
+    const selected = preset ? button.dataset.demandLevel === preset.level : false;
+    button.setAttribute('aria-checked', String(selected));
+    button.classList.toggle('is-selected', selected);
+  });
+  // The toolbar button carries the level, so the operator can read the current traffic
+  // without opening the popup.
+  const trigger = document.querySelector('[data-live-action="demand"]');
+  if (trigger) {
+    const label = preset ? preset.label : `${percent}%`;
+    trigger.dataset.level = preset ? preset.level : 'custom';
+    trigger.setAttribute('title', `Traffic demand: ${label} (${percent}% of the live rate)`);
+    trigger.setAttribute('aria-label', `Traffic demand: ${label}`);
+  }
+  const note = $('liveDemandNote');
+  if (note) {
+    note.textContent = latestSimulationState?.status === 'running'
+      ? 'Applies to the next traffic window.'
+      : 'Applies when the run starts.';
+  }
+}
+
+function closeDemandMenu() {
+  const picker = document.querySelector('.live-demand-picker');
+  picker?.querySelector('.live-demand-menu')?.setAttribute('hidden', '');
+  picker?.querySelector('[data-live-action="demand"]')?.setAttribute('aria-expanded', 'false');
+}
+
+function requestDemandLevel(level) {
+  simulationFetch('/api/simulation/demand', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ level })
+  })
+    .then(async (response) => {
+      const state = await response.json().catch(() => null);
+      if (!response.ok) {
+        showToast(state?.detail || `Demand change failed (HTTP ${response.status}).`);
+        return null;
+      }
+      return state;
+    })
+    .then((state) => {
+      if (!state) return;
+      updateSimulationState(state);
+      const preset = DEMAND_PRESETS.find((entry) => entry.level === state.demandLevel);
+      showToast(preset
+        ? `Traffic demand set to ${preset.label.toLowerCase()} — the next window arrives at ${Math.round(preset.fraction * 100)}% of the live rate.`
+        : 'Traffic demand updated.');
+    })
+    .catch(() => showToast('Simulation service is offline.'));
+}
+
+document.querySelectorAll('[data-demand-level]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const preset = DEMAND_PRESETS.find((entry) => entry.level === button.dataset.demandLevel);
+    if (!preset) return;
+    demandFraction = preset.fraction;
+    syncDemandControl();
+    closeDemandMenu();
+    requestDemandLevel(preset.level);
+  });
+});
+
+const demandSlider = $('liveDemandSlider');
+if (demandSlider) {
+  syncDemandControl();
+  demandSlider.addEventListener('input', () => {
+    const percent = Number(demandSlider.value);
+    if (!Number.isFinite(percent)) return;
+    demandFraction = Math.max(DEMAND_MIN, Math.min(DEMAND_MAX, percent)) / 100;
+    syncDemandControl();
+  });
+  // Only commit on release: dragging the slider must not fire a request per pixel.
+  demandSlider.addEventListener('change', () => {
+    const preset = demandPresetFor(demandFraction);
+    if (preset) {
+      requestDemandLevel(preset.level);
+      return;
+    }
+    // A custom intensity snaps to the nearest preset the backend understands, and the
+    // slider keeps the exact number so the operator sees what they asked for.
+    const nearest = DEMAND_PRESETS.reduce((best, entry) => (
+      Math.abs(entry.fraction - demandFraction) < Math.abs(best.fraction - demandFraction)
+        ? entry
+        : best
+    ));
+    requestDemandLevel(nearest.level);
+  });
+  // The slider stays open while dragging, so the menu only closes on a preset pick or
+  // an outside click; a release on the slider keeps it visible for a second adjustment.
+}
+
 function applyLiveMapStyle(styleName) {
+  // The picker's data-map-style values are keys of MAP_STYLES; an unknown value
+  // (or a stale menu entry) must not throw and take the whole click handler with it.
   const style = MAP_STYLES[styleName];
   if (!style) return;
   // The operator panels follow the map scene: Day and Dawn are light scenes, so the
   // panels are light; Night and Dusk are dark scenes, so the panels are dark.
   setPanelTheme(styleName === 'light' || styleName === 'dawn');
-  if (!liveMap || styleName === activeMapStyle) return;
+  if (styleName === activeMapStyle && liveMap) return;
   activeMapStyle = styleName;
-  liveMap.setConfigProperty('basemap', 'lightPreset', style.preset);
-  liveMap.setConfigProperty('basemap', 'showPedestrianRoads', false);
+  // The menu is DOM-only state: keep it in sync even when no map is mounted yet, so
+  // the picker never shows a selection that disagrees with activeMapStyle.
   document.querySelectorAll('[data-map-style]').forEach((option) => {
     const selected = option.dataset.mapStyle === styleName;
     option.classList.toggle('is-selected', selected);
     option.setAttribute('aria-checked', String(selected));
   });
+  if (!liveMap) return;
+  liveMap.setConfigProperty('basemap', 'lightPreset', style.preset);
+  liveMap.setConfigProperty('basemap', 'showPedestrianRoads', false);
   showToast(`${style.label} map mode applied.`);
 }
 
@@ -3106,6 +3405,105 @@ initModes({
   getScenario: () => getScenario()
 });
 
+initIncidentResponse({
+  getMap: () => liveMap,
+  onClear: () => runSimulationCommand('clearIncident')
+});
+
+initSignalComms({ getMap: () => liveMap });
+
+/*
+ * Launch SUMO's own GUI.
+ *
+ * The live run is headless (libsumo), and a viewer cannot be attached to a process that
+ * is already stepping — so this restarts the run with `gui: true`, which makes the
+ * session launch `sumo-gui` over TraCI instead. That means the run restarts, and the
+ * button says so before doing it rather than surprising the operator mid-demo.
+ *
+ * The binary is probed first: offering a button that can only fail after discarding the
+ * current run would be worse than not offering it.
+ */
+const sumoGuiButton = document.querySelector('[data-sumo-gui]');
+
+async function refreshSumoGuiState() {
+  if (!sumoGuiButton) return null;
+  try {
+    const response = await simulationFetch('/api/simulation/gui');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const status = await response.json();
+    sumoGuiButton.disabled = !status.available;
+    sumoGuiButton.classList.toggle('is-active', Boolean(status.attached));
+    sumoGuiButton.setAttribute('aria-pressed', String(Boolean(status.attached)));
+    sumoGuiButton.title = status.available
+      ? status.attached
+        ? 'SUMO GUI is attached to this run'
+        : 'Open SUMO GUI — restarts the run in SUMO\'s own viewer'
+      : `SUMO GUI not found: ${status.error || 'sumo-gui is not installed'}`;
+    return status;
+  } catch {
+    // The API being unreachable is not a reason to hide the control; leave it enabled
+    // and let the click report the real problem.
+    return null;
+  }
+}
+
+sumoGuiButton?.addEventListener('click', async () => {
+  const status = await refreshSumoGuiState();
+  if (status && !status.available) {
+    showToast(`SUMO GUI is not installed — ${status.error || 'sumo-gui was not found'}.`);
+    return;
+  }
+  const current = latestSimulationState || {};
+  const running = ['running', 'paused', 'starting'].includes(String(current.status));
+  if (running && !status?.attached) {
+    showToast('Restarting the run with SUMO GUI attached — the current run ends.');
+  }
+  sumoGuiButton.disabled = true;
+  try {
+    const response = await simulationFetch('/api/simulation/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenario: current.scenario || activeScenario || 'grid-2x2',
+        speed: simulationSpeed,
+        weather: current.weather || 'clear',
+        demand_level: current.demandLevel || undefined,
+        gui: true
+      })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+    updateSimulationState(body);
+    showToast('SUMO GUI launched — the run is now stepping in its own window.');
+  } catch (error) {
+    showToast(`SUMO GUI did not start: ${error.message}`);
+  } finally {
+    sumoGuiButton.disabled = false;
+    refreshSumoGuiState();
+  }
+});
+
+refreshSumoGuiState();
+
+// The coordination overlay is opt-in: it is a diagnostic view of the control layer,
+// not something that should sit on the map during ordinary operation.
+document.querySelectorAll('[data-signal-comms]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const on = setSignalCommsVisible(!signalCommsVisible());
+    button.classList.toggle('is-active', on);
+    button.setAttribute('aria-pressed', String(on));
+    renderSignalComms(latestSimulationState);
+    const comms = latestSimulationState?.metrics?.comms;
+    showToast(
+      on
+        ? comms
+          ? `Coordination overlay on — ${comms.pokes} of ${comms.total} links releasing traffic.`
+          : 'Coordination overlay on — waiting for a live run.'
+        : 'Coordination overlay off.'
+    );
+  });
+});
+
 document.querySelectorAll('[data-live-action]').forEach((button) => {
   button.addEventListener('click', () => {
     const action = button.dataset.liveAction;
@@ -3134,6 +3532,14 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
       return;
     }
 
+    if (action === 'demand') {
+      const menu = button.parentElement?.querySelector('.live-demand-menu');
+      const open = menu?.hidden;
+      if (menu) menu.hidden = !open;
+      button.setAttribute('aria-expanded', String(Boolean(open)));
+      return;
+    }
+
     if (action === 'locate') {
       resetLiveMapView();
       showToast(`Recentered on ${getScenario().title}.`);
@@ -3151,28 +3557,7 @@ document.querySelectorAll('[data-live-action]').forEach((button) => {
     }
 
     if (action === 'weather') {
-      const raining = latestSimulationState?.weather === 'rain';
-      simulationFetch('/api/simulation/weather', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weather: raining ? 'clear' : 'rain' })
-      })
-        .then(async (response) => {
-          const state = await response.json().catch(() => null);
-          if (!response.ok) {
-            showToast(state?.detail || `Weather change failed (HTTP ${response.status}).`);
-            return null;
-          }
-          return state;
-        })
-        .then((state) => {
-          if (!state) return;
-          updateSimulationState(state);
-          showToast(state.weather === 'rain'
-            ? 'Rain started — vehicles slow down and keep a longer headway.'
-            : 'Rain cleared — dry-road driving restored.');
-        })
-        .catch(() => showToast('Simulation service is offline.'));
+      requestLiveWeather(latestSimulationState?.weather !== 'rain');
       return;
     }
 
@@ -3199,6 +3584,7 @@ const RUN_COMMAND_TOASTS = {
   step: () => 'Advanced one decision.',
   stop: () => 'Run stopped.',
   incident: () => 'Incident injected into the live run.',
+  clearIncident: () => 'Incident cleared.',
   restart: () => 'Scenario restarted with the active controller.',
   speed: () => `Speed set to ${simulationSpeed}×.`
 };
@@ -3216,6 +3602,8 @@ async function runSimulationCommand(command) {
     path = '/api/simulation/stop';
   } else if (command === 'incident') {
     path = '/api/simulation/incident';
+  } else if (command === 'clearIncident') {
+    path = '/api/simulation/incident/clear';
   } else if (command === 'restart') {
     path = '/api/simulation/start';
     body = {
@@ -3377,6 +3765,12 @@ document.addEventListener('click', (event) => {
     if (!picker.contains(event.target)) {
       picker.querySelector('.live-layer-menu')?.setAttribute('hidden', '');
       picker.querySelector('[data-live-action="layers"]')?.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.querySelectorAll('.live-demand-picker').forEach((picker) => {
+    if (!picker.contains(event.target)) {
+      picker.querySelector('.live-demand-menu')?.setAttribute('hidden', '');
+      picker.querySelector('[data-live-action="demand"]')?.setAttribute('aria-expanded', 'false');
     }
   });
 });
@@ -3678,23 +4072,152 @@ document.querySelectorAll('[data-settings-tab]').forEach((tab) => {
 });
 
 /* ---------------- Control model picker (Settings → Models) ----------------
-   The catalog lists the checkpoints the backend will accept (selected runs, raw
-   training runs, registry versions); choosing one pins it in the active policy so the
-   next run uses exactly those weights instead of whatever seed1.zip happens to be. */
+   One panel owns the whole model choice: which controller runs (baseline, trained
+   weights, LLM or LLM team), which weights it loads, which LLM provider/model the LLM
+   controllers call. Training itself lives in the Train tab, never in Settings.
+   Every write goes through an endpoint the rest of the dashboard already uses
+   (PUT /api/policy, PUT /api/llm/config), so a choice made here is the choice the live
+   run and the benchmarks both see. */
 
 const modelList = document.getElementById('modelList');
 const modelStatus = document.getElementById('modelStatus');
+const modelScenarioList = document.getElementById('modelScenarioList');
 const modelNetwork = document.getElementById('modelNetwork');
+const llmConfigForm = document.getElementById('llmConfigForm');
+const llmProvider = document.getElementById('llmProvider');
+const llmModel = document.getElementById('llmModel');
+const llmStatus = document.getElementById('llmStatus');
+
+const LLM_DEFAULT_MODELS = {
+  openrouter: 'google/gemma-4-26b-a4b-it:free',
+  groq: 'openai/gpt-oss-20b',
+  gemini: 'gemini-2.5-flash',
+  opencode: 'deepseek-v4.1-flash'
+};
+
+const WEIGHTLESS_METHODS = [
+  'ft', 'act', 'mp', 'ev_rule', 'ev_rule_mp', 'ped_rule_mp', 'llm', 'llm_team'
+];
+
+let activePolicy = null;
 
 const escapeModelText = (value) => String(value ?? '').replace(
   /[&<>"']/g,
   (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]),
 );
 
+/* A checkpoint path can arrive with either separator; only the file name is shown. */
+function policyWeights(policy) {
+  if (!policy) return '—';
+  if (!policy.checkpoint) {
+    return WEIGHTLESS_METHODS.includes(policy.method) ? 'no weights' : 'default weights';
+  }
+  const parts = String(policy.checkpoint).split(String.fromCharCode(92));
+  return parts[parts.length - 1].split('/').pop();
+}
+
+const NETWORK_LABELS = {
+  sf_mission_2x2: 'SF Mission 2x2',
+  sf_mission_3x3: 'SF Mission 3x3',
+  monaco: 'Monaco',
+  tunis: 'Tunis'
+};
+
+const networkLabel = (network) => NETWORK_LABELS[network] || network;
+
+/* The only model types this dashboard offers: RL, LLM and the hybrid of both.
+   Baselines (fixed-time, actuated, max-pressure, EV/pedestrian rules) are not models,
+   so they are never listed as a choice here. */
+const MODEL_TYPES = [
+  { label: 'RL', method: 'generalist' },
+  { label: 'Hybrid', method: 'llm_team' },
+  { label: 'LLM', method: 'llm' },
+];
+
+/* RL / Hybrid / LLM, marked unavailable when the weights that type needs are missing.
+   A network still sitting on a baseline keeps showing that baseline, but the baseline
+   is a hidden current value and never appears in the dropdown. */
+function modelTypeOptions(entry, catalog) {
+  const known = new Map((catalog || []).map((option) => [option.method, option]));
+  const options = MODEL_TYPES.map(({ label, method }) => {
+    const option = known.get(method);
+    // `checkpoint` is only a path that may not exist yet; `available` is the verdict.
+    const missing = !option || option.available === false
+      || (option.learned && !option.checkpoint);
+    const selected = method === entry.method ? ' selected' : '';
+    const disabled = missing ? ' disabled' : '';
+    const note = missing ? ' · no weights yet' : '';
+    return `<option value="${escapeModelText(method)}"${selected}${disabled}>`
+      + `${escapeModelText(label + note)}</option>`;
+  });
+  if (!MODEL_TYPES.some((type) => type.method === entry.method)) {
+    options.unshift(
+      `<option value="${escapeModelText(entry.method)}" selected hidden>`
+      + `${escapeModelText(`${entry.label} (baseline)`)}</option>`,
+    );
+  }
+  return options.join('');
+}
+
+/* One row per scenario, each with its own controller list. The list comes from that
+   network's catalog, so a learned controller without weights for it stays listed as
+   unavailable instead of disappearing; the backend refuses it with the same reason. */
+function renderScenarioControllers(policy) {
+  if (!modelScenarioList) return;
+  const scenarios = policy?.perNetwork || [];
+  if (!scenarios.length) {
+    modelScenarioList.innerHTML = '<p class="model-empty">No scenario policy reported by the backend.</p>';
+    return;
+  }
+  const catalogs = policy.catalogByNetwork || {};
+  modelScenarioList.innerHTML = scenarios.map((entry) => {
+    const options = modelTypeOptions(entry, catalogs[entry.network]);
+    const weights = entry.weights ? ` · ${entry.weights}` : '';
+    const note = entry.available
+      ? (entry.degraded ? entry.reason : '')
+      : (entry.reason || 'unavailable');
+    return `
+      <article class="model-row scenario-model" role="listitem" data-network="${escapeModelText(entry.network)}">
+        <div class="model-copy">
+          <strong>${escapeModelText(networkLabel(entry.network))}</strong>
+          <small>${escapeModelText(entry.label)}${escapeModelText(weights)} · ${escapeModelText(entry.available ? 'ready' : 'not ready')}</small>
+          ${note ? `<small class="model-reason">${escapeModelText(note)}</small>` : ''}
+        </div>
+        <select class="settings-select scenario-controller" data-scenario-controller="${escapeModelText(entry.network)}" aria-label="Controller for ${escapeModelText(networkLabel(entry.network))}">${options}</select>
+      </article>`;
+  }).join('');
+  modelScenarioList.querySelectorAll('[data-scenario-controller]').forEach((select) => {
+    select.addEventListener('change', () => {
+      applyScenarioController(select.dataset.scenarioController, select);
+    });
+  });
+}
+
+/* The LLM form follows the backend so a reload shows the provider actually in use. */
+function syncLlmForm(policy) {
+  const provider = (policy.llmProvider || 'groq').toLowerCase();
+  if (llmProvider && !llmProvider.dataset.touched) llmProvider.value = provider;
+  if (llmModel && !llmModel.dataset.touched) {
+    llmModel.value = policy.llmModel || LLM_DEFAULT_MODELS[provider] || '';
+  }
+  if (llmStatus) {
+    llmStatus.textContent = `${policy.llmBackend || 'provider'} backend · provider ${provider}`
+      + ' · the key is saved in Settings → Integrations';
+  }
+}
+
 function describeActivePolicy(policy) {
-  if (!policy || !modelStatus) return;
-  const weights = policy.checkpoint ? String(policy.checkpoint).split(/[\\/]/).pop() : 'auto';
-  modelStatus.textContent = `Active: ${policy.label || policy.method} · ${policy.network} · ${weights}`;
+  if (!policy) return;
+  activePolicy = policy;
+  if (modelStatus) {
+    modelStatus.textContent = `Last edited: ${policy.label || policy.method} · ${networkLabel(policy.network)} · ${policyWeights(policy)}`
+      + (policy.reason ? ` — ${policy.reason}` : '');
+  }
+  if (modelNetwork && !modelNetwork.dataset.touched && policy.network) {
+    modelNetwork.value = policy.network;
+  }
+  renderScenarioControllers(policy);
+  syncLlmForm(policy);
 }
 
 async function refreshActivePolicy() {
@@ -3708,7 +4231,7 @@ function renderModelCatalog(payload) {
   if (!modelList) return;
   const models = payload.models || [];
   if (!models.length) {
-    modelList.innerHTML = '<p class="model-empty">No trained checkpoint for this network yet. Train one in Models &amp; Runs, then refresh.</p>';
+    modelList.innerHTML = '<p class="model-empty">No trained checkpoint for this network yet. Train one in the Train tab, then refresh.</p>';
     return;
   }
   modelList.innerHTML = models.map((model) => {
@@ -3722,7 +4245,7 @@ function renderModelCatalog(payload) {
           <small>${escapeModelText(model.agent)} · seed ${seed}${steps} · ${escapeModelText(model.source)}</small>
           ${reason}
         </div>
-        <button type="button" class="settings-btn" data-model-id="${escapeModelText(model.id)}"${model.available ? '' : ' disabled'}>Use for simulation</button>
+        <button type="button" class="settings-btn" data-model-id="${escapeModelText(model.id)}"${model.available ? '' : ' disabled'}>Use these weights</button>
       </article>`;
   }).join('');
   modelList.querySelectorAll('[data-model-id]').forEach((button) => {
@@ -3755,6 +4278,58 @@ async function applyModelToPolicy(model, button) {
   }
 }
 
+/* One PUT per scenario: the other scenarios keep their own controller and weights. */
+async function applyScenarioController(network, select) {
+  const method = select?.value;
+  if (!method) return;
+  if (modelStatus) modelStatus.textContent = `Applying ${method} to ${networkLabel(network)}…`;
+  try {
+    const response = await fetch('/api/policy', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method, network }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+    describeActivePolicy(body);
+    if (modelStatus) {
+      modelStatus.textContent = `${networkLabel(network)}: ${body.label || body.method} · ${policyWeights(body)}`
+        + ' — restart that scenario\'s run to use it.';
+    }
+    loadModelCatalog();
+  } catch (error) {
+    if (modelStatus) modelStatus.textContent = `Could not apply: ${error.message}`;
+    refreshActivePolicy();
+  }
+}
+
+/* ------------------------------------------------------- LLM provider switch */
+
+async function saveLlmConfig(event) {
+  event.preventDefault();
+  if (llmStatus) llmStatus.textContent = 'Saving the LLM provider…';
+  try {
+    const response = await fetch('/api/llm/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: llmProvider?.value || '',
+        model: (llmModel?.value || '').trim(),
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+    const chosen = body.default || {};
+    if (llmStatus) {
+      llmStatus.textContent = `Saved: ${chosen.provider} · ${chosen.model}. New LLM calls use it immediately.`;
+    }
+    if (llmModel) llmModel.dataset.touched = '';
+    refreshActivePolicy();
+  } catch (error) {
+    if (llmStatus) llmStatus.textContent = `Could not save: ${error.message}`;
+  }
+}
+
 async function loadModelCatalog() {
   if (!modelList) return;
   const network = modelNetwork?.value || '';
@@ -3771,9 +4346,22 @@ async function loadModelCatalog() {
   }
 }
 
-modelNetwork?.addEventListener('change', loadModelCatalog);
+modelNetwork?.addEventListener('change', () => {
+  modelNetwork.dataset.touched = '1';
+  loadModelCatalog();
+});
 document.getElementById('modelRefresh')?.addEventListener('click', loadModelCatalog);
-document.querySelector('[data-settings-tab="models"]')?.addEventListener('click', loadModelCatalog);
+llmProvider?.addEventListener('change', () => {
+  llmProvider.dataset.touched = '1';
+  if (llmModel) llmModel.value = LLM_DEFAULT_MODELS[llmProvider.value] || llmModel.value;
+});
+llmModel?.addEventListener('input', () => { llmModel.dataset.touched = '1'; });
+llmConfigForm?.addEventListener('submit', saveLlmConfig);
+document.querySelector('[data-settings-tab="models"]')?.addEventListener('click', () => {
+  loadModelCatalog();
+  refreshActivePolicy();
+});
+loadModelCatalog();
 
 /* ---------------- Live operation panels (Events tab) ----------------
    Zone Monitoring and the dock's Event Log used to be demo copy. They now read
@@ -3895,8 +4483,9 @@ const queueDelayValue = document.getElementById('queueDelayValue');
 const queueDelayDelta = document.getElementById('queueDelayDelta');
 const queueBacklogNote = document.getElementById('queueBacklogNote');
 let queueShownFor = null;
-// The backlog card announces itself a beat after the incident instead of during it.
-const QUEUE_REVEAL_DELAY_MS = 2500;
+// The Queue Backlog card is retired as an auto-opening window: the Incident Response
+// panel carries its numbers now. The reveal timer is kept only so a stale one can be
+// cleared if a run publishes while an old incident is still around.
 let queueRevealTimer = 0;
 
 /* Where the backlog card should point the camera: the incident itself when the run
@@ -4092,25 +4681,12 @@ function renderLiveOps(state) {
       : '<li class="live-event-empty">Waiting for the run — events appear once the simulation publishes.</li>';
   }
 
-  // Queue Backlog: starts hidden, pops up when an incident is published, and keeps
-  // the two metric slots on the run's measured queue/delay plus a clearance ETA.
+  // Queue Backlog used to be a second card that popped open on the same incident as the
+  // Incident Response panel, so an accident covered the map with two overlapping windows.
+  // The incident panel now carries the queue/delay/clearance numbers itself; this card is
+  // no longer auto-opened and stays hidden unless something explicitly reveals it.
   const incident = [...events].reverse().find((event) => event.kind === 'incident');
-  const incidentAge = incident ? (Number(state.simulationTime) || 0) - (Number(incident.t) || 0) : Infinity;
   if (queueBacklogPanel) {
-    if (live && incident && incidentAge <= 300 && queueShownFor !== incident.id) {
-      queueShownFor = incident.id;
-      window.clearTimeout(queueRevealTimer);
-      queueBacklogPanel.classList.remove('is-visible');
-      queueRevealTimer = window.setTimeout(() => {
-        // A later incident (or a closed card) owns the panel by now.
-        if (queueShownFor !== incident.id) return;
-        queueBacklogPanel.hidden = false;
-        queueBacklogPanel.classList.add('is-incident');
-        queueBacklogPanel.classList.remove('is-closing');
-        // Paint the faded state once, so the transition has somewhere to start.
-        requestAnimationFrame(() => queueBacklogPanel.classList.add('is-visible'));
-      }, QUEUE_REVEAL_DELAY_MS);
-    }
     const queueKm = queued * 0.007;
     const samples = Array.isArray(state.trend) ? state.trend : [];
     const oldest = samples.length > 1 ? samples[0] : null;
@@ -4136,7 +4712,21 @@ function renderLiveOps(state) {
         ? `${queued} vehicles queued · ${throughput.toFixed(1)} veh/min clearing`
         : 'Waiting for an incident.';
     }
+    // The incident panel reads these same measured values, so the two can never disagree.
+    paintIncidentImpact({ live, queueKm, delayMin: Math.round((Number(metrics.avgWaitingS) || 0) / 60), eta });
   }
+}
+
+/* The incident panel's impact row: the same measured queue/delay/clearance the retired
+   Queue Backlog card used to show, so one window carries the whole picture. */
+function paintIncidentImpact({ live, queueKm, delayMin, eta }) {
+  const set = (selector, value) => {
+    const node = document.querySelector(selector);
+    if (node) node.textContent = live ? String(value) : '—';
+  };
+  set('[data-incident-queue-km]', live ? queueKm.toFixed(1) : '—');
+  set('[data-incident-delay]', delayMin);
+  set('[data-incident-clear-eta]', eta === null ? '—' : eta);
 }
 
 /* ---------------- Live events (Events tab) ----------------
@@ -4655,7 +5245,8 @@ async function saveIntegration(id, value) {
     (body.integrations || []).forEach(renderIntegration);
     const input = card?.querySelector('input[name="value"]');
     if (input) input.value = '';
-    const label = { groq: 'Groq', gemini: 'Gemini', mapbox: 'Mapbox' }[id] || id;
+    const label =
+      { groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', mapbox: 'Mapbox' }[id] || id;
     showToast(`${label} ${value ? 'saved' : 'cleared'}.`);
   } catch {
     if (detail) {

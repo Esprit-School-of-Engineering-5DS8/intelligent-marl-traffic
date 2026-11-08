@@ -44,6 +44,11 @@ FIELDS: dict[str, tuple[str, str, str]] = {
         "AIza…",
         "the LLM controller cannot use Gemini",
     ),
+    "openrouter": (
+        "OPENROUTER_API_KEY",
+        "sk-or-v1-…",
+        "the LLM controllers cannot reach Gemma 4 or any OpenRouter model",
+    ),
     "mapbox": (
         "MAPBOX_TOKEN",
         "pk.…",
@@ -52,9 +57,10 @@ FIELDS: dict[str, tuple[str, str, str]] = {
 }
 
 # Only the LLM providers answer a key check without spending simulation resources.
-TESTABLE = ("groq", "gemini")
+TESTABLE = ("groq", "gemini", "openrouter")
 GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
 GEMINI_MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 
 def _env(name: str) -> str:
@@ -147,6 +153,7 @@ def statuses() -> list[dict[str, Any]]:
     """The real state of each integration, read from this process right now."""
     groq_key = _env("GROQ_API_KEY")
     gemini_key = _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
+    openrouter_key = _env("OPENROUTER_API_KEY")
     mapbox_token = _env("MAPBOX_TOKEN")
     return [
         {
@@ -178,6 +185,22 @@ def statuses() -> list[dict[str, Any]]:
                 f"{_env('GEMINI_MODEL') or _env('COTRAFFIC_LLM_MODEL') or 'gemini-2.5-flash'}"
                 if gemini_key
                 else f"No key saved: {FIELDS['gemini'][2]}."
+            ),
+        },
+        {
+            "id": "openrouter",
+            "label": "OpenRouter",
+            "description": "One key for Gemma 4 and the other hosted open models.",
+            "envVar": "OPENROUTER_API_KEY",
+            "placeholder": FIELDS["openrouter"][1],
+            "editable": True,
+            "configured": bool(openrouter_key),
+            "masked": _masked(openrouter_key),
+            "detail": (
+                f"Key {_masked(openrouter_key)} · model "
+                f"{_env('COTRAFFIC_LLM_MODEL') or _env('OPENROUTER_MODEL') or 'google/gemma-4-26b-a4b-it:free'}"
+                if openrouter_key
+                else f"No key saved: {FIELDS['openrouter'][2]}."
             ),
         },
         {
@@ -232,7 +255,9 @@ def update_integration(req: IntegrationUpdate) -> dict[str, Any]:
             422,
             "Mapbox needs a public token (starts with pk.); secret tokens stay out of the dashboard",
         )
-    if req.id in ("groq", "gemini") and value and any(char.isspace() for char in value):
+    if req.id in ("groq", "gemini", "openrouter") and value and any(
+        char.isspace() for char in value
+    ):
         raise HTTPException(422, "API keys cannot contain spaces")
 
     if value:
@@ -273,6 +298,10 @@ def test_integration(integration_id: str) -> dict[str, Any]:
         body = _remote_json(GROQ_MODELS_URL, {"Authorization": f"Bearer {key}"})
         found = len(body.get("data") or [])
         label = "Groq"
+    elif integration_id == "openrouter":
+        body = _remote_json(OPENROUTER_MODELS_URL, {"Authorization": f"Bearer {key}"})
+        found = len(body.get("data") or [])
+        label = "OpenRouter"
     else:
         body = _remote_json(GEMINI_MODELS_URL, {"x-goog-api-key": key})
         found = len(body.get("models") or [])

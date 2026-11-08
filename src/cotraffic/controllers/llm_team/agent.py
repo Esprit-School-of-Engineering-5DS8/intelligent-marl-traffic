@@ -129,7 +129,7 @@ class LLMAgent:
             except (LLMUnavailableError, SchemaError, ValueError, TypeError, KeyError) as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
                 user = self.build_user_message(t, snapshot, blackboard) + RETRY_NOTE
-            except Exception as exc:  # noqa: BLE001 - a failed role must not stop the run
+            except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
                 user = self.build_user_message(t, snapshot, blackboard) + RETRY_NOTE
         return AgentCall(

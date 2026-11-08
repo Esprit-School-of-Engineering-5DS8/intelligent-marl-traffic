@@ -18,6 +18,8 @@ SRC = os.path.join(PROJECT_ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
+from test_llm_controller import FakeEnv, FakeProvider
+
 from cotraffic.analysis.aggregate import (
     hyperparameters,
     llm_health,
@@ -25,8 +27,6 @@ from cotraffic.analysis.aggregate import (
     valid_only,
 )
 from cotraffic.controllers.llm import LLMController
-
-from test_llm_controller import FakeEnv, FakeProvider
 
 
 def test_budget_caps_calls_and_is_reported_as_budget_not_a_result():
@@ -163,7 +163,6 @@ def _compare_job(methods: list[str], seeds: list[int]):
 
 def test_compare_returns_paired_deltas_parameters_and_llm_health(monkeypatch):
     import cotraffic.evaluation.runner as runner_mod
-
     from api.jobs import JobRunner
 
     monkeypatch.setattr(runner_mod, "run_episode", _fake_episode)
@@ -196,7 +195,6 @@ def test_compare_returns_paired_deltas_parameters_and_llm_health(monkeypatch):
 
 def test_compare_reports_a_degraded_llm_instead_of_reporting_it_as_the_model(monkeypatch):
     import cotraffic.evaluation.runner as runner_mod
-
     from api.jobs import JobRunner
 
     def degraded(**kwargs):
@@ -217,7 +215,6 @@ def test_compare_reports_a_degraded_llm_instead_of_reporting_it_as_the_model(mon
 
 def test_compare_warns_that_one_seed_cannot_be_tested(monkeypatch):
     import cotraffic.evaluation.runner as runner_mod
-
     from api.jobs import JobRunner
 
     monkeypatch.setattr(runner_mod, "run_episode", _fake_episode)

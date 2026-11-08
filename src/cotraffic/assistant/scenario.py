@@ -17,7 +17,6 @@ import sys
 from dataclasses import dataclass, field
 
 from cotraffic.assistant.llm import LLMUnavailableError, LocalLLM
-from cotraffic.controllers.registry import LEARNED
 from cotraffic.assistant.vocabulary import (
     DEMANDS,
     METHODS,
@@ -27,6 +26,7 @@ from cotraffic.assistant.vocabulary import (
     find_first,
     normalise,
 )
+from cotraffic.controllers.registry import LEARNED
 from cotraffic.paths import REPO_ROOT, default_checkpoint
 
 BASELINES = ("ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp")

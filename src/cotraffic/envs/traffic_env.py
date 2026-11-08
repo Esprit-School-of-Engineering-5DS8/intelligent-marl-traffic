@@ -19,8 +19,8 @@ from gymnasium import spaces
 from pettingzoo import ParallelEnv
 
 from cotraffic import config
-from cotraffic.envs.ev import read_ev_states
 from cotraffic.controllers.overlays import build_overlays
+from cotraffic.envs.ev import read_ev_states
 from cotraffic.envs.intersection import Intersection
 from cotraffic.envs.observations import (
     Measurements,
@@ -50,7 +50,9 @@ def reward_norm(network: str) -> dict[str, float]:
 
 
 class CoTrafficEnv(ParallelEnv):
-    metadata = {"name": "cotraffic_v0", "render_modes": ["human"], "is_parallelizable": True}
+    # PettingZoo reads this as a class attribute; the dict is never mutated, so the
+    # shared mutable default is the framework's contract rather than a hazard.
+    metadata = {"name": "cotraffic_v0", "render_modes": ["human"], "is_parallelizable": True}  # noqa: RUF012
 
     def __init__(
         self,
@@ -240,7 +242,7 @@ class CoTrafficEnv(ParallelEnv):
 
         co2 = defaultdict(float)
         need_co2 = self.reward_cfg.co2 > 0
-        n_steps = max(1, int(round(self.delta / self.step_length)))
+        n_steps = max(1, round(self.delta / self.step_length))
         for _ in range(n_steps):
             conn.simulationStep()
             self.now = float(conn.simulation.getTime())

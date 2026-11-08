@@ -21,9 +21,28 @@ We use [Eclipse SUMO](https://sumo.dlr.de) as the microscopic traffic simulator 
 
 | Phase | Scenario | Status |
 |-------|----------|--------|
-| Phase 1 | 2x2 Grid - toy validation | 🟡 In Progress |
-| Phase 2 | 3x3 Grid - main benchmark | 🟠 In Progress |
-| Phase 3 | Monaco - real-world use case | 🔴 Planned |
+| Phase 1 | 2x2 grid - toy validation | ✅ Done |
+| Phase 2 | 3x3 grid - main benchmark | 🟡 Generalist PPO trained to 502k steps (seed 1); benchmark comparison pending |
+| Phase 3 | Monaco - real-world network | 🟡 Network + demand routes built; benchmark runs pending |
+| Phase 4 | Tunis - real-world network | 🟡 Network, routes and fixed-time demand sweep recorded; learned-controller runs pending |
+
+### Networks and demand
+
+| Network | Source | Notes |
+|---------|--------|-------|
+| `grid2x2` | generated grid | toy validation, 2x2 signalised intersections |
+| `grid3x3` | generated grid | main benchmark network |
+| `monaco` | [MoSTScenario](https://github.com/lcodeca/MoSTScenario) (Codeca & Härri, SUMO User Conference 2018) | whole principality, 3,523 junctions, 18,837 edges, 12 signalised intersections, pedestrian areas, bus and train stops |
+| `tunis` | OpenStreetMap via Overpass API + `netconvert` | central Tunis, roughly 5.2 km x 4.3 km, lake edge and port to El Menzah, real signalised junctions |
+
+Demand is generated per network from `configs/demand/*.yaml` (`low`, `medium`, `peak`) crossed with `configs/scenarios/*.yaml` (incident, pedestrians, buses, emergency pre-emption, communication dropout, sensor noise), and each run is written to `results/`.
+
+Generated artifacts are **gitignored**, so the networks, routes and runs are not in the repository and have to be rebuilt locally:
+
+```bash
+python -m cotraffic networks tunis --force      # OSM import -> sumo_files/tunis/tunis.net.xml (~24 MB)
+python -m cotraffic networks monaco --force     # MoSTScenario -> sumo_files/monaco/monaco.net.xml (~14 MB)
+```
 
 ---
 
@@ -87,6 +106,64 @@ cd frontend && npm install && npm run dev            # Vite on :5173
 python scripts/export_dashboard_data.py              # refresh served result files
 ```
 
+### Switch and train models from the dashboard
+
+**Settings → Models** owns the model *choice*, and every action there is an ordinary API
+call. Training happens in the **Train** tab, never in Settings:
+
+| Panel | What it does | Endpoint |
+|---|---|---|
+| Controller per scenario | one row per network (2x2, 3x3, Monaco, Tunis): runs a baseline, a trained recipe, `llm` or `llm_team` for **that** network | `PUT /api/policy` |
+| Trained weights | pins one checkpoint (selected run, raw training run, saved version) for the chosen network | `PUT /api/policy` with `checkpoint` |
+| LLM provider | `openrouter` (Gemma 4), `groq`, `gemini` or `opencode`, plus the model id | `PUT /api/llm/config` |
+
+The controller is stored **per network**, because a policy trained on one grid cannot
+drive another: `GET /api/policy` returns `perNetwork` (each scenario's controller,
+weights and readiness) next to the last-edited `method`/`network`. `scenario` configs
+(`emergency`, `buses`, `pedestrians`, `incident`) are event mixes *inside* every
+training episode, not separate networks — one `generalist` policy already covers them,
+and training them separately only means a recipe variant with a smaller
+`training.scenarios` list.
+
+The same steps from a shell:
+
+```bash
+# 1. Run the stack
+uvicorn api.main:app --port 8000                     # backend on :8000
+cd frontend && npm run dev                           # dashboard on :5173
+
+# 2. Point the LLM and LLM-team controllers at Gemma 4 through OpenRouter
+#    (OPENROUTER_API_KEY must be set; Settings → Integrations writes it to .env)
+curl -X PUT http://localhost:8000/api/llm/config \
+  -H 'Content-Type: application/json' \
+  -d '{"provider":"openrouter","model":"google/gemma-4-26b-a4b-it:free"}'
+
+# 3. Give each scenario its own controller (baseline, trained recipe, llm or llm_team)
+curl -X PUT http://localhost:8000/api/policy \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"llm_team","network":"sf_mission_3x3"}'
+curl -X PUT http://localhost:8000/api/policy \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"mp","network":"monaco"}'
+curl http://localhost:8000/api/policy                              # perNetwork[] per scenario
+
+# 4. Train, then save and pin the finished weights
+curl -X POST http://localhost:8000/api/train \
+  -H 'Content-Type: application/json' \
+  -d '{"recipe_id":"generalist","network":"sf_mission_3x3","seeds":[1],"timesteps":50000}'
+curl http://localhost:8000/api/jobs                              # progress
+curl http://localhost:8000/api/models/candidates                 # candidate ids
+curl -X POST http://localhost:8000/api/models/register-candidate \
+  -H 'Content-Type: application/json' \
+  -d '{"candidate_id":"generalist|sf_mission_3x3|1","name":"sf-mission-3x3-ppo"}'
+curl -X PUT http://localhost:8000/api/policy \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"generalist","network":"sf_mission_3x3","checkpoint":"results/models/<id>/weights.zip"}'
+```
+
+Without `OPENROUTER_API_KEY` the LLM methods still run: every call falls back to
+Max-Pressure and `GET /api/policy` reports the degradation in `reason`.
+
 ### Screenshots
 
 | Dashboard | Benchmark - Models & Runs |
@@ -140,11 +217,17 @@ Full architecture, controller catalog and A/B protocol: [docs/ARCHITECTURE.md](d
 
 ## 📊 Key Metrics Tracked
 
-- `avg_speed_m_s` - Network mean vehicle speed
-- `total_waiting_time_s` - Total vehicle delay per step
-- `arrived_vehicles` - Throughput (vehicles reaching destination)
-- `co2_mg_s` - CO2 emissions
-- `fuel_ml_s` - Fuel consumption
+Every run writes one row per evaluation, per method and demand scale:
+
+| Column | Meaning |
+|--------|---------|
+| `vehicles`, `arrived_vehicles` | demand loaded and throughput (vehicles reaching destination) |
+| `mean_travel_time`, `mean_waiting_time`, `mean_time_loss` | network-level delay |
+| `p95_waiting_time` | tail of the waiting-time distribution |
+| `mean_queue`, `mean_insertion_backlog` | queue pressure at junctions and demand that could not enter the network |
+| `throughput_per_h` | arrived vehicles per hour |
+| `unfinished`, `never_inserted`, `teleports_total` | runs that did not complete cleanly |
+| `co2_mg_s`, `fuel_ml_s` | emissions and consumption |
 
 ---
 
@@ -157,8 +240,8 @@ This project follows the **Design Thinking** methodology:
 | Empathize | ✅ Done | Personas: Mehdi (driver), Sarra (pedestrian), Sonia (EV responder), Karim (operator) |
 | Define | ✅ Done | Problem statement, POV statements, HMW questions, success criteria |
 | Ideate | 🟡 In Progress | Approach shortlist, chosen direction |
-| Prototype | 🟡 In Progress | Working SUMO + MARL prototype |
-| Test | 🔴 Planned | Experiment results, data-driven evidence vs baseline |
+| Prototype | ✅ Done | Working SUMO + MARL prototype across grid, Monaco and Tunis networks |
+| Test | 🟡 In Progress | Fixed-time demand sweep on Tunis recorded; benchmark vs baselines pending |
 
 ---
 

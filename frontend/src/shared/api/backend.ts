@@ -240,6 +240,8 @@ export type RunRequest = {
   seed: number;
   left: string;
   right: string;
+  // "mock" records without any provider call; "provider" uses the configured LLM.
+  llm?: "mock" | "provider";
 };
 
 export function useCreateRun() {

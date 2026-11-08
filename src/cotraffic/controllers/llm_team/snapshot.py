@@ -179,7 +179,7 @@ def build_pedestrians(
     maps = maps or build_phase_maps(env)
     try:
         waits = longest_waits(env)
-    except Exception:  # noqa: BLE001 - a PID-less test env has no person API
+    except Exception:
         waits = {}
     totals = getattr(env, "ped_wait_sum", {}) or {}
     owner = getattr(env, "crossing_owner", {}) or {}

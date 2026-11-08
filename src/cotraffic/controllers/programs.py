@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +77,7 @@ def _movement_flows(route_file: Path, begin: float, end: float) -> dict[tuple[st
         if begin <= depart < end:
             route = el.find("route")
             edges = route.get("edges", "").split() if route is not None else []
-            for a, b in zip(edges, edges[1:], strict=False):
+            for a, b in pairwise(edges):
                 counts[(a, b)] += 1.0
         el.clear()
     scale = 3600.0 / (end - begin)

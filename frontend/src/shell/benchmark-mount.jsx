@@ -15,13 +15,11 @@ import UnifiedModelsRunsPage from '@/features/models/UnifiedModelsRunsPage';
 import FreshCompare from '@/features/analytics/FreshCompare';
 import TrainingPage from '@/features/training/TrainingPage';
 
-/* Unified Benchmark navigation */
+/* One page per sidebar sub-item — the sidebar is the only tab control. */
 const PAGES = {
   models: UnifiedModelsRunsPage,
-  runs: UnifiedModelsRunsPage,
   training: TrainingPage,
   compare: FreshCompare,
-  simulation: FreshCompare,
 };
 
 /** The benchmark pages read the backend, not the bundled export. */
@@ -37,7 +35,7 @@ function View({ tab }) {
     <>
       <LiveDataMode />
       <Providers>
-        <Page />
+        <Page key={tab} />
       </Providers>
     </>
   );

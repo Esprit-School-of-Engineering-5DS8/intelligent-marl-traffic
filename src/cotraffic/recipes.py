@@ -214,7 +214,7 @@ def list_recipes() -> list[dict[str, Any]]:
     for name, source in sorted(names.items()):
         try:
             cfg = load_recipe(name)
-        except Exception as error:  # noqa: BLE001 - a broken file must not hide the rest
+        except Exception as error:
             out.append(
                 {
                     "id": name,

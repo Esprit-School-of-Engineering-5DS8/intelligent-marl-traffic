@@ -54,8 +54,11 @@ def build_grid(cfg: dict[str, Any], protocol: dict[str, Any], net_file: Path) ->
             raise
         try:
             _build_grid_with_netconvert(cfg, protocol, net_file)
-        except (CommandError, OSError):
-            raise exc
+        except (CommandError, OSError) as fallback:
+            # Chain the fallback failure onto the original one. Raising `exc` alone
+            # discarded the netconvert error, which is the one that explains why the
+            # build actually failed.
+            raise exc from fallback
     return net_file
 
 

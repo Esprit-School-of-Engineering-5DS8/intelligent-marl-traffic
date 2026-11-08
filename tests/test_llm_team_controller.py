@@ -227,11 +227,12 @@ def test_failed_call_does_not_break_the_tick():
 
 def test_replay_client_round_trip_and_strict_miss(tmp_path):
     cache = tmp_path / "cache.jsonl"
-    responder = lambda system, user, schema: {
-        "directives": [{"tls": "A0", "type": "bias", "ns": 1.1}],
-        "alerts": [],
-        "explanation": "cached",
-    }
+    def responder(system, user, schema):
+        return {
+            "directives": [{"tls": "A0", "type": "bias", "ns": 1.1}],
+            "alerts": [],
+            "explanation": "cached",
+        }
     writer = ReplayClient(MockClient(responder), str(cache))
     first = writer.complete("system", "user", {"type": "object"}, max_tokens=12)
     assert first.parsed["explanation"] == "cached"

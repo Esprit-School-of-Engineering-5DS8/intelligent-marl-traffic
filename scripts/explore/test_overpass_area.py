@@ -1,7 +1,7 @@
-import urllib.request
-import urllib.parse
 import json
 import time
+import urllib.parse
+import urllib.request
 
 query = """[out:json][timeout:60];
 (

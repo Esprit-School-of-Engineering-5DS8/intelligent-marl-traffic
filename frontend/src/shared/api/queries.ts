@@ -22,13 +22,17 @@ import {
 
 import { fetchData } from "./source";
 
-export const useRunsRegistry = () => useQuery({
-  queryKey: ["data", "live", "runs"],
-  queryFn: () => fetchData("live", "runs", RunsRegistry),
-  staleTime: 0,
-  refetchInterval: 5000,
-  retry: false,
-});
+/** runs.json: /api/data/runs on the live backend, the bundled export on mock data. */
+export const useRunsRegistry = () => {
+  const source = useSettings((s) => s.dataSource);
+  return useQuery({
+    queryKey: ["data", source, "runs"],
+    queryFn: () => fetchData(source, "runs", RunsRegistry),
+    staleTime: 0,
+    refetchInterval: 5000,
+    retry: false,
+  });
+};
 export const useModelsRegistry = () => useQuery({
   queryKey: ["models-registry"],
   queryFn: () => fetch("/api/models").then(async (response) => {
@@ -47,7 +51,7 @@ export const useTrainingCandidates = () => useQuery({
   queryFn: async () => {
     const response = await fetch("/api/models/candidates");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return z.object({ candidates: z.array(z.object({ id: z.string(), agent: z.string(), label: z.string(), network: z.string(), seed: z.number(), timesteps: z.number(), checkpoint: z.string(), sha256: z.string(), bytes: z.number(), recipeHash: z.string(), algorithm: z.string(), recipe: z.record(z.string(), z.unknown()) })) }).parse(await response.json());
+    return z.object({ candidates: z.array(z.object({ id: z.string(), agent: z.string(), method: z.string().nullable().optional(), label: z.string(), network: z.string(), seed: z.number(), timesteps: z.number(), checkpoint: z.string(), sha256: z.string(), bytes: z.number(), recipeHash: z.string(), algorithm: z.string(), recipe: z.record(z.string(), z.unknown()), registeredAs: z.string().nullable().optional() })) }).parse(await response.json());
   },
   retry: false,
 });

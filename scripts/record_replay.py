@@ -33,6 +33,8 @@ from cotraffic.paths import RESULTS_DIR, default_checkpoint
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "frontend" / "public" / "data" / "replays"
 KIND = {"car": 0, "bus": 1, "emergency": 2, "incident": 3}
+MAX_ACTORS = 1500  # per frame: a 7 800-vehicle network would otherwise write ~80 MB
+
 KPIS = [
     "mean_travel_time",
     "mean_waiting_time",
@@ -54,6 +56,7 @@ class Recorder:
     def __init__(self, window: float, every: int) -> None:
         self.window = window
         self.every = every
+        self.stride = 1
         self.start: float | None = None
         self.ids: dict[str, int] = {}
         self.kinds: dict[str, int] = {}
@@ -83,18 +86,27 @@ class Recorder:
             self.signals = sorted(env.conn.trafficlight.getIDList())
         if not (self.start <= now < self.start + self.window):
             return
-        if int(round(now - self.start)) % self.every:
+        if round(now - self.start) % self.every:
             return
         conn = env.conn
+        live = conn.vehicle.getIDList()
+        if self.stride == 1 and len(live) > MAX_ACTORS:
+            # Big network (Tunis, Monaco): keep the time window, thin the fleet. A stride
+            # by vehicle slot is stable across frames, and emergency vehicles always stay.
+            self.stride = -(-len(live) // MAX_ACTORS)
+            self.every = max(self.every, 4)
         vehicles: list[int] = []
-        for vid in conn.vehicle.getIDList():
-            x, y = conn.vehicle.getPosition(vid)
+        for vid in live:
             kind = self._kind(conn, vid)
             if kind == KIND["emergency"] and vid not in self.seen_ev:
                 self.seen_ev.add(vid)
                 self.events.append({"t": round(now - self.start), "type": "emergency", "id": vid})
+            slot = self.ids.setdefault(vid, len(self.ids))
+            if self.stride > 1 and kind != KIND["emergency"] and slot % self.stride:
+                continue
+            x, y = conn.vehicle.getPosition(vid)
             vehicles += [
-                self.ids.setdefault(vid, len(self.ids)),
+                slot,
                 kind,
                 round(x * 10),
                 round(y * 10),

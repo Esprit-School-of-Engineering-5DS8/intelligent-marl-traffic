@@ -50,11 +50,28 @@ class _FakeVehicleType:
         self.tau[type_id] = value
 
 
+class _FakeVehicle:
+    """A vehicle already driving when the weather changes."""
+
+    def __init__(self) -> None:
+        self.speed = {"car.0": 1.0, "car.1": 0.95}
+
+    def getIDList(self) -> list[str]:
+        return list(self.speed)
+
+    def getSpeedFactor(self, vehicle_id: str) -> float:
+        return self.speed[vehicle_id]
+
+    def setSpeedFactor(self, vehicle_id: str, value: float) -> None:
+        self.speed[vehicle_id] = value
+
+
 class _FakeConnection:
     def __init__(self) -> None:
         self.trafficlight = _FakeTrafficLight()
         self.simulation = _FakeSimulation()
         self.vehicletype = _FakeVehicleType()
+        self.vehicle = _FakeVehicle()
 
 
 def _session(running: bool = True) -> SimulationSession:
@@ -200,6 +217,34 @@ def test_rain_slows_vehicles_and_clearing_restores_the_calibration():
     assert connection.vehicletype.tau == {"car": 1.0, "bus": 1.2}
 
 
+def test_rain_slows_the_traffic_already_driving_and_restores_it():
+    """SUMO copies a type's speedFactor at insertion, so the type alone is not enough."""
+    session = _session()
+    connection = _FakeConnection()
+
+    session._weather = "rain"
+    session._apply_weather(connection)
+    assert connection.vehicle.speed == {
+        "car.0": pytest.approx(0.75),
+        "car.1": pytest.approx(0.7125),
+    }
+
+    session._weather = "clear"
+    session._apply_weather(connection)
+    assert connection.vehicle.speed == {
+        "car.0": pytest.approx(1.0),
+        "car.1": pytest.approx(0.95),
+    }
+
+
+def test_weather_is_remembered_before_a_run_starts():
+    """Turning rain on before starting must survive into the next run."""
+    session = _session(running=False)
+    body = session.set_weather("rain")
+    assert body["weather"] == "rain"
+    assert session.snapshot()["weather"] == "rain"
+
+
 def test_weather_endpoint_publishes_the_new_condition(monkeypatch):
     session = _session()
     monkeypatch.setattr(simulation_routes, "session", session)
@@ -231,3 +276,56 @@ def test_signal_endpoint_maps_the_run_and_validation_errors(monkeypatch):
     accepted = client.post("/api/simulation/signal", json={"junction": "J1", "green": 45})
     assert accepted.status_code == 200
     assert accepted.json()["runId"] == "live-grid-2x2-1"
+
+# --- demand dial -------------------------------------------------------------------
+
+def test_demand_level_is_remembered_before_a_run_starts():
+    """Choosing a level before starting must survive into the next run."""
+    session = _session(running=False)
+    body = session.set_demand_level("low")
+    assert body["demandLevel"] == "low"
+    assert session.snapshot()["demandLevel"] == "low"
+
+
+def test_demand_level_rejects_an_unknown_level():
+    session = _session()
+    with pytest.raises(ValueError, match="unknown demand level"):
+        session.set_demand_level("gridlock")
+
+
+def test_demand_level_endpoint_round_trips():
+    session = _session()
+    simulation_routes.session = session
+    response = client.post("/api/simulation/demand", json={"level": "medium"})
+    assert response.status_code == 200
+    assert response.json()["demandLevel"] == "medium"
+
+
+def test_demand_level_endpoint_refuses_a_bad_level():
+    simulation_routes.session = _session()
+    assert client.post("/api/simulation/demand", json={"level": "gridlock"}).status_code == 422
+
+
+def test_demand_scale_multiplies_the_networks_own_live_rate():
+    """The dial is a fraction of each network's live calibration, not a shared level.
+
+    ``high`` has to reproduce the live map's previous behaviour exactly, otherwise
+    adding the dial would silently change every existing run.
+    """
+    from api.simulation import DEFAULT_DEMAND_LEVEL, live_demand, live_demand_scale
+
+    net_cfg = {"demand": {"peak_vehicles_per_hour": 13000, "live_vehicles_per_hour": 14000}}
+    _, base = live_demand(net_cfg)
+
+    assert DEFAULT_DEMAND_LEVEL == "high"
+    assert live_demand_scale(net_cfg, "high") == pytest.approx(base)
+    assert live_demand_scale(net_cfg, "medium") == pytest.approx(base * 0.7)
+    assert live_demand_scale(net_cfg, "low") == pytest.approx(base * 0.45)
+
+
+def test_demand_scale_falls_back_when_a_network_declares_no_live_rate():
+    from api.simulation import live_demand_scale
+
+    net_cfg = {"demand": {"peak_vehicles_per_hour": 900}}
+    assert live_demand_scale(net_cfg, "high") == pytest.approx(1.0)
+    assert live_demand_scale(net_cfg, "low") == pytest.approx(0.45)

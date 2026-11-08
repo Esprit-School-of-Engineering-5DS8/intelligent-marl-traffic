@@ -1,9 +1,10 @@
-import urllib.request
 import json
 import urllib.parse
-from shapely.geometry import shape, mapping
-from shapely.ops import unary_union
+import urllib.request
 from pathlib import Path
+
+from shapely.geometry import mapping, shape
+from shapely.ops import unary_union
 
 governorates = [
     "Tunis Governorate, Tunisia",

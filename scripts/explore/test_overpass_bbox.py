@@ -1,6 +1,6 @@
-import urllib.request
-import urllib.parse
 import time
+import urllib.parse
+import urllib.request
 
 query = """[out:xml][timeout:30];
 (

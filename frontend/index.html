@@ -565,20 +565,47 @@
                   </div>
                 </div>
                 <div class="live-style-picker">
-                  <button type="button" class="live-tool" data-live-action="style" aria-label="Choose map mode" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-contrast"/></svg></button>
-                  <div class="live-style-menu" role="menu" aria-label="Map styles" hidden>
+                  <button type="button" class="live-tool" data-live-action="style" aria-label="Map conditions: style, weather and traffic demand" title="Map conditions" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-contrast"/></svg></button>
+                  <div class="live-style-menu" role="menu" aria-label="Map conditions" hidden>
                     <span class="live-style-menu-title">Map style</span>
                     <button type="button" class="live-style-option is-selected" data-map-style="light" role="menuitemradio" aria-checked="true"><span class="style-swatch style-swatch-light"></span><span><strong>Day</strong><small>Mapbox Standard · day</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                     <button type="button" class="live-style-option" data-map-style="dark" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dark"></span><span><strong>Night</strong><small>Mapbox Standard · night</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                     <button type="button" class="live-style-option" data-map-style="sunset" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-sunset"></span><span><strong>Dusk</strong><small>Mapbox Standard · dusk</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
                     <button type="button" class="live-style-option" data-map-style="dawn" role="menuitemradio" aria-checked="false"><span class="style-swatch style-swatch-dawn"></span><span><strong>Dawn</strong><small>Soft morning tones</small></span><svg class="ico style-check"><use href="#i-check"/></svg></button>
+                    <div class="live-weather-section">
+                      <span class="live-style-menu-title">Weather</span>
+                      <button type="button" class="live-weather-toggle" data-live-weather-toggle aria-pressed="false">
+                        <span><strong>Rain</strong><small>Slows traffic, longer headway</small></span>
+                        <span class="layer-toggle"></span>
+                      </button>
+                    </div>
                     <div class="live-rain-section" id="liveRainSection" hidden>
                       <span class="live-style-menu-title">Wet road</span>
                       <label class="live-rain-slider">
                         <span><strong>Rain &amp; fog</strong><small id="liveRainIntensityValue">60%</small></span>
-                        <input type="range" id="liveRainIntensity" min="0" max="100" step="5" value="60" aria-label="Rain and vignette intensity">
+                        <input type="range" id="liveRainIntensity" min="10" max="100" step="5" value="60" aria-label="Rain overlay intensity, 10 to 100 percent">
                       </label>
-                      <p class="live-rain-note">Drop density, blur and the vignette follow this level. The overlay thins out as you zoom away from the street.</p>
+                      <p class="live-rain-note">Droplet density and size follow this level — visuals only. The run's driving penalty stays on while rain is active.</p>
+                      <p class="live-rain-nerf"><span>Driving penalty</span><b>−25% speed · longer headway</b></p>
+                    </div>
+                  </div>
+                </div>
+                <div class="live-demand-picker">
+                  <button type="button" class="live-tool" data-live-action="demand" aria-label="Traffic demand level" title="Traffic demand" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#i-signal"/></svg></button>
+                  <div class="live-style-menu live-demand-menu" role="menu" aria-label="Traffic demand" hidden>
+                    <span class="live-style-menu-title">Traffic demand</span>
+                    <div class="live-demand" role="group" aria-label="Traffic demand level">
+                      <div class="live-demand-seg" role="radiogroup" aria-label="Demand preset">
+                        <button type="button" role="radio" aria-checked="false" data-demand-level="low">Low</button>
+                        <button type="button" role="radio" aria-checked="false" data-demand-level="medium">Medium</button>
+                        <button type="button" role="radio" aria-checked="true" data-demand-level="high">High</button>
+                      </div>
+                      <label class="live-demand-slider">
+                        <span class="live-demand-slider-label">Intensity</span>
+                        <input type="range" id="liveDemandSlider" min="45" max="100" step="5" value="100" aria-label="Traffic demand intensity, 45 to 100 percent of the network live rate">
+                        <output class="live-demand-slider-value" id="liveDemandSliderValue" for="liveDemandSlider">100%</output>
+                      </label>
+                      <p class="live-demand-note" id="liveDemandNote">Applies when the run starts.</p>
                     </div>
                   </div>
                 </div>
@@ -706,10 +733,75 @@
             </button>
           </section>
 
+          <section class="live-panel incident-panel" id="incidentResponsePanel" aria-label="Incident response" hidden>
+            <button type="button" class="incident-close" data-incident-close aria-label="Close incident response panel" title="Close"><svg class="ico"><use href="#i-x"/></svg></button>
+            <header class="incident-head">
+              <span class="incident-eyebrow"><i aria-hidden="true"></i>Incident Response</span>
+              <h2 data-incident-status>Active response</h2>
+              <p data-incident-location>—</p>
+            </header>
+
+            <!-- Only this body scrolls: the header and the Locate/Clear actions stay
+                 pinned, so a long response timeline can never push the buttons off
+                 the card or grow it down over the bottom dock. -->
+            <div class="incident-body">
+              <dl class="incident-grid">
+                <div><dt>Blocked lane</dt><dd data-incident-lane>—</dd></div>
+                <div><dt>Rerouted</dt><dd data-incident-rerouted>—</dd></div>
+                <div><dt>Ambulance</dt><dd data-incident-ambulance>—</dd></div>
+                <div><dt>ETA</dt><dd data-incident-eta>—</dd></div>
+              </dl>
+
+              <div class="incident-dispatch" data-incident-dispatch hidden>
+                <span class="incident-dispatch-phase" data-incident-phase>Dispatched</span>
+                <span class="incident-dispatch-track" aria-hidden="true"><i data-incident-progress></i></span>
+              </div>
+
+              <div class="incident-distance">
+                <span>Distance to scene</span>
+                <strong data-incident-distance>—</strong>
+              </div>
+
+              <dl class="incident-impact" data-incident-impact>
+                <div><dt>Queue</dt><dd><span data-incident-queue-km>—</span><small>km</small></dd></div>
+                <div><dt>Delay</dt><dd><span data-incident-delay>—</span><small>min</small></dd></div>
+                <div><dt>Clears in</dt><dd><span data-incident-clear-eta>—</span><small>min</small></dd></div>
+              </dl>
+
+              <section class="incident-controller" data-incident-controller hidden>
+                <header>
+                  <span>Controller response</span>
+                  <strong data-incident-controller-label>—</strong>
+                </header>
+                <p data-incident-controller-note>—</p>
+                <ul class="incident-preempts" data-incident-preempts></ul>
+              </section>
+
+              <ol class="incident-timeline" data-incident-timeline></ol>
+            </div>
+
+            <div class="incident-actions">
+              <button type="button" class="incident-locate" data-incident-locate><svg class="ico" aria-hidden="true"><use href="#i-crosshair"/></svg>Locate</button>
+              <button type="button" class="incident-clear" data-incident-clear>Clear incident</button>
+            </div>
+          </section>
+
           <div class="live-map-tools" aria-label="Map controls">
             <button type="button" data-live-map-action="zoom-in" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
             <button type="button" data-live-map-action="zoom-out" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
             <button type="button" data-live-map-action="reset" aria-label="Reset 3D view"><svg class="ico"><use href="#i-crosshair"/></svg></button>
+            <button type="button" class="live-map-comms" data-signal-comms aria-label="Show signal coordination channel" aria-pressed="false" title="Signal coordination — which junctions are handing traffic to which"><svg class="ico"><use href="#i-signal"/></svg></button>
+            <button type="button" class="live-map-gui" data-sumo-gui aria-label="Open the SUMO graphical interface" title="Open SUMO GUI — restarts the run in SUMO's own viewer"><svg class="ico"><use href="#i-monitor"/></svg></button>
+          </div>
+
+          <div class="live-comms-legend" data-comms-legend hidden>
+            <header><span>Coordination channel</span><strong data-comms-count>—</strong></header>
+            <p data-comms-note>—</p>
+            <ul class="live-comms-key">
+              <li><i class="is-active"></i>Handing over</li>
+              <li><i class="is-green"></i>Green, empty</li>
+              <li><i class="is-idle"></i>Idle</li>
+            </ul>
           </div>
 
           <div class="live-bottom-dock">
@@ -1230,8 +1322,26 @@
             <section class="settings-panel" data-settings-panel="models" role="tabpanel" hidden>
               <div class="settings-group">
                 <div class="settings-group-copy">
-                  <h2>Control Model</h2>
-                  <p>Pick the trained weights the live simulation runs. The choice is stored by the backend and survives a restart.</p>
+                  <h2>Control Model per Scenario</h2>
+                  <p>Every scenario owns its controller and its weights — a policy trained on one grid cannot drive another. Pick one per scenario; the choice is stored by the backend and survives a restart.</p>
+                </div>
+                <div class="settings-group-body">
+                  <div class="settings-form">
+                    <p class="field-hint" id="modelStatus">Loading trained models…</p>
+                    <div class="model-list scenario-models" id="modelScenarioList" role="list"></div>
+                    <div class="settings-actions">
+                      <button type="button" class="settings-btn" id="modelRefresh"><svg class="ico"><use href="#i-refresh"/></svg>Refresh</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>Trained Weights</h2>
+                  <p>The checkpoints that can run on the selected network: the selected run, saved model versions and raw training checkpoints.</p>
                 </div>
                 <div class="settings-group-body">
                   <div class="settings-form">
@@ -1244,14 +1354,39 @@
                         <option value="tunis">Tunis</option>
                       </select>
                     </label>
-                    <p class="field-hint" id="modelStatus">Loading trained models…</p>
                     <div class="model-list" id="modelList" role="list"></div>
-                    <div class="settings-actions">
-                      <button type="button" class="settings-btn" id="modelRefresh"><svg class="ico"><use href="#i-refresh"/></svg>Refresh</button>
-                    </div>
                   </div>
                 </div>
               </div>
+
+              <div class="settings-divider"></div>
+
+              <div class="settings-group">
+                <div class="settings-group-copy">
+                  <h2>LLM Provider</h2>
+                  <p>Which provider the LLM and LLM-team controllers call. Gemma 4 runs through OpenRouter; save its key in Integrations.</p>
+                </div>
+                <div class="settings-group-body">
+                  <form class="settings-form" id="llmConfigForm">
+                    <label class="form-field">
+                      <span>Provider</span>
+                      <select class="settings-select" id="llmProvider">
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="groq">Groq</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="opencode">OpenCode Go</option>
+                      </select>
+                    </label>
+                    <label class="form-field">
+                      <span>Model</span>
+                      <input type="text" id="llmModel" placeholder="google/gemma-4-26b-a4b-it:free">
+                    </label>
+                    <div class="settings-actions"><button type="submit" class="settings-primary">Save provider</button></div>
+                    <p class="field-hint" id="llmStatus">Checking the LLM provider…</p>
+                  </form>
+                </div>
+              </div>
+
             </section>
 
             <section class="settings-panel" data-settings-panel="workspace" role="tabpanel" hidden>
@@ -1469,6 +1604,24 @@
                       </form>
                       <div class="integration-actions">
                         <button type="button" class="settings-btn integration-test" data-integration-test="gemini"><svg class="ico" aria-hidden="true"><use href="#i-zap"/></svg>Test connection</button>
+                      </div>
+                      <p class="integration-detail" data-integration-detail>Checking backend…</p>
+                    </article>
+                    <article class="integration-card" data-integration="openrouter">
+                      <div class="integration-card-head">
+                        <span class="brand-mark brand-openrouter"><svg class="brand-svg" aria-hidden="true"><use href="#i-zap"/></svg></span>
+                        <span class="integration-status" data-integration-status><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg><span>Checking…</span></span>
+                      </div>
+                      <div class="integration-card-copy">
+                        <h3>OpenRouter</h3>
+                        <p>One key for Gemma 4 and the other hosted open models.</p>
+                      </div>
+                      <form class="integration-form" data-integration-form="openrouter">
+                        <input type="password" name="value" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" aria-label="OpenRouter API key">
+                        <button type="submit" class="settings-btn">Save</button>
+                      </form>
+                      <div class="integration-actions">
+                        <button type="button" class="settings-btn integration-test" data-integration-test="openrouter"><svg class="ico" aria-hidden="true"><use href="#i-zap"/></svg>Test connection</button>
                       </div>
                       <p class="integration-detail" data-integration-detail>Checking backend…</p>
                     </article>

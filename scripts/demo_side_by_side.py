@@ -579,7 +579,7 @@ def run(
                 if not pending and stop_after_snapshots:
                     try:  # the screenshot is written at the next step
                         env.step(controller.act(env, obs))
-                    except Exception as exc:  # noqa: BLE001 - sumo-gui may close first; the file is usually there
+                    except Exception as exc:
                         print(f"{method}: last step after the screenshot failed ({exc})")
                     break
     except FatalTraCIError:  # the window was closed, or sumo-gui stopped (e.g. its 3D view)

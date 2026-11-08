@@ -99,6 +99,7 @@ def list_models() -> dict[str, Any]:
 
 def _training_candidates() -> list[dict[str, Any]]:
     candidates = []
+    registry = load_registry()
     for info_path in sorted(TRAINING.glob("*/**/seed*/run_info.json")):
         try:
             info = json.loads(info_path.read_text(encoding="utf-8"))
@@ -109,7 +110,9 @@ def _training_candidates() -> list[dict[str, Any]]:
             if not checkpoint.is_file() or not sidecar.is_file():
                 continue
             meta = json.loads(sidecar.read_text(encoding="utf-8"))
-            candidates.append({"id": f"{agent}|{network}|{seed}", "agent": agent, "label": info.get("config", {}).get("label", agent), "network": network, "seed": seed, "timesteps": steps, "checkpoint": checkpoint.relative_to(ROOT).as_posix(), "sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(), "bytes": checkpoint.stat().st_size, "recipeHash": info.get("recipe_hash", ""), "algorithm": info.get("config", {}).get("algorithm", "ppo"), "recipe": info.get("config", {}), "sidecar": meta})
+            digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+            candidates.append({"id": f"{agent}|{network}|{seed}", "agent": agent, "method": agent, "label": info.get("config", {}).get("label", agent), "network": network, "seed": seed, "timesteps": steps, "checkpoint": checkpoint.relative_to(ROOT).as_posix(), "sha256": digest, "bytes": checkpoint.stat().st_size, "recipeHash": info.get("recipe_hash", ""), "algorithm": info.get("config", {}).get("algorithm", "ppo"), "recipe": info.get("config", {}), "sidecar": meta, # These weights may already be a saved version; the dashboard disables that row.
+                "registeredAs": _already_registered(registry, digest)})
         except (OSError, ValueError, KeyError, json.JSONDecodeError):
             continue
     return candidates

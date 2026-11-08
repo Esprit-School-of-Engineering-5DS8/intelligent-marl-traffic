@@ -120,7 +120,7 @@ def _execute(spec_dict: dict[str, Any]) -> tuple[str, str]:
             extra=spec.extra,
         )
         return row["run_id"], ""
-    except Exception:  # noqa: BLE001 - reported to the caller, the matrix goes on
+    except Exception:
         return spec_dict["method"], traceback.format_exc()
 
 

@@ -27,6 +27,10 @@ CONTEXT_WINDOWS = {
     "llama-3.3-70b-versatile": 131072,
     "gemini-2.5-flash": 1048576,
     "gemini-2.5-pro": 1048576,
+    "google/gemma-4-26b-a4b-it": 131072,
+    "google/gemma-4-26b-a4b-it:free": 131072,
+    "google/gemma-4-31b-it": 131072,
+    "google/gemma-4-31b-it:free": 131072,
 }
 DEFAULT_CONTEXT_WINDOW = 8192
 

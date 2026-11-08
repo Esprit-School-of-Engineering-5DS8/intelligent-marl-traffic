@@ -161,13 +161,18 @@ export function liveRoamStats() {
   const vehicles = Number(metrics.vehicles) || 0;
   const queued = Number(metrics.queued) || 0;
   const speed = Math.round(Number(metrics.avgSpeedKmh) || 0);
-  const critical = (snapshot.events || []).filter((event) => event.severity === 'critical').length;
+  // Signal transitions are counted in the KPIs, not treated as incidents; every
+  // other event the run publishes is still open, so the strip counts them all and
+  // keeps the critical subset for the severity colour.
+  const events = (snapshot.events || []).filter((event) => event.kind !== 'signalChange');
+  const critical = events.filter((event) => event.severity === 'critical').length;
   const junctions = Array.isArray(metrics.junctions) ? metrics.junctions : [];
   return {
     speed,
     density: round(vehicles ? queued / vehicles : 0, 0.01),
     vehicles,
-    incidents: critical,
+    incidents: events.length,
+    critical,
     signal: snapshot.policy?.label || String(snapshot.method || 'Live'),
     segments: junctions.slice(0, 6).map((junction) => {
       const segmentSpeed = Math.round(Number(junction.avgSpeedKmh) || 0);

@@ -29,6 +29,7 @@ def env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("MAPBOX_TOKEN", raising=False)
     return target
 
@@ -38,6 +39,7 @@ def test_only_real_services_are_listed():
     assert [entry["id"] for entry in body["integrations"]] == [
         "groq",
         "gemini",
+        "openrouter",
         "mapbox",
         "sumo",
     ]
@@ -46,6 +48,7 @@ def test_only_real_services_are_listed():
     assert [entry["id"] for entry in body["integrations"] if entry["testable"]] == [
         "groq",
         "gemini",
+        "openrouter",
     ]
 
 
@@ -139,6 +142,20 @@ def test_connection_test_reports_gemini_models(env_file, monkeypatch):
     response = client.post("/api/integrations/gemini/test")
     assert response.status_code == 200
     assert "Gemini accepted the key" in response.json()["detail"]
+
+
+def test_connection_test_reports_openrouter_models(env_file, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-live")
+
+    def fake_remote(url: str, headers: dict[str, str]) -> dict[str, object]:
+        assert url == "https://openrouter.ai/api/v1/models"
+        assert headers == {"Authorization": "Bearer sk-or-v1-live"}
+        return {"data": [{"id": "google/gemma-4-26b-a4b-it:free"}]}
+
+    monkeypatch.setattr(integrations, "_remote_json", fake_remote)
+    response = client.post("/api/integrations/openrouter/test")
+    assert response.status_code == 200
+    assert "OpenRouter accepted the key" in response.json()["detail"]
 
 
 def test_connection_test_surfaces_provider_refusal(env_file, monkeypatch):

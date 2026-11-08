@@ -18,3 +18,48 @@ addopts = "-ra"
 # Always test this checkout's backend. An editable install of another copy would
 # otherwise shadow src/cotraffic and silently run the tests against it.
 pythonpath = ["src"]
+
+[tool.ruff]
+# Pin the rule set explicitly. Without this section the lint result depends on the
+# default rules of whichever ruff build a developer happens to have installed, so
+# two people running `ruff check` on this checkout get different error counts and
+# neither can tell whether a change introduced a regression. requirements-dev.txt
+# pins the version; this pins the rules.
+target-version = "py310"
+line-length = 100
+extend-exclude = [".venv", "frontend", "node_modules", "sumo_files", "results"]
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: import sorting, B: bugbear, UP: pyupgrade,
+# SIM: simplify, RUF: ruff-specific. Deliberately excluded for now: BLE001 and S
+# (blind excepts and bandit) report ~75 hits in api/simulation.py, where broad
+# excepts around TraCI calls are intentional; enabling them without fixing that
+# file would just make the gate permanently red.
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+    "E501",  # line length is handled by the formatter, not the linter
+    "B008",  # FastAPI Depends()/Query() in defaults is the framework idiom
+    "RUF001", "RUF002", "RUF003",  # ambiguous unicode: French accents in docstrings
+    # The list-building code in analysis/tables.py and aggregate.py is written as
+    # `["a"] + rows` throughout; RUF005 is a style preference, not a defect, and
+    # rewriting 19 sites would be churn in files nobody is changing.
+    "RUF005",
+    # `zip(a, b)` over equal-length sequences is used deliberately in forecast.py
+    # and programs.py where a length mismatch is a bug we want to see, not mask
+    # with strict=True raising at runtime inside a simulation loop.
+    "B905",
+    # `try/except/pass` around best-effort TraCI and file cleanup is intentional;
+    # contextlib.suppress reads worse at these call sites.
+    "SIM105",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cotraffic", "api"]
+
+[tool.ruff.lint.per-file-ignores]
+# api/ and scripts/ put src/ on sys.path before importing cotraffic, so the imports
+# that follow the bootstrap are necessarily not at the top of the file.
+"api/**" = ["E402"]
+"scripts/**" = ["E402"]
+# Tests do the same bootstrap, and assert on private helpers by design.
+"tests/**" = ["E402"]

@@ -1714,6 +1714,17 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .model-copy .model-reason { color: #b4552f; }
 .model-empty { margin: 10px 0 0; font-size: 11px; color: #8d8d8d; }
 
+/* One row per scenario: controller select + a shortcut to train that scenario. */
+.scenario-model { flex-wrap: wrap; }
+.scenario-model .model-copy { flex: 1 1 160px; }
+.scenario-model .scenario-controller { flex: 0 1 200px; width: auto; min-width: 150px; }
+
+.settings-inline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 /* ---------------- Live events (Events tab) ---------------- */
 
 .live-events { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
@@ -5178,6 +5189,7 @@ html.is-sidebar-collapsed .sidebar-collapse {
 
 .live-panels-collapsed .zone-panel,
 .live-panels-collapsed .queue-panel { opacity: 0; pointer-events: none; translate: -110% 0; }
+.live-panels-collapsed .incident-panel { opacity: 0; pointer-events: none; translate: 110% 0; }
 .live-panels-collapsed .live-bottom-dock > * { opacity: 0; pointer-events: none; translate: 0 160%; }
 .live-panels-collapsed .simulation-timeline { opacity: 1; pointer-events: auto; }
 .live-roam-tab { color: #5b7280; }
@@ -5601,7 +5613,9 @@ html.is-sidebar-collapsed .sidebar-collapse {
   top: 16px;
   right: 16px;
   left: 16px;
-  z-index: 20;
+  /* Above the bottom dock (also 20): the map-style popup opens downward and the
+     weather controls at its bottom must cover the dock, not be clipped by it. */
+  z-index: 24;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -7314,7 +7328,8 @@ html.is-sidebar-collapsed .sidebar-collapse {
   .live-traffic-pill { height: 32px; padding: 0 5px 0 7px; font-size: 8px; }
   .live-tool-group { height: 32px; }
   .live-tool { width: 25px; height: 26px; }
-  .live-tool[data-live-action="weather"],
+  /* The weather toggle stays reachable at every width: it is the only control
+     that turns the run's rain on, so hiding it left narrow windows without it. */
   .live-tool[data-live-action="fullscreen"] { display: none; }
   .live-round-btn { display: none; }
   .zone-panel { top: 61px; left: var(--panel-edge); width: min(300px, calc(100% - (2 * var(--panel-edge)))); padding: 12px; }
@@ -7667,6 +7682,14 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-layer-picker { position: relative; }
 /* Wet-road intensity lives in the map-style popup: it only shows once rain is
    falling, so the toolbar keeps one weather button in both states. */
+.live-weather-section { margin: 2px 0 4px; padding: 4px 0 6px; border-top: 1px solid rgba(0, 0, 0, 0.08); border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+.live-weather-toggle { display: flex; width: 100%; align-items: center; gap: 9px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: #35362f; text-align: left; cursor: pointer; }
+.live-weather-toggle:hover { background: rgba(255, 255, 255, 0.7); }
+.live-weather-toggle > span:first-child { display: grid; flex: 1; gap: 2px; }
+.live-weather-toggle strong { font-size: 11px; font-weight: 600; }
+.live-weather-toggle small { color: #85847a; font-size: 9px; }
+.live-weather-toggle[aria-pressed="true"] .layer-toggle { background: #5d8a63; }
+.live-weather-toggle[aria-pressed="true"] .layer-toggle::after { transform: translateX(10px); }
 .live-rain-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
 .live-rain-section[hidden] { display: none; }
 .live-rain-slider { display: grid; gap: 6px; padding: 4px 8px 6px; }
@@ -7675,6 +7698,12 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-rain-slider small { color: #6f7a63; font-size: 10px; font-weight: 700; }
 .live-rain-slider input[type="range"] { width: 100%; height: 14px; margin: 0; accent-color: #5d8a63; cursor: pointer; }
 .live-rain-note { margin: 4px 0 2px; padding: 0 8px; color: #85847a; font-size: 9px; line-height: 1.45; }
+/* The slider shapes the map's rain only; the SUMO driving penalty is part of the
+   weather, so it must stay visible even when the slider is at its minimum. */
+.live-rain-nerf { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2px 0 4px; padding: 5px 8px; border-radius: 6px; background: rgba(93, 138, 99, 0.12); color: #4d5a45; font-size: 9px; line-height: 1.4; }
+.live-rain-nerf span { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.live-rain-nerf b { color: #35362f; font-weight: 600; }
+
 .live-layer-menu { right: auto; left: 0; }
 .live-layer-option { display: flex; width: 100%; align-items: center; gap: 9px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: #35362f; text-align: left; cursor: pointer; }
 .live-layer-option:hover, .live-layer-option.is-selected { background: rgba(255,255,255,.7); }
@@ -7693,6 +7722,9 @@ html.is-sidebar-collapsed .sidebar-collapse {
   position: absolute;
   z-index: 20;
   top: calc(100% + 10px);
+  /* Short windows cannot show every row at once; scroll instead of clipping. */
+  max-height: min(72vh, 540px);
+  overflow-y: auto;
   right: 0;
   width: 226px;
   padding: 8px;
@@ -10765,6 +10797,16 @@ html.is-sidebar-collapsed .sidebar-collapse {
   font-style: normal;
 }
 
+/* A critical incident is the one number on the strip that should stop a glance:
+   the value goes red and the label keeps its weight so the row still reads. */
+.roam-stat.is-critical strong,
+.roam-stat.is-critical i { color: #c0392b; }
+
+/* Values are patched in place at stream rate; a short fade marks the write so a
+   number that changes is visibly fresher than one that has not moved. */
+.roam-strip:not(.is-live) .roam-stat strong { opacity: 0.55; }
+.roam-stat strong { transition: color 160ms ease, opacity 160ms ease; }
+
 /* The roam telemetry strip is part of the panel chrome, so it goes dark with
    the rest of them instead of staying a white card over a dark scene. */
 .live-map-view.live-roam-mode:not(.live-panels-light) .roam-strip {
@@ -10777,6 +10819,8 @@ html.is-sidebar-collapsed .sidebar-collapse {
 .live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat span,
 .live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat i { color: rgba(244, 248, 251, 0.62); }
 .live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat strong { color: #f4f8fb; }
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat.is-critical strong,
+.live-map-view.live-roam-mode:not(.live-panels-light) .roam-stat.is-critical i { color: #ff8a7a; }
 
 .roam-pills {
   position: absolute;
@@ -11771,3 +11815,698 @@ html.is-sidebar-collapsed .sidebar-collapse {
 }
 
 .sig-row.is-held .sig-name i { opacity: 0.6; font-style: normal; }
+
+/* ------------------------------------------------------------------
+   Incident response � live accident, reroute and ambulance dispatch
+   ------------------------------------------------------------------ */
+@keyframes incidentPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.55; }
+}
+
+.live-map-view .incident-panel {
+  top: 86px;
+  /* The map tool rail (zoom / reset / comms / SUMO GUI) owns the right edge at
+     --panel-edge and is 31px wide, so the card has to clear it: edge + rail +
+     breathing gap. Anchoring at --panel-edge put the card straight over it. */
+  right: calc(var(--panel-edge) + 31px + 8px);
+  z-index: 14;
+  display: flex;
+  width: 300px;
+  /* The card is pinned to the top, so its height has to stop above the bottom
+     dock (dock + gap + timeline + gap + edge). Without this cap a long response
+     timeline grew the card straight down over the lower panels. */
+  max-height: calc(100% - 86px - var(--dock-h-total) - var(--panel-gap) - var(--timeline-h) - var(--panel-gap) - var(--panel-edge));
+  flex-direction: column;
+  padding: 14px 15px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 14px;
+  background: linear-gradient(152deg, rgba(255, 253, 245, 0.94) 0%, rgba(249, 244, 225, 0.86) 100%);
+  box-shadow: 0 22px 50px rgba(47, 45, 33, 0.16);
+  color: #3d3b2d;
+}
+
+/* Header and actions are the fixed frame; the body between them takes the
+   remaining height and scrolls. min-height:0 lets the flex child actually
+   shrink instead of forcing the card to overflow. */
+.live-map-view .incident-panel .incident-head,
+.live-map-view .incident-panel .incident-actions { flex: none; }
+
+.live-map-view .incident-panel .incident-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(86, 80, 58, 0.32) transparent;
+}
+
+.live-map-view .incident-panel .incident-body::-webkit-scrollbar { width: 6px; }
+
+.live-map-view .incident-panel .incident-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.live-map-view .incident-panel .incident-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(86, 80, 58, 0.28);
+}
+
+.live-map-view .incident-panel .incident-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(86, 80, 58, 0.45);
+}
+
+.live-map-view:not(.live-panels-light) .incident-panel .incident-body {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.live-map-view:not(.live-panels-light) .incident-panel .incident-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.live-map-view:not(.live-panels-light) .incident-panel .incident-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.live-map-view .incident-panel[hidden] { display: none; }
+
+.live-map-view .incident-panel .incident-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(86, 80, 58, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.4);
+  color: #4a4534;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.live-map-view .incident-panel .incident-close:hover { background: rgba(255, 255, 255, 0.72); }
+.live-map-view .incident-panel .incident-close .ico { width: 15px; height: 15px; }
+
+.incident-head { padding-right: 26px; }
+
+.incident-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b3402f;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.incident-eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff5a4e;
+  box-shadow: 0 0 0 4px rgba(255, 90, 78, 0.18);
+  animation: incidentPulse 1.4s ease-in-out infinite;
+}
+
+.incident-head h2 {
+  margin: 6px 0 0;
+  color: #313024;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.incident-head p {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #8c8879;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 12px 0 0;
+  padding: 11px 0;
+  border-top: 1px solid var(--lm-line);
+  border-bottom: 1px solid var(--lm-line);
+}
+
+.incident-grid dt {
+  color: #8c8879;
+  font-size: 7.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.incident-grid dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #403d2e;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-distance {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 9px 0 4px;
+  color: #8c8879;
+  font-size: 8.5px;
+}
+
+.incident-distance strong { color: #313024; font-size: 12px; font-weight: 600; }
+
+/* Dispatch window: the unit's run to the scene, phased and distance-driven. */
+.incident-dispatch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 0 3px;
+}
+
+.incident-dispatch[hidden] { display: none; }
+
+.incident-dispatch-phase {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 176, 32, 0.16);
+  color: #8a5a00;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.incident-dispatch[data-phase="onScene"] .incident-dispatch-phase,
+.incident-dispatch[data-phase="arrived"] .incident-dispatch-phase {
+  background: rgba(63, 143, 91, 0.16);
+  color: #2f6b45;
+}
+
+.incident-dispatch-track {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(86, 80, 58, 0.14);
+}
+
+.incident-dispatch-track i {
+  display: block;
+  width: 4%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffb020, #ff8a3d);
+  transition: width 420ms ease;
+}
+
+.incident-dispatch[data-phase="onScene"] .incident-dispatch-track i,
+.incident-dispatch[data-phase="arrived"] .incident-dispatch-track i {
+  background: linear-gradient(90deg, #3f8f5b, #5dab77);
+}
+
+/* Controller response: which policy handled the incident and what it held open. */
+.incident-controller {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid rgba(86, 80, 58, 0.12);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.incident-controller[hidden] { display: none; }
+
+.incident-controller header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.incident-controller header span {
+  color: #8c8879;
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.incident-controller header strong {
+  overflow: hidden;
+  color: #403d2e;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-controller p {
+  margin: 4px 0 0;
+  color: #6f6a58;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.incident-preempts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.incident-preempts[hidden] { display: none; }
+
+.incident-preempts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(63, 143, 91, 0.14);
+  color: #2f6b45;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.incident-preempts li i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #3f8f5b;
+}
+
+.incident-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.incident-step {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: start;
+}
+
+.incident-step-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #c9c4b1;
+}
+
+.incident-step.is-done .incident-step-dot { background: #3f8f5b; }
+.incident-step.is-active .incident-step-dot {
+  background: #ffb020;
+  box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.22);
+}
+
+.incident-step-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.incident-step-copy strong {
+  color: #6f6a58;
+  font-size: 7.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.incident-step-copy small {
+  color: #3d3b2d;
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+
+.incident-step time { color: #a19b88; font-size: 8px; }
+
+.incident-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--lm-line);
+}
+
+.incident-actions button {
+  display: inline-flex;
+  height: 30px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(86, 80, 58, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #403d2e;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.incident-actions button:hover { background: rgba(255, 255, 255, 0.78); }
+.incident-actions button:disabled { opacity: 0.55; cursor: default; }
+.incident-actions .ico { width: 12px; height: 12px; }
+
+.incident-actions .incident-clear {
+  border-color: #c23f2e;
+  background: #d34a38;
+  color: #ffffff;
+}
+
+.incident-actions .incident-clear:hover { background: #c23f2e; }
+
+.incident-panel.is-cleared .incident-eyebrow { color: #3f8f5b; }
+.incident-panel.is-cleared .incident-eyebrow i {
+  background: #3f8f5b;
+  box-shadow: 0 0 0 4px rgba(63, 143, 91, 0.18);
+  animation: none;
+}
+.incident-panel.is-cleared .incident-clear { border-color: #527059; background: #5d7a63; }
+
+.live-map-view:not(.live-panels-light) .incident-panel {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(152deg, rgba(24, 29, 35, 0.95) 0%, rgba(18, 22, 27, 0.92) 100%);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.42);
+  color: #eef3f7;
+}
+
+.live-map-view:not(.live-panels-light) .incident-head h2,
+.live-map-view:not(.live-panels-light) .incident-grid dd,
+.live-map-view:not(.live-panels-light) .incident-distance strong,
+.live-map-view:not(.live-panels-light) .incident-step-copy small { color: #eef3f7; }
+
+.live-map-view:not(.live-panels-light) .incident-grid { border-color: rgba(255, 255, 255, 0.1); }
+.live-map-view:not(.live-panels-light) .incident-head p,
+.live-map-view:not(.live-panels-light) .incident-grid dt,
+.live-map-view:not(.live-panels-light) .incident-distance,
+.live-map-view:not(.live-panels-light) .incident-step-copy strong { color: #97a3ad; }
+
+.live-map-view:not(.live-panels-light) .incident-actions button {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #eef3f7;
+}
+
+.live-map-view:not(.live-panels-light) .incident-actions button:hover { background: rgba(255, 255, 255, 0.16); }
+
+.live-map-view:not(.live-panels-light) .incident-controller {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.live-map-view:not(.live-panels-light) .incident-controller header strong,
+.live-map-view:not(.live-panels-light) .incident-controller p { color: #d5dde4; }
+
+.live-map-view:not(.live-panels-light) .incident-controller header span { color: #97a3ad; }
+
+.live-map-view:not(.live-panels-light) .incident-dispatch-track { background: rgba(255, 255, 255, 0.14); }
+
+.live-map-view:not(.live-panels-light) .incident-dispatch-phase {
+  background: rgba(255, 176, 32, 0.2);
+  color: #ffcf7a;
+}
+
+.live-map-view:not(.live-panels-light) .incident-dispatch[data-phase="onScene"] .incident-dispatch-phase,
+.live-map-view:not(.live-panels-light) .incident-dispatch[data-phase="arrived"] .incident-dispatch-phase {
+  background: rgba(63, 143, 91, 0.26);
+  color: #8fd6a8;
+}
+
+.live-map-view:not(.live-panels-light) .incident-preempts li {
+  background: rgba(63, 143, 91, 0.22);
+  color: #8fd6a8;
+}
+
+/* Signal coordination toggle: the active state is the same teal the map channel uses,
+   so the button and the overlay read as one thing. */
+.live-map-comms.is-active {
+  border-color: rgba(90, 209, 200, 0.6);
+  background: rgba(90, 209, 200, 0.18);
+  color: #2b8f87;
+}
+
+.live-map-view:not(.live-panels-light) .live-map-comms.is-active {
+  border-color: rgba(90, 209, 200, 0.5);
+  background: rgba(90, 209, 200, 0.22);
+  color: #8ff0e8;
+}
+
+/* SUMO GUI launcher: active while the run is stepping in SUMO's own window. */
+.live-map-gui.is-active {
+  border-color: rgba(255, 176, 32, 0.6);
+  background: rgba(255, 176, 32, 0.18);
+  color: #8a5a00;
+}
+
+.live-map-gui:disabled { cursor: not-allowed; opacity: 0.42; }
+
+.live-map-view:not(.live-panels-light) .live-map-gui.is-active {
+  border-color: rgba(255, 176, 32, 0.5);
+  background: rgba(255, 176, 32, 0.22);
+  color: #ffcf7a;
+}
+
+/* Coordination legend: states what the overlay is showing, including when the active
+   policy is not reading the channel. */
+.live-comms-legend {
+  position: absolute;
+  bottom: 18px;
+  left: var(--panel-edge);
+  z-index: 12;
+  width: 232px;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 11px;
+  background: rgba(255, 253, 245, 0.93);
+  box-shadow: 0 14px 34px rgba(47, 45, 33, 0.14);
+  color: #3d3b2d;
+}
+
+.live-comms-legend[hidden] { display: none; }
+
+.live-comms-legend header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.live-comms-legend header span {
+  color: #8c8879;
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.live-comms-legend header strong {
+  color: #2b8f87;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.live-comms-legend p {
+  margin: 5px 0 0;
+  color: #6f6a58;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.live-comms-legend p[data-mode="inert"] { color: #a8622a; }
+.live-comms-legend p[data-mode="idle"] { color: #6f6a58; }
+
+.live-comms-key {
+  display: flex;
+  gap: 12px;
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-comms-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8c8879;
+  font-size: 8px;
+}
+
+.live-comms-key i { width: 14px; height: 2px; border-radius: 2px; }
+.live-comms-key i.is-active { background: #5ad1c8; }
+.live-comms-key i.is-green { background: #8fa8a6; }
+.live-comms-key i.is-idle { background: rgba(125, 139, 147, 0.5); }
+
+.live-map-view:not(.live-panels-light) .live-comms-legend {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(24, 29, 35, 0.95);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+  color: #eef3f7;
+}
+
+.live-map-view:not(.live-panels-light) .live-comms-legend p { color: #d5dde4; }
+.live-map-view:not(.live-panels-light) .live-comms-legend p[data-mode="inert"] { color: #ffcf7a; }
+.live-map-view:not(.live-panels-light) .live-comms-legend header span,
+.live-map-view:not(.live-panels-light) .live-comms-key li { color: #97a3ad; }
+.live-map-view:not(.live-panels-light) .live-comms-legend header strong { color: #8ff0e8; }
+
+@media (max-width: 720px) {
+  .live-map-view .incident-panel {
+    top: auto;
+    right: 8px;
+    bottom: 104px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100% - 104px - 16px);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Traffic demand dial (map-conditions menu)
+   Lives in the style menu next to Weather rather than in a dock card:
+   the bottom dock is a fixed-height row, and this control needs more
+   room than a card has. The presets are the coarse control, the slider
+   the fine one; both write the same fraction of the live demand rate.
+   ------------------------------------------------------------------ */
+/* The demand trigger sits in the tool rail beside the layer and style pickers, so it
+   needs the same positioning context and popup anchoring they use. */
+.live-demand-picker {
+  position: relative;
+}
+
+.live-demand-picker .live-demand-menu {
+  right: 0;
+  width: 226px;
+}
+
+/* The trigger shows the current level, so the traffic can be read without opening the
+   popup. Colour tracks the level: green is the calibrated rate, amber and red warn
+   that the network is being pushed. */
+.live-demand-picker [data-live-action="demand"] {
+  position: relative;
+}
+
+.live-demand-picker [data-live-action="demand"]::after {
+  content: attr(data-level);
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #4d5a45;
+  font-size: 6px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.live-demand-picker [data-live-action="demand"][data-level="low"]::after { color: #7a6a2f; }
+.live-demand-picker [data-live-action="demand"][data-level="medium"]::after { color: #6f7a63; }
+.live-demand-picker [data-live-action="demand"][data-level="high"]::after { color: #3f6b46; }
+.live-demand-picker [data-live-action="demand"][data-level="custom"]::after { color: #8a6a2a; }
+
+.live-demand {
+  display: grid;
+  gap: 6px;
+  padding: 0 8px 2px;
+}
+
+.live-demand-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(120, 118, 105, 0.12);
+}
+
+.live-demand-seg button {
+  padding: 5px 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #5d5f56;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.live-demand-seg button:hover { background: rgba(255, 255, 255, 0.62); }
+
+.live-demand-seg button.is-selected {
+  background: #5d8a63;
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(45, 60, 45, 0.28);
+}
+
+.live-demand-seg button:focus-visible {
+  outline: 2px solid #5d8a63;
+  outline-offset: 1px;
+}
+
+.live-demand-slider {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-demand-slider-label {
+  color: #6f7a63;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.live-demand-slider input[type="range"] {
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  accent-color: #5d8a63;
+  cursor: pointer;
+}
+
+.live-demand-slider-value {
+  min-width: 30px;
+  color: #35362f;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.live-demand-note {
+  margin: 0;
+  color: #85847a;
+  font-size: 9px;
+  line-height: 1.4;
+}

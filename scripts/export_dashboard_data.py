@@ -95,17 +95,53 @@ def cell_key(network: str, scenario: str, demand: str) -> str:
 # --- aggregated results -----------------------------------------------------------------
 
 
+SUMMARY_COLUMNS = [
+    "network",
+    "scenario",
+    "demand",
+    "method",
+    "metric",
+    "n",
+    "n_train",
+    "mean",
+    "ci_lo",
+    "ci_hi",
+    "std",
+]
+
+
+def load_exported_summary(out: Path) -> pd.DataFrame | None:
+    """The aggregate table already exported to the dashboard, in the study's schema."""
+    path = out / "summary.json"
+    if not path.exists():
+        return None
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    frame = pd.DataFrame(rows).rename(columns={"ciLo": "ci_lo", "ciHi": "ci_hi", "nTrain": "n_train"})
+    for column in SUMMARY_COLUMNS:
+        if column not in frame:
+            frame[column] = None
+    return frame[SUMMARY_COLUMNS]
+
+
 def export_summary(out: Path) -> pd.DataFrame:
-    summary = pd.read_csv(SUMMARY / "summary.csv")
+    path = SUMMARY / "summary.csv"
+    if path.exists():
+        summary = pd.read_csv(path)
+    else:
+        # A checkout without the study's aggregates must not blank the dashboard: recording
+        # a replay refreshes the export, and that must not delete rows it cannot rebuild.
+        existing = load_exported_summary(out)
+        if existing is not None:
+            print(f"  no aggregated summary at {path}; keeping the {len(existing)} exported rows")
+            return existing
+        print(f"  no aggregated summary at {path}; writing an empty table")
+        summary = pd.DataFrame(columns=SUMMARY_COLUMNS)
     extra = extra_summary()
     if not extra.empty:
         summary = pd.concat([summary, extra], ignore_index=True)
     rows = [
         {camel(k): v for k, v in rec.items()}
-        for rec in summary[
-            ["network", "scenario", "demand", "method", "metric", "n", "n_train", "mean"]
-            + ["ci_lo", "ci_hi", "std"]
-        ].to_dict("records")
+        for rec in summary[SUMMARY_COLUMNS].to_dict("records")
     ]
     write(out, "summary.json", rows)
     return summary
@@ -170,6 +206,13 @@ BASELINE_SET = {"ft", "act", "mp", "ev_rule", "ev_rule_mp", "ped_rule_mp"}
 
 def export_comparisons(out: Path) -> None:
     frames = [pd.read_csv(f) for f in sorted(SUMMARY.glob("comparisons_*.csv"))]
+    if not frames:
+        # Same rule as the summary: never replace exported comparisons we cannot rebuild.
+        if (out / "comparisons.json").exists():
+            print("  no comparison tables; keeping comparisons.json")
+            return
+        write(out, "comparisons.json", [])
+        return
     comp = pd.concat(frames, ignore_index=True)
     keep = [
         "network",
@@ -348,7 +391,7 @@ def export_pedestrian_greens(out: Path) -> None:
             # crowd sizes seen fewer than 10 times give noisy means: left out
             stats = stats[stats["size"] >= 10]
             methods[method] = {
-                "greens": int(len(m)),
+                "greens": len(m),
                 "crossed": int(m["crossed"].sum()),
                 "crowd": stats["waiting_at_start"].astype(int).tolist(),
                 "meanDuration": stats["mean"].round(2).tolist(),

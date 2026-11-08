@@ -10,7 +10,7 @@ import asyncio
 import json
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -75,7 +75,7 @@ def start_train(req: TrainRequest) -> dict[str, Any]:
             overrides=req.overrides,
         )
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 class ModelBenchmarkRequest(BaseModel):
@@ -122,8 +122,8 @@ def start_model_benchmark(req: ModelBenchmarkRequest) -> dict[str, Any]:
             if hashlib.sha256(checkpoint.read_bytes()).hexdigest() != entry["sha256"]:
                 raise HTTPException(422, f"saved model checksum mismatch: {reference}")
         selected.append({"id": reference, "label": f"{name} v{version_num}", "version": version_num, "network": entry.get("network"), "method": entry.get("method", name), "checkpoint": str(checkpoint), "recipe": entry.get("recipe", {})})
-    from cotraffic.envs.episodes import unsupported
     from cotraffic import config
+    from cotraffic.envs.episodes import unsupported
     if req.scenario != "normal":
         try:
             config.load("scenarios", req.scenario)
@@ -208,7 +208,7 @@ def start_compare(req: CompareRequest) -> dict[str, Any]:
             req.llm_settings.model_dump() if req.llm_settings else None,
         )
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.get("/api/jobs")

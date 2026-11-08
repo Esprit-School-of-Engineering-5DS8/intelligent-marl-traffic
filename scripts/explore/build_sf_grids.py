@@ -27,9 +27,9 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT / "src"))
 
-from cotraffic.networks.osm import download_osm  # noqa: E402
-from cotraffic.utils.proc import run  # noqa: E402
-from cotraffic.utils.sumo import binary  # noqa: E402
+from cotraffic.networks.osm import download_osm
+from cotraffic.utils.proc import run
+from cotraffic.utils.sumo import binary
 
 OUT_DIR = PROJECT / "sumo_files"
 

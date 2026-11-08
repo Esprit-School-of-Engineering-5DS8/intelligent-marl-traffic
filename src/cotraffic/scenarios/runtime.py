@@ -26,7 +26,7 @@ class SensorNoise:
 
     def reset(self, lanes: Iterable[str], rng: np.random.Generator) -> None:
         lanes = sorted(lanes)
-        n_failed = int(round(self.failed_fraction * len(lanes)))
+        n_failed = round(self.failed_fraction * len(lanes))
         self.failed = set(rng.choice(lanes, size=n_failed, replace=False)) if n_failed else set()
 
     def apply(self, meas, rng: np.random.Generator) -> None:

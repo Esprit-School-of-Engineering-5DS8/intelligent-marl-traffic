@@ -1,6 +1,7 @@
+import sys
 import urllib.request
 from pathlib import Path
-import sys
+
 
 def download_tunisia_pbf():
     cache_dir = Path("sumo_files/cache")

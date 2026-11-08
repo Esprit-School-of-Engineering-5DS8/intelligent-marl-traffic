@@ -62,6 +62,10 @@ out/
 .ruff_cache/
 frontend/dist/
 
+# Local debug captures and Perch workspace state
+.native-*.png
+.perch/
+
 # Keep the README screenshots: only generated screenshot folders are ignored.
 !docs/screenshots/
 !docs/screenshots/*.png

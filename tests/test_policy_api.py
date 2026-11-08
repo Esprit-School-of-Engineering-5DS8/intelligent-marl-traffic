@@ -76,3 +76,48 @@ def test_llm_without_a_key_stays_runnable_but_degraded(monkeypatch):
     assert body["available"] is True
     assert body["degraded"] is True
     assert "GEMINI_API_KEY" in body["reason"]
+
+
+def test_each_scenario_keeps_its_own_controller():
+    """A choice made for one scenario must not leak into the others."""
+    assert client.put(
+        "/api/policy", json={"method": "mp", "network": "sf_mission_3x3"}
+    ).status_code == 200
+    assert client.put(
+        "/api/policy", json={"method": "act", "network": "tunis"}
+    ).status_code == 200
+    body = client.get("/api/policy").json()
+    per_network = {entry["network"]: entry for entry in body["perNetwork"]}
+    assert set(per_network) == set(policy.NETWORKS)
+    assert per_network["sf_mission_3x3"]["method"] == "mp"
+    assert per_network["tunis"]["method"] == "act"
+    # current() reports the last edited scenario, ready for the live controls.
+    assert body["network"] == "tunis"
+    # ... while a run of the other scenario reads its own controller.
+    assert policy.method_for("sf_mission_3x3") == "mp"
+    assert policy.method_for("sf_mission_2x2") == "mp"  # config default, untouched
+
+
+def test_editing_one_scenario_leaves_the_others_untouched():
+    client.put("/api/policy", json={"method": "mp", "network": "sf_mission_2x2"})
+    client.put("/api/policy", json={"method": "act", "network": "sf_mission_3x3"})
+    client.put("/api/policy", json={"method": "ft", "network": "sf_mission_2x2"})
+    per_network = {e["network"]: e for e in client.get("/api/policy").json()["perNetwork"]}
+    assert per_network["sf_mission_2x2"]["method"] == "ft"
+    assert per_network["sf_mission_3x3"]["method"] == "act"
+
+
+def test_each_scenario_reports_its_own_trained_weights_readiness():
+    body = client.get("/api/policy").json()
+    per_network = {entry["network"]: entry for entry in body["perNetwork"]}
+    for network, entry in per_network.items():
+        assert entry["scenario"] == next(
+            scenario for scenario, net in policy.SCENARIO_NETWORKS.items() if net == network
+        )
+        if entry["method"] in policy.LEARNED:
+            # Weights are network-specific: the entry says which network lacks them.
+            if not entry["available"]:
+                assert network in entry["reason"]
+        else:
+            assert entry["available"] is True
+    assert set(body["catalogByNetwork"]) == set(policy.NETWORKS)

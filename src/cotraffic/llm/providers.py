@@ -1,4 +1,5 @@
-"""Small JSON-capable LLM providers (OpenCode Go, Groq and Gemini) with no extra dependency.
+"""Small JSON-capable LLM providers (OpenCode Go, Groq, Gemini and OpenRouter) with no
+extra dependency.
 
 The traffic controllers need a strict, short JSON answer. Every API is called with the
 standard library so that the simulation runs on a laptop without another SDK. Keys are
@@ -8,7 +9,9 @@ Three providers share one contract:
 
 * ``groq`` and ``gemini`` keep their original request shapes;
 * ``opencode`` speaks the OpenAI-compatible OpenCode Go endpoint and honours a
-  ``reasoning_effort`` hint (the single biggest latency lever for the LLM team).
+  ``reasoning_effort`` hint (the single biggest latency lever for the LLM team);
+* ``openrouter`` speaks OpenRouter's OpenAI-compatible gateway, which is how Gemma 4
+  and the other hosted open models are reached with a single key.
 
 ``chat_json`` returns the parsed answer plus the token counters needed to audit a run:
 prompt/completion tokens, and, when the provider reports them, cached prompt tokens and
@@ -41,6 +44,12 @@ DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_OPENCODE_MODEL = "deepseek-v4.1-flash"
 DEFAULT_OPENCODE_BASE_URL = "https://opencode.ai/zen/go/v1"
+# Gemma 4 on OpenRouter: "google/gemma-4-26b-a4b-it" (paid) and its ":free"
+# variant, plus "google/gemma-4-31b-it" / ":free". The free routes cost nothing
+# but are rate-limited upstream, so a paid -it id is the reliable choice once the
+# account has credits.
+DEFAULT_OPENROUTER_MODEL = "google/gemma-4-26b-a4b-it:free"
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 @dataclass(frozen=True)
@@ -420,6 +429,78 @@ class OpenCodeGoProvider(BaseProvider):
         )
 
 
+class OpenRouterProvider(BaseProvider):
+    """OpenRouter's OpenAI-compatible gateway (Gemma 4 and the other hosted models).
+
+    ``response_format`` is sent as a hint and dropped on a 400: OpenRouter routes to
+    models that do not all support structured output, and the JSON contract is already
+    enforced by the schema message plus the validation retries in ``chat_json``.
+    """
+
+    name = "openrouter"
+
+    def __init__(
+        self,
+        model: str,
+        api_key: str = "",
+        timeout_s: float = 30.0,
+        attempts: int = 2,
+        min_interval_s: float = 0.0,
+        tracer: LLMTracer | None = None,
+        base_url: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        temperature: float = 0.0,
+    ) -> None:
+        super().__init__(
+            model, api_key, timeout_s, attempts, min_interval_s, tracer, temperature
+        )
+        self.base_url = (
+            base_url
+            or os.environ.get("OPENROUTER_BASE_URL")
+            or DEFAULT_OPENROUTER_BASE_URL
+        ).rstrip("/")
+        self.extra_headers = dict(
+            extra_headers if extra_headers is not None else _openrouter_headers()
+        )
+
+    def _complete(self, messages, max_tokens, schema):
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": [dict(message) for message in messages],
+            "max_tokens": max_tokens,
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", **self.extra_headers}
+        url = f"{self.base_url}/chat/completions"
+        try:
+            body = self._request(url, payload, headers)
+        except LLMUnavailableError as error:
+            if "HTTP 400" in str(error):
+                payload.pop("response_format", None)
+                body = self._request(url, payload, headers)
+            else:
+                raise
+        try:
+            text = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as error:
+            raise LLMUnavailableError("OpenRouter returned an unexpected response") from error
+        if not isinstance(text, str) or not text.strip():
+            raise LLMUnavailableError("OpenRouter returned an empty response")
+        usage = body.get("usage") or {}
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        completion_details = usage.get("completion_tokens_details") or {}
+        self._last_usage = {
+            "cached": _as_int(prompt_details.get("cached_tokens")),
+            "reasoning": _as_int(completion_details.get("reasoning_tokens")),
+        }
+        return (
+            text,
+            _as_int(usage.get("prompt_tokens")),
+            _as_int(usage.get("completion_tokens")),
+        )
+
+
 class GeminiProvider(BaseProvider):
     name = "gemini"
 
@@ -487,6 +568,23 @@ def _env_headers() -> dict[str, str]:
     return {str(key): str(value) for key, value in data.items()}
 
 
+def _openrouter_headers() -> dict[str, str]:
+    """Optional attribution headers OpenRouter documents; both are free-form."""
+    headers = {"X-Title": os.environ.get("OPENROUTER_APP_TITLE") or "KEMETRA"}
+    referer = os.environ.get("OPENROUTER_SITE_URL") or os.environ.get("COTRAFFIC_SITE_URL")
+    if referer:
+        headers["HTTP-Referer"] = referer
+    return headers
+
+
+def openrouter_api_key() -> str:
+    return (
+        os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("COTRAFFIC_OPENROUTER_API_KEY")
+        or ""
+    )
+
+
 def opencode_api_key() -> str:
     return (
         os.environ.get("COTRAFFIC_LLM_API_KEY")
@@ -504,6 +602,12 @@ def provider_available(provider: str) -> tuple[bool, str | None]:
             (True, None)
             if opencode_api_key()
             else (False, "COTRAFFIC_LLM_API_KEY is not configured")
+        )
+    if name == "openrouter":
+        return (
+            (True, None)
+            if openrouter_api_key()
+            else (False, "OPENROUTER_API_KEY is not configured")
         )
     if name == "gemini":
         key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -530,6 +634,19 @@ def make_provider(
     timeout = float(timeout_s if timeout_s is not None else os.environ.get("COTRAFFIC_LLM_TIMEOUT", "30"))
     sampling = 0.0 if temperature is None else max(0.0, float(temperature))
     min_interval = float(os.environ.get("COTRAFFIC_LLM_MIN_WALL_INTERVAL_S", "0"))
+    if name == "openrouter":
+        key = openrouter_api_key()
+        if not key:
+            raise LLMUnavailableError("OPENROUTER_API_KEY is not configured")
+        chosen = (
+            model
+            or os.environ.get("COTRAFFIC_LLM_MODEL")
+            or os.environ.get("OPENROUTER_MODEL")
+            or DEFAULT_OPENROUTER_MODEL
+        )
+        return OpenRouterProvider(
+            chosen, key, timeout, attempts, min_interval, tracer, temperature=sampling
+        )
     if name == "groq":
         key = os.environ.get("GROQ_API_KEY", "")
         if not key:
@@ -560,5 +677,5 @@ def make_provider(
             chosen, key, timeout, attempts, min_interval, tracer, temperature=sampling
         )
     raise LLMUnavailableError(
-        f"unknown LLM provider {name!r} (expected opencode, groq or gemini)"
+        f"unknown LLM provider {name!r} (expected opencode, openrouter, groq or gemini)"
     )

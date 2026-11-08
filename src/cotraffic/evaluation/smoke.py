@@ -254,7 +254,7 @@ def run_smoke(only: list[str] | None = None) -> int:
         try:
             msg = fn()
             print(f"[ ok ] {name:<22} {time.perf_counter() - start:6.1f}s  {msg}")
-        except Exception:  # noqa: BLE001 - every failure must be reported, not raised mid-run
+        except Exception:
             failures += 1
             print(f"[FAIL] {name:<22} {time.perf_counter() - start:6.1f}s")
             traceback.print_exc()

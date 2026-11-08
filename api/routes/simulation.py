@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from api.simulation import (
     NETWORK_SCENARIOS,
-    NotRunning,
     SCENARIOS,
+    NotRunning,
     network_geojson,
     resolve_scenario,
     session,
@@ -28,6 +28,9 @@ class SimulationRequest(BaseModel):
     network: str | None = None
     speed: float = Field(default=1, ge=0.25, le=20)
     count: int = Field(default=1, ge=1, le=600)
+    # How heavy the traffic is: a fraction of the network's own live rate. Omitted
+    # means "keep whatever the operator last chose".
+    demand_level: str | None = Field(default=None, pattern="^(low|medium|high)$")
     # Optional weights for this run: choosing them goes through PUT /api/policy, so a
     # request cannot start weights the policy layer would refuse.
     method: str | None = None
@@ -35,6 +38,9 @@ class SimulationRequest(BaseModel):
     # Rain slows vehicles and lengthens their headway inside SUMO, so it changes
     # the run's numbers, not just the map's look.
     weather: str = "clear"
+    # Launch SUMO's own GUI attached to this run. A GUI run uses TraCI instead of
+    # libsumo (libsumo has no display), so it is slower; it is a demonstration view.
+    gui: bool = False
 
     @field_validator("scenario")
     @classmethod
@@ -75,12 +81,29 @@ def simulation_network(scenario: str) -> JSONResponse:
     return JSONResponse(network_geojson(scenario))
 
 
+@router.get("/api/simulation/gui")
+def simulation_gui_status() -> dict[str, Any]:
+    """Whether SUMO's own GUI is installed, and whether the current run has it.
+
+    The dashboard offers a "launch SUMO GUI" control, so it needs to know up front
+    whether the binary exists — otherwise the button would only fail after restarting
+    the operator's run.
+    """
+    return session.gui_status()
+
+
 @router.post("/api/simulation/start")
 def simulation_start(request: SimulationRequest) -> dict[str, Any]:
     try:
         scenario = resolve_scenario(request.scenario, request.network)
         return session.start(
-            scenario, request.speed, request.method, request.checkpoint, request.weather
+            scenario,
+            request.speed,
+            request.method,
+            request.checkpoint,
+            request.weather,
+            request.demand_level,
+            gui=request.gui,
         )
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
@@ -109,6 +132,19 @@ def simulation_weather(request: WeatherRequest) -> dict[str, Any]:
         raise HTTPException(422, str(error)) from error
 
 
+class DemandRequest(BaseModel):
+    level: str = Field(pattern="^(low|medium|high)$")
+
+
+@router.post("/api/simulation/demand")
+def simulation_demand(request: DemandRequest) -> dict[str, Any]:
+    """Set how heavy the live traffic is, without restarting the run."""
+    try:
+        return session.set_demand_level(request.level)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
 @router.post("/api/simulation/stop")
 def simulation_stop() -> dict[str, Any]:
     return session.stop()
@@ -119,6 +155,15 @@ def simulation_incident() -> dict[str, Any]:
     """Inject an operator-reported collision into the live run."""
     try:
         return session.inject_incident()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@router.post("/api/simulation/incident/clear")
+def simulation_incident_clear() -> dict[str, Any]:
+    """Release the stopped vehicle and retire the current incident."""
+    try:
+        return session.clear_incident()
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
 

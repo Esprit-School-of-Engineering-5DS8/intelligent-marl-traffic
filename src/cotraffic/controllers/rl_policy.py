@@ -10,8 +10,8 @@ from typing import Any
 import numpy as np
 
 from cotraffic import config
-from cotraffic.recipes import normalize_recipe
 from cotraffic.controllers.base import Controller
+from cotraffic.recipes import normalize_recipe
 
 
 def checkpoint_agent_config(method: str, checkpoint: Path) -> dict[str, Any]:

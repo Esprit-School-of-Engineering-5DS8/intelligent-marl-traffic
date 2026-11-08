@@ -6,10 +6,8 @@ and runnable/disabled status.
 
 from __future__ import annotations
 
-import os
 import xml.etree.ElementTree as ET
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
@@ -18,7 +16,7 @@ from api import policy
 from api.policy import LABELS, LEARNED, METHODS, NETWORKS
 from cotraffic import config
 from cotraffic.networks.build import ensure_network
-from cotraffic.paths import CHECKPOINTS_DIR, default_checkpoint
+from cotraffic.paths import default_checkpoint
 
 router = APIRouter(tags=["catalog"])
 

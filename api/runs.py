@@ -7,12 +7,13 @@ demonstration feature, not part of the study's results.
 
 from __future__ import annotations
 
+import os
 import queue
 import subprocess
 import sys
 import threading
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,14 +31,23 @@ class RunRecord:
     replay_id: str | None = None
     log: list[str] = field(default_factory=list)
     error: str | None = None
+    cancelled: bool = False
+    process: subprocess.Popen | None = field(default=None, repr=False)
 
 
 def public(run: RunRecord) -> dict[str, Any]:
     """The run as the dashboard's contract has it (camelCase keys)."""
-    data = asdict(run)
-    data["createdAt"] = data.pop("created_at")
-    data["replayId"] = data.pop("replay_id")
-    return data
+    # Built by hand: asdict() deep-copies the subprocess handle, which cannot be copied.
+    return {
+        "id": run.id,
+        "request": run.request,
+        "status": run.status,
+        "createdAt": run.created_at,
+        "replayId": run.replay_id,
+        "log": run.log,
+        "error": run.error,
+        "cancelled": run.cancelled,
+    }
 
 
 class RunQueue:
@@ -67,13 +77,35 @@ class RunQueue:
         with self.lock:
             return sum(r.status in ("queued", "running") for r in self.runs.values())
 
+    def cancel(self, run_id: str) -> dict[str, Any] | None:
+        """Stop a queued or running run and free the worker for the next one."""
+        with self.lock:
+            run = self.runs.get(run_id)
+            if run is None:
+                return None
+            run.cancelled = True
+            process = run.process
+            if run.status in ("queued", "running"):
+                run.status = "cancelled"
+                run.error = "cancelled from the dashboard"
+                self.version += 1
+            snapshot = public(run)
+
+        # The simulation keeps writing files after the API forgets about it, so a
+        # running run has to be terminated rather than just marked.
+        if process is not None and process.poll() is None:
+            process.terminate()
+        return snapshot
+
     def _set(self, run: RunRecord, **changes: Any) -> None:
         with self.lock:
             for k, v in changes.items():
                 setattr(run, k, v)
             self.version += 1
 
-    def _stream(self, run: RunRecord, command: list[str]) -> int:
+    def _stream(
+        self, run: RunRecord, command: list[str], env: dict[str, str] | None = None
+    ) -> int:
         process = subprocess.Popen(
             command,
             cwd=ROOT,
@@ -82,7 +114,10 @@ class RunQueue:
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=env,
         )
+        with self.lock:
+            run.process = process
         assert process.stdout is not None
         for line in process.stdout:
             line = line.rstrip()
@@ -90,13 +125,22 @@ class RunQueue:
                 with self.lock:
                     run.log = [*run.log[-49:], line]
                     self.version += 1
-        return process.wait()
+        code = process.wait()
+        with self.lock:
+            run.process = None
+        return code
 
     def _worker(self) -> None:
         while True:
             run = self.runs[self.jobs.get()]
             r = run.request
+            if run.cancelled:
+                continue
             scen = "+".join(r["events"]) or "normal"
+            # Recording is about the scenario, not about waiting on an API: the LLM arms
+            # run on the mock backend unless the caller explicitly asks for real calls.
+            backend = str(r.get("llm") or "mock")
+            env = {**os.environ, "COTRAFFIC_LLM_BACKEND": backend}
             self._set(run, status="running")
             command = [
                 sys.executable,
@@ -109,7 +153,9 @@ class RunQueue:
                 "--scenarios", *r["events"],
             ]  # fmt: skip
             try:
-                if self._stream(run, command) != 0:
+                if self._stream(run, command, env) != 0:
+                    if run.cancelled:
+                        continue
                     raise RuntimeError("the simulation failed (see the log)")
                 export = [sys.executable, "scripts/export_dashboard_data.py", "--skip-networks"]
                 if self._stream(run, export) != 0:

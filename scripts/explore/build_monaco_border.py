@@ -1,9 +1,11 @@
-import urllib.request
-import urllib.parse
 import json
 import subprocess
+import urllib.parse
+import urllib.request
 from pathlib import Path
+
 from shapely.geometry import shape
+
 
 def build_monaco():
     out_dir = Path("sumo_files/monaco")
@@ -35,9 +37,6 @@ def build_monaco():
     # On land, Monaco is bounded by France. To create a precise closed land polygon:
     # Any coordinate with lat > 43.72 is on land.
     # The coastline connects the southwest point to the northeast point.
-    raw_coords = list(geom.exterior.coords)
-    land_coords = [p for p in raw_coords if p[1] > 43.72]
-
     # Use the full boundary or land-clipped boundary
     # Note: netconvert will only find roads where roads exist (on land).
     # Using the simplified exterior polygon:

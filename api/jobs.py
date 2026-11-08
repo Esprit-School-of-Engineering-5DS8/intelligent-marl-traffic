@@ -7,19 +7,17 @@ Provides event subscriptions for Server-Sent Events (SSE).
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import queue
 import shutil
-import sys
 import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable
+from typing import Any
 
 from api.policy import LABELS, LEARNED, METHODS, NETWORKS, checkpoint_path
 from cotraffic import config, recipes
@@ -558,8 +556,10 @@ class JobRunner:
 
         from cotraffic.training.train import (
             list_checkpoints,
-            train as train_recipe,
             write_checkpoint_sidecar,
+        )
+        from cotraffic.training.train import (
+            train as train_recipe,
         )
 
         agent = job.request["agent"]
@@ -766,7 +766,7 @@ class JobRunner:
                         }
                     model_entries.append({"modelId": model["id"], "label": model["label"], "version": model["version"], "metrics": metric_entries})
                 cells.append({"scenario": condition["scenario"], "demand": condition["demand"], "n": len(condition_rows), "models": model_entries})
-            return {"conditions": cells, "metricSpecs": [{"key": m, "label": l, "unit": u, "lowerIsBetter": lb} for m, l, u, lb in metric_specs]}
+            return {"conditions": cells, "metricSpecs": [{"key": m, "label": label, "unit": u, "lowerIsBetter": lb} for m, label, u, lb in metric_specs]}
 
         from cotraffic.analysis.stats import bootstrap_ci, cliffs_delta, paired_change_ci
 
@@ -824,7 +824,13 @@ class JobRunner:
 
     def _run_model_benchmark(self, job: JobRecord) -> None:
         """Evaluate saved checkpoints on exactly the same scenario/demand/seeds."""
-        from cotraffic.analysis.stats import bootstrap_ci, cliffs_delta, cliffs_magnitude, holm, paired_change_ci
+        from cotraffic.analysis.stats import (
+            bootstrap_ci,
+            cliffs_delta,
+            cliffs_magnitude,
+            holm,
+            paired_change_ci,
+        )
         from cotraffic.evaluation.matrix import _dirs
         from cotraffic.evaluation.runner import run_episode
 
@@ -940,7 +946,7 @@ class JobRunner:
                 entry["significant"] = bool(p_holm < 0.05)
                 entry["effect"] = cliffs_magnitude(entry["cliffsDelta"]) if isinstance(entry.get("cliffsDelta"), (int, float)) else ""
             for item in summaries:
-                for metric, entry in zip(item["metrics"].keys(), item["metrics"].values(), strict=True):
+                for entry in item["metrics"].values():
                     if item["modelId"] != reference["id"]:
                         entry.setdefault("pHolm", None)
                         entry.setdefault("significant", False)

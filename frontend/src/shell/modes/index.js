@@ -986,8 +986,24 @@ function predictLivePanel() {
     </aside>`;
 }
 
+/* The four strip numbers, formatted once so the first paint and every later
+   snapshot write the same strings. `stats` is the measured run while live and
+   the demo day model when idle — the segment list below uses the same source,
+   so the strip and the inspector can never disagree. */
+function roamStripValues(stats) {
+  const source = stats || modeData.roamStats(state.zone, nowMinute());
+  return {
+    speed: source.speed,
+    density: Math.round(source.density * 100),
+    vehicles: source.vehicles,
+    incidents: source.incidents,
+    critical: Number(source.critical) || 0
+  };
+}
+
 function roamStrip() {
   const stats = modeData.roamStats(state.zone, nowMinute());
+  const strip = roamStripValues(stats);
   const segments = stats.segments
     .map(
       (seg) => `
@@ -1007,11 +1023,11 @@ function roamStrip() {
 
   return `
     <div class="mode-roam" data-panel="roam">
-      <div class="roam-strip">
-        <div class="roam-stat"><span>Speed</span><strong>${stats.speed}</strong><i>km/h</i></div>
-        <div class="roam-stat"><span>Density</span><strong>${Math.round(stats.density * 100)}</strong><i>%</i></div>
-        <div class="roam-stat"><span>Vehicles</span><strong>${stats.vehicles}</strong><i>live</i></div>
-        <div class="roam-stat"><span>Incidents</span><strong>${stats.incidents}</strong><i>open</i></div>
+      <div class="roam-strip${isLive() ? ' is-live' : ''}">
+        <div class="roam-stat"><span>Speed</span><strong data-roam-stat="speed">${strip.speed}</strong><i>km/h</i></div>
+        <div class="roam-stat"><span>Density</span><strong data-roam-stat="density">${strip.density}</strong><i>%</i></div>
+        <div class="roam-stat"><span>Vehicles</span><strong data-roam-stat="vehicles">${strip.vehicles}</strong><i>live</i></div>
+        <div class="roam-stat${strip.critical ? ' is-critical' : ''}"><span>Incidents</span><strong data-roam-stat="incidents">${strip.incidents}</strong><i>open</i></div>
       </div>
 
       <div class="roam-pills">
@@ -1115,6 +1131,44 @@ function syncRoamClassOptions() {
   select.value = classes.some(([key]) => key === state.roamClass) ? state.roamClass : '';
   if (!select.value) state.roamClass = '';
   select.disabled = classes.length === 0;
+}
+
+/*
+ * The strip is telemetry, so it is patched in place on every published snapshot.
+ * Re-rendering the panel here would rebuild the class <select> (closing it while
+ * the operator is choosing) and collapse the segment inspector, so the numbers
+ * are written where they sit instead.
+ */
+function syncRoamStats() {
+  const stripEl = $('.roam-strip');
+  if (!stripEl) return;
+  const values = roamStripValues();
+  const live = isLive();
+  Object.entries(values).forEach(([key, value]) => {
+    if (key === 'critical') return;
+    const node = stripEl.querySelector(`[data-roam-stat="${key}"]`);
+    if (node && node.textContent !== String(value)) node.textContent = String(value);
+  });
+  stripEl.classList.toggle('is-live', live);
+  stripEl
+    .querySelector('[data-roam-stat="incidents"]')
+    ?.closest('.roam-stat')
+    ?.classList.toggle('is-critical', values.critical > 0);
+  syncRoamSegments(modeData.roamStats(state.zone, nowMinute()).segments);
+}
+
+/** Segment rows in the inspector carry the same measured speed as the strip. */
+function syncRoamSegments(segments) {
+  if (!Array.isArray(segments)) return;
+  segments.forEach((seg) => {
+    const row = document.querySelector(`[data-roam-seg="${seg.id}"]`);
+    if (!row) return;
+    row.classList.remove('is-flow', 'is-dense', 'is-jam');
+    row.classList.add(`is-${seg.state}`);
+    const speed = row.querySelector('.roam-seg-speed');
+    const text = `${seg.speed} km/h${seg.queue != null ? ` · ${seg.queue} queued` : ''}`;
+    if (speed && speed.textContent !== text) speed.textContent = text;
+  });
 }
 
 function dispatchRoamFollow(detail) {
@@ -1756,6 +1810,7 @@ function syncGaugesForMode() {
 /** app.js calls this on every published simulation snapshot. */
 export function refreshLiveGauges() {
   if (state.mode === 'roam') {
+    syncRoamStats();
     syncRoamClassOptions();
     maybeDropStoppedPov();
   }
@@ -1808,6 +1863,9 @@ function setMinute(minute) {
     updateFutureBand();
     // The forecast layer is coloured by the volume under the scrubber.
     syncMapForMode('predict');
+  } else if (state.mode === 'roam') {
+    // Idle roam reads the demo day model, so the strip follows the scrubber.
+    syncRoamStats();
   }
 }
 

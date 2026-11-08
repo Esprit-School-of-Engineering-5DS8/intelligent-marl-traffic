@@ -67,8 +67,29 @@ function kindOf(key: (typeof LEGEND)[number]["key"]): keyof Visibility {
     : key;
 }
 
-const COMPARE_NETWORKS = ["sf_mission_2x2", "sf_mission_3x3"];
+/** Every network the backend can record a comparison on (``api/policy.NETWORKS``). */
+const COMPARE_NETWORKS = ["sf_mission_2x2", "sf_mission_3x3", "monaco", "tunis"];
 const COMPARE_DEMANDS = ["low", "medium", "peak"] as const;
+
+/** The only model types this dashboard offers (same three as Settings → Models). */
+const COMPARE_MODEL_TYPES: { id: string; label: string; method: string }[] = [
+  { id: "rl", label: "RL", method: "generalist" },
+  { id: "hybrid", label: "Hybrid", method: "llm_team" },
+  { id: "llm", label: "LLM", method: "llm" },
+];
+
+type CompareEvent = "emergency" | "pedestrians" | "incident" | "buses";
+
+/** The event scenarios a comparison can record, not just plain demand. */
+import { takeBenchmarkIntent } from "@/shared/benchmark-intent";
+
+const COMPARE_SCENARIOS: { id: string; label: string; events: CompareEvent[] }[] = [
+  { id: "normal", label: "Normal traffic", events: [] },
+  { id: "emergency", label: "Emergency pre-emption", events: ["emergency"] },
+  { id: "pedestrians", label: "Pedestrians", events: ["pedestrians"] },
+  { id: "buses", label: "Buses", events: ["buses"] },
+  { id: "incident", label: "Incident", events: ["incident"] },
+];
 
 /** Registry versions keep their name/version; any other saved weights use their path. */
 function modelSpec(model: ModelCatalogEntry): string {
@@ -87,22 +108,87 @@ function ModelCompareBuilder() {
   const queryClient = useQueryClient();
   const [network, setNetwork] = useState(COMPARE_NETWORKS[0]);
   const [demand, setDemand] = useState<(typeof COMPARE_DEMANDS)[number]>("peak");
+  const [scenario, setScenario] = useState(COMPARE_SCENARIOS[0].id);
   const [seed, setSeed] = useState(3);
   const [left, setLeft] = useState<string | null>(null);
   const [right, setRight] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [openedId, setOpenedId] = useState<string | null>(null);
+  // Which controllers can actually run on this network (the policy layer's verdict).
+  const [runnable, setRunnable] = useState<Record<string, boolean>>({});
 
   const catalog = useModelCatalog(network);
   const createRun = useCreateRun();
+  // Recording is about the scenario, so the LLM arms answer from the mock backend by
+  // default; real provider calls are opt-in because they are slow and rate-limited.
+  const [realLlm, setRealLlm] = useState(false);
+
+  const cancelRun = async (runId: string) => {
+    await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
+    await runs.refetch();
+  };
   const runs = useRuns();
   const models = (catalog.data?.models ?? []).filter((model) => model.available);
-  const options = models.map((model) => ({
-    value: modelSpec(model),
-    label: `${model.label} · ${model.agent} · ${model.source}${
-      model.timesteps ? ` · ${model.timesteps} steps` : ""
-    }`,
-  }));
+  const scenarioEvents = COMPARE_SCENARIOS.find((s) => s.id === scenario)?.events ?? [];
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/policy")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!alive || !body) return;
+        const next: Record<string, boolean> = {};
+        for (const entry of body.catalogByNetwork?.[network] ?? []) {
+          next[entry.method] = entry.available !== false;
+        }
+        setRunnable(next);
+      })
+      .catch(() => {
+        if (alive) setRunnable({});
+      });
+    return () => {
+      alive = false;
+    };
+  }, [network]);
+
+  // The three model types, plus every saved checkpoint as its own comparable entry.
+  // A learned type only appears once this network has weights it could load.
+  const typeOptions = COMPARE_MODEL_TYPES.filter((type) =>
+    type.method === "generalist" ? runnable[type.method] === true : runnable[type.method] !== false,
+  ).map((type) => ({ value: type.method, label: `${type.label} · ${type.method}` }));
+  const options = [
+    ...typeOptions,
+    ...models.map((model) => ({
+      value: modelSpec(model),
+      label: `${model.label} · ${model.agent} · ${model.source}${
+        model.timesteps ? ` · ${model.timesteps} steps` : ""
+      }`,
+    })),
+  ];
+
+  // Arriving from Train or Models & Runs: open on the model that was clicked.
+  const [wanted, setWanted] = useState<string | null>(null);
+  useEffect(() => {
+    const intent = takeBenchmarkIntent("compare");
+    if (!intent) return;
+    if (intent.network && COMPARE_NETWORKS.includes(intent.network)) setNetwork(intent.network);
+    if (intent.scenario && COMPARE_SCENARIOS.some((s) => s.id === intent.scenario)) {
+      setScenario(intent.scenario);
+    }
+    if (intent.model) setWanted(intent.model);
+  }, []);
+
+  const optionKey = options.map((option) => option.value).join("|");
+  useEffect(() => {
+    if (!wanted || !optionKey.split("|").includes(wanted)) return;
+    // Wait for /api/policy, otherwise a network that does have RL weights would be
+    // paired with the hybrid just because the verdict had not arrived yet.
+    if (Object.keys(runnable).length === 0) return;
+    setLeft(wanted);
+    // Give it a sparring partner: trained RL where it exists, otherwise the hybrid.
+    setRight((current) => current ?? (runnable.generalist ? "generalist" : "llm_team"));
+    setWanted(null);
+  }, [wanted, optionKey, runnable]);
 
   useEffect(() => {
     setLeft(null);
@@ -163,6 +249,17 @@ function ModelCompareBuilder() {
           />
         </div>
         <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs font-medium text-text-2">Scenario</span>
+          <SelectControl
+            ariaLabel="Comparison scenario"
+            value={scenario}
+            options={COMPARE_SCENARIOS.map((s) => ({ value: s.id, label: s.label }))}
+            onChange={setScenario}
+            className="text-sm"
+            style={{ minWidth: 190 }}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="text-xs font-medium text-text-2">Demand</span>
           <SelectControl
             ariaLabel="Comparison demand"
@@ -184,23 +281,52 @@ function ModelCompareBuilder() {
             onChange={(event) => setSeed(Number(event.target.value) || 0)}
           />
         </label>
+        <label
+          className="flex items-center gap-2 pb-2 text-xs text-text-2"
+          title="Off: LLM controllers answer from the mock backend. On: every call goes to the configured provider, which is much slower and can be rate-limited."
+        >
+          <input
+            type="checkbox"
+            className="check-control"
+            checked={realLlm}
+            onChange={(event) => setRealLlm(event.target.checked)}
+          />
+          Real LLM calls
+        </label>
         <Button
           disabled={!ready || busy}
           onClick={() => {
             if (!left || !right) return;
             createRun.mutate(
-              { network, demand, events: [], seed, left, right },
+              {
+                network,
+                demand,
+                events: scenarioEvents,
+                seed,
+                left,
+                right,
+                llm: realLlm ? "provider" : "mock",
+              },
               { onSuccess: (run) => setCreatedId(run.id) },
             );
           }}
         >
           {busy ? "Recording…" : "Record A/B"}
         </Button>
+        {busy && createdId ? (
+          <button
+            type="button"
+            onClick={() => void cancelRun(createdId)}
+            className="pb-2 text-xs font-semibold text-jam hover:underline"
+          >
+            Cancel run
+          </button>
+        ) : null}
       </div>
       <p className="mt-2 text-xs text-muted">
         {options.length
-          ? `${options.length} saved checkpoints on ${f.networkName(network)}. Recording writes a new replay and opens it in the player above.`
-          : `No saved checkpoints for ${f.networkName(network)} yet.`}
+          ? `${options.length} controllers to compare on ${f.networkName(network)} · ${COMPARE_SCENARIOS.find((s) => s.id === scenario)?.label}. Recording writes a new replay and opens it in the player above; LLM controllers answer from the mock backend unless you tick “Real LLM calls”.`
+          : `Nothing can run on ${f.networkName(network)} yet: train an RL policy for it, or set the LLM key in Settings → Integrations.`}
       </p>
       {createRun.isError ? (
         <p role="alert" className="mt-1 text-xs text-jam">
@@ -329,14 +455,19 @@ export default function FreshCompare() {
         <QueryState query={meta} height={80}>
           {(metaData) => {
             if (!metaData.replays.length) {
+              // The recorder has to stay reachable: on a network with no replay yet it is
+              // the only way to create the first one.
               return (
-                <Card className="p-8 text-center border-dashed border-border flex flex-col items-center justify-center">
-                  <Film className="w-10 h-10 text-muted mb-2 opacity-50" />
-                  <p className="text-sm font-semibold text-text">No comparative replays available</p>
-                  <p className="text-xs text-muted max-w-lg mt-1">
-                    Run an evaluation recording to stream comparative candidate simulations.
-                  </p>
-                </Card>
+                <div className="flex flex-col gap-6 w-full">
+                  <ModelCompareBuilder />
+                  <Card className="p-8 text-center border-dashed border-border flex flex-col items-center justify-center">
+                    <Film className="w-10 h-10 text-muted mb-2 opacity-50" />
+                    <p className="text-sm font-semibold text-text">No comparative replays yet</p>
+                    <p className="text-xs text-muted max-w-lg mt-1">
+                      Pick two controllers above and record an A/B run — its replay opens here.
+                    </p>
+                  </Card>
+                </div>
               );
             }
 
@@ -521,11 +652,6 @@ function SidePanel({
           />
         </div>
       )}
-
-      {/* Telemetry Footer */}
-      <div className="border-t border-border p-3.5 bg-surface-2/20 mt-auto">
-        <ReplayStats replay={replay} sides={[side]} />
-      </div>
     </Card>
   );
 }

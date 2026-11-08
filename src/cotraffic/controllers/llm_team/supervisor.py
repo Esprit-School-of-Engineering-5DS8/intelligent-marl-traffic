@@ -526,7 +526,7 @@ class Supervisor:
                 for role in roles:
                     try:
                         calls[role] = futures[role].result()
-                    except Exception as error:  # noqa: BLE001 - keep the tick alive
+                    except Exception as error:
                         calls[role] = AgentCall(
                             role=role,
                             envelope=dict(EMPTY_ENVELOPE),

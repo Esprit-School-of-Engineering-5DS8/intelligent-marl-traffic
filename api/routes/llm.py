@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from cotraffic.llm.trace import CONTEXT_WINDOWS, TRACE_DIR, context_window
 
@@ -27,6 +28,16 @@ KNOWN_MODELS = {
         "gemini-1.5-flash",
         "gemini-1.5-pro",
     ],
+    # One key for every hosted open model; Gemma 4 is the controller default.
+    "openrouter": [
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free",
+        "google/gemma-4-26b-a4b-it",
+        "google/gemma-4-31b-it",
+        "google/gemma-3-27b-it",
+        "meta-llama/llama-3.3-70b-instruct",
+        "qwen/qwen3-32b",
+    ],
 }
 
 
@@ -34,6 +45,7 @@ KNOWN_MODELS = {
 def providers() -> dict[str, Any]:
     groq_key = bool(os.environ.get("GROQ_API_KEY"))
     gemini_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    openrouter_key = bool(os.environ.get("OPENROUTER_API_KEY"))
     backend = (os.environ.get("COTRAFFIC_LLM_BACKEND") or "provider").lower()
     return {
         # The team runs keyless on mock/replay; the dashboard unlocks its launch on this.
@@ -68,14 +80,59 @@ def providers() -> dict[str, Any]:
                     for model in KNOWN_MODELS["gemini"]
                 ],
             },
+            {
+                "id": "openrouter",
+                "label": "OpenRouter",
+                "available": openrouter_key,
+                "models": [
+                    {
+                        "id": model,
+                        "context_window": CONTEXT_WINDOWS.get(
+                            model, context_window(model)
+                        ),
+                    }
+                    for model in KNOWN_MODELS["openrouter"]
+                ],
+            },
         ],
         "default": {
-            "provider": os.environ.get("COTRAFFIC_LLM_PROVIDER", "groq"),
+            "provider": (os.environ.get("COTRAFFIC_LLM_PROVIDER") or "groq").lower(),
             "model": os.environ.get("COTRAFFIC_LLM_MODEL")
+            or os.environ.get("OPENROUTER_MODEL")
             or os.environ.get("GROQ_MODEL")
             or "openai/gpt-oss-20b",
         },
     }
+
+
+class LLMConfig(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+
+
+@router.put("/api/llm/config")
+def update_llm_config(req: LLMConfig) -> dict[str, Any]:
+    """Point the LLM controllers at another provider/model without editing ``.env``.
+
+    The controllers read these variables on every call, so a saved change applies to
+    the next request of a running simulation. ``PUT /api/integrations`` owns keys.
+    """
+    from api.routes.integrations import _write_env
+
+    updates: dict[str, str] = {}
+    if req.provider is not None:
+        provider = req.provider.strip().lower()
+        if provider not in {"groq", "gemini", "opencode", "openrouter"}:
+            raise HTTPException(422, f"unknown LLM provider {provider!r}")
+        updates["COTRAFFIC_LLM_PROVIDER"] = provider
+    if req.model is not None:
+        updates["COTRAFFIC_LLM_MODEL"] = req.model.strip()
+    if not updates:
+        return providers()
+    for key, value in updates.items():
+        os.environ[key] = value
+    _write_env(updates)
+    return providers()
 
 
 def _safe_dir(run_id: str) -> Path:

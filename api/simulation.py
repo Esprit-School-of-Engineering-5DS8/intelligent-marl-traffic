@@ -9,6 +9,8 @@ the state it publishes to the dashboard.
 
 from __future__ import annotations
 
+import heapq
+import math
 import random
 import sys
 import threading
@@ -16,6 +18,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections import Counter, deque
 from functools import lru_cache
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -30,8 +33,8 @@ from api import policy
 from cotraffic import config
 from cotraffic.controllers.registry import make_controller
 from cotraffic.envs.episodes import evaluation_episode
-from cotraffic.forecast import project as project_forecast
 from cotraffic.envs.traffic_env import CoTrafficEnv
+from cotraffic.forecast import project as project_forecast
 from cotraffic.networks.build import ensure_network
 from cotraffic.paths import RESULTS_DIR
 
@@ -48,6 +51,12 @@ SCENARIOS = {
 NETWORK_SCENARIOS = {network: scenario for scenario, network in SCENARIOS.items()}
 DEFAULT_SCENARIO = "grid-3x3"
 DEMAND = "medium"
+# The operator's demand dial on the live map. Each level is a fraction of the
+# network's own live rate, so "high" is the calibrated live window and the other two
+# thin it out. The live run regenerates demand every cycle, so a change lands within
+# one window rather than needing a restart.
+DEMAND_LEVELS: dict[str, float] = {"low": 0.45, "medium": 0.7, "high": 1.0}
+DEFAULT_DEMAND_LEVEL = "high"
 MIN_GREEN_S = 6.0
 MAX_GREEN_S = 90.0
 JUNCTION_HISTORY = 180
@@ -103,6 +112,22 @@ def live_demand(net_cfg: dict[str, Any]) -> tuple[str, float]:
     if rate and peak > 0:
         return "peak", float(rate) / peak
     return DEMAND, 1.0
+
+
+def live_demand_scale(net_cfg: dict[str, Any], level: str) -> float:
+    """The car-rate multiplier the live view runs one network at, for an operator level.
+
+    The live view already runs each network at its own calibrated rate rather than a
+    shared demand level (see :func:`live_demand`), so the operator dial multiplies
+    *that* baseline instead of replacing it. ``high`` is therefore exactly the
+    behaviour the live map had before the dial existed, and ``low``/``medium`` are
+    fractions of it. Multiplying the shared ``level`` instead would have made the
+    dial mean something different on every network.
+    """
+    if level not in DEMAND_LEVELS:
+        raise ValueError(f"unknown demand level {level!r}")
+    _, base = live_demand(net_cfg)
+    return base * DEMAND_LEVELS[level]
 
 
 def _bounds(scenario: str) -> dict[str, float]:
@@ -202,6 +227,51 @@ def _project(scenario: str, x: float, y: float) -> list[float]:
     longitude = bounds["west"] + (x - min_x) / span_x * (bounds["east"] - bounds["west"])
     latitude = bounds["south"] + (y - min_y) / span_y * (bounds["north"] - bounds["south"])
     return [round(longitude, 7), round(latitude, 7)]
+
+
+def _thin(points: list[list[float]], max_points: int = 120) -> list[list[float]]:
+    """Keep a route polyline small enough for the 4 Hz live snapshot."""
+    if len(points) <= max_points:
+        return points
+    step = max(1, len(points) // max_points)
+    thinned = points[::step]
+    if thinned[-1] != points[-1]:
+        thinned.append(points[-1])
+    return thinned
+
+
+def _vehicle_length(conn: Any, vehicle_id: str) -> float:
+    """Body length of one vehicle, so the map can draw the crash at its real size."""
+    try:
+        value = float(conn.vehicle.getLength(vehicle_id))
+    except Exception:
+        return 4.5
+    return round(value, 2) if value > 0 else 4.5
+
+
+def _polyline_meters(points: list[list[float]]) -> float | None:
+    """Great-circle length of a [lng, lat] polyline, in metres.
+
+    Used as the dispatch approach distance when the ambulance has been added to the
+    network but has not departed yet: TraCI cannot answer a driving distance for a
+    vehicle that is not on a lane, and a null there would leave the panel's progress
+    bar with nothing to measure against.
+    """
+    if not isinstance(points, list) or len(points) < 2:
+        return None
+    total = 0.0
+    for (lng_a, lat_a), (lng_b, lat_b) in zip(points, points[1:]):
+        try:
+            ax, ay = float(lng_a), float(lat_a)
+            bx, by = float(lng_b), float(lat_b)
+        except (TypeError, ValueError):
+            continue
+        phi_a, phi_b = math.radians(ay), math.radians(by)
+        d_phi = phi_b - phi_a
+        d_lambda = math.radians(bx - ax)
+        h = math.sin(d_phi / 2) ** 2 + math.cos(phi_a) * math.cos(phi_b) * math.sin(d_lambda / 2) ** 2
+        total += 2 * 6_371_000.0 * math.asin(min(1.0, math.sqrt(h)))
+    return round(total, 1) if total > 0 else None
 
 
 @lru_cache(maxsize=4)
@@ -409,8 +479,13 @@ class SimulationSession:
         self._pending_signals: deque[dict[str, Any]] = deque(maxlen=20)
         # Operator incidents are staged on the run thread (the only TraCI caller).
         self._pending_incidents: deque[dict[str, Any]] = deque(maxlen=5)
+        # A clear request is applied by the run thread so it owns the TraCI call.
+        self._pending_clear_incident = False
         # The crashed vehicle, held at 0 m/s for every step of the run.
         self._crash_hold: str | None = None
+        # Whether the current run was launched with SUMO's own GUI attached. A GUI run
+        # cannot use libsumo (it has no display), so it always goes through TraCI.
+        self._gui = False
         self._junction_history: dict[str, deque[dict[str, Any]]] = {}
         self.state: dict[str, Any] = {
             "runId": None,
@@ -420,6 +495,7 @@ class SimulationSession:
             "clock": "00:00:00",
             "speed": 1,
             "weather": "clear",
+            "demandLevel": DEFAULT_DEMAND_LEVEL,
             "method": None,
             "vehicles": [],
             "pedestrians": [],
@@ -447,6 +523,15 @@ class SimulationSession:
         # clearing the rain restores the network's own calibration.
         self._weather = "clear"
         self._weather_base: dict[str, tuple[float, float]] = {}
+        # Each vehicle's dry-road speed factor. SUMO copies speedFactor into a vehicle
+        # when it is inserted, so the type alone cannot slow the traffic already driving.
+        self._vehicle_speed_base: dict[str, float] = {}
+        # The factor the population currently carries: a type or vehicle first seen while
+        # it rains must still record its dry-road value as the base, not a rained-on one.
+        self._weather_speed_factor = 1.0
+        # The operator's demand dial. The run thread reads it when it builds each
+        # cycle's episode, so a change applies to the next window without a restart.
+        self._demand_level = DEFAULT_DEMAND_LEVEL
         # The run thread owns this link; set_weather only reads it to apply a
         # change mid-run, and never closes it.
         self._conn: Any | None = None
@@ -457,6 +542,41 @@ class SimulationSession:
 
     # --- controls -------------------------------------------------------------------
 
+    def gui_status(self) -> dict[str, Any]:
+        """Whether ``sumo-gui`` can be launched, and whether this run already has it.
+
+        Checked on demand rather than cached: a SUMO install can appear (or be blocked
+        by an application-control policy) between runs, and a stale answer would either
+        hide a working button or offer one that cannot start.
+        """
+        from cotraffic.utils.sumo import SumoNotFoundError, binary
+
+        with self.lock:
+            attached = bool(self._gui)
+            status = str(self.state.get("status") or "idle")
+            scenario = self.state.get("scenario")
+        try:
+            path = binary("sumo-gui")
+            available = True
+            error = None
+        except SumoNotFoundError as exc:
+            path = None
+            available = False
+            error = str(exc)
+        except Exception as exc:  # a broken install must not 500 the dashboard
+            path = None
+            available = False
+            error = str(exc)
+        return {
+            "available": available,
+            "path": path,
+            "attached": attached,
+            "status": status,
+            "scenario": scenario,
+            # A GUI run cannot use libsumo, so the dashboard can warn that it is slower.
+            "backend": "traci" if attached else "libsumo",
+        }
+
     def start(
         self,
         scenario: str,
@@ -464,21 +584,27 @@ class SimulationSession:
         method_override: str | None = None,
         checkpoint_override: str | None = None,
         weather: str = "clear",
+        demand_level: str | None = None,
+        gui: bool = False,
     ) -> dict[str, Any]:
         if scenario not in SCENARIOS:
             raise ValueError(f"{scenario} is not a live scenario")
         if weather not in WEATHER_EFFECTS:
             raise ValueError(f"unknown weather {weather}")
-        active = policy.current()
-        method, network = active["method"], SCENARIOS[scenario]
+        if demand_level is not None and demand_level not in DEMAND_LEVELS:
+            raise ValueError(f"unknown demand level {demand_level}")
+        network = SCENARIOS[scenario]
+        # Each scenario runs the controller pinned to its own network: starting the 2x2
+        # grid must not inherit the controller chosen for the 3x3 grid.
+        method = policy.method_for(network)
         # Weights chosen by the UI travel through the policy layer, so a run can never
         # load a checkpoint that PUT /api/policy would have refused.
         if checkpoint_override and not method_override:
             raise ValueError("choosing weights also needs the controller method")
         if method_override is not None or checkpoint_override is not None:
-            policy.update(method_override or active["method"], network, checkpoint_override or "auto")
-            active = policy.current()
-            method = active["method"]
+            policy.update(method_override or method, network, checkpoint_override or "auto")
+            method = policy.method_for(network)
+        active = policy.scenario(network)
         # The checkpoint must match the network that actually runs, not the one the settings
         # page was last pointed at: a grid3x3 policy on the 2x2 grid would mis-shape the
         # observations the trained controller expects.
@@ -497,6 +623,16 @@ class SimulationSession:
         # reads it on every decision, so a change applies without a restart.
         self._weather = weather
         self._weather_base.clear()
+        self._vehicle_speed_base.clear()
+        self._weather_speed_factor = 1.0
+        # A GUI run is a different SUMO process, so it is decided at launch: attaching
+        # the viewer to a run already in flight is not possible, and the caller restarts
+        # to get one.
+        self._gui = bool(gui)
+        # A restart keeps the dial unless the caller names a level, so restarting a
+        # run does not silently put the traffic back to its default.
+        if demand_level is not None:
+            self._demand_level = demand_level
         self.pause_event.clear()
         self._run_seq += 1
         run_id = f"live-{scenario}-{self._run_seq}"
@@ -510,6 +646,8 @@ class SimulationSession:
                     "simulationTime": 0,
                     "speed": speed,
                     "weather": weather,
+                    "demandLevel": self._demand_level,
+                    "gui": self._gui,
                     "method": method,
                     "vehicles": [],
                     "pedestrians": [],
@@ -583,7 +721,8 @@ class SimulationSession:
         """Turn rain on or off for the running run.
 
         The change is published immediately and applied to the vehicle types on
-        the next decision, so the map and the metrics agree.
+        the next decision, so the map and the metrics agree. With no run started
+        yet the condition is still remembered and carried into the next start.
         """
         if weather not in WEATHER_EFFECTS:
             raise ValueError(f"unknown weather {weather}")
@@ -593,6 +732,21 @@ class SimulationSession:
             self._apply_weather(conn)
         with self.lock:
             self.state["weather"] = weather
+        return self.snapshot()
+
+    def set_demand_level(self, level: str) -> dict[str, Any]:
+        """Set how heavy the live traffic is, for the running run.
+
+        The level is published immediately and picked up when the run thread builds
+        the next cycle's episode, so the map keeps running: the current window finishes
+        and the next one arrives at the new rate. With no run started yet the level is
+        still remembered and carried into the next start.
+        """
+        if level not in DEMAND_LEVELS:
+            raise ValueError(f"unknown demand level {level}")
+        self._demand_level = level
+        with self.lock:
+            self.state["demandLevel"] = level
         return self.snapshot()
 
     def inject_incident(self, message: str | None = None) -> dict[str, Any]:
@@ -620,6 +774,20 @@ class SimulationSession:
             # on the run thread; this only records the request and shows the report.
             self._pending_incidents.append({"message": message})
             self.state["events"] = list(self._events)
+        return self.snapshot()
+
+    def clear_incident(self) -> dict[str, Any]:
+        """Release the stopped vehicle and retire the current incident.
+
+        The run thread applies the change on its next decision, so the crash is not
+        unpinned from a TraCI call made on the HTTP worker thread.
+        """
+        with self.lock:
+            if self.state.get("status") not in ("running", "paused"):
+                raise ValueError("start a live run before clearing an incident")
+            if not (self.state.get("incident") or {}).get("active"):
+                raise ValueError("no active incident to clear")
+            self._pending_clear_incident = True
         return self.snapshot()
 
     def queue_signal(self, junction: str, green: float) -> dict[str, Any]:
@@ -674,123 +842,686 @@ class SimulationSession:
             )
 
     def _apply_pending_incidents(self, env: CoTrafficEnv, scenario: str) -> None:
-        """Stage an operator report as something the run can show: a stopped car and
-        an ambulance routed to it, so the response is visible in the simulator."""
+        """Stage operator reports on the run thread (the only TraCI caller)."""
+        conn = env.conn
+        self._apply_pending_incident_clear(conn)
         with self.lock:
             pending = list(self._pending_incidents)
             self._pending_incidents.clear()
-        if not pending:
-            return
-        conn = env.conn
-        now = self._time_offset + int(conn.simulation.getTime())
-        clock = str(self.state.get("clock") or "00:00:00")
-        for _request in pending:
+        for request in pending:
             try:
-                crash = self._pick_crash_vehicle(conn)
-                if crash is None:
-                    self._append_event(
-                        "incident", "warning", now, clock,
-                        "No ordinary car to stop — the corridor is empty.",
-                        {"source": "operator"},
-                    )
-                    continue
-                edge = conn.vehicle.getRoadID(crash)
-                x, y = conn.vehicle.getPosition(crash)
-                lng, lat = _project(scenario, x, y)
-                # SUMO rejects a zero max speed, so the crash is pinned at 0 m/s on
-                # every simulated step instead (see _hold_crash_stopped).
-                self._crash_hold = crash
-                conn.vehicle.setSpeed(crash, 0.0)
-                ev_id = self._dispatch_ambulance(conn, edge)
-                incident = {
-                    "vehicleId": crash,
-                    "edge": edge,
-                    "lng": lng,
-                    "lat": lat,
-                    "since": now,
-                    "ambulance": ev_id,
-                    "active": True,
-                }
-                with self.lock:
-                    self.state["incident"] = incident
-                self._append_event(
-                    "incident", "critical", now, clock,
-                    f"Collision: {crash} stopped on {edge}",
-                    {"source": "operator", "vehicleId": crash, "lng": lng, "lat": lat},
-                )
-                if ev_id:
-                    self._append_event(
-                        "evDispatch", "info", now, clock,
-                        f"Ambulance {ev_id} dispatched to {edge}",
-                        {"vehicleId": ev_id, "target": crash, "lng": lng, "lat": lat},
-                    )
+                self._stage_incident(conn, scenario, request.get("message"))
             except Exception as error:
+                now = self._time_offset + int(conn.simulation.getTime())
+                clock = str(self.state.get("clock") or "00:00:00")
                 self._append_event(
-                    "modelError", "warning", now, clock,
+                    "modelError",
+                    "warning",
+                    now,
+                    clock,
                     f"Incident could not be staged: {error}",
                     {"source": "operator"},
                 )
         with self.lock:
             self.state["events"] = list(self._events)
 
-    @staticmethod
-    def _pick_crash_vehicle(conn: Any) -> str | None:
-        """The slowest ordinary car on a real road: the one that reads as the crash."""
-        candidates: list[tuple[float, str]] = []
+    def _apply_pending_incident_clear(self, conn: Any) -> None:
+        """Release the crash and retire the incident on the run thread."""
+        with self.lock:
+            pending = self._pending_clear_incident
+            self._pending_clear_incident = False
+            incident = dict(self.state.get("incident") or {})
+        if not pending:
+            return
+        self._crash_hold = None
+        now = self._time_offset + int(conn.simulation.getTime())
+        clock = f"{now // 3600:02d}:{now % 3600 // 60:02d}:{now % 60:02d}"
+        if not incident:
+            return
+        response = list(incident.get("response") or [])
+        response.append(
+            self._response_action("cleared", "Safety", "Incident cleared", now, clock, "done")
+        )
+        with self.lock:
+            self.state["incident"] = {**incident, "active": False, "cleared": True, "response": response}
+        self._append_event(
+            "incidentCleared",
+            "info",
+            now,
+            clock,
+            "Incident cleared — the corridor is flowing again",
+            {"vehicleId": incident.get("vehicleId")},
+        )
+        with self.lock:
+            self.state["events"] = list(self._events)
+
+    def _stage_incident(self, conn: Any, scenario: str, message: str | None = None) -> None:
+        """Stop a car, reroute traffic around it and send an ambulance to it."""
+        now = self._time_offset + int(conn.simulation.getTime())
+        clock = str(self.state.get("clock") or "00:00:00")
+        crash = self._pick_crash_vehicle(conn)
+        if crash is None:
+            self._append_event(
+                "incident",
+                "warning",
+                now,
+                clock,
+                "No ordinary car to stop — the corridor is empty.",
+                {"source": "operator"},
+            )
+            return
+        edge = str(conn.vehicle.getRoadID(crash) or "")
+        lane = str(conn.vehicle.getLaneID(crash) or "")
+        x, y = conn.vehicle.getPosition(crash)
+        lng, lat = _project(scenario, x, y)
+        try:
+            street = str(conn.edge.getStreetName(edge) or "")
+        except Exception:
+            street = ""
+        # SUMO rejects a zero max speed, so the crash is pinned at 0 m/s on every
+        # simulated step instead (see _hold_crash_stopped).
+        self._crash_hold = crash
+        try:
+            conn.vehicle.setSpeed(crash, 0.0)
+        except Exception:
+            pass
+        blocked = self._lane_polyline(conn, scenario, lane) or self._edge_polyline(
+            conn, scenario, edge
+        )
+        rerouted, diversion = self._reroute_around(conn, scenario, edge, crash)
+        ambulance = self._dispatch_ambulance(conn, scenario, edge, x, y)
+        ev_id = ambulance.get("id") if ambulance else None
+        ev_route = list(ambulance.get("route") or []) if ambulance else []
+        ev_edges = list(ambulance.get("edges") or []) if ambulance else []
+        distance = self._ambulance_distance(conn, ev_id, x, y) if ev_id else None
+        eta = None if distance is None else round(distance / 8.0)
+        reroute_label = (
+            f"Rerouted {len(rerouted)} vehicles around the incident"
+            if rerouted
+            else "No alternate route — holding traffic"
+        )
+        response = [
+            self._response_action(
+                "detection", "Detection", "Collision detected", now, clock, "done",
+                {"vehicleId": crash, "edge": edge, "street": street},
+            ),
+            self._response_action(
+                "blocked", "Safety", f"Lane blocked on {street or edge}", now, clock, "done",
+                {"lane": lane},
+            ),
+            self._response_action(
+                "reroute", "Routing", reroute_label, now, clock, "done",
+                {"count": len(rerouted), "vehicles": rerouted[:8]},
+            ),
+        ]
+        if ev_id:
+            response.append(
+                self._response_action(
+                    "dispatch", "Dispatch", f"Ambulance {ev_id} dispatched", now, clock,
+                    "active", {"etaS": eta, "distanceM": distance},
+                )
+            )
+        else:
+            response.append(
+                self._response_action(
+                    "dispatch", "Dispatch", "No ambulance route available", now, clock, "done"
+                )
+            )
+        incident = {
+            "vehicleId": crash,
+            "edge": edge,
+            "lane": lane,
+            "street": street,
+            "lng": lng,
+            "lat": lat,
+            "x": round(float(x), 2),
+            "y": round(float(y), 2),
+            "since": now,
+            "ambulance": ev_id,
+            "ambulanceRoute": ev_route,
+            "ambulanceRouteEdges": ev_edges,
+            "ambulanceDistanceM": distance,
+            "ambulanceEtaS": eta,
+            # The approach distance at dispatch, so the panel's progress bar is the
+            # share actually covered instead of a bar that fills on a timer.
+            "ambulanceStartM": distance if distance is not None else _polyline_meters(ev_route),
+            "blocked": blocked,
+            "diversion": diversion,
+            "rerouted": rerouted,
+            "reroutedCount": len(rerouted),
+            "response": response,
+            # The map draws the crash as a twitching body, so the pose it twitches
+            # around is pinned here: the vehicle is held at 0 m/s and its heading is
+            # frozen, otherwise SUMO's own step would rotate it under the animation.
+            "angle": round(float(conn.vehicle.getAngle(crash) or 0.0), 2),
+            "length": _vehicle_length(conn, crash),
+            "ambulancePhase": "dispatched" if ev_id else "unavailable",
+            "controller": self._controller_incident_response(conn, scenario, edge, crash),
+            "active": True,
+            "cleared": False,
+        }
+        if message:
+            incident["message"] = message
+        with self.lock:
+            self.state["incident"] = incident
+        self._append_event(
+            "incident", "critical", now, clock,
+            f"Collision: {crash} stopped on {street or edge}",
+            {"source": "operator", "vehicleId": crash, "lng": lng, "lat": lat,
+             "edge": edge, "street": street},
+        )
+        if rerouted:
+            self._append_event(
+                "reroute", "info", now, clock,
+                f"Rerouted {len(rerouted)} vehicles around {street or edge}",
+                {"count": len(rerouted), "vehicles": rerouted[:8], "diversion": diversion},
+            )
+        if ev_id:
+            self._append_event(
+                "evDispatch", "info", now, clock,
+                f"Ambulance {ev_id} dispatched to {street or edge}",
+                {"vehicleId": ev_id, "target": crash, "lng": lng, "lat": lat,
+                 "route": ev_route, "etaS": eta},
+            )
+
+    def _reroute_around(
+        self, conn: Any, scenario: str, edge: str, crash: str
+    ) -> tuple[list[str], list[list[float]]]:
+        """Reroute vehicles whose remaining route crosses the blocked edge."""
+        candidates: list[str] = []
         for vehicle_id in conn.vehicle.getIDList():
+            if vehicle_id == crash:
+                continue
             try:
                 if conn.vehicle.getVehicleClass(vehicle_id) in ("emergency", "bus"):
                     continue
-                road = conn.vehicle.getRoadID(vehicle_id)
-                if not road or road.startswith(":"):
-                    continue
-                candidates.append((float(conn.vehicle.getSpeed(vehicle_id)), vehicle_id))
+                route = list(conn.vehicle.getRoute(vehicle_id))
+                index = max(0, int(conn.vehicle.getRouteIndex(vehicle_id)))
+                # A car already on the blocked edge cannot avoid it; only reroute
+                # traffic that would still enter it.
+                if edge in route[index + 1:]:
+                    candidates.append(vehicle_id)
             except Exception:
                 continue
+        candidates = candidates[:40]
         if not candidates:
-            return None
-        candidates.sort()
-        return candidates[0][1]
+            return [], []
+        rerouted: list[str] = []
+        routes: list[tuple[str, list[str]]] = []
+        try:
+            # A very high effort makes the blocked edge unattractive to SUMO's own
+            # routing, which is used as a fallback when the graph detour fails.
+            conn.edge.setEffort(edge, 1_000_000.0)
+            for vehicle_id in candidates:
+                try:
+                    before = list(conn.vehicle.getRoute(vehicle_id))
+                    index = max(0, int(conn.vehicle.getRouteIndex(vehicle_id)))
+                    current = str(conn.vehicle.getRoadID(vehicle_id) or "")
+                    lane = str(conn.vehicle.getLaneID(vehicle_id) or "")
+                except Exception:
+                    continue
+                # A body on a junction-internal edge cannot have its route replaced.
+                if not current or current.startswith(":"):
+                    continue
+                destination = before[-1] if before else None
+                after: list[str] = []
+                remaining: list[str] = []
+                alternate = self._alternate_route(conn, current, destination, edge)
+                if (
+                    alternate
+                    and self._route_connected(conn, alternate)
+                    and self._lane_can_reach(conn, lane, alternate[1])
+                ):
+                    try:
+                        conn.vehicle.setRoute(vehicle_id, alternate)
+                        after = list(conn.vehicle.getRoute(vehicle_id))
+                        remaining = after
+                    except Exception:
+                        after = []
+                if not after or edge in after:
+                    try:
+                        conn.vehicle.rerouteEffort(vehicle_id)
+                    except Exception:
+                        try:
+                            conn.vehicle.rerouteTraveltime(vehicle_id)
+                        except Exception:
+                            continue
+                    try:
+                        after = list(conn.vehicle.getRoute(vehicle_id))
+                        index = max(0, int(conn.vehicle.getRouteIndex(vehicle_id)))
+                        remaining = after[index:]
+                    except Exception:
+                        continue
+                if before == after or edge in remaining:
+                    continue
+                rerouted.append(vehicle_id)
+                if len(routes) < 5:
+                    routes.append((vehicle_id, remaining))
+        finally:
+            try:
+                conn.edge.setEffort(edge, -1.0)
+            except Exception:
+                pass
+        diversion = self._route_polyline(conn, scenario, routes[0][1]) if routes else []
+        return rerouted, diversion
 
-    def _dispatch_ambulance(self, conn: Any, target_edge: str) -> str | None:
-        """Route an ambulance to the crash from a reachable edge; ``None`` if none is."""
-        edges = [edge for edge in conn.edge.getIDList() if not edge.startswith(":")]
-        if not edges:
+    def _alternate_route(
+        self,
+        conn: Any,
+        current_edge: str | None,
+        destination_edge: str | None,
+        blocked_edge: str,
+    ) -> list[str] | None:
+        """Shortest connected path around the blocked edge, or ``None``."""
+        if not current_edge or not destination_edge:
             return None
-        rng = random.Random(self._run_seq * 1000 + self._event_seq)
-        for origin in rng.sample(edges, min(80, len(edges))):
+        if current_edge == blocked_edge or destination_edge == blocked_edge:
+            return None
+        if current_edge == destination_edge:
+            return None
+        try:
+            start = conn.edge.getToJunction(current_edge)
+            goal = conn.edge.getFromJunction(destination_edge)
+        except Exception:
+            return None
+        if not start or not goal:
+            return None
+        if start == goal:
+            return [current_edge, destination_edge]
+        heap: list[tuple[float, str]] = [(0.0, start)]
+        distances: dict[str, float] = {start: 0.0}
+        previous: dict[str, tuple[str, str]] = {}
+        visited: set[str] = set()
+        while heap:
+            cost, junction = heapq.heappop(heap)
+            if junction in visited:
+                continue
+            visited.add(junction)
+            if junction == goal:
+                break
+            try:
+                outgoing = conn.junction.getOutgoingEdges(junction)
+            except Exception:
+                continue
+            for next_edge in outgoing:
+                if not next_edge or next_edge.startswith(":") or next_edge == blocked_edge:
+                    continue
+                try:
+                    next_junction = conn.edge.getToJunction(next_edge)
+                except Exception:
+                    continue
+                if not next_junction:
+                    continue
+                step = self._edge_cost(conn, next_edge) + 1.0
+                new_cost = cost + step
+                if new_cost >= distances.get(next_junction, float("inf")):
+                    continue
+                distances[next_junction] = new_cost
+                previous[next_junction] = (junction, next_edge)
+                heapq.heappush(heap, (new_cost, next_junction))
+        if goal not in distances:
+            return None
+        reversed_edges: list[str] = []
+        node = goal
+        while node != start:
+            parent, edge = previous.get(node, (None, None))
+            if not parent or not edge:
+                return None
+            reversed_edges.append(edge)
+            node = parent
+        reversed_edges.reverse()
+        return [current_edge, *reversed_edges, destination_edge]
+
+    @staticmethod
+    def _edge_cost(conn: Any, edge: str) -> float:
+        try:
+            length = float(conn.lane.getLength(f"{edge}_0"))
+            speed = float(conn.lane.getMaxSpeed(f"{edge}_0"))
+            return length / max(speed, 1.0)
+        except Exception:
+            return 30.0
+
+    @staticmethod
+    def _route_connected(conn: Any, edges: list[str]) -> bool:
+        for current, following in pairwise(edges):
+            try:
+                if conn.edge.getToJunction(current) != conn.edge.getFromJunction(following):
+                    return False
+            except Exception:
+                return False
+        return True
+
+    @staticmethod
+    def _lane_can_reach(conn: Any, lane: str, edge: str) -> bool:
+        """Whether the vehicle's current lane has a connection to the given edge."""
+        if not lane or not edge:
+            return False
+        try:
+            links = conn.lane.getLinks(lane)
+        except Exception:
+            return False
+        for link in links:
+            successor = str(link[0] or "") if link else ""
+            if not successor:
+                continue
+            if successor.startswith(":"):
+                try:
+                    inner_links = conn.lane.getLinks(successor)
+                except Exception:
+                    continue
+                for inner in inner_links:
+                    inner_lane = str(inner[0] or "") if inner else ""
+                    if inner_lane and not inner_lane.startswith(":") and inner_lane.rsplit("_", 1)[0] == edge:
+                        return True
+            elif successor.rsplit("_", 1)[0] == edge:
+                return True
+        return False
+
+    def _dispatch_ambulance(
+        self, conn: Any, scenario: str, target_edge: str, x: float, y: float
+    ) -> dict[str, Any] | None:
+        """Route an ambulance to the crash from a nearby edge; ``None`` if none is."""
+        origins = self._ambulance_origins(conn, target_edge)
+        best = None
+        for origin in origins[:80]:
             try:
                 route = conn.simulation.findRoute(origin, target_edge)
             except Exception:
                 continue
             if route is None or len(route.edges) < 2:
                 continue
-            self._event_seq += 1
-            route_id = f"ev_route_{self._event_seq}"
-            vehicle_id = f"ev_dispatch_{self._event_seq}"
+            if best is None or len(route.edges) < len(best.edges):
+                best = route
+        if best is None:
+            return None
+        self._event_seq += 1
+        route_id = f"ev_route_{self._event_seq}"
+        vehicle_id = f"ev_dispatch_{self._event_seq}"
+        edges = list(best.edges)
+        try:
+            conn.route.add(route_id, edges)
+            # The ``emergency`` type is in the run's vtypes, so SUMO already knows it.
+            conn.vehicle.add(vehicle_id, route_id, typeID="emergency")
+        except Exception:
+            return None
+        return {
+            "id": vehicle_id,
+            "edges": edges,
+            "route": self._route_polyline(conn, scenario, edges),
+        }
+
+    def _ambulance_origins(self, conn: Any, target_edge: str) -> list[str]:
+        """Prefer edges around the crash so the dispatched ambulance is close."""
+        origins: list[str] = []
+        try:
+            from_junction = conn.edge.getFromJunction(target_edge)
+            to_junction = conn.edge.getToJunction(target_edge)
+        except Exception:
+            from_junction = to_junction = None
+        for junction in (from_junction, to_junction):
+            if not junction:
+                continue
             try:
-                conn.route.add(route_id, list(route.edges))
-                # The ``emergency`` type is in the run's vtypes, so SUMO already knows it.
-                conn.vehicle.add(vehicle_id, route_id, typeID="emergency")
+                origins.extend(conn.junction.getIncomingEdges(junction))
+                origins.extend(conn.junction.getOutgoingEdges(junction))
             except Exception:
                 continue
-            return vehicle_id
-        return None
+        clean = [
+            edge for edge in dict.fromkeys(origins)
+            if edge and not edge.startswith(":") and edge != target_edge
+        ]
+        if clean:
+            return clean
+        edges = [edge for edge in conn.edge.getIDList() if not edge.startswith(":")]
+        if not edges:
+            return []
+        rng = random.Random(self._run_seq * 1000 + self._event_seq)
+        return rng.sample(edges, min(120, len(edges)))
+
+    def _edge_polyline(self, conn: Any, scenario: str, edge: str) -> list[list[float]]:
+        """Projected shape of an edge, taken from its first lane."""
+        if not edge:
+            return []
+        try:
+            lane_count = int(conn.edge.getLaneNumber(edge) or 1)
+        except Exception:
+            lane_count = 1
+        shape = []
+        for index in range(max(1, lane_count)):
+            try:
+                candidate = conn.lane.getShape(f"{edge}_{index}")
+            except Exception:
+                continue
+            if candidate and len(candidate) >= 2:
+                shape = candidate
+                break
+        if not shape:
+            return []
+        return _thin([_project(scenario, px, py) for px, py in shape])
+
+    def _lane_polyline(self, conn: Any, scenario: str, lane: str) -> list[list[float]]:
+        """Projected shape of one lane, used to draw the blocked stretch."""
+        if not lane:
+            return []
+        try:
+            shape = conn.lane.getShape(lane)
+        except Exception:
+            shape = []
+        if not shape:
+            return []
+        return _thin([_project(scenario, px, py) for px, py in shape])
+
+    def _route_polyline(
+        self, conn: Any, scenario: str, edges: list[str]
+    ) -> list[list[float]]:
+        points: list[list[float]] = []
+        for edge in edges:
+            coords = self._edge_polyline(conn, scenario, edge)
+            if not coords:
+                continue
+            if points and coords and points[-1] == coords[0]:
+                coords = coords[1:]
+            points.extend(coords)
+        return _thin(points)
+
+    @staticmethod
+    def _ambulance_distance(
+        conn: Any, vehicle_id: str | None, x: float | None, y: float | None
+    ) -> float | None:
+        if not vehicle_id or x is None or y is None:
+            return None
+        try:
+            value = float(conn.vehicle.getDrivingDistance2D(vehicle_id, x, y))
+        except Exception:
+            return None
+        if value <= 0 or value >= 1_000_000:
+            return None
+        return round(value, 1)
+
+    @staticmethod
+    def _response_action(
+        key: str,
+        agent: str,
+        label: str,
+        at: int,
+        clock: str,
+        status: str = "done",
+        detail: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "key": key,
+            "agent": agent,
+            "label": label,
+            "at": at,
+            "clock": clock,
+            "status": status,
+            "detail": detail or {},
+        }
+
+    def _pick_crash_vehicle(self, conn: Any) -> str | None:
+        """The slowest ordinary car on a busy road: the one that reads as the crash.
+
+        Roads with traffic approaching them are preferred, because those vehicles
+        are the ones the incident can visibly reroute. A road with a usable bypass
+        wins over a busier chokepoint, so the map can show traffic actually diverting.
+        """
+        vehicle_ids = conn.vehicle.getIDList()
+        info: dict[str, tuple[list[str], int, str, str, float]] = {}
+        approaching: dict[str, int] = {}
+        for vehicle_id in vehicle_ids:
+            try:
+                if conn.vehicle.getVehicleClass(vehicle_id) in ("emergency", "bus"):
+                    continue
+                route = list(conn.vehicle.getRoute(vehicle_id))
+                index = max(0, int(conn.vehicle.getRouteIndex(vehicle_id)))
+                road = str(conn.vehicle.getRoadID(vehicle_id) or "")
+                if not road or road.startswith(":"):
+                    continue
+                lane = str(conn.vehicle.getLaneID(vehicle_id) or "")
+                speed = float(conn.vehicle.getSpeed(vehicle_id))
+                info[vehicle_id] = (route, index, road, lane, speed)
+                for edge in set(route[index + 1:]):
+                    approaching[edge] = approaching.get(edge, 0) + 1
+            except Exception:
+                continue
+        if not info:
+            return None
+        roads: dict[str, list[str]] = {}
+        for vehicle_id, (_route, _index, road, _lane, _speed) in info.items():
+            roads.setdefault(road, []).append(vehicle_id)
+        ranked = sorted(roads, key=lambda road: -approaching.get(road, 0))
+        for road in ranked[:8]:
+            if self._has_bypass(conn, road, info, set(roads[road])):
+                return min(roads[road], key=lambda vehicle_id: info[vehicle_id][4])
+        return min(roads[ranked[0]], key=lambda vehicle_id: info[vehicle_id][4])
+
+    def _has_bypass(
+        self,
+        conn: Any,
+        road: str,
+        info: dict[str, tuple[list[str], int, str, str, float]],
+        same_road: set[str],
+    ) -> bool:
+        """Whether at least one approaching vehicle can avoid the given road."""
+        checked = 0
+        for vehicle_id, (route, index, current, lane, _speed) in info.items():
+            if vehicle_id in same_road or road not in route[index + 1:]:
+                continue
+            checked += 1
+            if checked > 8:
+                break
+            alternate = self._alternate_route(conn, current, route[-1], road)
+            if (
+                alternate
+                and self._route_connected(conn, alternate)
+                and self._lane_can_reach(conn, lane, alternate[1])
+            ):
+                return True
+        return False
 
     def _refresh_incident(self, conn: Any) -> None:
-        """Retire the incident once SUMO no longer knows the stopped vehicle."""
+        """Keep the incident's ambulance ETA current and retire it when it clears."""
         with self.lock:
-            incident = self.state.get("incident")
+            incident = dict(self.state.get("incident") or {})
         if not incident or not incident.get("active"):
             return
+        now = self._time_offset + int(conn.simulation.getTime())
+        clock = f"{now // 3600:02d}:{now % 3600 // 60:02d}:{now % 60:02d}"
         try:
             present = incident.get("vehicleId") in conn.vehicle.getIDList()
         except Exception:
             return
         if not present:
             self._crash_hold = None
+            response = list(incident.get("response") or [])
+            response.append(
+                self._response_action("cleared", "Safety", "Incident cleared", now, clock, "done")
+            )
             with self.lock:
-                self.state["incident"] = {**incident, "active": False}
+                self.state["incident"] = {
+                    **incident, "active": False, "cleared": True, "response": response
+                }
+            self._append_event(
+                "incidentCleared",
+                "info",
+                now,
+                clock,
+                "Incident cleared — the corridor is flowing again",
+                {"vehicleId": incident.get("vehicleId")},
+            )
+            with self.lock:
+                self.state["events"] = list(self._events)
+            return
+        ambulance = incident.get("ambulance")
+        if not ambulance:
+            return
+        try:
+            present_ev = ambulance in conn.vehicle.getIDList()
+        except Exception:
+            present_ev = False
+        updated = dict(incident)
+        # The ambulance leaves the network once its route ends, so a missing body after
+        # dispatch means it finished the run — not that the dispatch failed. The old
+        # guard only fired from "dispatched", so a unit that had already been published
+        # as "enroute" stayed enroute forever and the panel froze on a stale ETA.
+        if not present_ev:
+            if incident.get("ambulancePhase") in ("dispatched", "enroute"):
+                updated["ambulancePhase"] = "arrived"
+                updated["ambulanceDistanceM"] = 0
+                updated["ambulanceEtaS"] = 0
+                updated["onScene"] = True
+                response = list(incident.get("response") or [])
+                response = [
+                    {**action, "status": "done"} if action.get("key") == "dispatch" else action
+                    for action in response
+                ]
+                if not any(action.get("key") == "onScene" for action in response):
+                    response.append(
+                        self._response_action(
+                            "onScene", "Dispatch", "Ambulance arrived on scene", now, clock, "done"
+                        )
+                    )
+                updated["response"] = response
+                with self.lock:
+                    self.state["incident"] = updated
+            return
+        distance = self._ambulance_distance(conn, ambulance, incident.get("x"), incident.get("y"))
+        if distance is not None:
+            updated["ambulanceDistanceM"] = distance
+            updated["ambulanceEtaS"] = round(distance / 8.0)
+            updated["ambulancePhase"] = "onScene" if distance <= 25 else "enroute"
+        response = list(incident.get("response") or [])
+        if distance is not None and distance <= 25 and not incident.get("onScene"):
+            updated["onScene"] = True
+            response = [
+                {**action, "status": "done"} if action.get("key") == "dispatch" else action
+                for action in response
+            ]
+            response.append(
+                self._response_action(
+                    "onScene", "Dispatch", "Ambulance on scene", now, clock, "done",
+                    {"distanceM": distance},
+                )
+            )
+            self._append_event(
+                "evOnScene",
+                "info",
+                now,
+                clock,
+                f"Ambulance {ambulance} reached the incident",
+                {"vehicleId": ambulance},
+            )
+            with self.lock:
+                self.state["events"] = list(self._events)
+        updated["response"] = response
+        # The controller's own account of the incident is re-read every refresh: the
+        # policy may have been switched mid-response, and a stale label would credit
+        # the wrong controller for the preemption.
+        updated["controller"] = self._controller_incident_response(
+            conn, "", incident.get("edge") or "", incident.get("vehicleId") or ""
+        )
+        with self.lock:
+            self.state["incident"] = updated
 
     def _hold_crash_stopped(self, conn: Any) -> None:
         """Keep the crashed vehicle at a standstill: SUMO would otherwise drive it on."""
@@ -804,6 +1535,39 @@ class SimulationSession:
                 self._crash_hold = None
         except Exception:
             self._crash_hold = None
+
+    def _controller_incident_response(
+        self, conn: Any, scenario: str, edge: str, crash: str
+    ) -> dict[str, Any]:
+        """What the active control policy did about the crash, in its own words.
+
+        The reroute and the ambulance are staged by this session; the signals are the
+        controller's. Reporting the policy's own preemption here is what makes the
+        difference between policies visible during an incident instead of only in the
+        aggregate metrics.
+        """
+        policy = self.state.get("policy") or {}
+        label = str(policy.get("label") or policy.get("method") or "Controller")
+        preempted: list[str] = []
+        # A junction holding a long green while the ambulance is inbound is the
+        # controller clearing the corridor; it is a measurement, not an inference.
+        for signal in list(self.state.get("signals") or []):
+            try:
+                if float(signal.get("green") or 0) >= 30 and float(signal.get("duration") or 0) >= 30:
+                    preempted.append(str(signal.get("id")))
+            except Exception:
+                continue
+        return {
+            "label": label,
+            "method": policy.get("method"),
+            "preempted": preempted[:6],
+            "preemptedCount": len(preempted),
+            "note": (
+                f"{label} held {len(preempted)} junction(s) open for the response"
+                if preempted
+                else f"{label} is serving the corridor normally"
+            ),
+        }
 
     def junctions(self) -> dict[str, Any]:
         """Per-junction measured values plus their short time series."""
@@ -931,19 +1695,34 @@ class SimulationSession:
         time, and the browser interpolates between them.
         """
         self._hold_crash_stopped(env.conn)
-        self._publish_frame(env, scenario)
+        self._publish_frame(env, scenario, stop_event)
         if self.pause_event.is_set() or stop_event.is_set():
             return
         steps = max(1.0, float(env.delta) / max(float(env.step_length), 1e-6))
         speed = max(float(self.state.get("speed", 1) or 1), 0.25)
         time.sleep(max(0.0, (1.0 / speed) / steps))
 
-    def _publish_frame(self, env: CoTrafficEnv, scenario: str) -> None:
+    def _owns_run(self, stop_event: threading.Event) -> bool:
+        """Whether this thread still runs the session the dashboard is showing.
+
+        A scenario switch sets the new run's scenario and runId, then waits for the old
+        run to release SUMO. Until that old thread exits it was still publishing its own
+        vehicles into the shared state, so the map read "Tunis" with San Francisco
+        bodies (and inherited the retired run's clock offset): the vehicles vanished
+        because they were drawn in the previous network's coordinates.
+        """
+        return self._run_stop is stop_event and not stop_event.is_set()
+
+    def _publish_frame(
+        self, env: CoTrafficEnv, scenario: str, stop_event: threading.Event
+    ) -> None:
         """Publish one simulated sub-step: positions, not new metrics or events.
 
         The map needs the bodies between two decisions; the platform's metrics, events
         and trend stay on the decision cadence so their numbers keep their meaning.
         """
+        if not self._owns_run(stop_event):
+            return
         wall = time.monotonic()
         if wall - self._last_frame_wall < FRAME_MIN_WALL_S:
             return
@@ -968,7 +1747,12 @@ class SimulationSession:
                 }
             )
 
-    def _publish(self, env: CoTrafficEnv, scenario: str) -> None:
+    def _publish(
+        self, env: CoTrafficEnv, scenario: str, stop_event: threading.Event
+    ) -> None:
+        # A retiring run must not overwrite the replacement's frames, metrics or events.
+        if not self._owns_run(stop_event):
+            return
         conn = env.conn
         self._refresh_incident(conn)
         raw_time = int(conn.simulation.getTime())
@@ -1002,6 +1786,7 @@ class SimulationSession:
         self._junction_history.clear()
         self._pending_signals.clear()
         self._pending_incidents.clear()
+        self._pending_clear_incident = False
         self._crash_hold = None
         self._phase_state = {}
         self._phase_changes = 0
@@ -1012,6 +1797,8 @@ class SimulationSession:
         self._arrived_total = 0
         self._departed_total = 0
         self._arrival_log.clear()
+        self._vehicle_speed_base.clear()
+        self._weather_speed_factor = 1.0
 
     def history(self) -> dict[str, Any]:
         """The live run's compact time series, for the dashboard's trend charts."""
@@ -1050,7 +1837,7 @@ class SimulationSession:
         self, checkpoint: Path | None, scenario: str, network: str
     ) -> None:
         """Say which controller/weights this run is actually using."""
-        active = policy.current()
+        active = policy.scenario(network)
         self._append_event(
             "modelLoaded",
             "info",
@@ -1073,8 +1860,117 @@ class SimulationSession:
             return {}
         try:
             return dict(controller.metrics())
-        except Exception:  # noqa: BLE001 - telemetry must never stop the run
+        except Exception:
             return {}
+
+    def _comms(
+        self,
+        env: CoTrafficEnv,
+        scenario: str,
+        signals: list[dict[str, Any]],
+        queued_counts: Counter,
+        now: float,
+    ) -> dict[str, Any]:
+        """The coordination channel between signalised intersections.
+
+        Every decision each intersection sends its downstream neighbours the triple
+        ``[queue, releasing, pressure]`` (``CoTrafficEnv._messages``). ``releasing`` is
+        the poke: the sender's light is green on the link that feeds the neighbour, so
+        the neighbour knows traffic is about to arrive. This publishes that channel as
+        it actually stands, so the map can show who is talking to whom and who is
+        currently handing traffic over.
+        """
+        links = getattr(env, "neighbour_links", {}) or {}
+        intersections = getattr(env, "intersections", {}) or {}
+        geometry = getattr(env, "geometry", {}) or {}
+        if not links:
+            return {
+                "enabled": False,
+                "links": [],
+                "total": 0,
+                "pokes": 0,
+                "greenOnly": 0,
+                "maxQueue": 0,
+            }
+
+        points: dict[str, list[float]] = {}
+        for tls_id, geo in geometry.items():
+            try:
+                points[tls_id] = _project(scenario, float(geo.x), float(geo.y))
+            except Exception:
+                continue
+
+        entries: list[dict[str, Any]] = []
+        pokes = 0
+        green_only = 0
+        max_queue = 0
+        for tls_id, sides in links.items():
+            upstream = intersections.get(tls_id)
+            origin = points.get(tls_id)
+            if upstream is None or origin is None:
+                continue
+            for side, link in sides.items():
+                try:
+                    neighbour_id, in_lanes, link_indices = link
+                except Exception:
+                    continue
+                target = points.get(neighbour_id)
+                if target is None:
+                    continue
+                # The sender's own phase decides the poke: green on the link that
+                # feeds this neighbour is exactly what `releasing` reports.
+                try:
+                    releasing = bool(
+                        not upstream.in_yellow
+                        and bool(upstream.phase_links[upstream.phase] & link_indices)
+                    )
+                except Exception:
+                    releasing = False
+                try:
+                    green_elapsed = round(float(upstream.green_elapsed(now)), 1)
+                except Exception:
+                    green_elapsed = None
+                # `in_lanes` are the sender's own approach lanes feeding this link, so
+                # this is the traffic actually about to be handed over — not the
+                # receiver's queue, and not a count of cars anywhere on the corridor.
+                queue = int(sum(queued_counts.get(lane, 0) for lane in in_lanes))
+                # A green link with nothing behind it is not a hand-off. Counting it as
+                # one made every junction look busy at once, because a green phase feeds
+                # several neighbours simultaneously. A poke now requires traffic to move.
+                handover = bool(releasing and queue > 0)
+                if handover:
+                    pokes += 1
+                    max_queue = max(max_queue, queue)
+                elif releasing:
+                    green_only += 1
+                entries.append(
+                    {
+                        "from": tls_id,
+                        "to": neighbour_id,
+                        "side": side,
+                        "fromPoint": origin,
+                        "toPoint": target,
+                        "releasing": releasing,
+                        "handover": handover,
+                        "queue": queue,
+                        "greenElapsedS": green_elapsed,
+                    }
+                )
+
+        obs_cfg = getattr(env, "obs_cfg", None)
+        return {
+            # Whether the active controller actually reads these messages. Max-Pressure
+            # and the learned policies do; a policy without the neighbour observation
+            # still has the graph, but nothing is being exchanged over it.
+            "enabled": bool(getattr(obs_cfg, "neighbours", False)),
+            "links": entries,
+            "total": len(entries),
+            # `pokes` is hand-offs with traffic behind them; `greenOnly` is the green
+            # links that are carrying nothing, kept so the two are never conflated.
+            "pokes": pokes,
+            "greenOnly": green_only,
+            "maxQueue": max_queue,
+        }
 
     def _metrics(
         self,
@@ -1169,6 +2065,7 @@ class SimulationSession:
             "controllerCalls": self._controller_calls,
             "lastDecisionMs": self._last_decision_ms,
             "junctions": junctions,
+            "comms": self._comms(env, scenario, signals, queued_counts, float(sim_time)),
         }
 
     def _publish_events(
@@ -1263,7 +2160,7 @@ class SimulationSession:
             # The live map draws one shape per vehicle class, so the run also carries the
             # buses and the emergency vehicles, not just cars and pedestrians.
             net_cfg = config.load("networks", network)
-            demand, scale = live_demand(net_cfg)
+            demand, _ = live_demand(net_cfg)
             unsupported = set(net_cfg.get("unsupported_scenarios", []))
             live = ["buses", "emergency"]
             if net_cfg.get("pedestrians", False):
@@ -1279,6 +2176,8 @@ class SimulationSession:
                 "the vehicles disappeared". Each cycle uses its own demand seed.
                 """
                 cycle["n"] += 1
+                # Read the dial per cycle, not once per run: the operator can change it
+                # while the map is running, and the next window picks it up.
                 return evaluation_episode(
                     network,
                     demand,
@@ -1288,7 +2187,7 @@ class SimulationSession:
                     ssm=False,
                     quick=True,
                     protocol=protocol,
-                    scale=scale,
+                    scale=live_demand_scale(net_cfg, self._demand_level),
                 )
 
             env = CoTrafficEnv(
@@ -1303,19 +2202,24 @@ class SimulationSession:
                 ),
                 compute_observations=controller.needs_observations,
                 protocol=protocol,
+                gui=self._gui,
             )
             env.run_id = str(self.state.get("runId") or f"live-{scenario}")
             self._conn = env.conn
             self._weather_base.clear()
+            self._vehicle_speed_base.clear()
+            self._weather_speed_factor = 1.0
             self._record_controller_event(checkpoint, scenario, network)
             while not stop_event.is_set():
                 obs, _ = env.reset()
                 controller.reset(env)
                 with self.lock:
-                    self.state["status"] = "running"
+                    if self._run_stop is stop_event:
+                        self.state["status"] = "running"
                 obs = self._drive_cycle(env, controller, obs, scenario, stop_event)
-                # The next window continues the same run: keep the clock monotonic.
-                if env.episode is not None:
+                # The next window continues the same run: keep the clock monotonic. A
+                # retired run must not push its offset onto the run that replaced it.
+                if env.episode is not None and self._run_stop is stop_event:
                     self._time_offset += int(env.episode.end_time)
             if not stop_event.is_set():
                 with self.lock:
@@ -1356,10 +2260,10 @@ class SimulationSession:
                     if not env.agents or stop_event.is_set():
                         break
                     obs = self._advance(env, controller, obs)
-                self._publish(env, scenario)
+                self._publish(env, scenario, stop_event)
                 continue
             obs = self._advance(env, controller, obs)
-            self._publish(env, scenario)
+            self._publish(env, scenario, stop_event)
             # Wall pacing happens per simulated step in _substep, so the map gets
             # small frames spread across the decision instead of one jump.
         return obs
@@ -1373,30 +2277,58 @@ class SimulationSession:
         clearing the rain restore the network's calibration exactly.
         """
         effect = WEATHER_EFFECTS[self._weather]
+        factor = float(effect["speed_factor"])
+        # Undo the factor the population already carries when recording a base, so a
+        # type or vehicle first seen mid-rain keeps its dry-road value as the base.
+        applied = self._weather_speed_factor or 1.0
         try:
             type_ids = list(conn.vehicletype.getIDList())
         except Exception:
-            return
+            type_ids = []
         for type_id in type_ids:
             base = self._weather_base.get(type_id)
             if base is None:
                 try:
                     base = (
-                        conn.vehicletype.getSpeedFactor(type_id),
+                        conn.vehicletype.getSpeedFactor(type_id) / applied,
                         conn.vehicletype.getTau(type_id),
                     )
                 except Exception:
                     continue
                 self._weather_base[type_id] = base
             try:
-                conn.vehicletype.setSpeedFactor(
-                    type_id, base[0] * float(effect["speed_factor"])
-                )
+                conn.vehicletype.setSpeedFactor(type_id, base[0] * factor)
                 conn.vehicletype.setTau(
                     type_id, base[1] if effect["tau"] is None else float(effect["tau"])
                 )
             except Exception:
                 continue
+        # SUMO copies the type's speedFactor into a vehicle at insertion, so the type
+        # change above only reached the traffic that arrived afterwards: the vehicles
+        # already driving kept their dry-road desired speed and the rain read as doing
+        # nothing. Their own factor (which carries each driver's speedDev) is the base.
+        try:
+            vehicle_ids = list(conn.vehicle.getIDList())
+        except Exception:
+            self._weather_speed_factor = factor
+            return
+        bases = self._vehicle_speed_base
+        for vehicle_id in vehicle_ids:
+            if vehicle_id not in bases:
+                try:
+                    bases[vehicle_id] = float(
+                        conn.vehicle.getSpeedFactor(vehicle_id)
+                    ) / applied
+                except Exception:
+                    continue
+            try:
+                conn.vehicle.setSpeedFactor(vehicle_id, bases[vehicle_id] * factor)
+            except Exception:
+                continue
+        # Vehicles that left must not keep an entry (SUMO reuses ids like car.0).
+        for gone in set(bases) - set(vehicle_ids):
+            bases.pop(gone, None)
+        self._weather_speed_factor = factor
 
     def _advance(self, env: CoTrafficEnv, controller, obs):
         started = time.perf_counter()

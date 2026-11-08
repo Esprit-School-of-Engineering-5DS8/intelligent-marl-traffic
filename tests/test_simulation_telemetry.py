@@ -80,8 +80,13 @@ def test_start_honours_the_requested_network(monkeypatch):
     """The stored policy's network must not decide where the run happens."""
     calls: dict = {}
 
-    def fake_start(scenario, speed=1, method=None, checkpoint=None, weather="clear"):
-        calls.update(scenario=scenario, speed=speed, method=method, weather=weather)
+    def fake_start(
+        scenario, speed=1, method=None, checkpoint=None, weather="clear", demand_level=None, gui=False
+    ):
+        calls.update(
+            scenario=scenario, speed=speed, method=method, weather=weather,
+            demand_level=demand_level, gui=gui,
+        )
         return {"scenario": scenario, "network": "sf_mission_2x2"}
 
     monkeypatch.setattr(
@@ -193,7 +198,7 @@ def test_remaining_green_refuses_a_held_open_phase():
         def __init__(self, next_switch: float) -> None:
             self.next_switch = next_switch
 
-        def getNextSwitch(self, tls_id: str) -> float:  # noqa: N802 - TraCI name
+        def getNextSwitch(self, tls_id: str) -> float:
             return self.next_switch
 
     class _Conn:
@@ -239,6 +244,39 @@ def test_operator_incident_is_published_in_the_snapshot():
     assert event["severity"] == "critical"
     assert event["detail"]["source"] == "operator"
     assert event["t"] == 42
+
+
+def test_clear_incident_requires_an_active_incident():
+    session = SimulationSession()
+    session._reset_telemetry()
+    with session.lock:
+        session.state.update({"status": "running"})
+
+    with pytest.raises(ValueError, match="no active incident"):
+        session.clear_incident()
+
+
+def test_clear_incident_is_applied_by_the_run_thread():
+    session = SimulationSession()
+    session._reset_telemetry()
+    with session.lock:
+        session.state.update(
+            {
+                "status": "running",
+                "incident": {
+                    "vehicleId": "car_1",
+                    "active": True,
+                    "response": [],
+                    "since": 10,
+                },
+            }
+        )
+
+    session.clear_incident()
+
+    assert session._pending_clear_incident is True
+    with session.lock:
+        assert session.state["incident"]["active"] is True
 
 
 def test_history_endpoint_reports_samples():

@@ -246,7 +246,7 @@ class LLMController(Controller):
                 actions,
             )
             return {agent: int(actions[agent]) for agent in agents}
-        except Exception as error:  # noqa: BLE001 - any provider/schema failure must fall back
+        except Exception as error:
             self._metrics["llm_calls"] += 1
             self._metrics["llm_errors"] += 1
             self._metrics["llm_fallbacks"] += 1

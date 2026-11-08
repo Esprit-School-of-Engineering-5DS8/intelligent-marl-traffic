@@ -5,12 +5,10 @@ import {
   X,
   Star,
   Plus,
-  Box,
   Layers,
   Check,
   Tag,
   Dna,
-  Activity,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +25,8 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { SelectControl } from "@/shared/ui/select";
+
+import { openBenchmark } from "@/shared/benchmark-intent";
 
 const METRIC_COLUMNS: { key: string; label: string }[] = [
   { key: "mean_waiting_time", label: "Mean wait (s)" },
@@ -48,7 +48,6 @@ const STATUS_TONE: Record<string, "neutral" | "accent" | "flow" | "jam"> = {
 };
 
 export default function UnifiedModelsRunsPage() {
-  const [activeTab, setActiveTab] = useState<"models" | "runs">("models");
   const modelsQuery = useModelsRegistry();
   const runsQuery = useRunsRegistry();
   const candidatesQuery = useTrainingCandidates();
@@ -66,73 +65,42 @@ export default function UnifiedModelsRunsPage() {
           </p>
         </div>
 
-        {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-surface-2 border border-border rounded-lg self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setActiveTab("models")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeTab === "models"
-                ? "bg-accent text-accent-ink shadow-sm"
-                : "text-text-2 hover:text-text hover:bg-surface-3"
-            }`}
-          >
-            <Box className="w-3.5 h-3.5" />
-            <span>Registered Models</span>
-            {modelsQuery.data && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/15 font-mono">
-                {Object.keys(modelsQuery.data.models).length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("runs")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeTab === "runs"
-                ? "bg-accent text-accent-ink shadow-sm"
-                : "text-text-2 hover:text-text hover:bg-surface-3"
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Experiment Runs Ledger</span>
-            {runsQuery.data && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/15 font-mono">
-                {runsQuery.data.runs.length}
-              </span>
-            )}
-          </button>
-        </div>
       </div>
 
-      {/* Main Content Area */}
-      {activeTab === "models" ? (
-        <div className="flex flex-col gap-6">
-          <QueryState query={modelsQuery} height={400} empty={<NoModels />}>
-            {(data: ModelsRegistry) => {
-              const names = Object.keys(data.models).sort();
-              if (names.length === 0) return <NoModels />;
-              return (
-                <div className="flex flex-col gap-4">
-                  {names.map((name) => (
-                    <ModelCard key={name} name={name} versions={[...data.models[name]].reverse()} />
-                  ))}
-                </div>
-              );
-            }}
-          </QueryState>
-
-          {/* Register uncommitted candidate checkpoints */}
-          <QueryState query={candidatesQuery} height={200}>
-            {(data) => <RegisterCandidate candidates={data.candidates} />}
-          </QueryState>
-        </div>
-      ) : (
-        <QueryState query={runsQuery} height={420}>
-          {(data: RunsRegistry) => <RunsLedgerView registry={data} />}
+      {/* Main Content Area: saved versions and the run ledger are one page, not two tabs. */}
+      <div className="flex flex-col gap-8">
+        <QueryState query={modelsQuery} height={400} empty={<NoModels />}>
+          {(data: ModelsRegistry) => {
+            const names = Object.keys(data.models).sort();
+            if (names.length === 0) return <NoModels />;
+            return (
+              <div className="flex flex-col gap-4">
+                {names.map((name) => (
+                  <ModelCard key={name} name={name} versions={[...data.models[name]].reverse()} />
+                ))}
+              </div>
+            );
+          }}
         </QueryState>
-      )}
+
+        {/* Register uncommitted candidate checkpoints */}
+        <QueryState query={candidatesQuery} height={200}>
+          {(data) => <RegisterCandidate candidates={data.candidates} />}
+        </QueryState>
+
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-text">Experiment Runs Ledger</h2>
+            <p className="text-xs text-text-2">
+              Training and evaluation runs the dashboard knows about. Tick rows to send them to the
+              Compare tab.
+            </p>
+          </div>
+          <QueryState query={runsQuery} height={320}>
+            {(data: RunsRegistry) => <RunsLedgerView registry={data} />}
+          </QueryState>
+        </section>
+      </div>
     </div>
   );
 }
@@ -170,6 +138,9 @@ function ModelCard({ name, versions }: { name: string; versions: ModelRow[] }) {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["models-registry"] });
     void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // Deleting a version changes what the live policy and the ledger can offer.
+    void queryClient.invalidateQueries({ queryKey: ["training-candidates"] });
+    void queryClient.invalidateQueries({ queryKey: ["model-catalog"] });
   };
 
   const promoteVersion = useMutation({
@@ -251,6 +222,21 @@ function ModelCard({ name, versions }: { name: string; versions: ModelRow[] }) {
                       size="sm"
                       variant="outline"
                       className="text-xs h-7"
+                      disabled={entry.available === false}
+                      onClick={() =>
+                        openBenchmark({
+                          tab: "compare",
+                          model: `model:${name}@v${entry.version}`,
+                          network: entry.network ?? undefined,
+                        })
+                      }
+                    >
+                      Benchmark
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7"
                       disabled={promoteVersion.isPending || entry.available === false}
                       onClick={() => promoteVersion.mutate(entry.version)}
                     >
@@ -292,13 +278,13 @@ function RegisterCandidate({ candidates }: { candidates: any[] }) {
   const queryClient = useQueryClient();
 
   const register = useMutation({
-    mutationFn: (runId: string) =>
+    mutationFn: (candidateId: string) =>
       api(
-        `models/register/${encodeURIComponent(targetName.trim())}`,
-        z.object({ name: z.string(), version: ModelVersion }),
+        "models/register-candidate",
+        z.object({ model: z.string(), version: ModelVersion }),
         {
           method: "POST",
-          body: JSON.stringify({ runId }),
+          body: JSON.stringify({ candidate_id: candidateId, name: targetName.trim() }),
         }
       ),
     onSuccess: () => {
@@ -323,12 +309,40 @@ function RegisterCandidate({ candidates }: { candidates: any[] }) {
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <input
-            className="input-control w-72 text-xs"
-            placeholder="Assign model name (e.g. SF-Mission-PPO)..."
+            className="input-control w-80 text-xs"
+            placeholder="Model name (e.g. sf-mission-3x3-ppo)"
             value={targetName}
             onChange={(e) => setTargetName(e.target.value)}
           />
         </div>
+        {register.isError ? (
+          <p role="alert" className="text-xs text-jam">
+            {register.error instanceof Error ? register.error.message : "Could not register the checkpoint."}
+          </p>
+        ) : null}
+        {register.data ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-flow/40 bg-flow-soft/40 p-2.5 text-xs">
+            <span className="text-text">
+              Registered <span className="font-semibold">{register.data.model}</span> v
+              {register.data.version.version}
+              {register.data.version.network ? ` · ${register.data.version.network}` : ""}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-7"
+              onClick={() =>
+                openBenchmark({
+                  tab: "compare",
+                  model: `model:${register.data.model}@v${register.data.version.version}`,
+                  network: register.data.version.network ?? undefined,
+                })
+              }
+            >
+              Benchmark it
+            </Button>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2">
           {candidates.map((cand) => (
             <div
@@ -339,15 +353,20 @@ function RegisterCandidate({ candidates }: { candidates: any[] }) {
                 <span className="font-semibold text-text">{cand.label || cand.id}</span>
                 <span className="text-muted font-mono">{cand.network}</span>
                 <span className="text-muted">seed {cand.seed}</span>
+                {cand.registeredAs ? (
+                  <Badge tone="flow" className="flex items-center gap-1">
+                    <Check className="size-3" /> {cand.registeredAs}
+                  </Badge>
+                ) : null}
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-xs h-7 text-accent border-accent/40 hover:bg-accent/10"
-                disabled={!targetName.trim() || register.isPending}
+                disabled={!targetName.trim() || register.isPending || Boolean(cand.registeredAs)}
                 onClick={() => register.mutate(cand.id)}
               >
-                Register as Model
+                {cand.registeredAs ? "Already registered" : "Register as Model"}
               </Button>
             </div>
           ))}
@@ -360,6 +379,13 @@ function RegisterCandidate({ candidates }: { candidates: any[] }) {
 // ==========================================
 // RUNS LEDGER VIEW COMPONENTS
 // ==========================================
+
+/** A run's metrics live under ``run.metrics`` in the export; older rows had them at the top level. */
+function metricValue(run: RegistryRun, key: string): string {
+  const metrics = run.metrics as Record<string, unknown> | undefined;
+  const raw = metrics?.[key] ?? (run as unknown as Record<string, unknown>)[key];
+  return typeof raw === "number" ? raw.toFixed(2) : "—";
+}
 
 function RunsLedgerView({ registry }: { registry: RunsRegistry }) {
   const [query, setQuery] = useState("");
@@ -378,7 +404,7 @@ function RunsLedgerView({ registry }: { registry: RunsRegistry }) {
     },
     onSuccess: () => {
       setOpenRun(null);
-      void queryClient.invalidateQueries({ queryKey: ["data", "live", "runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["data"] });
     },
   });
 
@@ -436,7 +462,8 @@ function RunsLedgerView({ registry }: { registry: RunsRegistry }) {
           <button
             type="button"
             onClick={() => {
-              document.querySelector('#benchmarkSubnav [data-benchmark-tab="compare"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              // Ask the shell to switch tabs instead of faking a click on its DOM.
+              window.dispatchEvent(new CustomEvent("benchmark:navigate", { detail: "compare" }));
             }}
             className="px-3 py-1.5 rounded-md bg-accent text-accent-ink text-xs font-semibold shadow-sm flex items-center gap-1.5"
           >
@@ -501,9 +528,7 @@ function RunsLedgerView({ registry }: { registry: RunsRegistry }) {
                   <td className="px-3 py-2.5 text-right font-mono">{run.episodes ?? "—"}</td>
                   {activeColumns.map((col) => (
                     <td key={col.key} className="px-3 py-2.5 text-right font-mono text-text">
-                      {typeof (run as any)[col.key] === "number"
-                        ? (run as any)[col.key].toFixed(2)
-                        : "—"}
+                      {metricValue(run, col.key)}
                     </td>
                   ))}
                   <td className="px-3 py-2.5">

@@ -26,7 +26,6 @@ LATEX, LONEX = 6371000.0, 6371000.0  # scale factors (meters -> degrees approx o
 
 def sumo_to_wgs84(x: float, y: float, netOffset) -> tuple[float, float]:
     """SUMO coordinates are (utm_offset applied); adding the netOffset restores UTM."""
-    import pyproj
 
     utm_x, utm_y = x - netOffset[0], y - netOffset[1]
     transformer = _transformer()

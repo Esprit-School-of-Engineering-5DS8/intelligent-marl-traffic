@@ -10,10 +10,10 @@ from cotraffic import config
 from cotraffic.assistant.llm import LLMUnavailableError
 from cotraffic.controllers.base import Controller
 from cotraffic.controllers.classical import MaxPressure
+from cotraffic.controllers.llm_team.agent import load_system_prompt
 from cotraffic.controllers.llm_team.arbiter import Arbiter
 from cotraffic.controllers.llm_team.blackboard import Blackboard
 from cotraffic.controllers.llm_team.client import CallLogger, make_team_client
-from cotraffic.controllers.llm_team.agent import load_system_prompt
 from cotraffic.controllers.llm_team.detector import QueueAlertDetector
 from cotraffic.controllers.llm_team.directive_layer import DirectiveLayer
 from cotraffic.controllers.llm_team.roles.emergency import EmergencyAgent
@@ -26,7 +26,6 @@ from cotraffic.controllers.llm_team.snapshot import (
     build_states,
 )
 from cotraffic.controllers.llm_team.supervisor import Supervisor, SupervisorConfig
-
 
 PERSONA_OBJECTIVES = {
     "arterial_throughput": (
@@ -291,7 +290,7 @@ class LLMTeamController(Controller):
                 self.preemptions += sum(
                     1 for directive in result.accepted if directive.type == "preempt"
                 )
-        except Exception as error:  # noqa: BLE001 - the team must degrade, not crash
+        except Exception as error:
             self._metrics["llm_team_last_error"] = f"{type(error).__name__}: {error}"[:200]
             self._metrics["llm_team_fallbacks"] = (
                 self._metrics.get("llm_team_fallbacks", 0) + 1
